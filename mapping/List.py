@@ -67,8 +67,8 @@ customer_mapping_dict = {
     "created_at": [
         "created_at", "createdOn", "createdDate", "created",
         "creation_date", "creation_timestamp", "record_created",
-        "inserted_at", "insert_date", "entry_date",
-        "row_created_at", "added_on", "time_created"
+        "inserted_at", "insert_date", "entry_date","created_timestamp","created_at_timestamp",                 
+        "row_created_at", "added_on", "time_created","record_created_at"
     ]
 }
 
@@ -127,11 +127,11 @@ mapping_dict_addresses = {
         "preferred_address"
     ],
 
-    "created_at": [
+     "created_at": [
         "created_at", "createdOn", "createdDate", "created",
         "creation_date", "creation_timestamp", "record_created",
-        "inserted_at", "insert_date", "entry_date",
-        "row_created_at", "added_on", "time_created"
+        "inserted_at", "insert_date", "entry_date","created_timestamp","created_at_timestamp",                 
+        "row_created_at", "added_on", "time_created","record_created_at"
     ]
 }
 
@@ -222,12 +222,11 @@ mapping_dict_products = {
         "ratings_count", "feedback_count"
     ],
 
-    "created_at": [
-        "created_at", "createdOn", "createdDate",
-        "creation_date", "creation_timestamp",
-        "record_created", "inserted_at",
-        "entry_date", "row_created_at",
-        "added_on", "time_created"
+      "created_at": [
+        "created_at", "createdOn", "createdDate", "created",
+        "creation_date", "creation_timestamp", "record_created",
+        "inserted_at", "insert_date", "entry_date","created_timestamp","created_at_timestamp",                 
+        "row_created_at", "added_on", "time_created","record_created_at"
     ]
 }
 
@@ -262,12 +261,11 @@ mapping_dict_categories = {
         "category_active", "cat_active"
     ],
 
-    "created_at": [
-        "created_at", "createdOn", "createdDate",
-        "creation_date", "creation_timestamp",
-        "record_created", "inserted_at",
-        "entry_date", "row_created_at",
-        "added_on", "time_created"
+      "created_at": [
+        "created_at", "createdOn", "createdDate", "created",
+        "creation_date", "creation_timestamp", "record_created",
+        "inserted_at", "insert_date", "entry_date",
+        "row_created_at", "added_on", "time_created","record_created_at"
     ]
 }
 '''wishlist related mapping '''
@@ -318,6 +316,7 @@ mapping_dict_wishlist = {
         "unwish_date"
     ]
 }
+
 '''cart related mapping '''
 
 mapping_dict_shopping_cart = {
@@ -480,10 +479,11 @@ mapping_dict_orders = {
         "drop_date", "completed_date"
     ],
 
-    "created_at": [
-        "created_at", "creation_date", "created_date",
-        "createdOn", "inserted_at", "entry_date",
-        "added_date", "record_created", "timestamp_created"
+      "created_at": [
+        "created_at", "createdOn", "createdDate", "created",
+        "creation_date", "creation_timestamp", "record_created",
+        "inserted_at", "insert_date", "entry_date","created_timestamp","created_at_timestamp",                 
+        "row_created_at", "added_on", "time_created","record_created_at"
     ]
 }
 
@@ -628,10 +628,11 @@ mapping_dict_payments = {
         "reimbursed_date", "credit_date"
     ],
 
-    "created_at": [
-        "created_at", "creation_date", "created_date",
-        "createdOn", "inserted_at", "entry_date",
-        "added_date", "record_created", "timestamp_created"
+     "created_at": [
+        "created_at", "createdOn", "createdDate", "created",
+        "creation_date", "creation_timestamp", "record_created",
+        "inserted_at", "insert_date", "entry_date","created_timestamp","created_at_timestamp",                 
+        "row_created_at", "added_on", "time_created","record_created_at"
     ]
 }
 
@@ -696,9 +697,10 @@ mapping_dict_inventory = {
     ],
 
     "created_at": [
-        "created_at", "creation_date", "created_date",
-        "createdOn", "inserted_at", "entry_date",
-        "added_date", "record_created", "timestamp_created"
+        "created_at", "createdOn", "createdDate", "created",
+        "creation_date", "creation_timestamp", "record_created",
+        "inserted_at", "insert_date", "entry_date","created_timestamp","created_at_timestamp",                 
+        "row_created_at", "added_on", "time_created","record_created_at"
     ]
 }
 
@@ -832,9 +834,10 @@ mapping_dict_marketing_campaigns = {
     ],
 
     "created_at": [
-        "created_at", "created", "timestamp", "created_date",
-        "record_date", "inserted_at", "added_date",
-        "campaign_created", "createdOn", "entry_date"
+        "created_at", "createdOn", "createdDate", "created",
+        "creation_date", "creation_timestamp", "record_created",
+        "inserted_at", "insert_date", "entry_date","created_timestamp","created_at_timestamp",                 
+        "row_created_at", "added_on", "time_created","record_created_at"
     ]
 }
 
