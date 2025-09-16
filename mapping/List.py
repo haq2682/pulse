@@ -20,7 +20,7 @@ customer_mapping_dict = {
         "customer_type", "cust_type", "type", "ctype",
         "customerType", "CustomerType", "client_type",
         "account_type", "user_type", "membership_type",
-        "category", "segment_type"
+        "category", "segment_type","customer_category"
     ],
 
     "gender": [
@@ -61,17 +61,17 @@ customer_mapping_dict = {
         "customer_segment", "segment", "cust_segment",
         "customerSegment", "CustomerSegment", "client_segment",
         "user_segment", "market_segment", "category_segment",
-        "tier", "customer_group", "membership_segment"
+        "tier", "customer_group", "membership_segment","customer_tier"
     ],
 
-    "created_at": [
+     "created_at": [
         "created_at", "createdOn", "createdDate", "created",
         "creation_date", "creation_timestamp", "record_created",
         "inserted_at", "insert_date", "entry_date","created_timestamp","created_at_timestamp",                 
-        "row_created_at", "added_on", "time_created","record_created_at"
+        "row_created_at", "added_on", "time_created","record_created_at","date_added",
+        "date_created","time_stamp","timestamp_created","date_created_at","created_time"
     ]
 }
-
 ''' adddress related mapping '''
 mapping_dict_addresses = {
     "address_id": [
