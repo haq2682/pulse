@@ -1,4 +1,3 @@
-''' customer related mapping '''
 customer_mapping_dict = {
     "customer_id": [
         "customer_id", "cust_id", "c_id", "id", "custid",
@@ -72,6 +71,7 @@ customer_mapping_dict = {
         "date_created","time_stamp","timestamp_created","date_created_at","created_time"
     ]
 }
+
 ''' adddress related mapping '''
 mapping_dict_addresses = {
     "address_id": [
