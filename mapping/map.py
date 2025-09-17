@@ -73,13 +73,13 @@ customer_mapping_dict = {
     ]
 }
 def normalize_dataframe(df: pd.DataFrame, column_variants: dict):
-    # 1. Create reverse lookup map: variant -> standard
+    
     variant_to_standard = {}
     for std_col, variants in column_variants.items():
         for v in variants:
             variant_to_standard[v.lower()] = std_col
     print(variant_to_standard)
-    # 2. Rename incoming columns
+
     mapped_cols = {}
     new_columns = []
     for col in df.columns:
@@ -89,24 +89,24 @@ def normalize_dataframe(df: pd.DataFrame, column_variants: dict):
             new_columns.append(std_col)
             mapped_cols[col] = std_col
         else:
-            new_columns.append(col)  # keep as-is if extra
+            new_columns.append(col) 
 
     df.columns = new_columns
 
-    # 3. Add missing schema columns
+    
     missing_cols = []
     for std_col in column_variants.keys():
         if std_col not in df.columns:
             df[std_col] = pd.NA
             missing_cols.append(std_col)
 
-    # 4. Reorder: schema first, then extras
+    
     schema_cols = list(column_variants.keys())
     extra_cols = [c for c in df.columns if c not in schema_cols]
     new_df =  df[schema_cols]
     df_extra = df[schema_cols + extra_cols]
 
-    # 5. Create report
+    
     return new_df,df_extra, extra_cols, missing_cols, mapped_cols
 
 df = pd.read_excel(r"D:\VS CODE\pulse\dataset\messy_customer_data.xlsx")  
