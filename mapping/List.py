@@ -181,6 +181,10 @@ mapping_dict_addresses = {
     "customer_id": [
         "customer_id",
         "cust_id",
+        "customer_ref",
+        "customer_reference",
+        "CustomerRef",
+        "cust_ref",
         "c_id",
         "id",
         "customerId",
