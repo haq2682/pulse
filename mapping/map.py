@@ -32,7 +32,7 @@ from utils.helpers import (
 load_dotenv(find_dotenv())
 
 minio_client = Minio(
-    "localhost:9100",
+    "localhost:9000",
     access_key="minioadmin",
     secret_key="minioadmin",
     secure=False,
@@ -42,7 +42,7 @@ bucket_name = "pulse-bucket-1"
 
 spark = (
     SparkSession.builder.appName("NormalizeData")
-    .config("spark.hadoop.fs.s3a.endpoint", "http://localhost:9100")
+    .config("spark.hadoop.fs.s3a.endpoint", "http://localhost:9000")
     .config("spark.hadoop.fs.s3a.access.key", "minioadmin")
     .config("spark.hadoop.fs.s3a.secret.key", "minioadmin")
     .config("spark.hadoop.fs.s3a.path.style.access", "true")
@@ -306,7 +306,7 @@ def save_dataframes_to_minio(results, client, bucket_name):
         secure=False,
     )
 
-    bucket_name = "mapped"
+    # bucket_name = "mapped"
 
     if not client.bucket_exists(bucket_name):
         client.make_bucket(bucket_name)
@@ -329,7 +329,7 @@ def save_dataframes_to_minio(results, client, bucket_name):
         csv_buffer.seek(0)
 
         # Upload to MinIO
-        file_name = table_name
+        file_name = "mapped_" + table_name + ".csv"
         minio_client.put_object(
             bucket_name,
             file_name,
@@ -366,7 +366,9 @@ if __name__ == "__main__":
     conn.close()
 
     results = process_all_dataframes(all_dataframes, columns_info, mapping_list)
+    save_dataframes_to_minio(results, minio_client, bucket_name)
 
     print("\n" + "=" * 50)
     print("Processing complete!")
     print(f"Total tables processed: {len(results)}")
+    spark.stop()

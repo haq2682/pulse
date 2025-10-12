@@ -70,15 +70,15 @@ def gpt_schema_mapping(df, missing_cols, extra_cols, mapped_cols):
         missing_cols = model_mapping["remaining_missing_cols"]
         extra_cols = model_mapping["remaining_extra_cols"]
 
-        # Rename + drop + add cols in df
-        for schema_col, df_col in model_mapping["mapped_cols"].items():
-            df = df.withColumnRenamed(df_col, schema_col)
-        df = df.drop(*extra_cols)
-        for col in missing_cols:
-            df = df.withColumn(col, lit(None))
-
     except Exception as e:
         print("Error parsing model output:", e)
-        model_mapping = {}
+        model_mapping = {"mapped_cols": mapped_cols}
+
+    # Rename + drop + add cols in df
+    for schema_col, df_col in model_mapping["mapped_cols"].items():
+        df = df.withColumnRenamed(df_col, schema_col)
+    df = df.drop(*extra_cols)
+    for col in missing_cols:
+        df = df.withColumn(col, lit(None))
 
     return df, missing_cols, extra_cols, mapped_cols
