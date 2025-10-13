@@ -1,0 +1,1036 @@
+product_id,product_name,sku,category_id,category,sub_category,brand,supplier_id,cost_price,sell_price,launch_date,weight,dimensions,color,size,material
+1369,Under Armour Smartphone Home,UN-SP0369-RED,CAT_500,Electronics,Wearables,Brooks,SUPP_10411,365.36,860.19,2024-11-28 00:00:00,0.128,16x6x1.4,White,"17""""",  Glass  
+1078,Amazon Charger Professional,AM-CL0078-GOL,CAT_654,Photography,Miscellaneous,JBL,SUPP_10041,32.2,44.38,2025-08-06 00:00:00,3.397,65x71x63,Gray,One Size,Wood
+1299,Canon Smartwatch,CA-SP0299-GRE,CAT_658,Electronics,Wearables,Lenovo,SUPP_10378,295.62,603.48,2021-08-27 00:00:00,0.886,40x18x15,  Space Gray  ,Large,Plastic
+1890,LG Running Shoes Max,LG-SP0890-BRO,CAT_605,Footwear,Running,NIKON,SUPP_10329,193.78,377.32,2021-06-02 00:00:00,  0.976  ,29x19x15,Blue,12,Mesh
+1821,Amazon Cable Basic,AM-AC0821-BLA,CAT_642,Audio,General,Puma,SUPP_10624,117.02,150.89,2023-02-10 00:00:00,7.088,75x43x29,Navy,Large,Metal
+1931,JBL Training Shoes Ultra,JB-HM0931-SIL,CAT_592,Footwear,Casual,hp,SUPP_10882,392.27,916.88,2024-03-24 00:00:00,1.158,26x19x13,White,41,Synthetic
+1862,JBL Casual Shoes Office,JB-HM0862-BEI,CAT_649,Footwear,Casual,Nikon,SUPP_10174,284.91,666.66,  2024-07-30  ,1.271,32x17x15,Black/White,42,Canvas
+1542,Microsoft Smartwatch Elite,MI-CL0542-WHI,CAT_691,Electronics,Wearables,New Balance,SUPP_10049,  399.16  ,987.28,2024-01-30 00:00:00,0.564,50x12x30,  Silver  ,"15.6""""",Carbon Fiber
+1053,Google T-Shirt Essential,GO-HM0053-BLU,CAT_513,Apparel,Pants,Dell,SUPP_10772,312.74,649.3,2022-09-07 00:00:00,  0.617  ,89x59x67,Beige,XXXL,Linen
+1034,JBL Screen Protector Plus,JB-CL0034-BRO,CAT_662,Fashion,Miscellaneous,Apple,SUPP_10481,180.5,294.81,2022-02-15,6.734,25x47x57,Turquoise,Large,Synthetic
+1539,BOSE RUNNING SHOES BASIC,BO-SP0539-NAV,CAT_659,Footwear,Casual,Nike,SUPP_10802,22.66,28.03,2025-09-18 00:00:00,0.812,27x18x10,  Gray  ,12,Nylon
+1252,Panasonic Training Shoes,PA-SP0252-YEL,CAT_647,Footwear,  Running  ,JBL,SUPP_10724,470.56,864.83,  2022-04-08  ,0.767,26x19x11,Black,12,Suede
+1554,Sony T-Shirt Sport,SO-CL0554-YEL,CAT_526,Apparel,Jackets,Under Armour,SUPP_10583,  485.67  ,787.26,2024-05-30 00:00:00,0.527,10x36x75,Gray,XL,Cotton
+1581,Google Backpack,GO-AC0581-YEL,CAT_599,Electronics,Tablets,Brooks,SUPP_10384,174.46,391.5,2022-07-18 00:00:00,8.551,59x57x95,Purple,Medium,Fabric
+1773,Adidas Monitor Essential,AD-HM0773-GRE,CAT_683,  Electronics  ,Tablets,Google,SUPP_10953,275.55,400.6,2023-04-04 00:00:00,1.866,21x30x30,Silver,"27""""",Magnesium Alloy
+1480,,xx-sp0480-bro#,,Gaming,,Amazon,,,262.45,,,59x19x27,,Extra Large,
+1734,Canon Smartwatch,CA-AC0734-WHI,CAT_631,ELECTRONICS,Wearables,Reebok,SUPP_10864,94.05,123.74,2021-05-01 00:00:00,0.747,20x11x25,White,"14""""",Steel
+1256,Bose Case Max,BO-EL0256-GOL,CAT_609,Home & Office,Other,ASICS,SUPP_10411,168.88,416.9,2022-12-15 00:00:00,5.802,22x46x32,White,One Size,  Composite  
+1167,ASICS Smartphone Sport,AS-AC0167-PUR,CAT_641,Electronics,Computers,Nike,SUPP_10761,133.16,267.22,2022-07-18 00:00:00,0.256,18x9x1.3,White,Standard,steel
+1168,JBL Headphones Sport,JB-SP0168-MIN,CAT_567,Electronics,mobile,Dell,SUPP_10598,424.55,512.58,2025-08-24 00:00:00,0.193,13x6x0.7,White,Standard,Aluminum
+1578,Reebok Screen Protector Plus,RE-CL0578-RED,CAT_669,Apparel,Sportswear,Samsung,SUPP_10773,29.3,68.69,2024-11-01 00:00:00,4.781,66x26x7,Orange,Extra Large,Wood
+1836,Lenovo Camera,  LE-EL0836-SIL  ,CAT_538,Footwear,Basketball,Apple,SUPP_10381,377.1,703.2,  2022-07-04  ,9.126,19x96x52,Mint,  Medium  ,Metal
+1982,Lenovo Charger Basic,LE-CL0982-WHI,CAT_534,ACCESSORIES,Belts,Nike,SUPP_10589,  56.02  ,117.38,2021-12-14 00:00:00,0.101,59x83x29,Green,Medium,Wood
+1155,Brooks Headphones Sport,BR-EL0155-MIN,CAT_564,Electronics,Wearables,Brooks,SUPP_10156,110.69,231.5,2020-10-16 00:00:00,0.102,15x6x1.2,White,Standard,Steel
+1875,Microsoft Tablet™ #875,,CAT_667,,Mobile,,SUPP_10883,436.25,,2025-07-02 00:00:00,4.525,,Gold,,Aluminum
+1440,Nikon Camera Advanced,SKU-440!@#,CAT_9999,,,Generic,,,0,2024-01-10,,x49x40,,Medium (M),
+1535,Reebok Case Pro,RE-CL0535-MIN,CAT_589,  Footwear  ,Casual,Amazon,supp_10950,122.75,180.62,  2023-09-16  ,3.099,59x39x34,Gold,Large,Mixed Materials
+1325,Saucony Training Shoes Home,,CAT_542,,Running,,SUPP_10585,318.75,,2021-12-05 00:00:00,1.203,,Blue,,Rubber
+1295,Apple Basketball Shoes,AP-CL0295-BEI,CAT_661,Footwear,Casual,Mizuno,SUPP_10659,209.08,260.11,2024-11-20 00:00:00,1.326,32x18x15,Red,11,Suede
+  1035  ,Nike Charger™ #35,UN-AC0031-BEI,CAT_605,Electronics,Mobile,Nike Inc.,SUPP_10637,380.66,  TBD  ,2024-03-13 00:00:00,4.476,Large,Gold,Standard,Wood
+1701,Reebok Backpack Classic,RE-CL0701-MIN,CAT_696,Outdoor,General,Nike,SUPP_10956,311.64,485.34,2024-07-15 00:00:00,7.824,83x13x97,Beige,Extra Large,Wood
+1171,Reebok Charger,RE-EL0171-GOL,CAT_671,Outdoor,GENERAL,ASICS,SUPP_10434,419.48,615.48,2025-03-08 00:00:00,8.305,99x60x87,Blue,medium,Mixed Materials
+1086,Samsung Camera Classic,SA-SP0086-GRE,  CAT_501  ,Sports,accessories,Lenovo,SUPP_10457,  379.34  ,925.68,2021-02-16 00:00:00,3.089,97x78x6,Navy,  Large  ,Synthetic
+1986,Sony Jacket Pro,SO-AC0986-SIL,CAT_503,Apparel,Shirts,Lenovo,SUPP_10723,208.37,468.06,2024-03-28 00:00:00,1.358,  50x86x56  ,Navy,XXXL,Polyester
+1820,  Apple Smartwatch Max  ,ap-hm0820-whi,CAT_507,Electronics,,Sony,,,899.29,2022-07-31 00:00:00,,32x16x9,,"14""""",
+1101,  Panasonic Smartwatch Advanced  ,PA-EL0101-COR,CAT_690,Electronics,Tablets,Adidas,SUPP_10100,  224.17  ,513.41,2024-10-11 00:00:00,2.033,49x48x17,White,"13""""",Magnesium Alloy
+1892,Dell Basketball Shoes Classic,DE-EL0892-BLA,CAT_575,footwear,Running,  Dell  ,SUPP_10634,56.4,124.25,2023-07-26 00:00:00,1.436,33x20x12,Black,41,Leather
+1873,Nikon Training Shoes Pro,NI-AC0873-MIN,CAT_643,Footwear,RUNNING,Samsung,SUPP_10775,198.04,451.87,2023-04-09 00:00:00,0.552,25x16x12,White,42,Rubber
+1020,Nikon Speaker Essential,ni-sp0020-bei,CAT_656,Fashion,,Saucony,,,894.18,2024-12-03 00:00:00,,59x75x62,,Medium,
+1977,LG Laptop,LG-CL0977-BLA,CAT_517,Electronics,Wearables,Lenovo,SUPP_10695,365.66,890.92,2024-11-28 00:00:00,2.173,31x25x2,Black,"24""""",STEEL
+1119,Saucony Running Shoes Ultra,SA-AC0119-BEI,CAT_555,Footwear,Running,Samsung,SUPP_10143,378.7,744.69,2021-01-09 00:00:00,0.699,31x17x11,White,10,Suede
+1914,Microsoft Speaker Premium,MI-AC0914-GRE,CAT_545,  Electronics  ,Tablets,Mizuno,SUPP_10379,390.94,601.12,2021-09-23 00:00:00,3.534,8x92x72,Gray,Extra Large,Composite
+1872,Adidas Monitor Plus,AD-HM0872-BLA%,CAT_645,Electronics,Mobile,Dell,SUPP_10517,272.92,631.99,  2023-04-08  ,4.723,42x39x29,White,"24""""",Glass
+1218,HP Speaker Premium,HP-EL0218-WHI,CAT_563,Equipment,  Other  ,Google,SUPP_10341,250.07,542.08,2025-09-11 00:00:00,0.282,92x50x50,Pink,Medium,Wood
+,,,, , , ,,,  NULL  ,,,,,    ,
+1555,Google Basketball Shoes Home,GO-HM0555-TUR,cat_612,Footwear,Formal,Reebok,SUPP_10564,499.2,723.8,2023-01-24 00:00:00,0.442,33x19x13,Black/White,42,Mesh
+1485,Microsoft Screen Protector Sport,MI-SP0485-BRO,CAT_523,Accessories,Jewelry,Reebok,SUPP_10285,246.84,587.47,2024-06-09 00:00:00,5.379,  36x53x7  ,Turquoise,EXTRA LARGE,Fabric
+1444,LG Casual Shoes,LG-EL0444-TUR,CAT_675,FOOTWEAR,  Basketball  ,Nikon,SUPP_10697,83.61,205.4,2023-11-12 00:00:00,1.011,35x16x12,Red,10.5,Leather
+1848,Mizuno Cable Plus,MI-SP0848-PUR,CAT_502,Technology,Other,Dell,SUPP_10678,323.6,727.47,2024-01-12 00:00:00,8.771,46x26x20,White,Medium,Metal
+1159,Nike Smartwatch Classic,NI-EL0159-BRO,CAT_612,Electronics,Computers,Apple,SUPP_10267,330.94,402.45,2023-07-31 00:00:00,4.407,43x46x28,  Gold  ,"17""""",Magnesium Alloy
+1008,Lenovo Tablet Home,LE-SP0008-BLU,CAT_631,  Electronics  ,Mobile,Microsoft,SUPP_10685,247.85,471.16,2021-11-16 00:00:00,3.755,46x46x20,Silver,"""  32""""  """,Carbon Fiber
+1597,JBL Backpack,JB-CL0597-NAV,CAT_585,Accessories,Watches,MICROSOFT,SUPP_10402,  68.39  ,107.44,2021-02-14 00:00:00,0.385,82x88x90,Coral,Extra Large,Composite
+1093,Panasonic Camera Classic,PA-CL0093-GRE,  CAT_576  ,Fashion,Other,Sony,SUPP_10825,236.88,  302.0  ,2021-12-27 00:00:00,4.186,58x76x72,Gray,Extra Large,Composite
+1191,Lenovo Running Shoes Home,LE-HM0191-ORA,CAT_539,Footwear,Running,Samsung,SUPP_10942,48.46,118.36,2022-12-16 00:00:00,0.84,25x19x10,Navy/Red,39,Canvas
+1052,Reebok Laptop Basic,RE-SP0052-BLA,CAT_546,Electronics,Tablets,Brooks,SUPP_10780,161.4,264.98,2023-10-04 00:00:00,1.214,32x29x3,Space Gray,"14""""",Plastic
+1314,ASICS Camera,AS-HM0314-WHI,CAT_516,HOME & OFFICE,Miscellaneous,  Samsung  ,SUPP_10632,121.08,233.75,2021-03-15 00:00:00,4.915,48x50x10,Mint,Large,Composite
+1194,  Panasonic Running Shoes  ,PA-CL0194-TUR,CAT_502,Footwear,Basketball,Canon,SUPP_10511,75.89,179.2,2020-10-13 00:00:00,1.02,33x20x12,Navy/Red,39,Canvas
+null#,  NA  ,,,,,,,,,, ,,, ,
+,Nikon Screen Protector™ #700,,,,,,,,,Invalid,,,,,
+1537,Bose Training Shoes Classic,BO-EL0537-BLA,CAT_597,Footwear,Formal,Panasonic,  SUPP_10984  ,430.17,714.55,2024-09-19 00:00:00,1.429,26x18x15,Blue,9.5,  Suede  
+1041,Puma Smartwatch,PU-SP0041-BEI,CAT_565,Electronics,Computers,Nikon,SUPP_10922,150.94,288.38,2022-10-02 00:00:00,0.832,32x47x14,Space Gray,"21""""",  Carbon Fiber  
+1635,Lenovo Basketball Shoes Sport,LE-AC0635-NAV,CAT_584,Footwear,Outdoor,Google,SUPP_10510,486.65,1211.13,2021-12-28 00:00:00,0.267,34x17x12,Black,8,Rubber
+1090,Product,,,APPAREL,General,  Appl  ,SUPP_999,,8.51,,,43 x 64 x 91,,  49  ,Unknown
+1458,Microsoft Screen Protector,MI-SP0458-BRO,CAT_566,Accessories,Watches,Mizuno,SUPP_10060,78.25,149.55,2023-11-16 00:00:00,7.365,89x12x35,Turquoise,Small,Wood
+1962,Puma T-Shirt Ultra,  PU-SP0962-BLA  ,CAT_579,Apparel,Pants,Google,SUPP_10502,136.24,289.38,2025-10-05 00:00:00,0.704,14x89x29,Turquoise,XXL,Nylon
+1735,Nikon Smartwatch™ #735,NE-AC0127-PIN,CAT_521,Gaming,Computers,Nike Inc.,SUPP_10950,334.13,,2021-12-18 00:00:00,4.169,Large,Gold,,Glass
+1454,Panasonic Tablet,  PA-CL0454-GRE  ,CAT_524,Electronics,Computers,Bose,SUPP_10956,  342.87  ,555.71,2022-12-05 00:00:00,1.542,25x16x10,Space Gray,"27""""",Aluminum
+1859,Nikon Casual Shoes Home,NI-CL0859-PUR,CAT_686,Footwear,  Basketball  ,Bose,SUPP_10831,404.83,755.18,2025-01-30 00:00:00,0.332,34x15x12,Red,45,Mesh
+1505,JBL Laptop Professional,  JB-AC0505-BLU  ,CAT_665,Electronics,Mobile,Sony,SUPP_10511,102.11,150.57,2023-02-18 00:00:00,2.201,35x26x3,Silver,"27""""",Plastic
+1948,Panasonic Case,PA-HM0948-PUR,cat_637,Gaming,General,Nike,SUPP_10376,136.65,271.86,2024-03-07 00:00:00,1.708,39x34x76,Coral,Large,Synthetic
+1672,Nikon Case Pro,NI-HM0672-COR,CAT_547,Apparel,Shirts,Adidas,SUPP_10274,402.98,969.8,2024-03-03 00:00:00,8.666,37x72x20,Mint,One Size,Synthetic
+1522,Under Armour Headphones Elite,UN-AC0522-BEI,CAT_645,Electronics,Computers,Saucony,SUPP_10866,411.26,914.64,2021-11-10 00:00:00,0.28,17x7x0.9,Black,"27""""",Magnesium Alloy
+1509,Reebok Case Home Yellow Edition with Extra Features and Extended Warranty Limited Time Offer,,,,CASUAL,,SUPP_10616,0,,0000-00-00,0,,Red/Green,,fabric
+1767,Canon Speaker,CA-HM0767-GRA,CAT_532,Fashion,Miscellaneous,Bose,SUPP_10850,10.03,  19.53  ,2022-03-16 00:00:00,9.387,11x13x85,Yellow,Medium,Synthetic
+1513,Google Casual Shoes Classic,GO-AC0513-BLA,CAT_539,Footwear,Outdoor,Puma,SUPP_10170,  315.89  ,611.05,2021-05-10 00:00:00,  0.74  ,25x17x14,Black/White,39,Synthetic
+1094,HP Smartphone,HP-HM0094-WHI,CAT_518,  Electronics  ,  Mobile  ,Mizuno,SUPP_10601,364.91,703,2024-10-24 00:00:00,0.196,18x8x0.8,Black,"17""""",Plastic
+1246,Microsoft Smartwatch Plus,MI-SP0246-BLA,CAT_689,Electronics,Computers,Under Armour,SUPP_10178,455.96,985.17,2023-06-28 00:00:00,3.466,33x21x13,Silver,"32""""",Plastic
+1898,Microsoft Cable Pro,MI-AC0898-NAV,CAT_572,Outdoor,General,  Mizuno  ,SUPP_10126,59.53,126.4,  2021-07-09  ,4.981,30x74x75,blue,One Size,Composite
+1085,Nikon Screen Protector Classic,NI-CL0085-COR,  CAT_619  ,sports,Clothing,Samsung,SUPP_10338,89.62,161.01,2023-09-20 00:00:00,2.647,290x114x854 centimeters (LxWxH) approx,Purple,Larg,Wood
+1297,Puma T-Shirt Max,PU-EL0297-BRO,CAT_594,Apparel,Pants,Panasonic,SUPP_10897,194.89,445.34,2023-12-15 00:00:00,1.184,7x7x76,Green,S,Spandex
+1355@,Nike Case,NI-SP0355-RED,CAT_636,Travel,Miscellaneous,Dell,SUPP_10079,338.98,411.72,2025-07-07 00:00:00,2.805,61x50x27,Gold,SMALL,Synthetic
+1146,LG Keyboard Basic!,LG-EL0146-BLA,  CAT_561  ,Home & Office,Miscellaneous,Under Armour,SUPP_10456,97.02,226.21,2024-06-27 00:00:00,5.91,49x49x25,navy,Small,  Fabric  
+1025,Apple Cable Basic,,CAT_562,,General,,SUPP_10713,388.52,,2022-09-04 00:00:00,8.518,,Red,,Wood
+1799,ASICS Laptop,AS-EL0799-TUR,CAT_635,Electronics,Tablets,Dell,SUPP_10145,466.64,608.14,2022-01-09 00:00:00,2.879,37x21x3,  White  ,"24""""",Plastic
+1145,Nikon Running Shoes Sport,NI-AC0145-COR,CAT_595,Footwear,Running,  JBL  ,SUPP_10810,87.9,141.03,2022-02-05 00:00:00,0.859,27x19x14,Black,8.5,SYNTHETIC
+1337,Sony Smartphone Classic,SO-EL0337-PIN,CAT_656,Electronics,Wearables,Apple,SUPP_10104,342.01,  659.07  ,  2021-04-15  ,0.159,15x9x0.6,Space Gray,"17""""",Steel
+1056,HP Jacket Home,HP-CL0056-GRE,CAT_526,Apparel,Pants,Microsoft,SUPP_10202,95.01,132.89,2024-03-08 00:00:00,1.542,14x27x85,Turquoise,2XL,Spandex
+1088,Samsung Charger™ #350%,,INVALID,,computers,,SUPP_10027,999999.99,,9999-99-99,  0  ,,Yellow/Pink,,COMPOSITE
+1147,HP Training Shoes Premium,HP-EL0147-BLA,CAT_621,Footwear,Basketball,New Balance,SUPP_10177,304.56,368.82,2022-02-19 00:00:00,0.528,  29x20x15  ,Black/White,10,Mesh
+1925,Adidas Headphones,,  CAT_627  ,,Wearables,,SUPP_10202,46.87,,2023-10-29 00:00:00,0.192,,Gold,,Glass
+1421,Panasonic Running Shoes Max,PA-HM0421-BLA,CAT_594,Footwear,Casual,Nike,SUPP_10309,  449.36  ,832.53,2024-05-28 00:00:00,1.328,  32x20x13  ,Red,  13  ,Canvas
+1661,Bose Basketball Shoes Classic,BO-CL0661-BRO,CAT_643,Footwear,Running,Brooks,SUPP_10078,60.56,143.21,2023-02-02 00:00:00,0.501,25x16x13,Red,41,Suede
+1996,Nike Casual Shoes Pro,NI-AC0996-GOL,CAT_590,Footwear,FORMAL,Mizuno,SUPP_10707,251.15,623.91,2022-11-08 00:00:00,1.466,25x19x12,Red,44,Suede
+  1459  ,Reebok Mouse Plus,RE-EL0459-RED,CAT_509,Gaming,Other,Lenovo,SUPP_10665,181.63,330.72,2023-04-07 00:00:00,7.837,  34x7x12  ,Black,Medium,Wood
+1263,Mizuno Speaker,MI-HM0263-YEL,CAT_622,Technology,Other,Samsung,SUPP_10463,  252.69  ,330.52,2021-09-07,7.555,93x98x57,Gold,Medium,Fabric
+1616,Google Mouse Sport,GO-HM0616-MIN,CAT_674,Fitness,Other,ASICS,SUPP_10804,291.25,527.2,2020-10-24 00:00:00,1.001,67x48x73,Coral,One Size,  Synthetic  
+1628,Lenovo Keyboard,LE-EL0628-GRE&,CAT_541,Outdoor,Other,Mizuno,SUPP_10043,42.87,72.48,2024-04-28 00:00:00,0.106,63x72x67,Yellow,One Size,Wood
+1980,Microsoft Basketball Shoes™ #980,PU-SP0962-BLA,CAT_501,TECHNOLOGY,,nike,,,TBD,1985-04-29 00:00:00,,Small,,One Size Fits All,
+1527,Lenovo Running Shoes Plus,LE-SP0527-COR,  CAT_620  ,Footwear,Running,ASICS,SUPP_10307,464.5,684.38,2021-09-21 00:00:00,1.073,30x16x11,Navy/Red,12,Nylon
+1412,Google Laptop Professional,GO-SP0412-YEL,CAT_628,Electronics,Mobile,Amazon,SUPP_10769,201.41,334.86,2022-11-08 00:00:00,1.498,40x21x2,Space Gray,Compact,Aluminum
+1196,  New Balance T-Shirt Essential  ,NE-HM0196-YEL,CAT_518,Apparel,Shirts,  Dell  ,SUPP_10351,  121.83  ,196.38,2025-07-09,0.654,39x82x87,Yellow,XL,Spandex
+  1425  ,Puma Backpack Basic,,CAT_566,,Other,,SUPP_10162,474.86,,2023-01-19 00:00:00,2.117,,Blue,,Mixed Materials
+1368,Mizuno Headphones,MI-SP0368-BLA,CAT_670,Electronics,Accessories,Adidas,  SUPP_10099  ,113.42,252.85,2024-01-06 00:00:00,0.175,16x8x1.4,Space Gray,"""  24""""  """,  Steel  
+1004,Bose Backpack Basic,BO-AC0004-GRA&,CAT_567,Apparel,Pants,Saucony,SUPP_10574,274.1,595.1,2023-09-23 00:00:00,4.341,79x56x51,Green,Medium,Wood
+1431,  Lenovo Tablet  ,LE-SP0431-ORA,CAT_537,Electronics,Tablets,Samsung,SUPP_10009,166.11,201.69,2022-09-15 00:00:00,1.98,39x46x30,White,"17""""",Steel
+1523,Apple Smartphone Premium,AP-CL0523-GRE,  CAT_565  ,Electronics,Mobile,Brooks,SUPP_10958,328.9,499.47,2025-07-12 00:00:00,0.238,15x7x0.5,Gold,"21""""",Steel
+1182,Google Tablet,GO-HM0182-TUR,CAT_623,Electronics,Mobile,  Lenovo  ,SUPP_10850,211.28,292.73,2022-10-07 00:00:00,3.122,21x49x26,Gold,"21""""",Plastic
+1674,Brooks Smartwatch Advanced,BR-HM0674-BRO,CAT_554,Electronics,Computers,Google,SUPP_10983,391.36,511.44,2021-02-07 00:00:00,4.43,34x28x25,Space Gray,"15.6""""",Glass
+1984,Mizuno Monitor Advanced,MI-CL0984-GRA,CAT_626,Electronics,Wearables,Nikon,SUPP_10478,116.99,283.23,2023-09-09 00:00:00,2.364,42x12x17,Space Gray,"21""""",  Magnesium Alloy  
+1347,  Amazon Running Shoes Plus  ,AM-SP0347-NAV,CAT_548,  footwear  ,Outdoor,Sony,SUPP_10875,378.67,818.6,2021-05-14 00:00:00,1.386,25x17x12,Navy/Red,11.5,Nylon
+1855,Bose Camera Édition Spéciale,,CAT_697,Sports,Nutrition,Appl,SUPP_10632,179.79,89.89,2024-03-21 00:00:00,3.278,"91,46,75",Silver,24,wood
+1927,Under Armour Monitor,UN-CL0927-BLA,CAT_501,Electronics,Accessories,Puma,SUPP_10162,333.32,781.02,2023-07-26 00:00:00,4.561,30x18x13,Black,"17""""",  Plastic  
+1978,Amazon Casual Shoes Plus,AM-EL0978-YEL,CAT_567,Footwear,Casual,HP,SUPP_10099,343.2,554.55,  2021-03-17  ,1.421,32x19x10,Blue,38,Leather
+1606,Nike Speaker Classic,NI-CL0606-BLU,CAT_677,Sports,CLOTHING,Mizuno,SUPP_10415,158.4,233.17,2024-02-23 00:00:00,6.419,29x8x7,Black,Large,Mixed Materials
+1809,Panasonic Smartphone Plus,PA-AC0809-GRE,CAT_646,Electronics,Wearables,ASICS,SUPP_10374,199.2,320.31,2021-08-21 00:00:00,0.155,15x6x0.9,White,Standard,Aluminum
+1611,Bose Jacket Sport,BO-EL0611-COR,CAT_677,Apparel,Jackets,New Balance,SUPP_10556,62.1,112.76,2022-07-02 00:00:00,0.63,76x94x59,Blue,S,Polyester
+1230,  Nikon Screen Protector Advanced  ,NI-CL0230-BRO,CAT_605,Electronics,Tablets,LG,SUPP_10573,404.96,597.74,2025-07-11 00:00:00,6.442,93x41x37,Blue,  Large  ,Fabric
+1249,ASICS Laptop Pro,AS-AC0249-RED,CAT_634,Electronics,Computers,ASICS,  SUPP_10456  ,182.24,390.51,2025-01-22 00:00:00,1.779,30x20x3,Black,"13""""",Steel
+1435,  Under Armour Backpack  ,UN-CL0435-GRA,CAT_649,Gaming,General,Sony,SUPP_10326,432.33,942.02,2021-04-10 00:00:00,8.889,57x86x62,Red,One Size,Wood
+1236,Apple Monitor Advanced,AP-HM0236-BEI,CAT_657,  Electronics  ,Tablets,Google,SUPP_10340,410.55,873.14,2024-08-09 00:00:00,3.519,44x15x29,Space Gray,Standard,Plastic
+1177,Nike Speaker Home,NI-HM0177-YEL,  CAT_696  ,Fitness,General,Adidas,SUPP_10564,137.7,  325.27  ,2025-01-25 00:00:00,5.443,88x24x51,Yellow,Medium,Wood
+1273,Bose Speaker Air,BO-HM0273-YEL,CAT_522,Electronics,Wearables,New Balance,SUPP_10936,143.93,205.44,2024-09-06 00:00:00,4.675,77X22X30,Silver,Extra Large,Fabric
+1153,HP Jacket Office,HP-SP0153-COR,CAT_548,Apparel,Shirts,ASICS,SUPP_10004,317.08,483.06,2021-03-27 00:00:00,1.418,49x44x21,Red,XXXL,Linen
+1013,Samsung Charger,SA-SP0013-GOL,CAT_683,Home & Office,General,ASICS,SUPP_10649,427.93,794.68,2025-07-24 00:00:00,2.586,11x16x86,Brown,Large,Mixed Materials
+1946,Nike Mouse,NI-HM0946-SIL,CAT_696,Fashion,  Other  ,Under Armour,SUPP_10082,339.72,657.92,2021-04-11 00:00:00,5.411,25x67x20,Mint,Medium,Metal
+1185,LG Headphones,LG-HM0185-NAV,CAT_566,Electronics,Accessories,Canon,SUPP_10578,189.17,294.77,2024-03-04 00:00:00,0.236,18x7x0.9,Gold,"32""""",Plastic
+1074,Microsoft Screen Protector,MI-HM0074-BRO,CAT_658,Outdoor,General,  Bose  ,SUPP_10910,317.31,500.26,2024-11-08 00:00:00,9.571,66x36x92,Yellow,Large,Metal
+1291,Google Screen Protector,GO-HM0291-GRE,CAT_603,Accessories,Bags,Sony,SUPP_10196,23.58,52.73,2022-07-06 00:00:00,3.174,67x76x60,Brown,Small,Composite
+  1716  ,Canon Headphones Basic,  CA-AC0716-TUR  ,CAT_556,Electronics,Mobile,Panasonic,SUPP_10296,131.1,160.65,2024-12-06 00:00:00,0.167,18x8x1.1,Space Gray,Standard,Magnesium Alloy
+1438,LG Training Shoes,LG-HM0438-BLU,CAT_590,Footwear,Formal,HP,SUPP_10154,204.49,359.92,2021-02-23 00:00:00,0.634,32x17x12,  Black  ,6.5,Suede
+1128,Puma Cable,PU-CL0128-GRE,CAT_574,Sports,Shoes,Panasonic,SUPP_10717,417.63,678.28,2024-01-24 00:00:00,  4.582  ,34x14x30,Gray,One Size,Mixed Materials
+1399,Microsoft Smartwatch Essential,MI-SP0399-PUR,CAT_514,Electronics,Computers,LG,SUPP_10224,367.93,575.29,2023-05-15 00:00:00,1.652,11x44x26,Gold,"14""""",Magnesium Alloy
+1541,Brooks Headphones Advanced,BR-HM0541-GOL,  CAT_532  ,Electronics,Mobile,JBL,SUPP_10132,404.67,560.62,2024-10-07 00:00:00,0.232,17x6x1.2,  White  ,Standard,Aluminum
+1067,Google Speaker Home,GO-HM0067-TUR,CAT_564,  Electronics  ,Mobile,  Google  ,SUPP_10365,432.45,545.81,2023-06-22 00:00:00,6.592,39x20x52,Brown,Extra Large,Synthetic
+1514,Google Camera Professional,GO-AC0514-MIN,CAT_604,Home & Office,General,Canon,SUPP_10922,303.63,490.43,2025-03-19 00:00:00,3.695,18x90x92,Purple,One Size,Wood
+1441,  Amazon Laptop  ,AM-SP0441-BLU,CAT_543,Electronics,  Computers  ,Under Armour,  SUPP_10360  ,485.08,949.84,2025-01-14 00:00:00,2.323,33x27x1,Black,"13""""",Steel
+1427,Google Training Shoes Air,GO-EL0427-TUR,CAT_592,Footwear,Basketball,Panasonic,SUPP_10103,250.61,307.89,2023-08-20 00:00:00,0.296,35x15x11,Black/White,13,Mesh
+1697,Brooks Cable Basic,BR-AC0697-YEL,CAT_674,Equipment,General,Nikon,SUPP_10489,353.05,608.47,2024-05-19 00:00:00,9.388,35x56x71,Gray,Small,Fabric
+1718,Dell Smartphone Plus!,DE-HM0718-TUR,CAT_655,  Electronics  ,Wearables,JBL,SUPP_10515,257.9,500.22,2024-11-10 00:00:00,0.17,13x8x1.2,White,"15.6""""",Plastic
+1005,Panasonic Case Premium,PA-SP0005-MIN,CAT_502,Outdoor,Other,Samsung,SUPP_10698,443.55,965.23,2020-12-03 00:00:00,  7.709  ,  48x19x42  ,Brown,Medium,Metal
+1882,Saucony Laptop Plus,SA-AC0882-TUR,CAT_546,Electronics,Wearables,Under Armour,SUPP_10023,112.04,161.05,2021-06-11 00:00:00,2.676,35x25x1,Silver,"15.6""""",Carbon Fiber
+1896,Panasonic Jacket Professional,PA-AC0896-GRA,CAT_533,Apparel,Jackets,Apple,SUPP_10979,464.03,1087.28,2020-12-20 00:00:00,1.779,57x74x61,Coral,XL,Linen
+1562,LG Cable,LG-AC0562-SIL,CAT_629,Apparel,Sportswear,Nike,SUPP_10637,29,55.07,2021-02-07 00:00:00,9.585,20x44x42,Red,Large,Synthetic
+1930,,XX-SP0930-BRO,,Sports,  N/A  ,JBL,SUPP_999,Free,643.81,,Varies,99x72x72,  Unknown  ,One Size,Unknown
+1248,Nikon Backpack Premium,NI-EL0248-RED,CAT_636,Outdoor,Miscellaneous,Canon,SUPP_10625,459.84,1064.93,2022-09-21 00:00:00,3.416,39x17x37,Yellow,Extra Large,Synthetic
+1019,Bose Case Air#,BO-AC0019-BRO,CAT_661,Fitness,General,Brooks,SUPP_10713,  198.15  ,340.73,2021-03-02 00:00:00,1.561,93x5x18,Brown,Medium,Composite
+1284,Nike Headphones Home,  NI-EL0284-TUR  ,CAT_673,Electronics,Computers,Dell,SUPP_10391,306.25,497.67,2023-09-02 00:00:00,0.161,16x6x1.3,Gold,"32""""",Carbon Fiber
+1451,Microsoft Case Home,MI-HM0451-RED,CAT_610,  Apparel  ,Shirts,Dell,SUPP_10145,411.09,844.67,2025-04-17 00:00:00,1.791,99x94x74,Gold,Extra Large,Metal
+1909,Samsung Training Shoes Sport,SA-SP0909-GRA,CAT_625,Footwear,  Outdoor  ,Puma,SUPP_10806,  218.0  ,533.42,2025-08-11 00:00:00,0.616,28x19x12,Blue,7.5,Synthetic
+  1488  ,Nikon Headphones,NI-AC0488-TUR,CAT_543,Electronics,Accessories,Bose,SUPP_10143,377.01,720.55,2021-10-11 00:00:00,0.18,14x6x0.9,White,large,Glass
+1287,LG Smartphone Max,LG-CL0287-PIN,CAT_651,ELECTRONICS,COMPUTERS,BROOKS,  SUPP_10067  ,435.78,587.79,2021-02-25 00:00:00,0.134,16x8x0.5,space gray,Standard,Steel
+1814,New Balance Keyboard Plus,NE-AC0814-BLA,CAT_682,Electronics,Computers,Sony,SUPP_10430,484.4,873.64,2025-03-26 00:00:00,3.131,74x90x60,Turquoise,Extra Large,Fabric
+1479,Apple Mouse Max%,AP-CL0479-WHI,CAT_607,Travel,Miscellaneous,Under Armour,SUPP_10389,319.2,480.44,2021-11-14 00:00:00,3.552,72x89x28,Pink,Medium,Fabric
+1077,New Balance Mouse,NE-EL0077-RED,  CAT_610  ,Apparel,Jackets,Saucony,SUPP_10374,384.29,643.96,2022-02-06 00:00:00,4.066,77x76x29,Orange,One Size,Fabric
+1310,Nike Running Shoes,NI-EL0310-GOL,CAT_506,Footwear,Basketball,Bose,SUPP_10664,81.13,122.86,2023-03-19 00:00:00,1.295,33x16x10,Blue,38,Synthetic
+1315,Samsung Case™ #315,AD-SP0058-BLU,CAT_643,Electronics,Accessories,  nike  ,SUPP_10171,  318.66  ,,2023-03-21 00:00:00,9.119,Small,  Pink  ,,WOOD
+1320,,xx-ac0320-pin,CAT_9999,Fitness,,Saucony,,,25.11,22-04-2022,,35x100x79,,One Size,
+1015,Canon Laptop,  CA-SP0015-BRO  ,CAT_671,Electronics,Mobile,Microsoft,SUPP_10163,395.81,530.59,2021-04-04 00:00:00,3.206,37x23x1,Space Gray,"24""""",Glass
+1410,Sony Running Shoes Pro,  SO-CL0410-YEL  ,CAT_547,Footwear,Outdoor,Under Armour,SUPP_10861,47.83,100.45,2023-04-08 00:00:00,0.821,35x20x13,Navy/Red,12,Synthetic
+1158,Microsoft Tablet Elite,MI-CL0158-RED,CAT_602,Electronics,Wearables,Nikon,SUPP_10278,419.5,879.64,2023-07-14 00:00:00,2.652,36x20x8,Silver,"13""""",Plastic
+1553,Microsoft Mouse Professional,MI-AC0553-ORA,CAT_693,Apparel,Pants,Amazon,SUPP_10016,64.63,126.44,2025-07-03 00:00:00,9.097,94x87x76,Pink,One Size,Wood
+1617,  HP JACKET MAX  ,HP-SP0617-COR,CAT_673,Apparel,Sportswear,Microsoft,SUPP_10270,302.9,627.18,2025-07-03 00:00:00,0.458,83x22x93,Pink,L,DENIM
+1972,Nikon Laptop,NI-AC0972-COR,CAT_602,Electronics,Computers,Amazon,SUPP_10950,408.17,698.53,2022-06-06 00:00:00,1.296,36x23x2,BLACK,"24""""",Aluminum
+1613,JBL Laptop,JB-SP0613-COR,CAT_502,Electronics,Tablets,Sony,SUPP_10327,461.16,1069.32,2023-05-30 00:00:00,3.043,33x30x2,space gray,"32""""",Plastic
+1585,ASICS Training Shoes Édition Spéciale,SKU,CAT_693,APPAREL,Running,Addidas,SUPP_10505,178.67,89.33,  2021-07-19  ,1.153,84 x 60 x 15,Black,S,Canvas
+1331,New Balance Training Shoes Advanced,NE-AC0331-NAV,CAT_562,Footwear,Casual,  Amazon  ,SUPP_10215,235.3,465.75,2022-04-04 00:00:00,0.221,27x20x10,Gray,39,Leather
+1465,Puma Speaker,PU-AC0465-BEI,CAT_690,Equipment,General,  Sony  ,SUPP_10929,17.44,39.06,2025-09-18 00:00:00,9.515,15x36x74,Pink,Large,Wood
+1761,Mizuno Laptop Professional,MI-AC0761-SIL,CAT_500,Electronics,Tablets,Microsoft,SUPP_10966,171.42,371.1,2020-12-16 00:00:00,2.072,31x25x1,Black,"""  27""""  """,Carbon Fiber
+1309,Under Armour Training Shoes Air,UN-AC0309-MIN%,CAT_504,Footwear,Running,Panasonic,SUPP_10119,16.52,33.91,2025-01-11 00:00:00,0.798,31x20x15,Gray,39,Canvas
+1216,Google Laptop Professional,GO-EL0216-PIN,CAT_615,Electronics,Wearables,Nike,SUPP_10339,112.41,  213.51  ,2024-10-22 00:00:00,1.669,38x24x3,  Space Gray  ,Standard,Magnesium Alloy
+1033,Samsung Keyboard Advanced,SA-AC0033-NAV,CAT_628,Photography,Miscellaneous,  Nikon  ,SUPP_10082,303.04,714.04,2021-08-04 00:00:00,7.372,82x37x8,  Blue  ,Medium,Synthetic
+1961,Under Armour Headphones Plus,UN-HM0961-YEL,CAT_532,Electronics,Accessories,Mizuno,SUPP_10558,461.4,1140.9,2025-06-12 00:00:00,0.107,18x8x0.9,Silver,"13""""",Aluminum
+1745,Brooks Backpack Pro,BR-SP0745-RED,cat_518,Gaming,General,Canon,SUPP_10699,366.82,548.47,2023-05-24 00:00:00,6,76x55x31,Brown,  Large  ,Composite
+1644#,Amazon Laptop Basic,AM-EL0644-TUR,CAT_606,Electronics,Wearables,Under Armour,SUPP_10585,123.16,  198.25  ,2022-01-20,2.559,37x24x2,Black,"17""""",Magnesium Alloy
+  1240  ,,xx-cl0240-gra,,Gaming,,Reebok,,,305.67,,,83x78x62,,Medium,
+1592,Brooks Laptop,BR-CL0592-GRA,CAT_575,Electronics,computers,Nike,SUPP_10667,325.55,569.01,2020-12-01 00:00:00,2.048,32x27x3,Space Gray,Compact,  Plastic  
+1786,Amazon Charger Advanced,AM-HM0786-PUR,CAT_645,Travel,Miscellaneous,Brooks,SUPP_10996,240.52,508.74,  2022-02-23  ,1.033,76x71x10,White,Large,Composite
+1987,HP Cable Essential,HP-AC0987-MIN,CAT_681,Sports,Nutrition,Apple,SUPP_10263,303.38,642.52,2024-02-12 00:00:00,  4.33  ,80x99x84,Purple,Large,Mixed Materials
+1724,Sony Training Shoes,SO-SP0724-MIN,CAT_583,Footwear,Outdoor,LG,SUPP_10396,160.4,385.16,2022-05-15 00:00:00,0.476,25x17x10,black/white,8,Leather
+1323,Samsung Jacket Pro,SA-HM0323-GRA,CAT_530,Apparel,Jackets,Google,SUPP_10383,158.6,290.51,2022-07-14 00:00:00,1.603,23x80x58,White,XL,Linen
+1558,Canon Smartwatch Max,CA-AC0558-PIN,CAT_637,Electronics,Tablets,Amazon,  SUPP_10238  ,289.23,676.44,2024-03-16 00:00:00,4.758,19x44x26,GOLD,"24""""",Aluminum
+1220,Sony Casual Shoes Advanced Coral Edition with Extra Features and Extended Warranty Limited Time Offer,SKU-220!@#,CAT_534,Other,,Unknown,,,  999999.99  ,2024-05-14 00:00:00,,30x14,,US 7 / EU 43,
+1469,Google Smartwatch Pro,go-el0469-gol,CAT_580,Electronics,Accessories,Brooks,SUPP_10799,373.6,828.83,2025-10-09 00:00:00,3.708,23x34x23,Black,  Large  ,Magnesium Alloy
+1373,Samsung Cable Home,SA-SP0373-YEL,CAT_647,Travel,General,Google,SUPP_10063,299.13,432.79,2024-03-21 00:00:00,3.943,59x45x51,Gray,One Size,Synthetic
+1717,Amazon Basketball Shoes Essential,AM-AC0717-COR,CAT_627,Footwear,Running,HP,SUPP_10502,356.88,807.53,2025-07-05 00:00:00,0.38,33x19x11,White,8,Leather
+1631,Adidas Jacket Sport,AD-AC0631-BLU,CAT_653,Apparel,Jackets,LG,SUPP_10840,261.16,475.37,2020-11-17 00:00:00,1.875,66x13x50,Purple,L,Linen
+1887,Nikon Basketball Shoes Essential,NI-EL0887-BLA,CAT_632,Footwear,Outdoor,Puma,SUPP_10786,  391.29  ,977.85,2021-02-21 00:00:00,0.358,26x18x10,Black,42,Nylon
+1860,Puma Backpack Air,pu-sp0860-gre,CAT_553,Fashion,,Panasonic,,,153.82,2024-06-12 00:00:00,,82x78x37,,Extra Large,
+1752,Amazon Training Shoes Professional,  AM-SP0752-WHI  ,CAT_508,Footwear,Formal,Microsoft,SUPP_10312,329.88,518.17,2024-09-19 00:00:00,0.807,27x16x10,Black,8,Synthetic
+1751,Samsung Camera,SA-HM0751-NAV,CAT_558,Travel,Miscellaneous,Amazon,SUPP_10233,220.74,  464.74  ,2024-07-06 00:00:00,7.322,73x11x64,Mint,  Large  ,Synthetic
+1964,Nikon Casual Shoes Pro,NI-SP0964-TUR,CAT_610,Footwear,Running,Nikon,SUPP_10767,479.8,835.23,2025-06-17 00:00:00,0.367,  28x17x10  ,Black,46,Nylon
+1929,Brooks Charger Essential,BR-CL0929-BLA,CAT_577,Technology,Other,Bose,SUPP_10504,30.31,55.79,2024-08-18 00:00:00,3.884,78x30x31,Green,medium,wood
+1769,Bose Tablet,BO-SP0769-MIN,CAT_664,Electronics,Computers,Apple,SUPP_10118,291.44,719.02,2022-02-21 00:00:00,3.247,39x16x26,Black,"24""""",Plastic
+1520,Nikon Camera Advanced,ni-ac0520-bei,CAT_9999,Aparrel,,Sony,,,746.29583,06/21/2025,,23cm x 82cm x 42cm,,one size,
+1160@,,xx-ac0160-gra,CAT_9999,Fashion,,Reebok,,,  894.22  ,"Feb 24, 2021",,11x6x87,,Medium,
+1394,Canon Basketball Shoes Pro,CA-CL0394-WHI,CAT_500,Footwear,Running,ASICS,SUPP_10762,167.6,263.28,2022-01-14 00:00:00,0.564,34x15x13,  White  ,10,Mesh
+1478,Amazon Running Shoes Basic,AM-EL0478-BLA,CAT_562,Footwear,Basketball,Puma,SUPP_10385,437.34,650.01,2023-10-24 00:00:00,0.454,32x16x13,  Navy/Red  ,8.5,Suede
+1075,BROOKS T-SHIRT HOME,,CAT_588,,Sportswear,,SUPP_10133,382.73,,2021-06-01 00:00:00,1.078,,Red,,DENIM
+1311,Nike Keyboard Max,NI-SP0311-YEL,CAT_513,Home & Office,General,Samsung,SUPP_10645,425.34,749.16,2024-10-06 00:00:00,4.215,68x99x79,Mint,Large,Mixed Materials
+1232,LG Tablet Plus,LG-EL0232-PUR,CAT_596,Electronics,Accessories,Dell,SUPP_10584,306.79,442.88,2024-12-05 00:00:00,1.026,29x30x27,Black,"21""""",Carbon Fiber
+1467,Lenovo Screen Protector,LE-HM0467-WHI,CAT_559,Footwear,Running,Dell,SUPP_10700,258.29,457.79,2024-03-24 00:00:00,3.242,75x96x34,White,large,Fabric
+1493,Brooks Training Shoes Premium,BR-AC0493-ORA,CAT_545,Footwear,Running,LG,SUPP_10875,238.38,493.7,  2024-07-04  ,1.147,28x19x14,white,12,Canvas
+1726,Amazon T-Shirt,AM-CL0726-BLA,CAT_556,  Apparel  ,Jackets,Adidas,SUPP_10255,38.74,47.34,2024-09-24 00:00:00,0.79,56x68x77,Beige,XXL,NYLON
+1633,Microsoft Smartwatch,MI-CL0633-BLU,CAT_657,Electronics,  Wearables  ,Microsoft,SUPP_10403,117.92,148.25,2024-12-08 00:00:00,0.555,18x22x18,Gold,"17""""",Carbon Fiber
+1888,Reebok Cable Advanced,RE-HM0888-WHI,CAT_599,Electronics,Accessories,Saucony,  SUPP_10344  ,157.1,390.5,2024-08-06 00:00:00,9.514,75x59x66,Navy,EXTRA LARGE,Composite
+1189,Google T-Shirt Professional,GO-HM0189-NAV,CAT_637,Apparel,Formal,Microsoft,SUPP_10710,226.96,383.61,2020-12-18 00:00:00,1.019,36x48x63,Beige,XS,Spandex
+1071,Brooks Tablet Plus,BR-SP0071-SIL,CAT_682,Electronics,Mobile,LG,SUPP_10520,119.88,297.38,2021-12-21 00:00:00,4.064,25x41x5,White,Compact,  Steel  
+1639,  Dell Screen Protector Premium  ,DE-EL0639-TUR,CAT_655,Accessories,Watches,Adidas,SUPP_10402,427.56,882.7,2021-02-26,6.98,62x50x70,Pink,Large,Synthetic
+1603,,,,,,,SUPP_999,,,,,,Various,,Mixed
+1989,Saucony Camera,SA-CL0989-COR,CAT_680,Equipment,Miscellaneous,Bose,SUPP_10307,94.59,222.89,2024-03-16 00:00:00,6.406,48x55x96,Beige,One Size,Synthetic
+1525,Puma Screen Protector™ #525,,CAT_657,,Miscellaneous,,  SUPP_10000  ,133.36,,2023-07-01 00:00:00,4.131,,Navy,,Metal
+1401,Bose Tablet Classic,BO-CL0401-SIL,CAT_548,Electronics,Accessories,Bose,SUPP_10965,367.45,750.27,2021-10-16 00:00:00,0.595,20x21x17,Gold,"17""""",Aluminum
+1928,  HP Smartwatch  ,HP-EL0928-PIN,CAT_560,Electronics,Computers,JBL,SUPP_10871,226.39,541.64,2025-06-26 00:00:00,2.574,18x26x19,Gold,"15.6""""",Glass
+1583,Saucony Tablet,  SA-EL0583-BLA  ,CAT_610,Electronics,Mobile,HP,SUPP_10051,361.32,615.32,2025-08-14 00:00:00,3.315,22x40x11,Space Gray,Standard,Magnesium Alloy
+1202,Nike Basketball Shoes,NI-EL0202-TUR!,CAT_555,Footwear,Casual,Canon,SUPP_10319,395.01,729.94,2022-11-17,0.683,25x17x10,Navy/Red,  8  ,Leather
+1105,HP Mouse™ #105,GO-SP0043-GRA,CAT_545,Audio,Miscellaneous,Nike Inc.,SUPP_10752,350.53,Contact for price,2023-02-02 00:00:00,9.681,Small,purple,,Fabric
+1911,Nikon Smartwatch,  NI-EL0911-BEI  ,CAT_526,Electronics,Computers,Nikon,SUPP_10208,39.96,73.93,2021-08-17 00:00:00,1.051,34x26x29,Space Gray,Compact,Magnesium Alloy
+1349,ASICS Jacket Sport,AS-AC0349-YEL,CAT_695,Apparel,Formal,Google,SUPP_10333,297.61,576.72,2024-08-27 00:00:00,0.161,22x24x47,Yellow,XXXL,Silk
+1727,Dell Basketball Shoes,  DE-EL0727-GRA  ,CAT_564,Footwear,Formal,Canon,SUPP_10002,64.17,123.3,2020-12-18 00:00:00,1.2,33x15x10,White,6,Nylon
+1235,Microsoft Headphones,MI-HM0235-MIN,CAT_631,Electronics,Computers,  HP  ,SUPP_10555,181.66,293.2,2024-12-22 00:00:00,0.128,17x8x1.1,Silver,"14""""",Glass
+  1577  ,Apple T-Shirt Elite,AP-CL0577-GRA,CAT_554,Apparel,Jackets,Apple,SUPP_10371,315.38,507.81,2024-07-01 00:00:00,1.819,62x65x48,Silver,XL,Linen
+1385,Panasonic Cable™ #385,NI-CL0152-BLU,CAT_513,Equipment,Other,Nike Inc.,SUPP_10724,390.99,TBD,2025-08-15 00:00:00,6.126,Compact,Silver,,Fabric
+1304,Mizuno Mouse Office,MI-SP0304-BLA,CAT_572,Outdoor,Other,Samsung,SUPP_10403,193.04,464.82,2024-12-05 00:00:00,1.15,46x24x8,Blue,Extra Large,Synthetic
+1063,Nikon Speaker,  NI-AC0063-BLU  ,CAT_556,Fashion,Miscellaneous,LG,SUPP_10952,23.07,29.28,2023-04-25 00:00:00,5.07,35x54x15,Orange,Medium,Mixed Materials
+1457,Samsung Headphones Pro,SA-HM0457-MIN,CAT_584,Electronics,Computers,Lenovo,SUPP_10841,470.9,1129.67,2023-10-28 00:00:00,0.15,17x8x0.6,Silver,"21""""",Aluminum
+1058,Adidas Keyboard,  AD-SP0058-BLU  ,CAT_629,Outdoor,  General  ,Adidas,SUPP_10253,356.73,887.64,2021-05-01 00:00:00,5.288,83x25x51,Orange,Large,  Metal  
+ ,,,, , ,,, ,, ,,,,,
+1647,Reebok Screen Protector,RE-CL0647-RED,CAT_500,  Accessories  ,Bags,Mizuno,SUPP_10788,399.27,969.3,2023-02-04 00:00:00,9.655,19x62x48,Red,One Size,Wood
+1417,  Panasonic T-Shirt  ,PA-SP0417-TUR,  CAT_554  ,Apparel,Sportswear,Samsung,SUPP_10285,232.74,444.21,2024-08-21 00:00:00,1.902,23x86x32,Purple,XS,nylon
+1659,ASICS Speaker Advanced,AS-AC0659-BLA,CAT_516,Fitness,General,Lenovo,supp_10920,148.58,334.69,2023-11-07 00:00:00,  7.602  ,90x76x83,Coral,Medium,Synthetic
+1825,Nike Basketball Shoes Pro Green Edition with Extra Features and Extended Warranty Limited Time Offer&,,CAT_550,,Casual,,SUPP_10418,239.54,,2023-05-28 00:00:00,0.288,,Black/White,,Leather
+1083,Microsoft Smartwatch,MI-HM0083-GRE,CAT_562,Electronics,Computers,ASICS,SUPP_10926,270.21,548.34,2021-02-03 00:00:00,0.736,36x31x27,Space Gray,"14""""",Magnesium Alloy
+1569,Samsung Basketball Shoes,SA-AC0569-SIL,CAT_521,Footwear,Running,Lenovo,SUPP_10446,311.51,551.23,2022-11-05 00:00:00,0.386,34x15x15,Gray,9,  Nylon  
+1681,  Apple Basketball Shoes Elite  ,AP-SP0681-BRO,CAT_519,Footwear,Running,Microsoft,SUPP_10956,27.88,  60.49  ,2022-04-28 00:00:00,1.15,  27x19x14  ,Red,6.5,  Nylon  
+1103,Nikon Charger Sport,NI-EL0103-BLA,CAT_522,Home & Office,Other,Apple,SUPP_10611,303.04,  491.46  ,2023-06-16 00:00:00,3.914,42x57x54,  Blue  ,One Size,Composite
+1480,,xx-sp0480-bro,,Gaming,,Amazon,,,262.45,,,59x19x27,,Extra Large,
+1384,Google Cable Classic,GO-EL0384-COR,CAT_589,Travel,Other,Google,SUPP_10564,142.82,189.78,2023-12-13 00:00:00,0.575,45x54x28,Orange,One Size,Wood
+1092,Puma T-Shirt Professional,PU-SP0092-GRE,CAT_577,Apparel,Pants,  ASICS  ,SUPP_10533,  118.31  ,  188.19  ,2023-06-22 00:00:00,0.216,80x99x27,Brown,3XL,Spandex
+  1452  ,Canon Monitor,CA-SP0452-BEI,CAT_530,electronics,Accessories,panasonic,SUPP_10011,294.46,366.4,2022-05-25 00:00:00,3.427,  49x38x6  ,White,"15.6""""",CARBON FIBER
+1906,LG Keyboard,LG-AC0906-BLA,CAT_599,Technology,Miscellaneous,ASICS,SUPP_10699,184.69,326.53,2025-09-04 00:00:00,6.932,36x78x51,Gray,Small,Fabric
+1721,Samsung Keyboard Professional,  SA-CL0721-WHI  ,CAT_529,Fitness,  Other  ,ASICS,SUPP_10091,66.81,113.4,2021-01-15 00:00:00,1.135,28x10x20,White,Extra Large,Composite
+1795,Nikon Camera Basic,NI-EL0795-ORA,  CAT_636  ,Accessories,Belts,Lenovo,SUPP_10266,475.13,1156.55,2025-07-09 00:00:00,  0.444  ,93x35x14,Blue,  Large  ,Synthetic
+1211,Under Armour Laptop Office%,UN-SP0211-BLA,CAT_576,Electronics,Mobile,HP,SUPP_10876,  164.3  ,361.95,2024-09-29 00:00:00,3.37,34x28x3,Gold,Standard,Steel
+1352,Panasonic Case Premium,  PA-SP0352-TUR  ,CAT_617,Gaming,Other,Adidas,SUPP_10754,54.64,111.48,2022-04-06 00:00:00,9.197,49x94x96,Pink,Extra Large,Wood
+1206,  Under Armour Charger  ,UN-HM0206-GRA,CAT_615,Sports,Shoes,Reebok,supp_10375,232.5,  513.52  ,2022-04-18 00:00:00,5.109,98x28x7,Orange,One Size,Composite
+1098,Microsoft Charger Pro,MI-HM0098-BRO,CAT_545,Footwear,Running,JBL,SUPP_10152,128.07,256.87,2024-02-22 00:00:00,2.599,50x39x55,Blue,Large,Metal
+1489,LG Speaker Classic,LG-AC0489-GOL,CAT_584,Equipment,Other,Saucony,SUPP_10872,464.64,656.77,2023-06-06 00:00:00,  7.179  ,65x6x45,Brown,Medium,Composite
+1336,Nike Cable Office,NI-SP0336-NAV,CAT_563,Footwear,Formal,Lenovo,SUPP_10981,176.99,224.91,2023-12-19 00:00:00,3.403,35x14x81,Beige,Small,Synthetic
+1118,ASICS Keyboard,AS-SP0118-RED,CAT_608,Travel,General,Bose,SUPP_10072,122.18,  160.8  ,2024-07-07 00:00:00,8.079,18x45x52,Pink,Medium,Metal
+1615,Canon Screen Protector Basic,CA-CL0615-GRE,CAT_653,Photography,Miscellaneous,Bose,SUPP_10791,46.78,92.61,2025-09-12 00:00:00,4.231,76x15x95,Gray,Small,Fabric
+1443,LG Running Shoes Max,LG-AC0443-RED,CAT_570,Footwear,Outdoor,Nikon,SUPP_10981,439.29,627.06,2025-02-19 00:00:00,1.383,30x17x13,  Gray  ,13,Canvas
+1756,MIZUNO T-SHIRT#,MI-HM0756-RED,CAT_537,Apparel,Formal,Nikon,SUPP_10983,256.15,527.51,2023-07-04 00:00:00,1.761,99X54X84,Brown,3xl,Wool
+1763,Reebok Smartwatch Advanced,RE-HM0763-YEL,CAT_540,Electronics,Wearables,Under Armour,SUPP_10470,394.61,744.37,2025-03-16 00:00:00,2.93,45x45x21,Gold,"14""""",Carbon Fiber
+1131,Adidas Camera Sport,AD-AC0131-TUR,CAT_507,  Audio  ,Other,Canon,SUPP_10176,183.43,436.71,2021-12-20 00:00:00,2.822,62x24x9,Green,Large,Metal
+1854,Lenovo Charger,  LE-EL0854-TUR  ,  CAT_520  ,apparel,Jackets,Amazon,SUPP_10746,180.37,240.27,  2022-04-06  ,7.045,81x12x5,Green,Extra Large,Composite
+1858,Brooks Running Shoes,BR-HM0858-SIL,CAT_609,Footwear,Running,JBL,SUPP_10485,257.95,607.86,2023-10-23 00:00:00,1.256,33x15x12,Navy/Red,8.5,Mesh
+1626,Canon Training Shoes Ultra,CA-CL0626-BRO,CAT_579,Footwear,Basketball,JBL,SUPP_10068,123.59,163.13,2025-05-19 00:00:00,0.268,35x20x11,Blue,41,  Mesh  
+1812,Apple Case Ultra,AP-CL0812-BEI,CAT_666,Audio,OTHER,Mizuno,SUPP_10028,235.59,386.57,2024-02-12 00:00:00,5.81,72x73x84,Turquoise,One Size,Metal
+1871,HP Charger Ultra,HP-AC0871-GOL,CAT_502,Sports,Clothing,Bose,SUPP_10429,112.18,154.2,2021-09-21 00:00:00,8.586,18x38x86,Navy,Large,Metal
+1901,Lenovo Mouse,LE-HM0901-YEL,CAT_513,Electronics,Mobile,Dell,SUPP_10063,499.76,730.72,2021-08-02 00:00:00,5.987,75x80x84,WHITE,Small,Mixed Materials
+1533,Apple Charger Premium,  AP-CL0533-COR  ,CAT_522,Fitness,Miscellaneous,Under Armour,SUPP_10665,496.55,1081.23,2024-09-16 00:00:00,7.694,60x40x64,Beige,Medium,Synthetic
+1116,Canon Running Shoes Elite,  CA-SP0116-PUR  ,CAT_640,Footwear,Outdoor,Sony,SUPP_10579,427.69,951.52,2021-11-11 00:00:00,1.362,25x15x10,Black/White,  38  ,Leather
+1956,Bose Camera,BO-EL0956-NAV,CAT_547,Fitness,Other,Panasonic,SUPP_10188,  91.23  ,158.19,2024-01-14 00:00:00,6.237,6x54x58,Yellow,Small,Metal
+1941!,Reebok Keyboard Home,RE-SP0941-BRO,CAT_565,Equipment,Miscellaneous,Nikon,SUPP_10134,342.92,584.34,2021-11-04 00:00:00,2.415,75x13x52,Pink,Small,Wood
+,,,,,,,,,,,,,,,
+1126,Nikon Casual Shoes Plus,NI-SP0126-BLU,CAT_641,Footwear,Formal,NIKE,SUPP_10377,108.33,209.4,2023-09-02 00:00:00,0.595,34x16x13,Blue,42,Mesh
+  1333  ,Under Armour Screen Protector Advanced,UN-CL0333-GRE,CAT_626,Home & Office,General,Microsoft,SUPP_10504,453.21,960.38,2024-04-25 00:00:00,2.17,30x86x55,Red,Large,Wood
+1359,Brooks Laptop,BR-HM0359-RED,CAT_579,Electronics,Mobile,Saucony,SUPP_10438,381.05,764.27,2021-07-22 00:00:00,1.338,35x27x2,SILVER,"15.6""""",Carbon Fiber
+1653,Saucony Smartphone,SA-EL0653-BLA,  CAT_527  ,Electronics,Wearables,Adidas,SUPP_10480,406.66,702.62,2024-10-03 00:00:00,0.121,13x7x0.6,Silver,"15.6""""",Magnesium Alloy
+,,,,,,,,,,,,,,,
+1824,Dell Charger Plus,DE-AC0824-YEL,CAT_586,  Apparel  ,Sportswear,Mizuno,SUPP_10344,367.62,801.43,2025-10-10 00:00:00,7.612,30x30x22,Coral,Medium,wood
+1283,HP Case Sport,HP-EL0283-GRE,CAT_608,Travel,Miscellaneous,Microsoft,SUPP_10783,359.61,703.57,2025-08-07 00:00:00,2.802,87x56x50,Turquoise,One Size,Metal
+1489,LG Speaker Classic,  LG-AC0489-GOL  ,CAT_584,Equipment,Other,Saucony,SUPP_10872,464.64,656.77,2023-06-06 00:00:00,7.179,65x6x45,Brown,Medium,Composite
+1571,Dell Smartwatch Elite,DE-EL0571-RED,CAT_675,Electronics,Computers,Canon,SUPP_10530,271.79,  544.71  ,2022-10-08 00:00:00,1.265,30x33x6,Silver,"14""""",Magnesium Alloy
+1413,Nikon Tablet Air,NI-CL0413-GOL,CAT_674,Electronics,Mobile,Mizuno,SUPP_10735,88.91,218.08,2025-09-04 00:00:00,2.823,48x43x29,White,"32""""",Plastic
+1225,Microsoft T-Shirt Édition Spéciale,,CAT_677,,Pants,,SUPP_10735,369.3,,2021-08-27 00:00:00,0.273,,Beige,,Denim
+1598,ASICS Running Shoes Home,AS-SP0598-ORA,CAT_618,Footwear,Running,New Balance,SUPP_10641,122.61,289.02,2021-03-26 00:00:00,1.297,28x19x10,Blue,6,Synthetic
+1954,Mizuno Casual Shoes,MI-SP0954-GRA,CAT_695,Footwear,Casual,Adidas,SUPP_10360,183.88,387.6,2022-05-19 00:00:00,0.752,33x15x15,Gray,38,Nylon
+1402,Under Armour Headphones Pro,UN-EL0402-BLA,CAT_695,Electronics,COMPUTERS,Sony,SUPP_10254,387.36,599.62,2025-05-31 00:00:00,0.288,16x6x1.3,Black,"14""""",Steel
+  1411  ,Mizuno T-Shirt,MI-SP0411-SIL,CAT_638,Apparel,Shirts,Apple,SUPP_10216,302.58,660.68,2023-04-27 00:00:00,0.687,75x30x86,White,L,Linen
+1151,Amazon Jacket,am-sp0151-bei,CAT_530,Apparel,Sportswear,Adidas,supp_10887,320.85,627.07,2023-04-21 00:00:00,1.279,  65x29x69  ,Red,XXXL,Linen
+1916,Adidas Camera,AD-CL0916-TUR,  CAT_526  ,Footwear,Running,Nikon,SUPP_10850,191.79,451.3,  2022-11-03  ,4.317,20x67x18,Brown,Medium,Mixed Materials
+1474,Sony Laptop Elite,SO-AC0474-YEL,CAT_582,Electronics,Wearables,Dell,SUPP_10520,364.04,569.03,2022-02-23 00:00:00,2.978,33x24x2,White,"13""""",Steel
+  1261  ,Under Armour Keyboard,UN-SP0261-GRA,CAT_617,Travel,General,New Balance,SUPP_10367,488.02,713.91,2021-03-12 00:00:00,1.359,93x77x12,Navy,Medium,Mixed Materials
+1725,Bose Training Shoes,,CAT_653,,Outdoor,,SUPP_10062,227.13,,2024-12-21 00:00:00,1.138,,Black,,Mesh
+,,,,,,,, ,, ,,     ,,    ,
+1856,Bose Jacket Classic,bo-el0856-whi,CAT_586,Apparel,Shirts,JBL,SUPP_10872,322,538.47,2022-12-22 00:00:00,1.239,38x62x63,Pink,XL,Spandex
+1708,Bose Laptop,BO-CL0708-GRE,CAT_631,Electronics,Accessories,Reebok,SUPP_10877,385.82,664.71,2025-08-10 00:00:00,3.247,35x28x2,Space Gray,"13""""",Glass
+1264,Puma Cable,PU-AC0264-BEI,CAT_697,Apparel,Sportswear,Dell,SUPP_10808,437.06,880.61,2022-09-02 00:00:00,7.069,5x85x14,  Yellow  ,Large,Wood
+1621*,Lenovo Smartwatch,LE-HM0621-PUR,CAT_695,  Electronics  ,Mobile,Dell,SUPP_10825,483.54,821.17,2021-08-26 00:00:00,2.938,11x20x7,Gold,Standard,Glass
+1372,New Balance Mouse,NE-SP0372-GRE,CAT_647,Technology,Other,Apple,SUPP_10659,178.18,424.64,2022-12-21 00:00:00,7.455,97x53x88,Mint,Extra Large,  Composite  
+1710,Nike Smartphone,NI-SP0710-ORA,CAT_663,Electronics,Mobile,  Puma  ,SUPP_10662,440.42,570.16,2025-02-20 00:00:00,0.147,17x6x1.3,White,"14""""",Plastic
+1388,Samsung Casual Shoes,SA-SP0388-NAV,CAT_554,Footwear,Running,Saucony,SUPP_10646,288.73,428.1,2025-01-24 00:00:00,0.596,35x19x10,Red,43,Nylon
+1003,HP Training Shoes Basic,HP-EL0003-SIL,CAT_636,Footwear,Basketball,Dell,  SUPP_10473  ,195.93,  487.16  ,2024-06-16 00:00:00,  1.032  ,33x16x15,Blue,6.5,Synthetic
+1879,Amazon Keyboard Elite,AM-EL0879-WHI,CAT_524,Gaming,General,  Sony  ,SUPP_10341,478.1,923.69,2023-10-06 00:00:00,0.222,64x32x83,Beige,Small,Composite
+1904,Brooks Speaker,BR-HM0904-TUR,CAT_539,Apparel,Pants,  ASICS  ,SUPP_10610,440.77,865.89,2023-02-24 00:00:00,9.88,37x66x67,Red,One Size,Composite
+1348,Lenovo Running Shoes Premium,LE-HM0348-MIN,CAT_693,Footwear,Formal,Saucony,SUPP_10833,236.09,526.36,2023-10-22 00:00:00,0.607,28x18x15,Red,9,Mesh
+1069,JBL Camera Ultra,JB-HM0069-BEI,CAT_508,Apparel,  Shirts  ,Lenovo,SUPP_10797,326.13,544.9,2020-11-14 00:00:00,9.5,9x82x24,Beige,Large,Fabric
+1045,Google Screen Protector Édition Spéciale,,CAT_529,APPAREL,General,Samung,SUPP_10504,66.9,  33.45  ,2025-04-07 00:00:00,2.425,73 x 22 x 54,  Orange  ,86,Synthetic
+,,,,,,, ,,,,, ,,,
+1207,Under Armour Casual Shoes Basic,UN-SP0207-RED,cat_524,Footwear,Outdoor,ASICS,SUPP_10068,31.45,76.08,2022-12-04 00:00:00,0.432,25x16x10,Red,9,Leather
+1289,Saucony Tablet Essential,  SA-EL0289-PUR  ,CAT_569,Electronics,Computers,Puma,SUPP_10820,270.22,474.3,2025-01-10 00:00:00,2.063,14x29x21,White,"27""""",  Magnesium Alloy  
+1865,Saucony Cable Ultra,  SA-EL0865-BEI  ,CAT_619,Fitness,General,  LG  ,SUPP_10323,82.43,  191.23  ,2022-01-05 00:00:00,9.254,79x31x33,Orange,  Small  ,Synthetic
+1920,Nikon Camera Advanced,ni-cl0920-min,CAT_9999,Fashion,,Apple,,,176.86,"Jul 31, 2023",,20x54x33,,Large,
+1047,Apple Charger,AP-CL0047-GRE,CAT_584,  Technology  ,General,Under Armour,supp_10002,145.86,361.62,2023-04-28 00:00:00,9.877,74x37x27,Red,Small,COMPOSITE
+ ,,,,,,,,,,    ,,    ,,,
+1141,Microsoft Cable,MI-EL0141-BLU,CAT_671,Home & Office,other,Canon,SUPP_10994,380.66,569.38,2023-11-01 00:00:00,0.704,54x71x58,Mint,Extra Large,Wood
+1938,Mizuno Mouse,MI-SP0938-ORA,CAT_609,Technology,Miscellaneous,HP,SUPP_10513,413.72,804.43,2025-07-21 00:00:00,4.541,6x26x50,Pink,ONE SIZE,Fabric
+1884,JBL Monitor,JB-AC0884-YEL,CAT_515,Electronics,Computers,JBL,  SUPP_10538  ,141.92,254.47,2022-08-09 00:00:00,0.606,24x38x26,Gold,"14""""",Steel
+1463,Sony Smartphone Advanced,SO-AC0463-BEI,CAT_529,Electronics,Computers,Bose,SUPP_10856,26.54,41.44,2025-04-13 00:00:00,0.177,18x6x0.6,gold,"27""""",Carbon Fiber
+1680,  Nikon Camera Advanced  *,ni-el0680-min,CAT_9999,Sports,,Lenovo,,,246.72,"Jun 02, 2021",,588x451x958 centimeters (LxWxH) approx,,Smal,
+1416,NEW BALANCE SMARTPHONE MAX,NE-HM0416-BLA,CAT_539,Electronics,Computers,Google,SUPP_10384,87.52,150.45,2025-02-04 00:00:00,0.115,15x9x1.2,White,"32""""",Carbon Fiber
+1623,JBL T-Shirt Classic,JB-HM0623-YEL,CAT_613,Apparel,Formal,HP,SUPP_10381,80.81,105.1,2023-04-11 00:00:00,1.69,92x53x26,Yellow,L,Silk
+1204,HP Headphones,HP-AC0204-PUR,CAT_503,Electronics,Mobile,Microsoft,SUPP_10598,68.63,152.76,  2023-11-08  ,  0.102  ,12x9x1.2,Silver,"24""""",Aluminum
+1378,New Balance Backpack Professional,NE-EL0378-BEI,CAT_666,Audio,Miscellaneous,New Balance,SUPP_10668,228.11,277.17,2021-03-25 00:00:00,1.255,20x67x87,Coral,Medium,  Mixed Materials  
+1190,Reebok Laptop Plus,  RE-CL0190-PIN  ,CAT_523,Electronics,WEARABLES,ASICS,SUPP_10766,412.33,535.55,2022-07-03 00:00:00,3.342,37x25x2,Silver,Standard,Glass
+1406,Sony Camera Elite,SO-SP0406-TUR,CAT_608,Gaming,Other,Canon,SUPP_10616,398.82,651.47,2023-07-13 00:00:00,8.041,88x36x54,Brown,One Size,Metal
+1272,ASICS JACKET ADVANCED,AS-AC0272-ORA,CAT_598,  Apparel  ,Jackets,  Nike  ,  SUPP_10291  ,179.01,286.51,2021-11-23 00:00:00,0.947,76x16x32,Beige,XXXL,Spandex
+1656,Nike Screen Protector,NI-EL0656-BLA,CAT_605,Footwear,Casual,HP,SUPP_10457,80.75,172.93,2020-12-17 00:00:00,7.877,52x46x57,Yellow,One Size,Synthetic
+1387,Canon Charger Max,CA-HM0387-WHI,CAT_655,Gaming,General,ASICS,SUPP_10952,442.15,831.49,2022-05-19 00:00:00,2.328,14x51x22,Coral,Large,Mixed Materials
+1329,Sony Casual Shoes Classic,SO-EL0329-COR,CAT_552,Footwear,Basketball,lg,SUPP_10553,492.8,1092.36,2025-09-05 00:00:00,0.899,31x19x13,BLACK,6,Nylon
+1245,LG Casual Shoes™ #245,HP-HM0082-NAV,CAT_542,Electronics,Accessories,  Nike Inc.  ,SUPP_10744,  394.66  ,Contact for price,2022-11-06 00:00:00,0.28,Compact,Gray,One Size Fits All,Rubber
+1091,ASICS Monitor Office,AS-EL0091-GRE,CAT_552,Electronics,Computers,Samsung,SUPP_10608,26.45,52.29,2024-02-14 00:00:00,3.665,13x25x28,Black,"27""""",CARBON FIBER
+1012,Amazon Tablet,AM-HM0012-RED,CAT_518,Electronics,Accessories,  HP  ,SUPP_10518,139.95,337.73,2022-03-01 00:00:00,4.464,25x33x14,Silver,"32""""",Steel
+1808,New Balance Smartphone Max,NE-AC0808-GRE,CAT_517,Electronics,Computers,Reebok,SUPP_10056,143.06,298.82,2025-01-15 00:00:00,0.198,12x7x0.5,White,"17""""",Steel
+1573,Panasonic Training Shoes Elite,PA-EL0573-BRO,CAT_576,Footwear,Basketball,Adidas,SUPP_10470,211.08,494.72,2024-02-07 00:00:00,1.307,31x16x15,Blue,9,Mesh
+,,,CAT_9999,,,,,,,20201126,,,,,
+1981,Under Armour Mouse,un-cl0981-gol,CAT_644,Fashion,Miscellaneous,Google,SUPP_10265,29.56,68.85,2020-10-22 00:00:00,9.223,46x35x25,Yellow,Extra Large,Metal
+1043,Google Keyboard,GO-SP0043-GRA,CAT_523,Equipment,Miscellaneous,Amazon,SUPP_10765,213.6,312.08,2022-01-03 00:00:00,7.886,51x72x69,Navy,  Medium  ,Fabric
+1266,Saucony Basketball Shoes Office,sa-sp0266-cor,CAT_674,Footwear,Formal,Microsoft,SUPP_10055,41.05,67.68,  2024-07-31  ,0.832,33x15x13,Black/White,41,Suede
+1913,Microsoft Smartwatch,MI-AC0913-GOL,CAT_536,Electronics,Wearables,Apple,SUPP_10880,419.07,615.4,2020-12-06 00:00:00,2.022,45x35x20,Space Gray,"15.6""""",Glass
+1713,Lenovo Monitor,LE-CL0713-GOL,CAT_683,Electronics,Accessories,Nikon,SUPP_10353,21.87,30.94,2024-05-01 00:00:00,2.622,43x15x26,Space Gray,"15.6""""",PLASTIC
+1117,  New Balance Casual Shoes  ,NE-SP0117-BLU,CAT_667,Footwear,Casual,Microsoft,SUPP_10084,192.2,456.46,2023-09-03,0.415,31x20x12,Black/White,46,nylon
+1620,Samsung Charger Ultra,sa-el0620-bro,CAT_552,Electronics,,ASICS,,,575.24,2023-04-06 00:00:00,,  6x19x48  ,,One Size,
+1587,New Balance Smartwatch Pro,NE-AC0587-SIL,  CAT_538  ,electronics,Accessories,Dell,SUPP_10222,56.47,96.49,2022-07-11 00:00:00,1.175,31x22x5,space gray,"27""""",Plastic
+1364,Adidas Headphones Essential,AD-CL0364-GOL,CAT_695,Electronics,Wearables,Microsoft,SUPP_10789,457.41,978.36,2024-04-16 00:00:00,0.202,15x8x1.2,  Space Gray  ,"27""""",Magnesium Alloy
+1774,Brooks Smartphone Classic,BR-HM0774-PUR,  CAT_590  ,Electronics,Computers,LG,SUPP_10983,204.56,300.25,2022-08-12 00:00:00,0.137,18x6x1.1,Gold,"24""""",Glass
+1518,Mizuno Smartphone Advanced,  MI-HM0518-BEI  ,CAT_609,Electronics,Computers,Samsung,SUPP_10149,425.06,928.89,2025-03-15 00:00:00,0.216,18x6x1.2,White,"27""""",Magnesium Alloy
+1224,Google Case Advanced,GO-HM0224-GRA,CAT_618,Fashion,Other,Nikon,SUPP_10092,364.1,490.49,2024-09-01 00:00:00,7.809,94x74x22,Yellow,Extra Large,Fabric
+1453,Panasonic Speaker,PA-CL0453-ORA,CAT_667,Travel,Other,Amazon,SUPP_10470,360.44,801.15,2022-03-29 00:00:00,2.856,89x43x55,Blue,Extra Large,  Metal  
+1193,MICROSOFT BASKETBALL SHOES,MI-HM0193-PUR,CAT_593,Footwear,Basketball,Bose,SUPP_10434,113.16,238.87,2022-01-18 00:00:00,0.684,31x17x13,White,42,Synthetic
+1967,ASICS Running Shoes Sport,AS-CL0967-WHI,CAT_561,  Footwear  ,Outdoor,  LG  ,SUPP_10937,412.18,791.83,2025-06-02 00:00:00,1.09,29x20x15,Black/White,6,Suede
+1760,Nikon Camera Advanced,ni-sp0760-bro,CAT_9999,Technology,,Mizuno,,,771.11,"Feb 02, 2021",,87x22x29,,Large,
+1730,ASICS Running Shoes Ultra,AS-AC0730-NAV,CAT_611,Footwear,Formal,Canon,SUPP_10842,82.97,137.66,2023-01-07 00:00:00,0.283,28x16x15,Navy/Red,39,Leather
+1536,HP Backpack,HP-AC0536-YEL,CAT_550,Accessories,Jewelry,Puma,SUPP_10834,71.08,174.86,2022-06-02 00:00:00,5.116,79x97x71,Red,Medium,Composite
+1436,Apple Jacket Home,AP-CL0436-GOL,CAT_677,Apparel,Shirts,Apple,SUPP_10995,252.36,372.54,2020-11-07 00:00:00,1.374,64X54X29,  Turquoise  ,S,Denim
+1780,,n/-hm0780-yel,,Accesseries,,Bose,,,270.14025,,,94cm x 35cm x 66cm,,3xl,
+1940,Mizuno Basketball Shoes Air,mi-sp0940-bro,CAT_512,Footwear,,Google,,,498.95,2024-01-21 00:00:00,,35x20x13,,7.5,
+,,,,,,,,,,,,,,,
+1667,Brooks Smartwatch,BR-CL0667-MIN,CAT_559,Electronics,Mobile,Lenovo,SUPP_10929,34.87,80.75,2023-04-19 00:00:00,2.947,14x25x22,Gold,"14""""",Glass
+1317,Sony Laptop Premium,SO-EL0317-BLU,CAT_586,Electronics,Tablets,Panasonic,SUPP_10790,90.52,115.86,2023-01-06 00:00:00,2.946,40x30x1,Gold,"13""""",Magnesium Alloy
+1843,Dell Running Shoes Advanced,  DE-HM0843-GRA  ,  CAT_525  ,Footwear,OUTDOOR,JBL,SUPP_10748,485.7,803.41,2023-09-26 00:00:00,0.443,34x20x10,Gray,39,Canvas
+1851,  Nikon Charger Office  ,NI-SP0851-BRO,CAT_614,Fitness,General,JBL,SUPP_10779,245.13,523.92,2023-04-07 00:00:00,0.293,20x72x65,Silver,Extra Large,Synthetic
+1244,Saucony Speaker Professional,SA-SP0244-BEI,CAT_632,Footwear,Outdoor,Under Armour,SUPP_10090,130.16,262.91,2024-04-22 00:00:00,6.671,90x14x92,Mint,One Size,Fabric
+1093,Panasonic Camera Classic,PA-CL0093-GRE,CAT_576,Fashion,Other,Sony,SUPP_10825,236.88,302,2021-12-27 00:00:00,4.186,58x76x72,Gray,Extra Large,Composite
+1130,Nikon Headphones Ultra,NI-EL0130-BLA,  CAT_515  ,Footware,Mobile,HP,SUPP_10843,206.29,689.42241,2024-02-15 00:00:00,0.288,  15cm x 79cm x 80cm  ,White,ONE SIZE,Aluminum
+1715,Puma Camera Home Black Edition with Extra Features and Extended Warranty Limited Time Offer,SKU-715!@#,CAT_583,Unknown,General,Unknown,SUPP_10590,478.04,999999.99,2022-02-20 00:00:00,7.436,20x16,Pink,Medium (M),Composite
+1544,Samsung Headphones Plus,SA-CL0544-ORA,CAT_578,Electronics,Wearables,Canon,SUPP_10566,492.31,  643.87  ,2024-09-22 00:00:00,0.273,16x7x0.9,Gold,"17""""",Plastic
+1572,New Balance Smartphone Air,NE-EL0572-TUR,CAT_646,Electronics,Wearables,Google,  SUPP_10702  ,311.86,556.54,2022-05-04 00:00:00,0.25,  17x9x1.1  ,White,Large,Carbon Fiber
+1255,Saucony Cable,SA-EL0255-WHI,CAT_688,Apparel,SPORTSWEAR,New Balance,SUPP_10019,240.9,576.58,2023-03-20 00:00:00,0.553,818x764x233 centimeters (lxwxh) approx,Black,Mediun,Synthetic
+1143,Nikon Laptop Essential,NI-HM0143-COR,CAT_607,Electronics,Computers,Canon,  SUPP_10153  ,82.62,162.29,2025-06-08 00:00:00,2.944,31x21x3,Black,"21""""",Steel
+1939,HP Speaker Advanced,HP-SP0939-BLU,CAT_667,Electronics,Computers,  Under Armour  ,SUPP_10347,121.3,283.44,2022-07-04 00:00:00,6.296,45x66x99,Navy,Medium,Mixed Materials
+1643,Under Armour Jacket Air,UN-AC0643-COR,CAT_551,Apparel,Pants,Sony,SUPP_10340,343.37,794.94,2021-12-15 00:00:00,  1.514  ,40x72x55,Coral,L,Nylon
+1157,New Balance Basketball Shoes Plus,NE-SP0157-BEI,CAT_512,Footwear,Running,Dell,SUPP_10895,29.33,46.28,2021-08-01 00:00:00,1.242,30x18x15,Black,7.5,Nylon
+1260,Puma T-Shirt Advanced,pu-sp0260-gre,CAT_699,Electronix,,Amazon,,,235.50424,2025-04-23 00:00:00,,35cm x 99cm x 57cm,,ONE SIZE,
+1565,JBL Smartphone,JB-EL0565-PIN,CAT_650,Electronics,Accessories,Reebok,SUPP_10177,  324.06  ,700.3,2023-01-16 00:00:00,0.207,12x8x0.9,White,Compact,Aluminum
+1346,Canon Monitor Classic,  CA-SP0346-NAV  ,CAT_597,Electronics,Computers,Dell,SUPP_10452,124.56,253.97,2021-03-14 00:00:00,2.116,15x28x21,Gold,Compact,Magnesium Alloy
+1827,Google Keyboard,GO-HM0827-BLA,CAT_523,Gaming,Other,Dell,SUPP_10980,90.07,201.41,2021-05-26 00:00:00,2.997,  52x12x61  ,Brown,Large,  Synthetic  
+1830,Under Armour Smartphone Office,UN-EL0830-BEI,CAT_512,Electronics,Wearables,Google,SUPP_10710,27.67,  55.84  ,  2021-06-01  ,0.145,13x8x0.6,Gold,Standard,Glass
+1740,SONY TRAINING SHOES ULTRA,  so-hm0740-bei  ,CAT_654,Footwear,,Puma,,,86.79,2023-12-08 00:00:00,,25x19x10,,7,
+  1676  ,  Saucony Headphones Premium  ,SA-HM0676-COR,CAT_545,Electronics,Tablets,Amazon,supp_10742,486.51,878.34,2022-03-13 00:00:00,  0.266  ,12x8x0.5,Black,"21""""",Plastic
+1391,Microsoft Headphones Premium,MI-AC0391-GRA,CAT_583,Electronics,Wearables,JBL,SUPP_10743,462.55,1062.01,2022-03-20 00:00:00,0.178,12x6x1.3,Silver,"15.6""""",Glass
+1301,Under Armour Backpack Sport,UN-SP0301-GRA,CAT_643,Electronics,Accessories,Dell,SUPP_10266,93.23,171.61,2023-11-09 00:00:00,3.458,64x21x16,Purple,One Size,Metal
+1428,Under Armour Smartphone,UN-SP0428-ORA,cat_623,Electronics,Accessories,Under Armour,SUPP_10559,12.46,23.4,2025-01-20 00:00:00,0.151,12x7x1.1,Gold,"13""""",Steel
+1705,JBL Headphones Sport,JB-SP0705-ORA,CAT_506,Electronics,Wearables,  JBL  ,SUPP_10269,478.57,1165.05,2022-08-13 00:00:00,0.212,12x8x1.3,White,"21""""",Plastic
+1449,Adidas Headphones Basic,AD-HM0449-WHI,CAT_679,Electronics,Mobile,JBL,SUPP_10147,285.4,701.36,2022-12-29 00:00:00,0.127,17x7x0.8,White,"13""""",Carbon Fiber
+1109,Lenovo Speaker,LE-CL0109-PUR,CAT_643,Audio,Miscellaneous,Lenovo,SUPP_10816,208.47,300.15,2021-08-09 00:00:00,6.441,  60x55x8  ,Gold,Extra Large,Wood
+1691,Under Armour Screen Protector,UN-SP0691-BLU,CAT_688,Home & Office,General,Nikon,SUPP_10417,389.09,903.38,2021-07-20 00:00:00,5.266,79x61x87,Brown,Medium,Mixed Materials
+1096,HP T-Shirt,HP-HM0096-GRE,CAT_627,APPAREL,Formal,New Balance,SUPP_10966,345.57,530.29,2022-07-19 00:00:00,1.661,97x87x99,Turquoise,2XL,Wool
+1813,  Apple Screen Protector Elite  ,AP-SP0813-GOL@,CAT_507,Photography,Other,Saucony,SUPP_10804,293.33,479.69,2023-07-11 00:00:00,2.408,23x10x25,Red,One Size,Mixed Materials
+1495,Samsung Smartphone Édition Spéciale,SKU,CAT_507,Fitness,Mobile,Appl,SUPP_10891,426.96,213.48,2025-08-04 00:00:00,0.117,20-12-61,White,S,Steel
+1651,Microsoft T-Shirt Air,MI-HM0651-ORA,CAT_519,Apparel,Sportswear,Google,SUPP_10756,156.91,192.93,2021-07-12 00:00:00,1.964,46X28X96,Blue,M,Polyester
+1666,Canon Camera Professional,CA-AC0666-NAV,CAT_580,Sports,Nutrition,hp,SUPP_10948,369.37,813.85,2025-09-08 00:00:00,0.298,56x42x53,Mint,Extra Large,Mixed Materials
+1036,Dell Casual Shoes Premium,DE-AC0036-BLU,CAT_557,Footwear,  Running  ,Nikon,SUPP_10969,  67.56  ,154.16,2021-12-02 00:00:00,0.848,29x19x15,  Blue  ,13,Nylon
+1765,LG Smartwatch Édition Spéciale,,CAT_618,home & office,Accessories,Samung,SUPP_10994,479.1,  239.55  ,2025-09-21 00:00:00,2.573,63-42-95,Silver,2XL,Glass
+1881,Bose Laptop Plus,BO-CL0881-BRO,cat_513,Electronics,Mobile,Lenovo,SUPP_10777,157.75,  365.01  ,2025-01-04 00:00:00,3.341,32x22x2,Silver,"""  14""""  """,Magnesium Alloy
+1179,Bose Keyboard Pro,BO-SP0179-RED,CAT_680,Photography,Other,Microsoft,SUPP_10854,373.54,729.23,2022-07-10 00:00:00,5.745,53x88x53,Orange,One Size,Synthetic
+1993,Canon Speaker Plus,CA-EL0993-ORA,CAT_518,Audio,Miscellaneous,LG,SUPP_10261,169.3,237.03,2021-11-14 00:00:00,8.929,43x38x13,Coral,One Size,Wood
+1223,Under Armour Cable Premium,  UN-EL0223-COR  ,CAT_527,Gaming,Miscellaneous,Adidas,  supp_10898  ,497.96,933.33,2025-03-28 00:00:00,4.017,99x10x76,Yellow,  One Size  ,Synthetic
+1340,HP Tablet Basic,hp-ac0340-bei,CAT_653,Electronics,,Brooks,,,344.52,2021-09-11 00:00:00,,692x679x443 centimeters (LxWxH) approx,,XX-Large,
+1351,Canon Backpack,CA-EL0351-GRA,CAT_637,Audio,Miscellaneous,Saucony,SUPP_10070,200.61,476.38,2023-01-11 00:00:00,2.144,31x44x60,Turquoise,Medium,Wood
+1949,Nike Backpack Basic,NI-SP0949-GRE,CAT_673,Footwear,Casual,new balance,SUPP_10540,294.15,641.92,2020-10-19 00:00:00,9.039,11x18x53,Navy,One Size,SYNTHETIC
+1142,JBL Cable Essential,JB-CL0142-RED,CAT_693,Gaming,General,Dell,SUPP_10995,113.83,165.12,2024-02-12 00:00:00,0.522,15x92x60,Gold,Medium,WOOD
+1832,HP Running Shoes Plus,HP-SP0832-BEI,CAT_504,  Footwear  ,Casual,JBL,SUPP_10860,264.1,  491.53  ,2022-12-09 00:00:00,0.954,30x15x12,Red,6,Nylon
+1001,Puma Monitor,PU-EL0001-GOL,CAT_559,Electronics,Accessories,Under Armour,SUPP_10027,285.01,607.31,2020-11-24 00:00:00,3.656,36x24x19,Gold,"21""""",Aluminum
+1564,Panasonic Charger Plus,PA-SP0564-GRA,CAT_614,Technology,General,Google,SUPP_10966,316.91,546.83,2022-09-05 00:00:00,3.833,67x8x67,Red,Large,Wood
+1847,ASICS Mouse,AS-SP0847-PIN,CAT_603,Sports,Equipment,JBL,SUPP_10198,403.34,904.52,  2021-03-07  ,8.485,19x57x64,Green,Large,Metal
+1161,JBL Basketball Shoes Sport,JB-AC0161-GRE,CAT_520,Footwear,  Formal  ,Nikon,SUPP_10820,290.79,382.22,  2023-07-03  ,0.848,30x15x13,Black/White,44,Leather
+1258,Brooks Smartphone Advanced,BR-AC0258-BLU,CAT_660,Electronics,Tablets,LG,SUPP_10428,12.24,18.44,2024-05-25 00:00:00,0.124,16x6x1.1,Gold,Compact,Plastic
+1771,Puma Running Shoes Sport,PU-SP0771-GRA,CAT_652,  Footwear  ,Casual,Microsoft,SUPP_10979,241.39,325.93,2024-06-29 00:00:00,1.287,26x19x15,Gray,8,Mesh
+1187,Adidas Backpack Sport,AD-HM0187-COR,CAT_573,Travel,Other,Adidas,SUPP_10968,389.07,555.53,2025-02-28,4.994,6x30x89,Coral,Large,Composite
+1999,Panasonic Speaker Plus,PA-EL0999-BRO,CAT_540,Accessories,Belts,  Dell  ,SUPP_10994,446.84,554.29,2023-05-28 00:00:00,6.464,97x75x53,Navy,Medium,  Metal  
+1829,Panasonic Charger,PA-SP0829-COR,CAT_685,Travel,General,Lenovo,SUPP_10497,132.06,190.68,2023-02-08 00:00:00,5.777,14x28x17,Gray,Small,Mixed Materials
+1737,  Dell Case Premium  ,DE-HM0737-GRA,CAT_618,Travel,Miscellaneous,Puma,SUPP_10965,499.53,1203.51,2023-12-21 00:00:00,4.824,86x11x39,White,One Size,Fabric
+1021,Nikon Tablet Max,NI-SP0021-PUR#,CAT_581,Electronics,Accessories,Apple,SUPP_10141,83.91,142.47,2023-08-30 00:00:00,1.188,23x14x18,Space Gray,"24""""",Steel
+1381,Reebok Keyboard,RE-AC0381-PUR,CAT_633,Equipment,Miscellaneous,Under Armour,SUPP_10551,260.19,544.92,2023-02-16 00:00:00,6.66,10x35x9,Gold,Medium,Fabric
+1362,Google Cable Basic,GO-CL0362-NAV,CAT_623,Footwear,Casual,Panasonic,SUPP_10386,  92.21  ,163.56,2022-03-26 00:00:00,5.102,99x60x24,Turquoise,Small,Metal
+1590,Lenovo Basketball Shoes Classic,LE-EL0590-PUR,CAT_630,Footwear,Running,Panasonic,SUPP_10768,82.69,133.8,  2025-01-01  ,0.888,32x19x15,Blue,7,Mesh
+1556,Reebok Jacket,RE-CL0556-PUR,  CAT_679  ,Apparel,Pants,Reebok,SUPP_10592,73.09,180.92,2021-01-29 00:00:00,1.59,69x95x65,Mint,XXL,Polyester
+1156,HP Case,HP-SP0156-COR,cat_551,Home & Office,Other,  Canon  ,SUPP_10302,88.58,169.42,2023-12-18,9.113,93x66x47,Green,Small,Mixed Materials
+1846,Microsoft Monitor Pro,MI-AC0846-PIN,CAT_534,Electronics,Accessories,Under Armour,SUPP_10023,228.08,459.72,2024-11-25 00:00:00,  1.142  ,49x36x18,Gold,"21""""",Aluminum
+1483,Google Camera Elite,GO-AC0483-GOL,CAT_641,Travel,General,Nike,SUPP_10036,424.29,925.66,  2022-04-27  ,5.313,69x55x67,White,Medium,Fabric
+1271,Nike Backpack Max,NI-AC0271-ORA,CAT_523,Home & Office,General,Under Armour,SUPP_10656,105.62,199.03,2025-10-10 00:00:00,7.835,40x30x7,blue,One Size,Metal
+  1516  ,Nike Case Basic,NI-AC0516-MIN,CAT_630,Fashion,General,Dell,SUPP_10468,190.84,446,2024-02-16 00:00:00,1.835,96x30x46,Gray,Large,Mixed Materials
+1124,Apple Mouse Elite,AP-EL0124-TUR,CAT_645,Apparel,Jackets,Dell,SUPP_10261,388.93,918.87,2023-10-02 00:00:00,6.774,19x34x99,Coral,Small,Mixed Materials
+1963,LG Smartphone,LG-EL0963-SIL,CAT_511,Electronics,Mobile,Brooks,SUPP_10341,418.33,906.72,2024-09-18 00:00:00,0.217,17x6x1.1,Gold,"32""""",Plastic
+1531,HP Charger,HP-CL0531-PUR,  CAT_646  ,Photography,Other,Microsoft,SUPP_10570,270.2,426.6,  2021-01-10  ,0.316,13x94x96,Purple,  Large  ,Metal
+1834,Reebok Tablet,RE-HM0834-GRA,CAT_507,Electronics,Tablets,Puma,SUPP_10742,464.45,648.46,2022-04-18 00:00:00,1.786,14x30x29,Space Gray,"17""""",Aluminum
+1097,Adidas Tablet Basic,AD-EL0097-BLA,CAT_605,Electronics,Mobile,New Balance,SUPP_10236,43.3,60.46,2023-02-10 00:00:00,1.484,39x33x6,Gold,Large,Magnesium Alloy
+1867,Samsung Speaker Pro,SA-SP0867-PUR,CAT_515,Equipment,General,Google,SUPP_10217,360.17,528.93,2025-02-04 00:00:00,0.79,48x94x72,Turquoise,Medium,Metal
+1828,Samsung Case Essential,SA-CL0828-NAV,cat_512,Audio,Miscellaneous,New Balance,SUPP_10554,121.42,283.41,2023-12-27 00:00:00,4.463,91x65x85,Gray,Large,  Wood  
+1917,Adidas Jacket,AD-EL0917-BRO,CAT_648,Apparel,  Shirts  ,HP,SUPP_10598,429.67,615.68,2022-10-29 00:00:00,0.156,28x100x57,Mint,XS,Polyester
+1081,Sony Speaker,SO-SP0081-TUR,CAT_634,Audio,Miscellaneous,Dell,SUPP_10470,456.94,751.68,2022-12-19 00:00:00,3.607,97x92x87,navy,One Size,Metal
+1746,Panasonic Mouse,PA-EL0746-PIN,CAT_534,Sports,Nutrition,Puma,SUPP_10256,97.67,154.45,2021-02-10 00:00:00,3.826,53x92x40,  Mint  ,One Size,Metal
+  1853  ,Amazon Monitor Ultra,AM-CL0853-RED,CAT_655,  Electronics  ,Computers,Amazon,SUPP_10241,115.57,234.12,2023-03-11 00:00:00,3.47,38x11x13,Space Gray,"21""""",Carbon Fiber
+  1392  ,Google Mouse,GO-AC0392-GRE,CAT_658,Apparel,Formal,Dell,SUPP_10255,147.76,199.41,2024-11-04 00:00:00,2.709,94x36x90,Brown,Medium,Metal
+1540,,,,gaming,,Miscrosoft,,,8.71,,,73-61-22,,40,
+1470,CANON CHARGER HOME,CA-HM0470-WHI,CAT_655,gaming,Other,JBL,SUPP_10532,226.1,350.44,2021-04-22 00:00:00,8.376,42x36x47,Green,Large,Composite
+1593,Puma Smartwatch Pro,PU-EL0593-WHI,CAT_583,Electronics,Accessories,Bose,SUPP_10377,79.46,181.28,2024-04-15 00:00:00,2.188,11x50x18,White,"27""""",plastic
+1934,Under Armour Camera,UN-SP0934-BEI,CAT_523,Footwear,Outdoor,Lenovo,SUPP_10391,427.57,  899.3  ,2022-03-19 00:00:00,4.257,7x72x23,Beige,Extra Large,Synthetic
+1302,LG Monitor,LG-SP0302-NAV,CAT_632,Electronics,Tablets,Canon,supp_10914,90.84,196.03,2023-02-06 00:00:00,2.711,19x45x26,Space Gray,"13""""",Plastic
+1024,Test,,,,,,SUPP_999,Free,,,Heavy,,,,Unknown
+1026,Canon Mouse,CA-SP0026-BEI,CAT_681,Apparel,  Sportswear  ,Dell,SUPP_10751,265.66,543.43,2023-12-15 00:00:00,6.198,73x66x64,Brown,One Size,Fabric
+1197,Microsoft Tablet,MI-AC0197-RED,CAT_524,Electronics,Computers,Bose,SUPP_10561,36.37,80.09,2023-11-22 00:00:00,2.858,15x16x13,Gold,"15.6""""",Aluminum
+1521,LG Speaker Premium,LG-AC0521-TUR,CAT_658,Equipment,General,LG,SUPP_10659,86.38,199.4,2020-12-08 00:00:00,3.212,52x53x67,Silver,One Size,Metal
+1404,Brooks Headphones Air,BR-CL0404-RED,CAT_572,Electronics,Tablets,Apple,SUPP_10630,173.53,289.56,2021-05-19 00:00:00,0.285,12x6x1.1,Silver,"27""""",Steel
+1176,Nike T-Shirt,NI-CL0176-BRO,CAT_570,APPAREL,Jackets,Sony,SUPP_10695,369.16,864.3,2022-09-08 00:00:00,  0.979  ,50x44x67,Mint,S,Wool
+1885,Adidas Smartphone Advanced,AD-HM0885-GOL,CAT_600,Electronics,Accessories,Saucony,SUPP_10640,72.65,105.82,2021-01-11 00:00:00,0.165,13x8x1.0,Gold,"27""""",Glass
+1398,Lenovo Casual Shoes Premium,LE-EL0398-SIL,CAT_557,Footwear,Running,Reebok,SUPP_10243,153,310.82,2022-11-04 00:00:00,1.425,29x16x12,NAVY/RED,6.5,Suede
+1429,Apple Smartwatch,ap-ac0429-gol,CAT_523,Electronics,Tablets,Brooks,SUPP_10564,329.44,595.35,2020-12-28 00:00:00,4.141,37x42x17,Silver,"21""""",Plastic
+1274,Nike Smartwatch,NI-AC0274-RED,CAT_667,Electronics,Tablets,Canon,SUPP_10183,251.02,525.69,2024-07-18 00:00:00,1.601,17x27x20,  Black  ,Standard,Magnesium Alloy
+1358,Samsung Charger Office,SA-HM0358-SIL,CAT_564,Footwear,Outdoor,Amazon,SUPP_10646,351.19,730.92,2021-12-22 00:00:00,9.726,93x22x47,Silver,Large,  Synthetic  
+1116,Canon Running Shoes Elite,CA-SP0116-PUR,CAT_640,Footwear,Outdoor,Sony,  SUPP_10579  ,427.69,951.52,2021-11-11 00:00:00,1.362,25x15x10,Black/White,38,leather
+1472,New Balance Running Shoes Office,NE-AC0472-BLA,CAT_542,Footwear,Running,Canon,SUPP_10269,385.1,818.26,2025-09-27 00:00:00,0.811,26x16x10,Navy/Red,13,Leather
+1512,  Canon Screen Protector Premium  ,CA-AC0512-TUR,CAT_642,Electronics,Tablets,Amazon,SUPP_10327,179.72,319.49,2022-04-19 00:00:00,4.673,100x68x31,Mint,Medium,Synthetic
+1322,Bose Screen Protector Classic,BO-AC0322-BRO,CAT_541,Apparel,Formal,Sony,SUPP_10496,358.46,490.45,2022-11-26 00:00:00,7.075,72x20x93,Gold,Extra Large,Metal
+1356,Mizuno Backpack Office,MI-CL0356-ORA,CAT_561,Accessories,Bags,Nike,SUPP_10431,23.69,28.88,2023-11-26 00:00:00,8.223,92x90x13,Green,Small,Synthetic
+1437,Sony Basketball Shoes Sport,SO-AC0437-COR,CAT_551,Footwear,Formal,HP,  SUPP_10070  ,146.14,206.56,2022-10-29 00:00:00,0.599,34x20x10,White,38,Leather
+1169,JBL Basketball Shoes Premium,JB-EL0169-COR,CAT_540,Footwear,Formal,Reebok,SUPP_10549,207.67,343.53,2025-05-28 00:00:00,1.348,35x17x12,Blue,10.5,Synthetic
+1383,Panasonic Laptop Max,PA-EL0383-NAV,CAT_531,Electronics,Accessories,Samsung,SUPP_10700,278.7,358.34,2025-10-05 00:00:00,2.672,  35x25x2  ,Silver,"17""""",Glass
+1227,HP Cable Classic,  HP-AC0227-BEI  ,CAT_520,  Fitness  ,Other,Nike,SUPP_10250,442.26,690.61,2025-05-13 00:00:00,6.323,31x11x28,Gray,Small,Synthetic
+  1625  ,JBL Running Shoes Sport,,CAT_593,,Running,,SUPP_10778,122,,2022-12-15 00:00:00,1.119,,White,,Leather
+1815,Microsoft T-Shirt,MI-AC0815-GRE,CAT_590,Apparel,Jackets,Brooks,SUPP_10225,240.43,300.28,2024-05-02 00:00:00,1.504,39x77x59,Silver,2XL,Spandex
+1723,nike cable ultra,NI-CL0723-PIN,CAT_596,Apparel,Shirts,Puma,SUPP_10198,353.31,592.41,2022-08-25 00:00:00,9.68,97x53x13,Black,Medium,Synthetic
+1152,Nikon Smartwatch Advanced,NI-CL0152-BLU,CAT_624,Electronics,Tablets,NEW BALANCE,SUPP_10181,163.57,208.62,2025-04-21 00:00:00,2.534,23x20x23,Silver,"32""""",Aluminum
+1762,Apple Tablet Office,AP-CL0762-PIN,CAT_500,Electronics,Wearables,Reebok,SUPP_10331,59.28,118.46,2020-12-29 00:00:00,4.651,47x27x29,Gold,"32""""",  Aluminum  
+1460,Brooks Monitor Air,br-ac0460-red,CAT_657,Electronics,,LG,,,364.75,2021-12-08 00:00:00,,31x37x6,,"17""""",
+1030,Product,PR-CL0030-WHI,,Sports,General,Samsung,SUPP_999,,412.69,,,78x85x92,,  Medium  ,Unknown
+1840,Nikon Camera Advanced,NE-HM0794-RED,,Electronics,,nike,,,,,,,,One Size Fits All,
+1538,Lenovo Camera Ultra,LE-HM0538-GRA,CAT_535,Travel,Miscellaneous,Mizuno,SUPP_10039,39.98,89.68,  2022-02-28  ,8.677,89x42x52,Brown,Medium,Metal
+1234,Nike Casual Shoes Basic,NI-HM0234-BLU,CAT_585,Footwear,Formal,adidas,SUPP_10105,265.08,545.18,2023-01-10 00:00:00,0.606,34x17x15,White,11,Synthetic
+1241,Brooks Jacket Essential,BR-EL0241-COR,CAT_603,Apparel,Pants,Google,SUPP_10063,190.92,365.34,2022-05-17 00:00:00,0.201,95x76x50,Red,XL,Cotton
+1104,Canon Training Shoes Classic,CA-EL0104-ORA,CAT_564,Footwear,Basketball,Saucony,SUPP_10640,252.94,506.3,2022-11-19 00:00:00,0.795,27x17x10,Red,11,Nylon
+1785,Nike Camera,NI-CL0785-RED,CAT_665,Technology,Other,Saucony,SUPP_10676,93.75,155.47,2023-11-07 00:00:00,9.113,20x71x78,Turquoise,Small,Synthetic
+1869,LG Headphones,LG-SP0869-GRE,  CAT_600  ,Electronics,Accessories,Adidas,SUPP_10675,75.67,140.78,2024-11-04 00:00:00,0.148,15x7x1.0,Silver,Compact,Steel
+1370,Nike Screen Protector Pro,NI-SP0370-BEI,CAT_559,Fitness,Miscellaneous,Panasonic,SUPP_10756,310.17,405.01,2021-01-26 00:00:00,4.336,65x89x94,Red,Extra Large,Fabric
+1503,Nikon Laptop Max,NI-CL0503-PIN,CAT_578,  Electronics  ,Computers,Dell,SUPP_10241,430.3,760.56,2023-09-12 00:00:00,2.866,32x30x3,White,"13""""",Carbon Fiber
+1563,Nikon Charger Professional,NI-AC0563-RED,CAT_671,Photography,General,Amazon,SUPP_10252,189.19,285.92,2023-11-24 00:00:00,8.194,29x56x10,Orange,small,Metal
+1422,Under Armour Camera Sport,UN-SP0422-BRO,CAT_662,Sports,Nutrition,Samsung,SUPP_10089,404.91,540.54,2025-02-06 00:00:00,6.531,83x57x18,Turquoise,One Size,  Wood  
+1712,LG Casual Shoes,LG-EL0712-COR,CAT_555,FOOTWEAR,Basketball,Brooks,SUPP_10556,405.79,542.79,  2023-07-20  ,0.374,26x16x11,  Gray  ,8,Nylon
+1546,Amazon Smartwatch Plus,AM-EL0546-BLU,CAT_564,Electronics,Accessories,ASICS,SUPP_10319,112.29,241.82,2021-08-24 00:00:00,3.173,14x13x29,Space Gray,"15.6""""",Plastic
+1801,Amazon Smartwatch,AM-AC0801-BEI,CAT_615,Electronics,Mobile,Puma,SUPP_10440,206.15,334.19,2023-04-09 00:00:00,1.347,39x10x8,White,"13""""",Magnesium Alloy
+1231,Amazon T-Shirt Classic,AM-AC0231-WHI,CAT_665,Apparel,Pants,Bose,SUPP_10159,317.33,748.8,2023-11-03 00:00:00,1.12,47x64x57,White,3XL,Linen
+1797,LG Laptop Office,LG-EL0797-PUR,CAT_658,Electronics,Tablets,JBL,SUPP_10089,409.24,589.7,  2023-08-24  ,2.118,32x25x2,Gold,"27""""",  Carbon Fiber  
+1215,Samsung Monitor Elite%,  SA-CL0215-PUR  ,cat_588,Electronics,Accessories,New Balance,SUPP_10024,387.14,  549.75  ,2024-02-21 00:00:00,2.074,38x49x9,Space Gray,"13""""",Plastic
+1011,Dell Smartphone Air,DE-CL0011-BLU,CAT_652,Electronics,Computers,ASICS,SUPP_10882,125.25,169.82,2024-04-07 00:00:00,0.278,13x6x1.1,Space Gray,Large,Steel
+1902,Brooks Mouse Essential,BR-AC0902-MIN,CAT_606,Electronics,Computers,New Balance,SUPP_10775,200.1,481.34,2023-09-29 00:00:00,7.63,50x92x96,White,One Size,Fabric
+1532,Microsoft Training Shoes Office,MI-EL0532-GRA,CAT_530,Footwear,Formal,Canon,SUPP_10405,404.97,906.13,2021-12-29 00:00:00,1.281,25x19x12,Black,42,Mesh
+1645,Panasonic Laptop Air,PA-SP0645-MIN,CAT_639,Electronics,Wearables,Nike,SUPP_10513,435.59,937.64,2023-10-15 00:00:00,2.964,34x29x3,Black,"32""""",Steel
+1219,Lenovo Smartwatch Sport,le-cl0219-blu,CAT_686,  Electronics  ,Wearables,JBL,SUPP_10983,342.22,798.92,2023-01-20 00:00:00,3.589,36x25x23,Silver,"27""""",Glass
+1363,Nikon Casual Shoes Sport,NI-HM0363-TUR,CAT_518,Footwear,Casual,Sony,SUPP_10732,239.94,336.19,2022-03-20 00:00:00,0.447,25x19x15,Black/White,  11.5  ,Mesh
+1731,Mizuno Tablet Pro,MI-AC0731-TUR,CAT_670,Electronics,Wearables,Samsung,SUPP_10935,133.64,163.78,2025-04-22 00:00:00,3.448,47x25x22,Gold,"14""""",Magnesium Alloy
+1634,Apple Basketball Shoes Ultra,AP-AC0634-RED,CAT_520,Footwear,Formal,Amazon,SUPP_10631,366.68,617.4,2021-03-20 00:00:00,0.81,29x19x14,Gray,11,Suede
+1212,Lenovo Training Shoes Air,LE-HM0212-YEL,  cat_645  ,Footwear,Basketball,Saucony,SUPP_10079,364.55,813.23,2024-01-26 00:00:00,0.425,34x15x14,Black/White,10.5,Leather
+1728,JBL Smartphone Premium,JB-EL0728-ORA,CAT_614,Electronics,Computers,Sony,SUPP_10606,24.94,53.27,2024-04-03 00:00:00,0.295,17x6x1.0,Silver,Compact,Aluminum
+1173,Panasonic Backpack Pro,PA-AC0173-SIL,CAT_636,Accessories,Belts,Saucony,SUPP_10400,400.42,922.69,2024-09-08 00:00:00,3.02,86x23x43,Orange,Small,Wood
+1361,Panasonic Speaker Classic,PA-EL0361-BLU,CAT_625,Footwear,Basketball,Adidas,SUPP_10649,496.09,1200.42,  2023-01-11  ,1.343,27x80x75,Gold,  Medium  ,Wood
+1332,Apple Screen Protector Premium,AP-EL0332-BEI,CAT_672,Footwear,Casual,Panasonic,SUPP_10847,304.64,518.73,2021-09-02 00:00:00,8.408,94x6x20,Beige,Large,Composite
+1014,Apple Smartwatch Home,AP-SP0014-MIN,CAT_537,Electronics,Wearables,Sony,SUPP_10042,161.05,381.48,2021-04-14 00:00:00,4.083,12x32x11,Silver,Large,Aluminum
+1790,LG Case,LG-AC0790-BEI,CAT_617,Home & Office,Miscellaneous,Puma,SUPP_10098,309.44,461.54,2025-01-07 00:00:00,7.702,92x7x88,  Silver  ,One Size,MIXED MATERIALS
+1456,ASICS Headphones,AS-CL0456-BLA,CAT_592,Electronics,Wearables,Puma,SUPP_10559,433.6,712.37,2021-08-16 00:00:00,0.236,17x9x0.7,Silver,Standard,Carbon Fiber
+1134,  Reebok Casual Shoes  ,RE-EL0134-BLU*,CAT_514,Footwear,Basketball,  Under Armour  ,SUPP_10224,19.76,35.99,2020-10-27 00:00:00,  0.631  ,  34x16x11  ,Blue,46,Synthetic
+1784,Panasonic Smartphone,  PA-CL0784-BRO  ,CAT_671,Electronics,Mobile,Nike,SUPP_10905,350.17,628.5,2024-05-29 00:00:00,0.171,  13x6x0.8  ,Space Gray,"13""""",Magnesium Alloy
+1685,Puma Camera Advanced,PU-AC0685-NAV,CAT_649,Technology,General,Panasonic,SUPP_10774,302.95,589.12,2023-04-27 00:00:00,9.432,58x84x78,Yellow,Large,Wood
+1660,Test,SKU-660!@#,,Unknown,,Unknown,,,0,,,29x37,,  Extra Large (L)  ,
+1228,Samsung Monitor Ultra,SA-SP0228-MIN,CAT_545,  Electronics  ,Wearables,Saucony,SUPP_10592,186.49,232.48,2023-01-21 00:00:00,3.958,30x33x17,Black,"""  27""""  """,Steel
+1770,HP Smartphone™ #770,DE-AC0036-BLU,CAT_618,Footwear,Budget Sports Products,nike,SUPP_10004,  478.92  ,Contact for price,1984-07-07 00:00:00,45.311943,Large,Red-ish,,Linen
+1758,New Balance Charger Sport,NE-CL0758-GOL,CAT_544,Photography,Other,Adidas,SUPP_10728,293.26,  704.22  ,2025-09-05 00:00:00,1.761,20x10x19,Black,Medium,Composite
+1842,JBL Case Basic,JB-CL0842-GOL,  CAT_623  ,Audio,Other,apple,SUPP_10517,174.75,235.61,2023-04-16 00:00:00,6.348,  74x56x27  ,  Yellow  ,extra large,Mixed Materials
+1524,Mizuno Cable Air,MI-HM0524-WHI,CAT_581,Technology,Other,Apple,SUPP_10201,244.37,433.63,  2021-04-09  ,4.813,17x74x80,Gold,One Size,Metal
+1026,Saucony Headphones Elite,,,,  running  ,,SUPP_10976,999999.99,,Invalid,0,,Blue/Blue,,aluminum
+1868,HP Jacket,HP-HM0868-WHI,CAT_680,Apparel,Shirts,New Balance,SUPP_10341,276.83,683.23,2022-01-06 00:00:00,1.955,60x16x51,Pink,2XL,Silk
+1618,Lenovo Running Shoes Basic,LE-SP0618-SIL,CAT_665,Footwear,Formal,LG,SUPP_10251,201.9,430.48,2024-08-06 00:00:00,1.412,32x19x12,WHITE,10,Rubber
+1468,JBL Keyboard,JB-EL0468-GRE,  CAT_552  ,Home & Office,Other,LG,SUPP_10849,413.12,719.14,2025-01-01 00:00:00,6.455,41x23x8,Purple,One Size,Fabric
+1278,Dell Casual Shoes,DE-EL0278-GRE,CAT_532,Footwear,Basketball,Brooks,SUPP_10232,160.64,236.59,2023-08-06 00:00:00,1.475,31x20x10,Black,6,Nylon
+ ,  NULL  ,,,, ,,,,, ,    ,,  NULL  ,,
+1894#,Brooks Jacket,BR-AC0894-BRO,CAT_692,Apparel,Jackets,Lenovo,SUPP_10978,409.3,965.36,2023-10-15 00:00:00,  1.836  ,38x44x53,White,XL,Wool
+1040,  Nikon Camera Advanced  ,ni-sp0040-bla,CAT_9999,electronics,,Amazon,,,800.22,02-11-2021,,50x52x60,,Medium,
+1395,LG Jacket Essential,LG-HM0395-ORA,CAT_560,Apparel,Jackets,HP,SUPP_10598,198.18,466.39,2025-08-17 00:00:00,0.348,100x82x20,White,L,Silk
+1254,Adidas Running Shoes,AD-HM0254-GRE,CAT_625,Footwear,Formal,Apple,SUPP_10811,274.87,439.81,2023-06-20 00:00:00,0.894,32x15x10,Blue,6.5,Canvas
+1447,Panasonic Monitor,PA-HM0447-BEI,CAT_677,Electronics,Tablets,JBL,SUPP_10957,345.73,575.58,2022-12-11 00:00:00,2.094,39x36x18,Space Gray,"13""""",Steel
+1062,Bose Running Shoes Essential,BO-AC0062-BEI,CAT_696,Footwear,Casual,  Mizuno  ,SUPP_10391,256.42,447.26,2025-08-20 00:00:00,0.411,28x19x11,Navy/Red,10,Leather
+1983,ASICS Mouse Elite,AS-EL0983-PUR,CAT_568,Travel,Miscellaneous,Sony,SUPP_10918,200.61,479.32,2025-07-19 00:00:00,  4.481  ,60x77x93,Blue,Medium,Wood
+1739,Microsoft Keyboard Ultra,  MI-EL0739-BEI  ,  CAT_502  ,Apparel,Formal,Amazon,SUPP_10104,199.11,280.3,2023-10-05 00:00:00,9.341,79x36x85,Brown,Large,Wood
+1907,Bose Laptop,BO-SP0907-WHI,CAT_666,Electronics,Accessories,Mizuno,SUPP_10264,447.47,  628.03  ,2024-10-04 00:00:00,3.152,31x29x3,Silver,Standard,Plastic
+1625,Sony Monitor Pro,,,,  COMPUTERS  ,,SUPP_10031,0,,0000-00-00,100000,,Silver/Yellow,,PLASTIC
+1209,Panasonic Running Shoes,PA-CL0209-SIL&,CAT_642,Footwear,Outdoor,Canon,SUPP_10764,61.7,125.26,2024-02-26 00:00:00,0.665,32X20X15,Red,7.5,Synthetic
+,Nikon Cable Essential,,,,,,,,,0000-00-00,,,,,
+1330,  Test  ,SKU-330!@#,,General,  NULL  ,generic,supp_999,,999999.99,,Heavy,44x46,,  Small (M)  ,
+1923,Dell Basketball Shoes Pro,  DE-CL0923-ORA  ,CAT_666,Footwear,Casual,lg,SUPP_10873,486.98,656.24,  2025-05-03  ,1.35,28x17x12,Blue,46,Suede
+1640,,xx-cl0640-whi,CAT_9999,footwear,,Adidas,,,595.93,2023-06-06,,23x18x62,,Medium,
+1632,HP Screen Protector Pro,  HP-AC0632-YEL  ,CAT_585,Technology,Other,Nikon,SUPP_10355,314.67,494.16,2021-08-20 00:00:00,0.604,71x79x20,Beige,Extra Large,Metal
+1895,LENOVO LAPTOP ADVANCED,LE-CL0895-PIN,CAT_625,Electronics,Mobile,Microsoft,SUPP_10240,181.36,444.23,2023-04-11 00:00:00,1.391,36x28x1,Silver,"24""""",Aluminum
+1294,LG Casual Shoes,LG-HM0294-WHI,CAT_689,Footwear,Running,Brooks,SUPP_10939,396.51,599.36,2020-11-02 00:00:00,0.919,29x20x15,Blue,45,Leather
+1111,Dell Jacket Premium,DE-AC0111-BRO,CAT_652,Apparel,Pants,Puma,SUPP_10392,217.29,398.22,2025-04-15 00:00:00,1.121,87x27x76,Silver,2XL,Linen
+1051,LG Monitor Advanced,LG-EL0051-PIN,CAT_653,Electronics,Tablets,LG,SUPP_10106,293.18,432.9,2024-09-26 00:00:00,3.455,24X16X16,Gold,"24""""",Aluminum
+1407,Brooks Basketball Shoes Max,BR-SP0407-BLA,CAT_552,Footwear,Running,LG,SUPP_10571,  242.22  ,332.73,2021-03-29 00:00:00,0.343,30X17X11,Blue,38,Synthetic
+1107,Under Armour Screen Protector Air,UN-CL0107-ORA,CAT_542,Outdoor,Other,Adidas,SUPP_10576,491.97,1023.65,2021-01-10 00:00:00,4.056,47x60x18,Black,Small,Fabric
+1290,Puma Mouse,PU-AC0290-NAV,CAT_663,Photography,Other,Mizuno,SUPP_10928,222.52,430.79,2024-10-03 00:00:00,6.305,71x30x51,Beige,Medium,Composite
+1108,  LG Laptop Plus  ,LG-AC0108-BLU,CAT_529,Electronics,Mobile,LG,supp_10319,178.1,395.3,2025-08-15 00:00:00,2.399,35x27x1,Space Gray,"32""""",Glass
+1198,Dell Laptop,DE-SP0198-PUR,CAT_621,Electronics,Wearables,Reebok,SUPP_10957,143.48,255.15,  2024-05-16  ,3.43,38x22x3,Gold,"32""""",  Magnesium Alloy  
+1692,Dell Smartphone Classic,DE-CL0692-YEL,CAT_695,Electronics,Wearables,ASICS,SUPP_10133,302.19,497.98,2024-12-30 00:00:00,0.211,12x9x1.2,Space Gray,"27""""",Aluminum
+1306,Bose Monitor Office,BO-SP0306-GRA,CAT_591,Electronics,Computers,LG,SUPP_10524,107.94,192.03,2021-12-29 00:00:00,2.246,27x46x24,Space Gray,"14""""",Carbon Fiber
+1213,Samsung Basketball Shoes Home,SA-HM0213-BLA,CAT_662,Footwear,Formal,Adidas,SUPP_10312,266.95,431.15,2023-05-09 00:00:00,0.934,30X19X15,White,8,Leather
+1738,Bose Charger Ultra,BO-AC0738-PIN,  CAT_672  ,Equipment,Other,Reebok,SUPP_10571,119.82,256.38,2021-02-01 00:00:00,3.605,63x79x89,Yellow,Medium,Fabric
+1543,Under Armour Training Shoes Air,UN-SP0543-COR,  CAT_586  ,Footwear,Casual,Dell,SUPP_10261,177.08,413.23,2021-06-07 00:00:00,1.204,32x20x10,Black/White,11,Nylon
+1010,Panasonic Smartphone,PA-EL0010-YEL,CAT_567,  Electronics  ,Wearables,Google,SUPP_10433,351.33,755.24,2024-07-27 00:00:00,0.257,17X9X0.7,White,"17""""",Aluminum
+1702,  JBL Cable  ,JB-EL0702-MIN,CAT_581,Outdoor,Other,  Nike  ,SUPP_10408,325.34,679,2021-12-11 00:00:00,7.945,52x11x94,Navy,Small,Synthetic
+1596,Bose Laptop Advanced,BO-AC0596-MIN,CAT_517,Electronics,Computers,HP,SUPP_10603,27.64,41.41,2023-08-10 00:00:00,2.33,35x21x3,White,Compact,Plastic
+1343,LG Camera Professional,LG-HM0343-BRO,cat_682,Footwear,Running,Sony,SUPP_10903,462.84,1033.69,2022-10-12,1.998,53x93x52,Purple,One Size,Metal
+  1167  ,ASICS Smartphone Sport,AS-AC0167-PUR,CAT_641,Electronics,Computers,Nike,SUPP_10761,133.16,267.22,2022-07-18 00:00:00,  0.256  ,18x9x1.3,White,standard,Steel
+1794,New Balance Smartphone Classic,NE-HM0794-RED,CAT_689,Electronics,Accessories,Canon,  SUPP_10151  ,323.34,692.48,2023-10-20 00:00:00,0.281,  17x6x1.2  ,Gold,Large,Carbon Fiber
+1048,Canon Speaker,CA-EL0048-TUR,CAT_614,Technology,Miscellaneous,JBL,SUPP_10607,63.44,117.68,2024-07-21 00:00:00,9.46,10x98x89,Coral,  Large  ,Metal
+1886,Dell Smartwatch Pro,DE-CL0886-BLU,CAT_542,Electronics,Mobile,Saucony,SUPP_10744,250.92,607.34,2022-08-03 00:00:00,1.168,10x32x15,Black,"17""""",Plastic
+1442,Saucony Jacket Plus,SA-AC0442-NAV,CAT_593,Apparel,Sportswear,nike,SUPP_10847,182.79,388.1,2025-07-19 00:00:00,1.794,89x81x66,Red,XL,Cotton
+1665,ASICS Monitor™ #665,  UN-CL0123-RED  ,CAT_521,Technology,Mobile,NIKE,SUPP_10074,85.33,,2023-01-11 00:00:00,2.456,Small,White,,Magnesium Alloy
+1065,Nike Screen Protector Max,NI-CL0065-PIN,CAT_609,Electronix,Other,LG,SUPP_10246,289.63,  195.44077  ,2024-12-25,6.715,  72cm x 51cm x 13cm  ,Coral,3Xl,Wood
+1704,Reebok Cable Elite,RE-AC0704-SIL,CAT_566,Footwear,Casual,Dell,SUPP_10545,383.13,819.57,2025-04-18 00:00:00,9.328,27x48x54,Silver,One Size,Composite
+1031,Under Armour Basketball Shoes Sport,UN-AC0031-BEI!,CAT_576,Footwear,Outdoor,Canon,SUPP_10312,288.63,368.96,2023-10-27 00:00:00,1.448,26x16x15,White,10,Suede
+  1106  ,saucony keyboard max,SA-AC0106-PIN,CAT_677,Footwear,Formal,ASICS,SUPP_10511,78.2,124.63,2022-12-28 00:00:00,2.602,24x96x59,Yellow,Small,Metal
+1095,  Google Backpack Basic  ,GO-SP0095-PIN,CAT_566,Home & Office,Other,Bose,SUPP_10477,58.32,144.38,2021-03-31 00:00:00,4.748,45x31x52,Purple,Extra Large,Mixed Materials
+1782,Reebok Training Shoes,RE-EL0782-SIL,CAT_669,Footwear,  Outdoor  ,Brooks,SUPP_10797,83.23,185.27,2021-08-10 00:00:00,0.6,26x15x10,Black/White,6.5,Rubber
+1222,Panasonic Mouse Ultra,PA-CL0222-GRE,CAT_508,Audio,General,Microsoft,SUPP_10973,  212.39  ,459.84,2021-07-06 00:00:00,9.884,31x13x27,Beige,One Size,Metal
+1663,Samsung Tablet Max,SA-HM0663-NAV,CAT_500,Electronics,Wearables,Brooks,SUPP_10357,467.98,1019.88,2022-05-20 00:00:00,3.003,20x11x28,Black,Large,Steel
+1826,Mizuno Mouse Elite,mi-sp0826-gre,CAT_691,Electronics,Mobile,Microsoft,SUPP_10657,191.4,243.63,2024-11-22 00:00:00,9.421,27x34x99,Mint,Large,Metal
+,,,,,,,,,,,,,,,
+1046,Brooks Jacket,BR-AC0046-GRE,CAT_592,  Apparel  ,Shirts,ASICS,SUPP_10376,276.79,684,2022-08-02 00:00:00,0.781,55x40x29,Red,2XL,Polyester
+1768,Dell Speaker,DE-HM0768-PUR,CAT_684,Equipment,Miscellaneous,Nike,SUPP_10059,53.59,100.55,  2025-02-07  ,9.459,  71x28x25  ,Navy,Extra Large,  Composite  
+1127,  New Balance Laptop Pro  ,NE-AC0127-PIN,CAT_526,Electronics,  Mobile  ,JBL,SUPP_10243,215.71,528.39,2023-11-15 00:00:00,3.437,32x24x1,Black,"17""""",Steel
+1612,Samsung Laptop,SA-HM0612-SIL,CAT_670,Electronics,Mobile,Nikon,SUPP_10675,498.3,839.79,  2022-03-11  ,1.805,31x30x1,Gold,"27""""",Aluminum
+  1490  ,samsung smartphone™ #490,PA-SP0352-TUR,CAT_619,Fitness,Premium Gaming Products,NIKE,SUPP_10353,318.12,,1992-05-20 00:00:00,13.801573,  Compact  ,Red-ish,Standard,Denim
+1446,Panasonic Monitor Office,PA-EL0446-NAV,CAT_577,Electronics,Accessories,Google,SUPP_10177,286.31,596.27,2025-10-06 00:00:00,1.951,47x18x26,Silver,"21""""",Plastic
+1877,Saucony Charger Advanced,SA-AC0877-NAV,CAT_647,Audio,General,Dell,SUPP_10181,192.87,480.13,2023-09-10 00:00:00,8.436,23x28x42,Black,Large,Synthetic
+1764,Nikon Tablet Office,NI-AC0764-BLA,CAT_677,Electronics,accessories,Lenovo,SUPP_10129,20.92,27.47,2025-06-11 00:00:00,2.442,32x39x25,Gold,Standard,Steel
+1305,  Amazon Cable  ,AM-EL0305-PIN,CAT_582,Technology,General,Saucony,SUPP_10072,278.11,551.49,2022-03-03 00:00:00,1.016,37x27x35,Yellow,Small,  Mixed Materials  
+  1324  ,Bose Cable Classic,BO-SP0324-YEL,CAT_621,Fashion,Other,Under Armour,SUPP_10135,383.36,711.59,2022-02-16 00:00:00,4.663,62x90x62,Gray,Large,Mixed Materials
+1779,New Balance T-Shirt Essential,NE-CL0779-MIN,CAT_591,Apparel,Jackets,Mizuno,SUPP_10768,129.38,218.13,2024-01-30 00:00:00,1.177,23x10x51,Yellow,S,Cotton
+1192,Mizuno Cable,MI-HM0192-BRO,CAT_622,Photography,General,JBL,SUPP_10355,202.92,424.56,2022-09-13 00:00:00,1.831,20x94x71,Beige,Large,  Synthetic  
+1247,Canon Backpack,CA-AC0247-SIL,  CAT_553  ,Fitness,Other,LG,SUPP_10055,324.71,708.56,2021-01-31 00:00:00,1.248,26x64x56,turquoise,Large,Metal
+  1709  ,Amazon Speaker Advanced,AM-SP0709-MIN,  CAT_661  ,Home & Office,Other,Puma,SUPP_10432,482.62,1078.94,2024-10-12 00:00:00,  3.242  ,96x83x41,Silver,One Size,Composite
+1174,HP JACKET,HP-HM0174-GRA,CAT_541,Apparel,Pants,Lenovo,SUPP_10631,419.03,608.69,2024-10-14 00:00:00,0.445,77x11x75,Beige,3XL,Polyester
+1070,Samsung Laptop™ #70,HP-CL0024-TUR,CAT_627,Photography,Budget Sports Items,Nike Inc.,SUPP_10793,137.54,Contact for price,1993-05-08 00:00:00,10.807064,Standard Size,Grey,,Silk
+1744,Puma Backpack Premium,PU-AC0744-PIN,CAT_629,Audio,Other,Google,SUPP_10705,447.34,589.32,2021-09-17 00:00:00,3.469,38x45x89,White,Small,Mixed Materials
+1641,Canon Headphones Basic,CA-HM0641-PIN,CAT_681,Electronics,Mobile,Bose,SUPP_10671,  26.58  ,37.3,  2025-04-22  ,0.138,12x6x0.5,White,"27""""",Plastic
+1316,Mizuno Laptop,MI-AC0316-PUR,CAT_573,Electronics,Accessories,Dell,SUPP_10087,140.35,298.91,2024-03-24 00:00:00,2.155,40x30x1,Silver,Compact,  Carbon Fiber  
+1711,Samsung Casual Shoes Home,SA-HM0711-COR,CAT_657,Footwear,Formal,Panasonic,SUPP_10600,313.78,668.9,2023-12-25 00:00:00,0.387,28x18x13,Black/White,38,Suede
+,Nikon Camera Advanced,,,,,,,,,,,,,,
+1433,Sony Backpack,SO-HM0433-COR,CAT_510,Home & Office,Other,Nike,SUPP_10071,240.25,547.48,2021-05-28 00:00:00,  4.209  ,43x40x45,Orange,Extra Large,Mixed Materials
+1791,Saucony Speaker,SA-EL0791-NAV,CAT_563,Fashion,Other,Reebok,SUPP_10840,  145.19  ,291.27,  2020-12-12  ,3.98,24x77x15,Gold,Small,Metal
+1009,New Balance Screen Protector!,NE-AC0009-PUR,CAT_527,Accessories,Belts,HP,SUPP_10549,229.82,401.83,2024-10-27 00:00:00,2.858,36x14x61,Mint,SMALL,Mixed Materials
+1944,Bose Running Shoes Max,BO-SP0944-SIL,CAT_678,Footwear,Outdoor,Brooks,SUPP_10632,435.54,807.85,2021-12-26 00:00:00,0.826,31x15x15,Navy/Red,11,Nylon
+1891,Sony Charger Advanced,SO-HM0891-GRA,CAT_535,Outdoor,General,JBL,SUPP_10457,302.27,664.14,2022-09-29 00:00:00,9.685,24x55x23,White,One Size,Fabric
+1671,JBL Smartwatch Essential,JB-EL0671-GRE,CAT_605,Electronics,Mobile,Microsoft,SUPP_10523,121.64,196.83,2022-09-17 00:00:00,3.476,33x29x10,Gold,"27""""",MAGNESIUM ALLOY
+1246,Nike Smartwatch Classic,,,,COMPUTERS,,SUPP_10000,999999.99,,0000-00-00,0.0001,,Yellow/Yellow,,aluminum
+1736,Puma Keyboard Elite,PU-AC0736-BLA,CAT_638,Apparel,Shirts,Nike,SUPP_10265,274.65,479.11,2021-01-05 00:00:00,3.27,90x16x28,Gold,Extra Large,Wood
+1217,Google Running Shoes Essential,GO-SP0217-WHI,CAT_619,Footwear,Running,Apple,SUPP_10397,333.58,687.8,2020-11-23 00:00:00,1.387,30x15x10,blue,44,Mesh
+1007,Microsoft Speaker Sport,MI-CL0007-MIN,CAT_693,Travel,Other,HP,  SUPP_10730  ,162.74,405.82,2023-08-01 00:00:00,6.534,61x71x62,red,Medium,Composite
+1957,ASICS Smartwatch Advanced,AS-HM0957-MIN,CAT_563,Electronics,Mobile,Amazon,SUPP_10769,280.89,511.42,2023-06-14 00:00:00,4.876,45x42x19,Space Gray,"32""""",Steel
+1804,ASICS Running Shoes Ultra,AS-CL0804-GRA,CAT_663,Footwear,Formal,lenovo,supp_10716,311.81,736.4,2024-04-18 00:00:00,0.984,27x15x12,Blue,39,Suede
+1517,Nikon Speaker Professional,NI-HM0517-PUR,CAT_540,Accessories,JEWELRY,Saucony,SUPP_10985,44.22,96.1,2023-09-18 00:00:00,6.852,57x71x65,Yellow,Small,Metal
+1106,  N/A  ,,,,General,,SUPP_999,,,,Light,,,,Mixed
+1462,Lenovo Keyboard Elite,LE-HM0462-PIN,CAT_667,Accessories,Hats,Microsoft,SUPP_10326,351.91,652.61,2025-04-09 00:00:00,0.635,57x95x84,Turquoise,Large,Mixed Materials
+1382,Microsoft Training Shoes Office,MI-CL0382-YEL,CAT_616,Footwear,  Running  ,Microsoft,SUPP_10692,218.42,459.31,2025-05-10 00:00:00,0.897,26x20x15,Blue,44,Suede
+1084,Google T-Shirt,GO-EL0084-BLU,CAT_666,Apparel,Formal,Lenovo,SUPP_10547,371.96,857.53,2023-09-19 00:00:00,0.171,27x58x27,White,XXXL,Spandex
+1991,Nike T-Shirt Basic,NI-AC0991-NAV,CAT_645,Apparel,Sportswear,HP,SUPP_10904,342.35,518.27,2024-03-24 00:00:00,0.107,84x61x24,Gold,XXXL,  Polyester  
+1374,Lenovo Mouse Ultra,LE-HM0374-PIN,CAT_537,Travel,  other  ,Brooks,SUPP_10035,303.45,485.99,  2025-06-28  ,9.904,20x40x95,Turquoise,Medium,Metal
+1699,Nike Camera,NI-EL0699-PUR,CAT_508,Fitness,  OTHER  ,Saucony,SUPP_10235,334.53,637.27,2025-08-16,9.753,81x96x93,Navy,  One Size  ,Fabric
+1374,Lenovo Mouse Ultra,LE-HM0374-PIN,CAT_537,Travel,Other,Brooks,SUPP_10035,303.45,485.99,  2025-06-28  ,9.904,  20x40x95  ,Turquoise,Medium,Metal
+1979&,Brooks Backpack Sport,BR-SP0979-YEL,CAT_531,  Photography  ,General,HP,SUPP_10902,167.91,334.05,2021-09-12 00:00:00,2.712,90x76x63,Yellow,One Size,Mixed Materials
+1689,Canon Headphones Basic,CA-CL0689-GOL,CAT_635,Electronics,Tablets,Puma,SUPP_10344,  490.43  ,1066.95,2021-09-25 00:00:00,  0.15  ,13x8x0.9,Silver,"17""""",Steel
+1163,Dell Mouse,DE-AC0163-RED,CAT_565,Fitness,General,HP,  SUPP_10123  ,465.81,796.89,  2022-12-04  ,4.625,29x96x48,Red,Extra Large,Mixed Materials
+1604,Canon Tablet Office,CA-CL0604-PUR&,CAT_591,Electronics,Wearables,Nikon,SUPP_10771,274.21,571.57,2025-03-11 00:00:00,4.504,31x42x25,silver,Standard,Glass
+1619,Microsoft Mouse Premium,MI-HM0619-NAV%,CAT_630,Fitness,Miscellaneous,HP,SUPP_10272,34.99,61.44,2022-06-01 00:00:00,9.819,81x18x65,Brown,Extra Large,Fabric
+1073,JBL Casual Shoes Plus,jb-cl0073-min,  CAT_570  ,Footwear,Basketball,New Balance,SUPP_10310,311.07,411.07,2021-03-15 00:00:00,1.033,34x19x11,White,45,Rubber
+1115,Lenovo Backpack Essential,  LE-SP0115-BRO  ,CAT_596,  Gaming  ,General,New Balance,SUPP_10813,441.26,582.91,2021-07-19 00:00:00,5.205,40x93x52,Beige,Extra Large,Fabric
+1694,Canon Basketball Shoes Basic,CA-SP0694-GRA,CAT_619,Footwear,Formal,Reebok,SUPP_10587,488.45,824.88,2024-02-01 00:00:00,0.448,32x15x15,Gray,10.5,Canvas
+1339,Puma Monitor Basic,PU-SP0339-PIN,CAT_649,electronics,Accessories,Mizuno,SUPP_10149,82.23,131.67,2023-03-03,  2.043  ,  33x10x21  ,  Gold  ,Large,Magnesium Alloy
+,,,,,,,,,,,,,,,
+1703,ASICS Headphones,AS-HM0703-SIL,CAT_699,Electronics,Tablets,LG,  SUPP_10274  ,133.09,321.35,2022-04-28 00:00:00,0.179,16x9x0.7,White,Standard,Glass
+1783,Canon Speaker,CA-EL0783-GRA,CAT_529,Footwear,Formal,panasonic,SUPP_10454,117.77,162.16,2022-07-14 00:00:00,9.282,41x91x47,Beige,Large,Wood
+1017,Reebok Running Shoes Air,RE-SP0017-PUR,CAT_669,Footwear,Running,Saucony,SUPP_10921,157.16,251.78,  2024-06-04  ,0.731,31x20x12,Gray,8,Synthetic
+  1559  ,Canon Camera Max,CA-HM0559-SIL,CAT_546,Electronics,Wearables,Saucony,SUPP_10122,172.58,228.22,2024-05-03,4.095,94x92x54,Brown,Extra Large,Synthetic
+1584,Dell Running Shoes,DE-HM0584-GOL,CAT_679,Footwear,Running,Brooks,SUPP_10779,47.13,68.02,2022-07-14 00:00:00,0.618,28x16x13,Black/White,42,Canvas
+1484,Panasonic Smartwatch Office,PA-SP0484-BLU,CAT_519,Electronics,Computers,JBL,SUPP_10739,354.71,763.49,2020-12-09 00:00:00,0.591,44x48x9,Black,Standard,Carbon Fiber
+1502,Mizuno Speaker,MI-AC0502-NAV,CAT_647,Audio,Other,Nike,SUPP_10167,260.98,626.11,2023-01-18 00:00:00,8.877,94x72x30,Gray,Medium,Synthetic
+1201,Brooks Training Shoes,BR-HM0201-NAV,CAT_605,  Footwear  ,Basketball,Apple,SUPP_10186,76.95,103.38,  2023-07-19  ,0.792,32x17x15,Gray,39,Synthetic
+1652,Puma Tablet,PU-SP0652-PIN,CAT_694,Electronics,Accessories,Mizuno,  SUPP_10554  ,457.36,596.2,2023-02-13 00:00:00,3.708,46x44x14,Gold,Large,Glass
+1455,New Balance Laptop™ #455,MI-HM0098-BRO,CAT_582,Footwear,Formal,Nike®,SUPP_10136,494.55,TBD,2023-06-07 00:00:00,2.48,Small,White,,Carbon Fiber
+1079,JBL Speaker Advanced!,JB-HM0079-PIN,CAT_621,Fashion,General,LG,SUPP_10339,340.17,841.54,2024-05-04 00:00:00,5.879,97x93x85,Black,One Size,Metal
+1268,Lenovo Speaker Sport,LE-HM0268-PUR,CAT_667,Outdoor,Miscellaneous,Bose,SUPP_10607,336.27,635.29,2022-01-13 00:00:00,5.53,63x43x77,gray,Large,Composite
+1883,Brooks Jacket Elite,BR-EL0883-YEL,CAT_509,Apparel,Pants,Samsung,SUPP_10108,291.74,391.97,2024-05-31 00:00:00,1.915,73x79x16,Silver,XXXL,Nylon
+1529,Microsoft Laptop Max,MI-CL0529-NAV,CAT_575,Electronics,Tablets,Nike,SUPP_10329,219.47,372.47,2021-03-26 00:00:00,2.484,33x23x3,Gold,"32""""",Glass
+1341,Nike Screen Protector,NI-CL0341-BEI,CAT_659,Accessories,Belts,Bose,SUPP_10752,386.49,873.1,  2022-01-14  ,8.092,53x31x56,Silver,Small,Fabric
+1568,Dell Mouse,DE-HM0568-PUR,CAT_542,Travel,Miscellaneous,ASICS,SUPP_10732,466,800.43,2022-12-04 00:00:00,5.409,41x77x38,Red,Small,Metal
+1649,Brooks Tablet Advanced,BR-CL0649-TUR,CAT_642,Electronics,  Wearables  ,Panasonic,SUPP_10329,324.84,473.89,  2025-02-04  ,  0.689  ,38x22x5,Gold,"24""""",Aluminum
+1602,Nikon Monitor,NI-EL0602-WHI,CAT_668,Electronics,Computers,  Mizuno  ,SUPP_10897,147.6,  231.15  ,2022-05-02 00:00:00,2.656,27x11x26,White,"17""""",Plastic
+1308,ASICS Cable Elite,AS-SP0308-BLU,CAT_696,  Photography  ,General,Samsung,SUPP_10758,334.17,479.01,2022-06-16 00:00:00,1.904,55x10x15,Brown,Large,Fabric
+1313,Brooks Backpack Home,BR-SP0313-TUR,CAT_541,Fitness,General,Google,SUPP_10707,377.13,  779.59  ,2023-07-22 00:00:00,1.378,30x25x82,Turquoise,Small,Metal
+1960,,xx-cl0960-pin,,Equipment,,Nike,,,342.92,,,95x88x24,,Small,
+1432,Apple Cable Sport,AP-AC0432-PUR,CAT_581,Accessories,Belts,  adidas  ,SUPP_10821,252.03,317.77,2023-04-02 00:00:00,2.817,20x20x62,Silver,One Size,Fabric
+1066,LG Basketball Shoes Basic,LG-EL0066-PUR,CAT_534,Footwear,Running,LG,supp_10559,175.89,358.05,2021-07-16 00:00:00,  1.279  ,35x18x15,Red,44,Synthetic
+1580,Amazon Camera,am-cl0580-pin,CAT_567,Gaming,,Canon,,,350.77,2024-02-16 00:00:00,,39x100x89,,Extra Large,
+1064,Brooks Smartwatch Classic,BR-AC0064-BLA,CAT_520,Electronics,Computers,Microsoft,SUPP_10220,419.13,801.98,2025-02-16,3.773,43x37x8,WHITE,"17""""",Glass
+1409,Google Mouse Elite,GO-AC0409-BLA,CAT_573,Footwear,Basketball,Adidas,SUPP_10902,324.8,644.87,2024-01-06 00:00:00,1.818,25x6x55,Brown,Extra Large,Wood
+1669,Apple T-Shirt,AP-HM0669-BLU,CAT_521,Apparel,Pants,Bose,SUPP_10975,404.63,716.47,2025-09-24 00:00:00,1.799,87x52x12,Black,M,Denim
+  1166  ,Adidas Smartphone,AD-CL0166-PIN,CAT_674,Electronics,Tablets,Sony,SUPP_10859,40.4,89.67,2024-03-09 00:00:00,0.141,16x6x0.9,Space Gray,"14""""",  Steel  
+1610!,Apple Running Shoes Max,AP-EL0610-YEL,CAT_698,Footwear,Basketball,Mizuno,SUPP_10385,31.5,45.28,2024-07-20 00:00:00,0.642,35x19x13,White,46,Mesh
+  1136  ,Puma Backpack Professional,PU-HM0136-WHI,CAT_546,Fitness,Miscellaneous,Under Armour,SUPP_10226,323.43,431.89,  2023-04-22  ,5.012,47x100x14,Green,Large,  Fabric  
+1582,Amazon Speaker Pro,AM-CL0582-RED,CAT_562,  Footwear  ,Basketball,LG,SUPP_10066,85.46,191.59,2025-02-12 00:00:00,7.811,14x6x97,Black,Large,Wood
+1140,Panasonic Mouse™ #140,AP-HM0068-SIL,CAT_669,Sports,,nike,,,TBD,1992-06-13 00:00:00,,Standard Size,,,
+  1732  ,Dell Smartphone,DE-HM0732-COR,CAT_509,Electronics,Accessories,Google,SUPP_10662,416.76,  945.31  ,2022-01-20 00:00:00,0.286,15X9X1.1,Black,"17""""",Carbon Fiber
+1334,Puma Basketball Shoes Advanced,PU-SP0334-GOL,CAT_673,Footwear,Running,  Brooks  ,SUPP_10694,271.14,414.52,2022-02-23 00:00:00,0.928,32x15x13,Black/White,45,Suede
+1849,Microsoft Charger Elite,MI-HM0849-RED,CAT_697,Accessories,Bags,Reebok,SUPP_10898,274.42,527.49,2023-11-13 00:00:00,  8.762  ,10x47x66,Pink,One Size,Wood
+1682,JBL Headphones,JB-CL0682-BRO,CAT_699,Electronics,Computers,Adidas,SUPP_10966,104.54,260.03,2023-12-29 00:00:00,0.204,13x8x0.9,Gold,"14""""",Aluminum
+1866,ASICS Backpack,AS-EL0866-RED,CAT_647,Accessories,Hats,Apple,SUPP_10010,131.82,  305.16  ,2021-01-10 00:00:00,1.344,78x65x44,Gray,Large,Fabric
+1481,Bose Case Max,BO-EL0481-PIN,cat_568,Photography,General,Canon,SUPP_10062,285.51,462.57,2023-11-18 00:00:00,6.782,57x55x61,Brown,Extra Large,Fabric
+1757,Microsoft Keyboard Plus,  MI-AC0757-GRE  ,CAT_509,Technology,General,Saucony,SUPP_10612,274.82,674.01,2024-12-05 00:00:00,7.134,27x39x21,Gold,One Size,Synthetic
+1552,Microsoft Camera,  MI-HM0552-PUR  ,  CAT_689  ,Audio,Miscellaneous,Mizuno,SUPP_10835,94.31,174.45,2023-01-13 00:00:00,0.98,50x83x73,GREEN,Large,Fabric
+1818,Nike Speaker Home,NI-HM0818-SIL,  CAT_537  ,Accessories,Bags,Puma,  SUPP_10336  ,255.25,348.87,2024-09-26 00:00:00,7.257,97x32x78,Mint,One Size,Wood
+1670,Bose Casual Shoes Office,BO-EL0670-GRA@,CAT_544,Footwear,Casual,JBL,SUPP_10636,396.27,637.34,  2022-08-05  ,0.81,33x18x13,Black,6.5,Rubber
+1955,Sony Headphones Advanced,SO-HM0955-BEI,CAT_627,Electronics,Mobile,JBL,SUPP_10378,145.46,309.25,2025-04-25 00:00:00,0.182,13x7x0.7,Black,"27""""",Carbon Fiber
+1296,Saucony T-Shirt Pro,SA-EL0296-SIL%,CAT_661,Apparel,Sportswear,New Balance,SUPP_10139,11.51,16.81,2022-12-11 00:00:00,0.681,78x15x19,Silver,L,Wool
+1789,HP Smartphone,HP-CL0789-GRE,CAT_533,Electronics,Mobile,Brooks,  SUPP_10449  ,254.03,585.7,2025-07-16 00:00:00,0.125,12x7x0.9,Silver,"13""""",Plastic
+1575,Under Armour Monitor,,CAT_555,,Tablets,,SUPP_10564,446.06,,2021-02-09 00:00:00,3.468,,Gold,,Carbon Fiber
+  1668  ,HP Smartwatch Max,HP-EL0668-COR,CAT_537,Electronics,Accessories,Nikon,SUPP_10073,216.84,438.89,2020-12-20 00:00:00,0.861,30x39x10,White,"24""""",aluminum
+1397,Puma Smartphone Advanced,PU-CL0397-YEL,CAT_626,Electronics,Accessories,JBL,SUPP_10994,46.74,82.69,2024-01-24 00:00:00,0.202,16x9x0.9,White,"17""""",Plastic
+1243,Canon Case*,CA-HM0243-BRO,CAT_641,Fashion,Miscellaneous,Panasonic,SUPP_10363,120.61,211.33,2022-09-09 00:00:00,0.174,68x98x35,Coral,Large,Metal
+,,,,,,,,,,,,,,,
+1380,Puma Running Shoes Air,pu-hm0380-nav,CAT_692,Footwear,,Adidas,,,102.92,2023-08-28 00:00:00,,26x19x12,,11.5,
+1743,Saucony Laptop Classic,SA-HM0743-GRA,CAT_524,Electronics,Tablets,Apple,SUPP_10453,142.73,267.2,2021-12-23 00:00:00,3.489,33x25x3,Silver,"""  27""""  """,Magnesium Alloy
+1971,Apple Case Advanced,ap-cl0971-nav,CAT_607,Equipment,Miscellaneous,Panasonic,SUPP_10417,74.81,129.4,2022-02-20 00:00:00,2.557,94x78x53,Black,large,Composite
+1123,Under Armour Smartphone Advanced,UN-CL0123-RED,CAT_503,Electronics,Mobile,Brooks,SUPP_10011,90.28,220.19,2025-01-12 00:00:00,0.205,18x8x0.7,Silver,"21""""",Magnesium Alloy
+1120,Nikon Camera Advanced,ni-ac0120-pin,,Outdoor,,Adidas,,,788.13,,,35x68x54,,Small,
+1415,  Microsoft Mouse Professional  ,MI-AC0415-GRA,CAT_531,Fitness,Miscellaneous,Adidas,SUPP_10372,430.91,741.69,2022-09-10 00:00:00,8.584,92x21x61,Orange,One Size,Wood
+1819,Sony Smartphone Air,SO-AC0819-WHI,CAT_622,  Electronics  ,Tablets,google,SUPP_10920,427.3,705.93,2024-09-23,0.157,17x9x0.9,  Space Gray  ,  Standard  ,Plastic
+1839,JBL Cable Advanced,JB-EL0839-BLU@,CAT_620,Fashion,Other,Nikon,SUPP_10157,414.44,716.2,2021-05-26 00:00:00,6.133,83x40x78,Coral,Small,Synthetic
+1733,Panasonic Headphones,PA-AC0733-PIN,  CAT_512  ,Electronics,Wearables,Bose,SUPP_10584,140.43,211.11,2023-07-09 00:00:00,  0.135  ,14x9x0.7,Gold,Large,Steel
+1781,Puma Jacket Pro,PU-EL0781-YEL,CAT_625,Apparel,Sportswear,Panasonic,SUPP_10776,  425.55  ,597.61,2023-01-02 00:00:00,0.723,32x25x86,Orange,XS,Polyester
+  1146  ,Dell Headphones Plus,,,,CASUAL,,SUPP_10654,-9999,,99-99-9999,100000,,Purple/Navy,,PLASTIC
+1677,Brooks Headphones Max,BR-CL0677-RED,CAT_523,Electronics,Computers,Brooks,SUPP_10614,232.82,420.56,2022-06-11 00:00:00,0.276,12x6x1.1,Silver,"17""""",Steel
+1114,HP Running Shoes Essential,HP-SP0114-MIN,CAT_571,Footwear,Outdoor,Reebok,SUPP_10172,168.59,356.61,2022-03-15 00:00:00,0.576,29x19x15,Navy/Red,7.5,Synthetic
+1303,Bose Smartphone Advanced,BO-HM0303-TUR,CAT_617,Electronics,Wearables,Samsung,SUPP_10866,362.68,505.02,2022-05-21 00:00:00,0.17,13x8x0.7,Silver,  Compact  ,Glass
+  1775  ,  Samsung Keyboard Sport  ,,CAT_524,,Other,,SUPP_10703,19.36,,2024-10-12 00:00:00,3.352,,Pink,,Synthetic
+1835,Saucony Smartwatch Ultra,SA-HM0835-PIN,CAT_670,Electronics,MOBILE,Adidas,SUPP_10441,194.72,318.52,2022-05-22 00:00:00,1.666,42x11x25,Gold,"24""""",Aluminum
+1121,Amazon Smartwatch Home,am-hm0121-bro,CAT_593,Electronics,Accessories,ASICS,SUPP_10176,383.74,936.63,2023-04-16 00:00:00,3.967,11x47x7,Black,"21""""",Plastic
+1138,Microsoft Headphones,  MI-CL0138-YEL  ,CAT_541,Electronics,Computers,Reebok,  SUPP_10964  ,450.08,594.57,2025-03-04 00:00:00,0.219,16x9x1.2,Space Gray,Large,Plastic
+1953,Sony Casual Shoes,SO-SP0953-GOL,CAT_604,Footwear,Outdoor,Nike,SUPP_10599,54.11,130.07,2024-07-22 00:00:00,1.444,32X17X11,Black,  8.5  ,Rubber
+1918,Nike Tablet Office,NI-EL0918-GOL,CAT_520,Electronics,Wearables,HP,SUPP_10456,444.68,556.36,2025-02-20 00:00:00,2.041,10x12x14,Gold,"17""""",Plastic
+1487,Adidas T-Shirt Essential,AD-AC0487-BLA,CAT_568,Apparel,Pants,Mizuno,SUPP_10575,399.4,762.56,2024-07-06 00:00:00,0.695,88x35x46,Beige,2XL,Polyester
+1408,Brooks Smartwatch Pro,BR-AC0408-ORA,CAT_513,Electronics,Computers,ASICS,SUPP_10595,46.15,105.62,2023-01-31 00:00:00,4.417,11x19x16,Silver,"""  14""""  """,Plastic
+1686,Panasonic Screen Protector Max,PA-CL0686-PUR,CAT_644,Footwear,Casual,Nike,SUPP_10790,255.21,408.97,2022-08-03 00:00:00,6.226,29x27x29,Red,Medium,Composite
+1816,Brooks Jacket Advanced,BR-EL0816-SIL,CAT_594,Apparel,Jackets,Samsung,SUPP_10165,269.22,484.99,2024-09-29 00:00:00,1.381,59x43x35,Blue,XXL,Linen
+1251,Nikon Tablet Office,NI-CL0251-YEL,CAT_545,Electronics,Wearables,Samsung,SUPP_10147,274.91,484.01,2023-02-28 00:00:00,3.263,16x38x27,  White  ,"14""""",Aluminum
+1970,Panasonic Smartphone,PA-AC0970-SIL,CAT_537,Electronics,Computers,Amazon,SUPP_10231,304.3,551.24,2025-01-11 00:00:00,0.101,15x8x0.9,White,"21""""",Carbon Fiber
+1366,Samsung Screen Protector Professional,SA-SP0366-GRA,CAT_568,Travel,General,Saucony,SUPP_10407,352.51,425.95,2025-05-24 00:00:00,1.767,67x5x17,Blue,Extra Large,Wood
+1803,Dell Smartphone,DE-CL0803-YEL,CAT_659,Electronics,Tablets,LG,SUPP_10726,85.55,188.91,2022-01-31 00:00:00,0.135,17x6x1.1,Silver,Standard,Magnesium Alloy
+1375,Saucony Smartphone Professional,,CAT_545,,Wearables,,SUPP_10744,201.99,,  2022-12-18  ,0.297,,Silver,,Aluminum
+1476,Lenovo Training Shoes,LE-CL0476-MIN,CAT_630,Footwear,Basketball,Nike,SUPP_10612,452.25,1107.02,2024-12-09 00:00:00,0.902,28x15x13,Navy/Red,6,Canvas
+1838,Saucony Headphones Advanced,SA-CL0838-GOL,CAT_575,Electronics,Mobile,Samsung,SUPP_10625,79.05,190.45,2021-10-03 00:00:00,0.262,13x6x0.7,Black,"21""""",Magnesium Alloy
+1638,ASICS Jacket Air,AS-EL0638-SIL,CAT_579,Apparel,Jackets,Samsung,SUPP_10039,498.19,651.16,2021-11-18 00:00:00,0.175,5x29x26,Yellow,2XL,Polyester
+1226,ASICS Smartwatch,AS-CL0226-SIL,CAT_696,Electronics,Computers,Canon,SUPP_10315,161.66,355.53,  2021-01-09  ,2.508,50x21x8,Silver,"17""""",Aluminum
+1280,Nikon Camera Advanced#,SA-CL0203-WHI,CAT_9999,Accessories,,Nike Inc.,,,,"Aug 11, 2024",,Large,,,
+1326,JBL Running Shoes Premium,JB-EL0326-RED,  CAT_668  ,Footwear,Outdoor,Dell,  SUPP_10985  ,19.3,42.9,2022-05-09 00:00:00,0.519,34x18x10,Navy/Red,41,Rubber
+1061,JBL Smartphone Office,JB-HM0061-GRA,CAT_652,Electronics,Wearables,Sony,SUPP_10166,98.61,  207.15  ,2025-07-18 00:00:00,0.225,13x9x0.5,White,Large,Magnesium Alloy
+1530,Mizuno Backpack Office,MI-AC0530-GRE,CAT_571,Fitness,Other,Panasonic,SUPP_10060,59.71,121.3,  2023-12-26  ,2.833,52x61x41,Red,Extra Large,Composite
+1952,Nike Basketball Shoes Classic,NI-EL0952-SIL,CAT_607,Footwear,  Basketball  ,ASICS,SUPP_10922,442.36,692.2,2023-03-01 00:00:00,0.484,34x18x15,Black/White,8.5,Suede
+1195,New Balance Headphones Elite,NE-SP0195-ORA,CAT_592,Aparrel,Tablets,Nike,SUPP_10421,69.41,868.6949,  2022-08-06  ,0.293,30cm x 78cm x 78cm,Gold,m,  Glass  
+1199,Canon Training Shoes,CA-EL0199-BLA,CAT_633,Footwear,Basketball,LG,SUPP_10293,239.91,290.49,2023-04-24 00:00:00,1.399,32x17x10,Navy/Red,13,Nylon
+1328,Panasonic Headphones,PA-CL0328-GRE,CAT_626,Electronics,Accessories,Mizuno,SUPP_10516,198.67,268.13,2022-02-27 00:00:00,0.112,15x9x0.6,Black,"27""""",Magnesium Alloy
+1175,Sony Screen Protector™ #175,,CAT_560,,General,,SUPP_10291,313.56,,2022-02-09 00:00:00,9.011,,Purple,,Metal
+1845,Brooks Casual Shoes Classic,BR-CL0845-BLA,CAT_683,Footware,Formal,Panasonic,SUPP_10377,351.01,823.75556,2024-12-27 00:00:00,0.894,26cm x 83cm x 50cm,Gray,ONE SIZE,Synthetic
+1259,Bose Camera,BO-EL0259-WHI,CAT_665,Home & Office,Miscellaneous,HP,SUPP_10445,133.18,266.61,2025-05-17 00:00:00,8.912,63x10x18,White,One Size,Composite
+1995,Lenovo Laptop Professional,LE-SP0995-BLU,CAT_554,Electronics,Tablets,ASICS,SUPP_10592,15.94,35.09,2024-07-07 00:00:00,2.667,39x27x3,Space Gray,Standard,  Carbon Fiber  
+1678,Canon Smartphone Air,CA-HM0678-COR,CAT_627,Electronics,Tablets,Panasonic,  SUPP_10097  ,236.24,437.25,2025-05-11 00:00:00,0.181,16x6x0.5,Silver,"17""""",Aluminum
+1492,Adidas Smartwatch Classic,AD-AC0492-TUR,CAT_583,electronics,  Tablets  ,JBL,SUPP_10778,67.48,130.11,2025-08-12 00:00:00,2.198,34x40x16,White,Compact,Glass
+1039,New Balance Smartwatch,NE-SP0039-PUR,CAT_659,Electronics,Wearables,New Balance,SUPP_10082,  427.36  ,986.37,2025-05-05 00:00:00,4.367,34x30x25,  Space Gray  ,Compact,Aluminum
+1992,Amazon Jacket Advanced,AM-AC0992-COR,CAT_604,Apparel,Jackets,Amazon,SUPP_10511,336.1,631.72,2022-08-12 00:00:00,0.857,46x50x68,Orange,S,Wool
+1265,Amazon Smartphone Office,am-sp0265-whi,CAT_528,Electronics,Wearables,LG,  SUPP_10476  ,313.38,524.99,  2023-01-18  ,0.135,16x6x1.1,Silver,"15.6""""",Glass
+  1945  *,Microsoft Screen Protector™ #945,  HP-AC0632-YEL  ,CAT_608,Technology,Other,nike,SUPP_10558,433.52,TBD,2023-12-19 00:00:00,7.261,Large,Brown,,Composite
+1899,  JBL Camera Premium  ,JB-HM0899-NAV,CAT_650,Technology,Miscellaneous,Reebok,SUPP_10023,496.61,857.5,2022-06-01 00:00:00,8.675,  7x49x17  ,Red,Small,Composite
+1969,BROOKS CASE,  BR-SP0969-GRE  ,CAT_520,Footwear,Basketball,ASICS,SUPP_10876,456.13,1028.11,2025-03-22 00:00:00,3.848,17x47x73,Navy,One Size,Fabric
+1238,Brooks Headphones Basic,BR-EL0238-PIN,CAT_636,Electronics,Wearables,Panasonic,SUPP_10604,212.59,426.7,2022-12-22 00:00:00,0.21,15x9x0.6,Silver,Standard,  Carbon Fiber  
+1903,HP Keyboard Elite,HP-HM0903-SIL,CAT_680,Footwear,Running,  Bose  ,SUPP_10944,91.57,172.8,2024-04-26 00:00:00,8.686,61x71x100,Black,Extra Large,Composite
+1164,JBL Smartphone Sport,JB-HM0164-TUR,CAT_630,Electronics,Mobile,Brooks,SUPP_10592,95.09,214.89,2022-04-26 00:00:00,0.121,17x8x1.0,Space Gray,"27""""",Steel
+1154,Amazon Mouse Max,AM-CL0154-YEL,CAT_504,Accessories,Belts,Saucony,SUPP_10134,113.48,139.41,2024-12-03 00:00:00,5.096,20x51x96,White,Extra Large,Synthetic
+1286,Bose Charger Premium,BO-EL0286-YEL,CAT_567,gaming,Other,Panasonic,SUPP_10631,341.48,750.03,2022-10-04 00:00:00,2.916,12x8x80,White,Medium,Fabric
+1282,Lenovo Charger Home,LE-AC0282-GOL,CAT_517,Equipment,MISCELLANEOUS,ASICS,SUPP_10376,97.86,244.49,2024-08-31 00:00:00,4.967,18x55x61,Coral,Small,Mixed Materials
+1787,Puma Mouse Professional,PU-HM0787-NAV,CAT_584,Equipment,Miscellaneous,Adidas,SUPP_10673,57.03,106.54,2021-02-24 00:00:00,1.764,66x25x5,White,Medium,Wood
+1852,Google Casual Shoes Plus,GO-CL0852-WHI,CAT_600,Footwear,Formal,Microsoft,SUPP_10681,178.04,311.31,2023-12-26 00:00:00,1.373,31x17x11,  Blue  ,6.5,Mesh
+1112,Sony Running Shoes Premium,SO-HM0112-TUR,CAT_604,Footwear,Formal,Canon,SUPP_10727,421.55,773.67,2022-09-02 00:00:00,0.307,25x16x12,Black,10,Synthetic
+1545,Reebok Jacket Advanced,  RE-HM0545-SIL  ,CAT_595,Apparel,Pants,Samsung,SUPP_10696,91.16,184.56,2023-09-20 00:00:00,1.275,96x24x74,BROWN,L,Linen
+1706,Under Armour Mouse,UN-CL0706-COR,CAT_680,Home & Office,Other,Lenovo,SUPP_10275,398.79,523.14,2023-01-31 00:00:00,  3.706  ,55x44x16,PURPLE,Large,Metal
+1082,HP Mouse Elite,HP-HM0082-NAV,CAT_573,Footwear,Outdoor,ASICS,SUPP_10556,196.05,485.07,2021-05-19 00:00:00,8.202,  23x42x10  ,Pink,Small,Fabric
+1696,HP Training Shoes Sport,HP-CL0696-MIN,CAT_587,Footwear,Formal,Saucony,SUPP_10703,307.18,462.01,2021-08-02 00:00:00,0.754,28x19x11,Black,40,Synthetic
+1038,  Panasonic Basketball Shoes Sport  ,PA-EL0038-PUR,CAT_690,Footwear,Formal,Brooks,SUPP_10935,407.59,693.68,2022-02-11 00:00:00,1.063,35x16x13,black,8,Rubber
+1698,Panasonic Jacket,PA-SP0698-MIN,  CAT_614  ,Apparel,Shirts,  ASICS  ,SUPP_10271,208.42,290.84,2022-10-30 00:00:00,0.238,88x27x14,Gray,XXL,Nylon
+1162,HP Screen Protector Elite,HP-SP0162-WHI,CAT_557,Fashion,Miscellaneous,Amazon,SUPP_10573,386.03,764.31,2023-09-09 00:00:00,7.195,51x96x62,Red,Small,Synthetic
+1792,Nikon Smartphone Advanced,NI-AC0792-GRA,CAT_521,Electronics,accessories,JBL,SUPP_10823,202.92,338.91,2021-12-15 00:00:00,0.161,14x8x0.8,Black,"32""""",Carbon Fiber
+1496,Saucony Jacket Basic,SA-AC0496-BRO,CAT_670,Apparel,Shirts,Apple,SUPP_10197,414.27,767.22,2024-07-18 00:00:00,1.485,15x27x61,  White  ,XL,Silk
+1122,NEW BALANCE CHARGER ULTRA,NE-SP0122-BLU,CAT_579,Footwear,Outdoor,HP,SUPP_10997,405.95,770.21,2021-01-21 00:00:00,3.968,  86x88x92  ,Blue,Large,Synthetic
+1507,Amazon Charger Air,AM-CL0507-BRO,CAT_636,Technology,Miscellaneous,ASICS,SUPP_10081,83.69,137.11,2024-01-06 00:00:00,9.348,80x38x30,Coral,One Size,  Synthetic  
+1893,Adidas Smartphone Ultra,AD-CL0893-WHI,CAT_567,electronics,Wearables,Canon,SUPP_10024,36.35,49.66,2024-07-20 00:00:00,0.148,13x9x0.6,Black,"15.6""""",Plastic
+1943,Panasonic Mouse Office,PA-EL0943-MIN,CAT_534,Apparel,Pants,Canon,SUPP_10420,445.05,  809.1  ,2021-06-17 00:00:00,5.789,40x15x83,Black,one size,Metal
+1695,JBL Smartphone Air,JB-AC0695-NAV,CAT_572,Electronics,Computers,  Lenovo  ,SUPP_10462,110.4,168.38,2023-10-06 00:00:00,0.12,15x6x1.4,Space Gray,"32""""",Magnesium Alloy
+1508,Under Armour Jacket,UN-SP0508-PIN,CAT_696,Apparel,Shirts,Reebok,SUPP_10273,97.58,  162.37  ,2025-04-28 00:00:00,0.133,46x43x86,White,S,Denim
+1024,HP Laptop Max,HP-CL0024-TUR,CAT_671,Electronics,Computers,Puma,SUPP_10970,116.8,246.37,2025-01-19 00:00:00,2.964,32x29x3,Black,"15.6""""",Glass
+1403,Amazon Mouse,AM-EL0403-MIN,CAT_677,Sports,Nutrition,Samsung,SUPP_10021,414.21,552.42,2025-03-07 00:00:00,3.038,70x58x23,Black,Medium,Mixed Materials
+  1959  ,Saucony Tablet Plus,SA-CL0959-WHI,CAT_572,Electronics,Accessories,Apple,SUPP_10222,157.25,192.11,2022-11-12 00:00:00,2.825,46x41x15,Silver,Large,Steel
+1002,Samsung Jacket Essential,SA-SP0002-WHI,CAT_686,Apparel,Sportswear,Reebok,SUPP_10127,486.83,823.76,2021-12-31,1.149,85x84x51,Gold,S,Cotton
+1237,Lenovo Basketball Shoes,LE-HM0237-NAV,CAT_593,Footwear,Formal,Dell,SUPP_10716,459.46,748.66,2023-11-29 00:00:00,1.319,30x18x13,Black,7,Mesh
+1357,HP Case,HP-HM0357-YEL#,  CAT_609  ,  Footwear  ,Basketball,HP,SUPP_10108,184.72,263.36,2024-01-29 00:00:00,4.081,45x6x54,Gold,Extra Large,Composite
+1110,Samsung Charger Ultra Orange Edition with Extra Features and Extended Warranty Limited Time Offer,SKU-110!@#,CAT_583,Unknown,Miscellaneous,,SUPP_10268,338.64,-100,2023-03-08 00:00:00,5.324,x48x34,Red,Large (L),Metal
+1912,Nike Camera Plus,NI-EL0912-PIN,CAT_628,Fashion,Miscellaneous,Brooks,SUPP_10470,339.14,575.97,2021-07-06 00:00:00,1.704,27x47x38,Yellow,One Size,Metal
+1933,Brooks Keyboard,BR-AC0933-YEL,CAT_500,Sports,Shoes,Adidas,SUPP_10985,294.55,518.23,2023-07-31 00:00:00,1.933,66x41x87,White,Small,Synthetic
+1998,PUMA KEYBOARD CLASSIC,PU-SP0998-MIN,CAT_611,Gaming,Miscellaneous,Under Armour,SUPP_10374,478.28,644.62,2024-08-01 00:00:00,3.157,70x59x99,Navy,ONE SIZE,Synthetic
+1936,Google Smartwatch Advanced,GO-EL0936-YEL,CAT_589,Electronics,Tablets,Google,SUPP_10119,458.54,667.46,  2024-11-13  ,1.304,40x34x21,White,"32""""",Carbon Fiber
+1365,  Sony Training Shoes  ,SO-HM0365-SIL,CAT_503,Footwear,Running,Mizuno,SUPP_10094,325.75,779.18,2021-02-17 00:00:00,0.717,  34x15x14  ,White,13,Synthetic
+1506,JBL Headphones Air,JB-SP0506-RED,CAT_667,Electronics,Wearables,  Nike  ,SUPP_10164,166.32,323.84,2025-05-09 00:00:00,0.177,15x6x1.0,Space Gray,"27""""",Aluminum
+1951,ASICS Laptop Premium,AS-HM0951-PUR,CAT_644,Electronics,Mobile,New Balance,SUPP_10662,238.79,372.1,  2022-10-23  ,1.373,38x20x2,Gold,Large,Aluminum
+1113,Reebok Smartphone Classic,  RE-HM0113-GOL  ,CAT_608,Electronics,COMPUTERS,Saucony,SUPP_10849,330.3,502.65,2022-02-06 00:00:00,0.275,12x9x0.8,black,"32""""",Aluminum
+1755,Google Speaker Home,GO-AC0755-ORA,CAT_544,Sports,Shoes,Microsoft,SUPP_10938,338.31,564.07,2021-06-10 00:00:00,2.693,11x73x31,Mint,Large,Synthetic
+1345,  New Balance Smartphone  ,NE-CL0345-BEI,CAT_560,Electronics,Wearables,HP,  SUPP_10313  ,218.26,368.9,2021-07-14 00:00:00,0.131,18x8x0.8,Black,"15.6""""",Aluminum
+1510,,N/-AC0510-RED,,  Technology  ,,Puma,SUPP_999,Free,995.02,,Light,626x652x974 centimeters (LxWxH) approx,Unknown,Med.,
+1662,Nike Cable Plus,NI-HM0662-BEI,CAT_553,Footwear,Casual,Lenovo,SUPP_10626,68.2,153.25,2023-01-09 00:00:00,7.932,73x100x85,Green,Small,metal
+1870*,,N/-AC0870-NAV,,Sports,,  Brooks  ,SUPP_999,,95.01,,,84x94x64,Various,Medium,Various
+1139,Saucony Charger,SA-SP0139-PIN,CAT_560,Footwear,Running,Panasonic,SUPP_10585,279.33,513.47,2022-03-14 00:00:00,0.64,5x59x16,Pink,One Size,Metal
+1528,  Canon Training Shoes  ,CA-SP0528-TUR,CAT_577,Footwear,Casual,Sony,SUPP_10313,173.52,288.06,2025-07-09 00:00:00,1.169,32x17x13,Gray,12,Nylon
+1990,Product,000000,,fashion,  N/A  ,MISCROSOFT,SUPP_999,,4.46,,,"98,30,94",,83,VARIOUS
+1147,HP Training Shoes Premium,HP-EL0147-BLA,CAT_621,Footwear,Basketball,New Balance,SUPP_10177,304.56,368.82,2022-02-19 00:00:00,0.528,29x20x15,Black/White,10,Mesh
+1172,Lenovo Training Shoes Classic,LE-AC0172-BRO,  CAT_580  ,  Footwear  ,Running,  Panasonic  ,supp_10689,67.97,82.09,2021-09-02 00:00:00,1.136,26x20x14,  Black  ,46,Nylon
+1802,JBL Smartphone,JB-CL0802-TUR,CAT_674,  Electronics  ,Mobile,Saucony,SUPP_10131,42.2,60.86,2025-05-06 00:00:00,0.193,18x7x0.6,Black,Standard,Glass
+1445,Canon Jacket Pro,CA-EL0445-NAV,CAT_535,Apparel,Jackets,Google,SUPP_10804,430.92,889.82,2023-12-07 00:00:00,1.561,24x16x96,Navy,M,Silk
+1461,Nike Basketball Shoes Air,NI-EL0461-GRA,CAT_612,Footwear,Basketball,Google,SUPP_10044,  163.92  ,325.08,2023-01-27 00:00:00,1.358,29x16x14,Red,39,Suede
+1288,Amazon Cable,AM-AC0288-RED,CAT_676,Outdoor,General,Amazon,SUPP_10508,256.36,562.55,2021-04-14 00:00:00,3.461,83x43x51,Brown,Medium,Metal
+1807,Sony Camera Premium,SO-EL0807-RED,  CAT_693  ,Fitness,Miscellaneous,Microsoft,SUPP_10157,179.59,  446.73  ,2021-10-10 00:00:00,8.595,77x24x96,  Silver  ,Medium,Synthetic
+1968,GOOGLE MONITOR MAX,GO-CL0968-GRE,CAT_587,Electronics,Wearables,sony,SUPP_10204,37.19,53.81,2022-03-13 00:00:00,4.935,29x26x5,Gold,Compact,Aluminum
+1637,Puma Running Shoes Home,PU-CL0637-PIN,CAT_562,Footwear,Outdoor,Dell,SUPP_10344,88,143.03,2025-02-16 00:00:00,0.69,26x15x10,Black,6,Synthetic
+1170,Lenovo Smartphone Elite,  LE-AC0170-RED  ,CAT_598,Electronics,  Tablets  ,Reebok,SUPP_10741,148.59,354.35,2025-02-05 00:00:00,0.264,483x626x922 centimeters (LxWxH) approx,Gold,  X-Large  ,Carbon Fiber
+1547,Puma Running Shoes,PU-SP0547-BLU,CAT_557,Footwear,Casual,Sony,SUPP_10914,206.71,443.14,  2021-05-29  ,0.962,35x16x11,Red,8,Suede
+1281,Dell Jacket Sport,DE-CL0281-COR%,CAT_558,  Apparel  ,Sportswear,Samsung,SUPP_10779,492.46,  670.09  ,2023-10-21 00:00:00,0.31,22x68x51,Pink,3XL,  Cotton  
+1089,  HP Cable  ,HP-AC0089-ORA,CAT_679,FOOTWEAR,Outdoor,Adidas,SUPP_10957,448.17,1112.35,2023-05-07 00:00:00,4.774,41x57x28,Gray,Extra Large,Fabric
+1688,Canon Headphones Office,ca-hm0688-bro,CAT_587,Electronics,computers,Reebok,SUPP_10823,426,592.74,2025-07-07 00:00:00,0.218,14x7x0.9,White,"14""""",Steel
+1742,Sony Training Shoes,SO-EL0742-BRO,CAT_581,Footwear,  Running  ,HP,SUPP_10713,151.68,187.59,2022-12-03 00:00:00,0.937,31x15x13,Navy/Red,39,Suede
+1570,Product,PR-AC0570-GOL,,Equipment,,Panasonic,SUPP_999,,170.04,,Varies,69x13x33,  Unknown  ,Medium,Various
+1607,Panasonic Laptop Plus,PA-SP0607-YEL,CAT_595,Electronics,Mobile,Google,SUPP_10438,313.44,750.82,2022-12-28 00:00:00,2.661,39x20x3,Space Gray,"13""""",Carbon Fiber
+1560,,LG-EL0051-PIN,  CAT_9999  ,Apparel,,Nike Inc.,,,Contact for price,02/21/2021,,Small,,standard,
+1275,Saucony Cable Pro Navy Edition with Extra Features and Extended Warranty Limited Time Offer,,CAT_541,,Other,,SUPP_10059,81.61,,2021-10-09 00:00:00,4.664,,Gray,,Fabric
+1806,Reebok Basketball Shoes Premium,RE-HM0806-SIL,CAT_680,Footwear,Running,Bose,SUPP_10682,398.94,805.6,2024-03-30 00:00:00,1.4,29x19x12,Navy/Red,12,Mesh
+1975,Panasonic Jacket Premium,,CAT_554,,Jackets,,SUPP_10907,421.09,,  2024-09-23  ,0.638,,Purple,,Nylon
+1418,Microsoft Training Shoes Air,MI-CL0418-BLU,CAT_570,Footwear,Formal,Apple,SUPP_10305,438.15,782.91,2022-06-22 00:00:00,0.746,28x20x12,White,6.5,Leather
+1675,ASICS Camera Édition Spéciale,,CAT_575,,General,,SUPP_10982,434.08,,2023-07-26 00:00:00,7.32,,Blue,,Metal
+1006,JBL Case,JB-SP0006-SIL,  CAT_638  ,Technology,Other,Nike,SUPP_10613,168.84,206.88,2021-12-09 00:00:00,9.298,44x35x12,Green,One Size,Mixed Materials
+1614,Mizuno Tablet Air,MI-HM0614-SIL,  CAT_563  ,Electronics,  Wearables  ,New Balance,SUPP_10370,469.43,  1068.6  ,2020-12-31,2.329,37x12x15,Space Gray,"13""""",Plastic
+1796,Microsoft Mouse Classic,mi-ac0796-nav,CAT_684,Technology,Other,Amazon,SUPP_10969,107.69,264.61,2022-12-30 00:00:00,4.422,77x65x39,Yellow,Extra Large,Synthetic
+1137,Lenovo Tablet Professional,LE-EL0137-BLA,CAT_512,Electronics,Wearables,Nikon,SUPP_10750,215.63,305.38,2025-06-11 00:00:00,2.363,34x32x22,Space Gray,"14""""",Carbon Fiber
+1285,Mizuno Smartphone Office,MI-EL0285-YEL,CAT_615,Electronics,tablets,Panasonic,SUPP_10453,235.23,292.32,2023-08-27 00:00:00,0.211,18x8x1.4,Silver,"32""""",Carbon Fiber
+1376,Google Casual Shoes Max,GO-HM0376-YEL,CAT_524,Footwear,Basketball,Amazon,SUPP_10770,397.73,924.97,2025-03-22 00:00:00,0.27,29x18x15,White,42,Synthetic
+1229,Adidas Headphones Basic,AD-HM0229-BLU,CAT_623,Electronics,Accessories,Brooks,SUPP_10294,219.26,504.77,2024-02-11 00:00:00,0.152,16x8x1.4,Gold,Standard,Carbon Fiber
+1551,Panasonic Screen Protector Sport,PA-EL0551-GOL,CAT_645,Apparel,  Shirts  ,  New Balance  ,SUPP_10968,171.19,270.47,2023-05-05 00:00:00,4.18,8x98x63,Navy,Large,Synthetic
+1889,  Canon Headphones Advanced  ,CA-CL0889-BEI,CAT_521,Electronics,Computers,JBL,SUPP_10903,51.73,68.29,2024-11-25 00:00:00,0.221,17x8x1.2,White,  Compact  ,Plastic
+,,, ,,, ,,,,  null  ,,,,,
+1307,ASICS Smartwatch Premium,  AS-HM0307-BLU  ,CAT_574,Electronics,Wearables,Canon,SUPP_10081,454.53,827.65,2023-08-17 00:00:00,1.169,18x29x12,Gold,"27""""",Glass
+1054,Google Smartphone,GO-HM0054-WHI,CAT_501,Electronics,Mobile,Google,SUPP_10968,113.5,  156.45  ,2023-06-03 00:00:00,0.151,14x6x0.5,Space Gray,"15.6""""",Plastic
+1184,Mizuno Backpack Professional,MI-HM0184-RED,CAT_608,Apparel,Jackets,Bose,SUPP_10784,123.93,287.12,2022-07-13 00:00:00,2.904,74x57x37,GOLD,Small,Synthetic
+1262,Dell Cable Home,DE-CL0262-BLU,CAT_605,Fashion,Other,Bose,SUPP_10882,497.88,980.35,2021-06-14 00:00:00,8.386,40x6x98,Brown,  Medium  ,Composite
+1439,Canon Headphones Basic,CA-CL0439-RED,CAT_556,Electronics,Computers,Adidas,SUPP_10916,27.49,42.5,2022-06-20 00:00:00,0.113,12x8x0.7,Gold,"27""""",Carbon Fiber
+1477,Nikon Monitor Air,NI-CL0477-NAV,CAT_687,Electronics,  Computers  ,LG,  SUPP_10822  ,48.74,108.75,2024-08-27 00:00:00,  3.773  ,30x20x21,White,"21""""",Carbon Fiber
+1076,Canon Basketball Shoes Office,CA-CL0076-PUR,CAT_647,Footwear,Casual,HP,SUPP_10781,88.08,219.74,2025-07-05 00:00:00,  0.807  ,29x18x10,Black,12,Rubber
+1655,New Balance Case Air,NE-AC0655-GOL,CAT_691,Sports,Clothing,Puma,SUPP_10188,409.08,799.45,2022-04-30 00:00:00,9.675,36x21x96,White,Medium,Composite
+1806,Reebok Basketball Shoes Premium,  RE-HM0806-SIL  ,CAT_680,Footwear,  Running  ,Bose,  SUPP_10682  ,398.94,805.6,2024-03-30 00:00:00,1.4,29x19x12,Navy/Red,12,Mesh
+1844,Adidas Monitor Advanced,AD-SP0844-SIL,CAT_501,Electronics,Accessories,JBL,SUPP_10102,429.59,969.66,2021-08-18 00:00:00,1.613,14x49x9,Space Gray,Standard,Carbon Fiber
+  1747  ,LG Mouse Elite,  LG-HM0747-BLA  ,CAT_646,Gaming,Miscellaneous,Mizuno,supp_10326,482.73,699.95,2022-09-23 00:00:00,5.114,82x8x59,Gray,Medium,Fabric
+,Nikon Camera Advanced,,CAT_9999,,,,,,,05/28/2022,,,,,
+1242,Dell Mouse,DE-HM0242-YEL,CAT_592,Fashion,Miscellaneous,Sony,SUPP_10295,498.75,1032.95,2021-06-19 00:00:00,1.429,14x87x7,Gray,Extra Large,Synthetic
+1549,Lenovo Mouse Sport,LE-AC0549-WHI,CAT_663,Footwear,Casual,Saucony,SUPP_10750,145.17,221.7,2023-02-27 00:00:00,5.127,58x90x37,Orange,Small,Mixed Materials
+1566,NIKON CAMERA ADVANCED,NI-SP0566-BLU*,CAT_682,Accessories,Jewelry,HP,SUPP_10584,323.81,395.14,2021-04-09 00:00:00,9.229,31x93x19,Pink,Small,Composite
+1880,,SKU-880!@#,CAT_9999,,,,,,0,  20220316  ,,41x19,,Large (L),
+1203,Samsung Basketball Shoes Classic,SA-CL0203-WHI,CAT_550,Footwear,Formal,Saucony,SUPP_10789,56.04,115.77,2024-02-29 00:00:00,0.471,31x20x12,Blue,8.5,Suede
+1630,Test,DE-HM0277-GRE,,Apparel,,NIKE,SUPP_999,,Contact for price,,TBD,Compact,,,Various
+1055,Apple T-Shirt Essential Brown Edition with Extra Features and Extended Warranty Limited Time Offer,SKU-55!@#,  CAT_646  ,Other,Sportswear,  Generic  ,SUPP_10117,208.47,  0.01  ,2024-03-05 00:00:00,0.427,x33x15,Red,Medium (XL),Nylon
+1068,Apple Monitor,AP-HM0068-SIL,  CAT_639  ,Electronics,Tablets,Amazon,SUPP_10105,49.23,101.37,2023-10-09 00:00:00,1.879,48x37x10,  Space Gray  ,"24""""",Carbon Fiber
+1687,Reebok Mouse,RE-EL0687-BEI,CAT_695,Audio,General,New Balance,SUPP_10452,95.22,140.99,2025-07-13 00:00:00,5.66,97x34x71,Green,Large,Synthetic
+  1292  ,Saucony Mouse Pro,  SA-EL0292-PUR  ,CAT_654,Sports,Equipment,Canon,SUPP_10918,188.08,386.44,2024-01-31 00:00:00,0.994,97x22x35,Red,One Size,Synthetic
+1312,Reebok Tablet,RE-AC0312-TUR,CAT_529,Electronics,Wearables,Under Armour,SUPP_10961,326.63,582.32,2022-03-04 00:00:00,2.463,20x28x28,  Silver  ,"32""""",Glass
+1042,Brooks Casual Shoes,BR-AC0042-NAV,CAT_502,Footwear,Outdoor,ASICS,SUPP_10796,374.89,473.77,2021-06-28 00:00:00,0.988,32x17x11,Gray,  11.5  ,Synthetic
+1434,LG Case,LG-CL0434-WHI,  CAT_502  ,Apparel,Shirts,Amazon,SUPP_10882,346.92,612.8,2025-02-14 00:00:00,1.785,29x97x52,Mint,small,Synthetic
+  1321  ,Sony Backpack Max,SO-EL0321-PUR,CAT_632,Fitness,General,Mizuno,SUPP_10369,232.61,323.45,2023-02-21 00:00:00,4.314,57x15x16,White,Extra Large,Composite
+1080,,xx-cl0080-gre,CAT_9999,Electronics,,Puma,,,949.24,2025-10-02,,29x7x61,,LARGE,
+1965,Mizuno Jacket,MI-CL0965-SIL,CAT_637,Apparel,Formal,LG,SUPP_10080,  141.31  ,240.03,2025-02-27 00:00:00,1.946,9x82x14,  Mint  ,XXL,Cotton
+1144,Under Armour Case Sport,UN-EL0144-YEL,CAT_584,Travel,General,Adidas,SUPP_10763,242.86,376.23,2025-06-21 00:00:00,3.787,48x43x44,  Navy  ,  Extra Large  ,Synthetic
+1754,Lenovo Smartphone,LE-CL0754-WHI,CAT_598,Electronics,Accessories,Lenovo,SUPP_10332,362.4,671.87,2024-08-19,0.129,16x7x0.8,Silver,"21""""",Aluminum
+1673,  JBL Running Shoes Professional  ,JB-CL0673-COR,CAT_665,Footwear,Running,  Panasonic  ,SUPP_10274,128.69,267.02,2024-09-20 00:00:00,0.384,31x19x15,Blue,8.5,Rubber
+1276,JBL Screen Protector Premium,JB-CL0276-SIL,CAT_695,Footwear,Outdoor,Mizuno,SUPP_10171,276.42,645.21,2023-11-19 00:00:00,8.286,92x43x39,Orange,Small,Wood
+1183,JBL Monitor Essential,JB-EL0183-SIL,CAT_621,Electronics,Accessories,Under Armour,SUPP_10039,440.1,832.17,2025-02-05 00:00:00,3.886,15x40x26,Silver,Standard,Steel
+1371,Bose Tablet Basic,BO-HM0371-BEI,CAT_543,Electronics,Wearables,Samsung,SUPP_10493,  334.69  ,506.44,2023-10-02 00:00:00,1.452,15x16x18,Black,"15.6""""",Glass
+1574,Panasonic Smartwatch Max,PA-CL0574-GOL,CAT_682,Electronics,  Mobile  ,Puma,SUPP_10199,474.52,1019.32,2025-07-18 00:00:00,4.029,33x39x22,Space Gray,"24""""",Magnesium Alloy
+1624,Puma Basketball Shoes Air,PU-AC0624-BLA,CAT_599,Footwear,Outdoor,LG,SUPP_10368,  196.68  ,361.55,2021-02-18 00:00:00,1.141,31x15x13,Blue,11.5,Synthetic
+  1018  ,Canon Cable Elite,CA-AC0018-BEI,CAT_613,Outdoor,General,JBL,SUPP_10484,398.93,976.49,2025-08-22 00:00:00,  7.386  ,89x15x41,Coral,One Size,Fabric
+1318,Saucony T-Shirt Pro,SA-SP0318-COR,CAT_656,Apparel,Pants,Brooks,SUPP_10413,228.63,  335.33  ,2021-03-29 00:00:00,1.134,84x88x61,Orange,XXXL,Silk
+1233,Samsung Jacket Professional,SA-CL0233-BLU,CAT_613,Apparel,Formal,Nike,SUPP_10818,246.5,456.04,2025-04-06 00:00:00,0.461,  66x98x72  ,Pink,XXL,Wool
+1353,Panasonic Smartphone,PA-CL0353-NAV,CAT_660,Electronics,Accessories,Google,SUPP_10682,458.99,967.3,2022-04-20 00:00:00,0.244,13x9x0.9,Gold,"14""""",  Glass  
+1498,Mizuno Smartwatch Sport,MI-SP0498-SIL%,CAT_571,Electronics,Mobile,Puma,supp_10323,212.85,486.54,2025-08-12 00:00:00,1.728,22x21x14,White,"32""""",Glass
+1874,Saucony Basketball Shoes,SA-SP0874-TUR,CAT_615,Footwear,Running,  Microsoft  ,SUPP_10096,123.95,150.1,2023-04-06 00:00:00,0.216,26x17x11,Gray,44,Nylon
+1997,Sony Monitor,SO-HM0997-NAV,CAT_569,Electronics,Mobile,  New Balance  ,SUPP_10892,406.28,510.93,  2024-07-24  ,1.55,15x32x21,Gold,"15.6""""",Glass
+1837,Microsoft Charger Sport,MI-SP0837-PIN,CAT_692,Apparel,  Shirts  ,Adidas,SUPP_10813,200.25,  388.69  ,2025-01-02 00:00:00,5.075,68x61x86,Coral,Extra Large,Composite
+1777,New Balance Cable,NE-HM0777-PUR,CAT_508,Gaming,Miscellaneous,Adidas,SUPP_10978,419.03,557.25,  2023-07-03  ,4.485,29x21x64,Mint,SMALL,Fabric
+1214,Apple Mouse Pro,AP-HM0214-YEL,CAT_567,Footwear,Formal,JBL,SUPP_10444,389.17,532.96,2021-03-29 00:00:00,1.435,76x30x67,Yellow,One Size,Composite
+,,,,,,,,,,,,,, ,
+1057,Google Training Shoes Elite,GO-HM0057-BLU,CAT_579,Footwear,Formal,Nikon,SUPP_10038,37.88,86.41,2024-08-14 00:00:00,0.3,26x19x14,Gray,12,Mesh
+1178,Lenovo Case Professional,LE-HM0178-GRA,CAT_614,Apparel,Pants,Puma,SUPP_10971,287.25,  670.4  ,2021-10-09 00:00:00,1.547,98x66x50,White,Medium,Metal
+1966,Under Armour Backpack Max,UN-HM0966-RED,CAT_601,Electronics,Wearables,Bose,SUPP_10002,34.78,42.25,2022-04-08 00:00:00,2.534,6x96x44,purple,Large,mixed materials
+1798,Mizuno Cable Plus,mi-cl0798-yel,CAT_531,Equipment,Miscellaneous,Adidas,SUPP_10683,477.29,976.47,  2022-10-07  ,5.877,36x25x58,Red,Large,Fabric
+1988,Sony Basketball Shoes Plus,SO-AC0988-RED,CAT_533,Footwear,Running,Dell,  SUPP_10735  ,278.55,589.15,2022-04-23 00:00:00,1.345,35x15x15,Navy/Red,7.5,Canvas
+1567,Under Armour Training Shoes Sport#,UN-HM0567-PIN,CAT_552,Footwear,Casual,Canon,SUPP_10706,15.01,34.08,2025-01-15 00:00:00,0.69,28x18x12,Gray,6,Suede
+1473,Brooks Casual Shoes,BR-SP0473-RED,CAT_684,Footwear,Running,APPLE,SUPP_10756,461.15,1122.85,2020-11-19 00:00:00,1.384,35x18x15,Navy/Red,13,Canvas
+1654,JBL Basketball Shoes Pro,  JB-HM0654-NAV  *,CAT_647,Footwear,Basketball,Bose,SUPP_10560,  126.58  ,222.61,2022-07-14 00:00:00,0.997,31x16x14,Blue,11.5,SYNTHETIC
+1426,Nike Smartwatch Basic,NI-SP0426-SIL,CAT_561,Electronics,Mobile,Google,SUPP_10198,272.35,413.65,2025-02-14 00:00:00,4.01,34x26x26,Black,"21""""",Aluminum
+1594,Sony Mouse,SO-EL0594-GRA,CAT_538,Footwear,Outdoor,Dell,SUPP_10962,359.79,474.71,2025-05-20 00:00:00,3.667,50x48x15,Brown,Large,Mixed Materials
+1719,  Apple Cable Essential  ,AP-SP0719-RED,  CAT_617  ,Footwear,Casual,Dell,SUPP_10976,112.93,242.39,2025-06-05 00:00:00,8.996,16x7x24,Silver,One Size,Synthetic
+1509,Bose Monitor Elite,BO-AC0509-GRE,CAT_687,  Electronics  ,Accessories,Puma,SUPP_10469,29.91,48.59,2024-01-09 00:00:00,0.672,48x50x30,Black,"27""""",Steel
+1805,Adidas Mouse™ #805,PA-HM0447-BEI,CAT_523,Equipment,General,Nike®,SUPP_10046,260.61,Contact for price,  2025-10-04  ,6.111,Large,Coral,One Size Fits All,Composite
+1586,LG Mouse Classic,LG-SP0586-MIN,CAT_690,Accessories,Belts,Puma,SUPP_10174,30.92,51.29,2021-11-23 00:00:00,4.703,64x46x56,Beige,Extra Large,Metal
+1424,Under Armour T-Shirt Essential,UN-AC0424-GRE,CAT_642,Apparel,Sportswear,HP,SUPP_10631,325.77,741.82,2022-06-09 00:00:00,1.623,78x59x21,Yellow,M,nylon
+1612,Samsung Laptop,SA-HM0612-SIL,CAT_670,Electronics,Mobile,Nikon,SUPP_10675,  498.3  ,839.79,  2022-03-11  ,1.805,31x30x1,Gold,"27""""",Aluminum
+1793,Nike Casual Shoes Sport,NI-CL0793-BEI,CAT_548,Footwear,Basketball,Dell,SUPP_10394,76.0,178.35,2022-08-02 00:00:00,0.353,29x16x12,White,13,Suede
+1919,Nikon Camera Professional,NI-AC0919-BRO,CAT_561,Equipment,OTHER,Nike,  SUPP_10552  ,118.92,229.71,2024-04-21 00:00:00,7.44,46x38x12,Silver,Large,Wood
+1922,Nike Headphones Home,NI-CL0922-WHI,CAT_542,Electronics,Mobile,Mizuno,SUPP_10079,453.02,1001,  2025-07-23  ,0.289,18x7x1.1,White,"21""""",Steel
+1133,Lenovo Camera,LE-CL0133-NAV,CAT_636,Fashion,Other,Adidas,SUPP_10782,498.23,739.99,2023-01-23 00:00:00,8.48,54x50x27,Silver,Medium,Wood
+1482,Puma Camera Professional,PU-EL0482-PUR,CAT_533,Fitness,Other,Nike,SUPP_10973,363.89,816.26,2023-12-01 00:00:00,0.994,  95x47x50  ,Mint,Small,Synthetic
+1227,HP Cable Classic,HP-AC0227-BEI,CAT_520,Fitness,Other,Nike,SUPP_10250,  442.26  ,690.61,2025-05-13 00:00:00,6.323,31x11x28,Gray,Small,Synthetic
+1037,Apple Training Shoes Home,AP-AC0037-PUR%,CAT_629,Footwear,  Casual  ,Nike,SUPP_10289,365.76,837.12,2024-10-19 00:00:00,0.954,35x18x11,Red,41,Mesh
+1591,new balance laptop home,NE-HM0591-TUR,CAT_643,Electronics,Mobile,Microsoft,SUPP_10979,  166.82  ,413.86,2023-10-27 00:00:00,2.591,38x23x3,Silver,Standard,Steel
+1605,Canon Headphones Premium Mint Edition with Extra Features and Extended Warranty Limited Time Offer,SKU-605!@#,CAT_510,,Computers,,SUPP_10260,467.91,999999.99,2021-07-24 00:00:00,0.248,x17x30,Gold,Extra Large (XL),Plastic
+1335,Mizuno Smartphone Max,MI-EL0335-NAV,CAT_607,Electronics,Accessories,Nikon,SUPP_10323,12.53,  18.21  ,2023-07-17 00:00:00,0.116,16x6x1.5,Silver,"27""""",Aluminum
+1861,Adidas Headphones,AD-HM0861-MIN,CAT_587,Electronics,Wearables,Lenovo,SUPP_10591,18.31,43.54,2025-08-27 00:00:00,0.267,17x8x0.7,Black,Compact,  Steel  
+1857,Saucony Casual Shoes,SA-AC0857-RED,CAT_591,Footwear,Outdoor,Google,SUPP_10719,404.83,786.34,2023-02-05 00:00:00,0.459,29x19x11,Black,11,  synthetic  
+1609,Under Armour Monitor,UN-CL0609-BLA,CAT_629,Electronics,Wearables,Apple,SUPP_10514,98.8,153.85,2022-11-05 00:00:00,3.043,  44x13x13  ,Gold,"14""""",Magnesium Alloy
+1327,Panasonic Training Shoes,PA-EL0327-MIN,CAT_543,Footwear,Casual,Sony,SUPP_10187,135.22,178.02,2021-09-24 00:00:00,0.599,31x20x11,Black,43,Canvas
+1926,HP Keyboard Professional,HP-EL0926-GRA,CAT_546,Audio,Miscellaneous,Apple,SUPP_10719,122.25,223.24,2025-07-25 00:00:00,2.398,56x21x59,Navy,  Extra Large  ,Fabric
+1205,Reebok Headphones,RE-CL0205-PUR,CAT_642,Electronics,  Tablets  ,Nikon,SUPP_10750,104.55,219.14,2022-10-21 00:00:00,0.172,13x8x1.4,Space Gray,"32""""",Steel
+1032,Google Smartphone,GO-SP0032-BEI,CAT_518,Electronics,Mobile,Microsoft,SUPP_10806,397.71,782.19,2023-06-12 00:00:00,0.261,13x9x0.6,SILVER,Large,Plastic
+1973,HP CABLE,HP-EL0973-SIL,CAT_515,technology,Other,Lenovo,SUPP_10654,24.12,40.38,2024-01-07 00:00:00,0.331,38x48x25,gold,Extra Large,Fabric
+1405,Samsung Training Shoes Édition Spéciale,,CAT_669,home & office,Running,Addidas,SUPP_10882,467.22,233.61,2024-04-28 00:00:00,0.393,88/23/45,Red,2XL,Suede
+,N/A&,,, ,,  NULL  ,, ,,,, ,, , 
+  1270  ,,,,equipment,,Addidas,SUPP_999,Free,6.83,,Varies,65/42/78,,94,Mixed
+1208,Brooks Tablet@,BR-CL0208-TUR,CAT_520,Electronics,Wearables,New Balance,  SUPP_10062  ,186.85,  404.81  ,2023-02-06 00:00:00,4.507,33x13x24,White,Compact,Aluminum
+1088,JBL Running Shoes Ultra,JB-CL0088-PUR,CAT_633,Footwear,Formal,Samsung,SUPP_10696,110.65,216.66,2025-01-27 00:00:00,0.318,33x18x10,  Red  ,8,Rubber
+1729,LG Speaker Classic,LG-SP0729-GOL,CAT_602,Apparel,Shirts,Brooks,SUPP_10201,22.15,42.85,2024-07-27 00:00:00,1.899,73x72x91,Orange,  Extra Large  ,Metal
+1486,LG Mouse Basic,LG-SP0486-PUR,CAT_536,Technology,Other,Apple,SUPP_10097,284.83,418.7,2025-04-28 00:00:00,9.427,80x36x15,  Gray  ,Extra Large,Wood
+  1423  ,HP Mouse Elite,HP-AC0423-BRO,CAT_665,Travel,  Other  ,Panasonic,SUPP_10007,470.41,  1042.83  ,2023-06-20 00:00:00,5.125,39x89x38,Pink,Extra Large,Synthetic
+1905,Google Charger,GO-HM0905-ORA,  CAT_590  ,Gaming,Other,Adidas,SUPP_10015,93.16,142.9,2022-08-13 00:00:00,8.694,29x22x32,Yellow,Medium,Composite
+1022,Panasonic Mouse,PA-SP0022-PIN,CAT_692,Audio,Miscellaneous,Reebok,SUPP_10765,369.97,828.67,2021-01-01 00:00:00,8.988,67x33x39,Brown,Extra Large,Mixed Materials
+1099,Apple Backpack Premium,AP-AC0099-WHI,CAT_663,Electronics,Mobile,Apple,SUPP_10511,424.21,864.7,2021-01-28 00:00:00,3.38,17x72x10,Green,Medium,Synthetic
+1494,Amazon Headphones Office,AM-SP0494-COR,CAT_503,Electronics,Accessories,Microsoft,SUPP_10034,327.14,665.46,  2024-10-18  ,0.18,17x8x0.8,Black,Standard,Aluminum
+1430,Bose Monitor Sport,BO-HM0430-NAV,CAT_581,Electronics,Accessories,Samsung,SUPP_10621,197.69,288.56,2024-04-20 00:00:00,2.088,50x14x19,Silver,"13""""",Steel
+1548,ASICS Keyboard,AS-EL0548-MIN,CAT_690,Fitness,MISCELLANEOUS,Sony,SUPP_10072,  441.31  ,962.29,2023-05-29 00:00:00,7.228,39x10x53,Navy,Small,Synthetic
+1802,JBL SMARTPHONE,JB-CL0802-TUR,  CAT_674  ,Electronics,Mobile,Saucony,SUPP_10131,42.2,60.86,2025-05-06 00:00:00,0.193,18x7x0.6,Black,Standard,Glass
+1623,JBL T-Shirt Classic,JB-HM0623-YEL,CAT_613,Apparel,Formal,HP,SUPP_10381,80.81,105.1,2023-04-11 00:00:00,  1.69  ,92x53x26,Yellow,L,Silk
+1414,Under Armour Case,UN-CL0414-TUR,CAT_524,Technology,General,Sony,SUPP_10784,436.52,834.31,2023-01-22 00:00:00,9.693,16x68x17,Beige,Large,composite
+1298,LG Camera Air,LG-EL0298-COR,CAT_611,Technology,Miscellaneous,ASICS,SUPP_10506,68.07,144.83,2024-04-24 00:00:00,1.986,39x41x100,Turquoise,Extra Large,Composite
+1324,Bose Cable Classic,BO-SP0324-YEL,CAT_621,Fashion,Other,Under Armour,SUPP_10135,383.36,711.59,2022-02-16 00:00:00,  4.663  ,62x90x62,Gray,Large,Mixed Materials
+1833,ASICS Keyboard Essential,AS-CL0833-YEL,CAT_609,Outdoor,Other,HP,SUPP_10163,474.34,937.8,2024-12-06 00:00:00,3.234,34x39x28,Beige,Extra Large,Metal
+1293,Puma Backpack Advanced,PU-CL0293-BRO,CAT_555,  Apparel  ,Shirts,Dell,SUPP_10219,  485.26  ,859.55,2023-04-22 00:00:00,2.618,80x12x67,Mint,Large,Synthetic
+1060#,,xx-sp0060-bla,,Home & Office,,Google,,,196.66,,,32x48x67,,Medium,
+1099,Under Armour Speaker Air,,,,mobile,,SUPP_10506,0.001,,0000-00-00,0,,Purple/Green,,fabric
+1188,Microsoft Backpack Sport,MI-AC0188-GOL,CAT_632,Electronics,Computers,  Apple  ,SUPP_10562,149.4,340.44,2021-09-01 00:00:00,9.159,49x49x40,Green,One Size,Composite
+1921,Amazon Camera Ultra,AM-HM0921-PIN,CAT_591,Accessories,Hats,Bose,SUPP_10271,315.48,635.56,2023-05-28 00:00:00,3.799,62x97x5,Coral,One Size,Metal
+1501,Amazon Screen Protector Ultra,AM-SP0501-PIN,CAT_541,Gaming,Other,Dell,SUPP_10770,20.66,46.53,2020-11-04 00:00:00,4.619,78x93x60,Yellow,Extra Large,Composite
+1044,ASICS Backpack Professional,AS-HM0044-ORA,CAT_523,Technology,Miscellaneous,  Nike  ,SUPP_10270,272.92,488.86,2024-07-05 00:00:00,6.761,91x38x79,Yellow,Large,Mixed Materials
+1338,New Balance Laptop Elite,NE-HM0338-GOL,CAT_527,Electronics,Computers,NIKE,SUPP_10609,359.52,708.52,2023-08-24 00:00:00,3.134,39x22x3,Gold,"21""""",Glass
+1149,Panasonic T-Shirt Advanced,PA-EL0149-TUR,CAT_575,Apparel,Jackets,Canon,SUPP_10414,200.25,249.49,2024-03-19 00:00:00,1.445,  78x29x48  ,Green,3XL,Spandex
+1217,Google Running Shoes Essential,GO-SP0217-WHI,  CAT_619  ,Footwear,Running,Apple,SUPP_10397,333.58,687.8,2020-11-23 00:00:00,1.387,30x15x10,Blue,44,Mesh
+1165,Brooks Speaker Plus Mint Edition with Extra Features and Extended Warranty Limited Time Offer,SKU-165!@#,cat_580,,Other,Unknown,SUPP_10205,112.76,0.01,2025-04-09 00:00:00,6.897,x42x44,Red,Large (XL),Wood
+  1181  ,Samsung Mouse Classic,SA-CL0181-SIL,CAT_665,Fashion,Miscellaneous,Nike,SUPP_10249,31.14,60.58,2021-11-21 00:00:00,1.695,  85x70x10  ,Gray,Small,Composite
+1279,Microsoft Smartphone,MI-EL0279-RED,CAT_531,  Electronics  ,Accessories,  HP  ,SUPP_10601,451.58,650.37,2023-02-06 00:00:00,0.17,12x7x1.3,White,Standard,Glass
+1419,Brooks Camera Sport,BR-SP0419-YEL,CAT_502,Photography,Other,HP,SUPP_10079,364.13,710.79,2024-11-17 00:00:00,1.532,90x98x100,Purple,Small,Composite
+1910,Puma Mouse™ #910,SA-AC0569-SIL!,CAT_525,Home & Office,Budget Office Items,Nike®,SUPP_10874,470.06,,1990-03-16 00:00:00,38.145119,Standard Size,Blu,One Size Fits All,Synthetic
+1027,Amazon Laptop Elite,AM-CL0027-TUR,CAT_554,Electronics,Tablets,Microsoft,SUPP_10348,147.03,290.38,2021-08-03 00:00:00,3.224,38x20x3,Silver,"14""""",Plastic
+1810,Product,SKU,,audio,,Addidas,SUPP_999,,6.33,,Unknown,  80 x 46 x 62  ,Various,24,  N/A  
+1379,Sony Headphones Advanced,SO-HM0379-SIL,CAT_603,Electronics,Computers,Panasonic,SUPP_10569,410.56,910.83,2025-10-10 00:00:00,  0.206  ,12x6x1.3,Silver,Large,  Aluminum  
+1976,Under Armour Mouse,UN-AC0976-YEL,CAT_503,Accessories,Jewelry,Samsung,SUPP_10830,215.8,298.11,2021-08-26 00:00:00,5.463,8x62x6,Pink,Extra Large,Synthetic
+1269,Dell Charger,DE-CL0269-GRA,cat_541,Accessories,Bags,Adidas,SUPP_10324,291.52,516.91,2023-02-16 00:00:00,3.76,31x76x95,White,Large,Fabric
+1658,Nikon Jacket Max,  NI-AC0658-GOL  ,CAT_676,Apparel,Jackets,  Bose  ,SUPP_10986,201.39,283.68,2023-12-31 00:00:00,0.519,22x7x35,Turquoise,XXXL,Silk
+1682,JBL Headphones,JB-CL0682-BRO,CAT_699,Electronics,Computers,Adidas,SUPP_10966,104.54,260.03,2023-12-29 00:00:00,0.204,13x8x0.9,Gold,"14""""",Aluminum
+1393,Sony Backpack,SO-CL0393-GRA&,CAT_609,Electronics,Accessories,HP,SUPP_10093,433.53,734.6,2023-01-18 00:00:00,5.297,94x86x34,Green,  Large  ,Metal
+1386,Google Monitor Home,GO-EL0386-BLU,CAT_519,Electronics,Mobile,Apple,SUPP_10169,291.91,382.39,2022-07-07 00:00:00,1.786,41x10x18,Gold,"15.6""""",Carbon Fiber
+1753,Under Armour Tablet Office,UN-AC0753-GOL,CAT_562,Electronics,Tablets,New Balance,SUPP_10656,342.47,485.03,2021-12-24 00:00:00,1.264,22x45x22,Space Gray,Large,Plastic
+1772,Microsoft T-Shirt,MI-SP0772-MIN,CAT_669,Apparel,Formal,Panasonic,SUPP_10227,345.46,445.41,2022-06-21 00:00:00,  1.796  ,32x98x51,Beige,XL,Silk
+1342,LG Smartphone Max,LG-CL0342-PIN,CAT_544,Electronics,Mobile,Microsoft,SUPP_10736,95.4,219.59,2021-05-06 00:00:00,0.149,13x6x0.7,White,"14""""",Aluminum
+1389,Panasonic Jacket,PA-AC0389-TUR,CAT_550,  Apparel  ,Shirts,JBL,SUPP_10526,450.27,780.74,2022-11-01 00:00:00,  1.835  ,5x24x89,Navy,L,Spandex
+1642,ASICS T-Shirt Professional,AS-HM0642-SIL,CAT_501,Apparel,Pants,Microsoft,SUPP_10425,55.68,130.19,2022-07-13 00:00:00,0.736,10x22x35,Coral,2XL,Linen
+1841,Adidas T-Shirt Plus,AD-CL0841-COR,CAT_560,Apparel,Formal,Brooks,SUPP_10001,468.31,898.73,2023-11-06 00:00:00,0.407,58x83x26,White,XS,Spandex
+  1707  ,Bose Speaker,BO-AC0707-BEI,CAT_581,Electronics,Computers,Under Armour,SUPP_10272,476.84,665,2024-08-31 00:00:00,8.656,18x41x16,White,Large,Composite
+1257,Lenovo Cable,LE-EL0257-YEL,CAT_699,Apparel,Shirts,Bose,SUPP_10082,13.11,18.79,2022-09-20 00:00:00,0.982,88x80x41,Brown,Extra Large,Synthetic
+1239,Puma Mouse,PU-HM0239-BEI,CAT_583,Photography,General,Nikon,SUPP_10180,160.94,278.03,2021-12-12 00:00:00,6.023,92x81x53,Purple,Extra Large,Synthetic
+1908,Apple Laptop Max,AP-EL0908-GRA,CAT_525,Electronics,Tablets,Apple,SUPP_10386,243.37,407.44,2023-10-05 00:00:00,3.057,38x26x3,White,"27""""",Magnesium Alloy
+1589,Brooks Smartwatch Classic,BR-EL0589-BLA,CAT_614,Electronics,Tablets,Canon,SUPP_10252,112.63,182.92,2023-08-24 00:00:00,1.55,30x50x20,  White  ,Compact,Glass
+1897,Samsung Speaker Essential,SA-AC0897-PIN*,CAT_537,Apparel,Pants,Amazon,SUPP_10884,  143.22  ,210.87,2024-10-17 00:00:00,0.631,97x58x99,Yellow,One Size,Composite
+1475,Saucony Running Shoes Plus,,  CAT_647  ,,Outdoor,,SUPP_10321,58.74,,2025-04-30 00:00:00,0.57,,Black,,Canvas
+1776,Amazon Training Shoes Air,AM-CL0776-BLA,CAT_521,Footwear,Basketball,Dell,SUPP_10448,  451.55  ,1002.63,2021-03-03,1.37,30x15x10,White,13,Nylon
+1985,Adidas T-Shirt Ultra,AD-HM0985-COR,CAT_577,Apparel,Pants,New Balance,SUPP_10294,51.56,117.11,2022-01-30 00:00:00,1.317,95x43x98,White,M,Spandex
+1519,Brooks Mouse Professional,BR-SP0519-PUR,CAT_575,Travel,Miscellaneous,Amazon,SUPP_10806,230.68,354.16,2024-12-11 00:00:00,2.825,9x22x23,Coral,Large,Mixed Materials
+1319,Reebok Casual Shoes,RE-HM0319-MIN,CAT_579,Footwear,Outdoor,Amazon,SUPP_10775,321.49,395.58,2022-10-18 00:00:00,1.357,33x19x12,White,10.5,Suede
+1396,Saucony Smartwatch,SA-CL0396-BRO,CAT_640,Electronics,Tablets,Mizuno,SUPP_10873,424.58,818.78,2025-02-06 00:00:00,2.063,33x38x25,Black,"27""""",Aluminum
+1267,Apple Tablet Ultra,AP-SP0267-BLU,CAT_527,Electronics,Mobile,microsoft,supp_10114,351.57,  648.73  ,  2022-03-02  ,4.437,43x50x5,White,"27""""",Magnesium Alloy
+  1778  ,  ASICS Case  ,AS-SP0778-BLA,CAT_552,Travel,  Other  ,Samsung,SUPP_10003,145.94,  199.04  ,  2021-04-15  ,0.411,32x59x10,Coral,ONE SIZE,Synthetic
+1690,,N/-HM0690-BRO,,Fitness,general,Panasonic,SUPP_999,,998.47,,,54x69x30,,Small,
+1557,Microsoft Cable Classic,MI-HM0557-BEI,CAT_627,Fitness,Miscellaneous,Apple,SUPP_10976,497.94,611.84,2025-01-05 00:00:00,4.54,88x12x49,Turquoise,  Medium  ,Mixed Materials
+1491,PUMA HEADPHONES,PU-HM0491-YEL,CAT_584,Electronics,Accessories,Mizuno,SUPP_10873,300.16,468.37,2025-05-06 00:00:00,0.261,18x9x0.7,Black,"17""""",Plastic
+  1994  ,Reebok Monitor,RE-CL0994-PUR,CAT_620,Electronics,  Computers  ,Saucony,SUPP_10065,231.79,566.92,2023-03-02 00:00:00,2.337,12x49x14,White,"15.6""""",Plastic
+1367,Bose Camera Air,BO-AC0367-GOL,CAT_547,Accessories,Bags,Saucony,SUPP_10187,406.5,589.2,2022-11-25 00:00:00,9.831,57x61x85,Red,Medium,Mixed Materials
+1102,Puma Backpack,PU-HM0102-PIN,CAT_563,Travel,General,Apple,SUPP_10274,85.57,181.85,2022-01-07 00:00:00,6.376,99x54x45,Orange,Small,Mixed Materials
+1049,Apple Tablet Ultra,AP-EL0049-GRA,CAT_570,Electronics,  Accessories  ,New Balance,SUPP_10599,278.69,452.24,2021-07-16 00:00:00,4.976,43x28x19,Gold,Standard,Carbon Fiber
+1464,Adidas Casual Shoes,AD-SP0464-BLA@,CAT_655,Footwear,Casual,Microsoft,SUPP_10829,379.13,561.68,2021-02-21 00:00:00,0.236,34x18x13,Navy/Red,6.5,Nylon
+1087,Google Headphones Plus,GO-SP0087-GRE,CAT_556,Electronics,  Mobile  ,Bose,SUPP_10156,232.94,578.97,2021-12-02 00:00:00,0.175,17x9x1.3,Silver,"17""""",  Magnesium Alloy  
+1511,JBL Smartphone Office,JB-CL0511-PIN,CAT_569,Electronics,Computers,Canon,SUPP_10212,19.17,33.33,2021-06-22 00:00:00,0.126,14x9x1.1,  White  ,"14""""",Plastic
+1603,Saucony Smartphone,SA-EL0603-ORA,CAT_616,Electronics,Wearables,Reebok,SUPP_10167,192.9,457.63,2024-08-29 00:00:00,0.245,16x7x0.8,White,"27""""",Plastic
+,,,,,,,,,,,,,,,
+1864,Samsung Tablet,SA-CL0864-BLA,CAT_553,Electronics,Accessories,JBL,SUPP_10349,378.47,871.84,2021-05-21 00:00:00,1.013,15x46x12,Gold,"32""""",  Steel  
+,,,CAT_9999,,,,,,,"Nov 26, 2023",,,,,
+1876,Brooks Mouse Home,BR-SP0876-RED,CAT_644,Accessories,  Belts  ,Microsoft,SUPP_10380,498.94,754.53,2025-08-11 00:00:00,  5.553  ,14x12x84,Turquoise,One Size,Fabric
+1579,Under Armour Casual Shoes Office,UN-CL0579-RED,CAT_671,Footwear,Basketball,New Balance,SUPP_10328,153.25,341.84,2023-09-16 00:00:00,1.223,30x19x13,Black,  43  ,Rubber
+  1588  ,Dell Mouse Pro,DE-SP0588-RED,CAT_517,Home & Office,Other,Bose,SUPP_10622,151.77,228.52,2021-05-07 00:00:00,9.439,32x58x67,Black,Large,Synthetic
+1924,Lenovo Backpack Essential,LE-AC0924-GRA,CAT_501,Technology,Other,Nike,SUPP_10355,286.52,619.61,2023-07-05 00:00:00,9.998,34x20x21,Navy,Large,Mixed Materials
+1741,ASICS Case Ultra*,AS-CL0741-BRO,CAT_527,Accessories,Belts,Bose,SUPP_10736,209.74,251.8,2024-05-14 00:00:00,1.947,36x10x37,  Purple  ,  One Size  ,Wood
+1683,HP Training Shoes Elite,HP-EL0683-BRO,CAT_630,Footwear,Outdoor,Dell,SUPP_10446,290.3,531.54,2024-11-03 00:00:00,1.302,31x19x15,White,43,Synthetic
+1617,HP Jacket Max,HP-SP0617-COR,  CAT_673  ,Apparel,Sportswear,Microsoft,SUPP_10270,  302.9  ,627.18,2025-07-03 00:00:00,0.458,83x22x93,Pink,L,Denim
+1601,Samsung Screen Protector Basic,SA-EL0601-TUR,CAT_544,Electronics,Computers,Apple,SUPP_10742,125.05,291.46,2022-06-24 00:00:00,5.84,76x39x39,Black,  One Size  ,Metal
+1221,New Balance Training Shoes,NE-CL0221-RED&,CAT_533,Footwear,Basketball,Nike,SUPP_10780,493.12,  987.24  ,2023-04-01 00:00:00,0.987,34x16x14,White,9.5,Suede
+1722,HP Monitor Max,HP-HM0722-BLA,CAT_669,  Electronics  ,Mobile,Nikon,SUPP_10666,439.67,991.3,2021-12-14 00:00:00,3.995,16x19x29,White,"15.6""""",Aluminum
+  1942  ,Mizuno Speaker Pro,MI-AC0942-MIN,CAT_598,Electronics,Tablets,LENOVO,SUPP_10372,211.83,497.16,2025-06-10 00:00:00,0.429,9x34x95,Green,Extra Large,Fabric
+1023,Puma Laptop,PU-AC0023-GRA,CAT_618,Electronics,Mobile,Adidas,SUPP_10266,195.76,288.78,2024-08-22 00:00:00,1.952,36x24x2,White,"14""""",Carbon Fiber
+1576,Mizuno Smartwatch Essential,MI-CL0576-GRA,CAT_605,Electronics,  Tablets  ,Nikon,SUPP_10251,435.33,596.28,2021-03-29 00:00:00,4.691,30x49x29,Gold,Compact,Magnesium Alloy
+1029,Bose Training Shoes Professional,BO-HM0029-PIN,  CAT_525  ,Footwear,Basketball,Google,SUPP_10232,186.83,297.61,2024-04-14 00:00:00,1.12,27x17x10,Black,41,Canvas
+1595,Dell Headphones™ #595,AP-CL0295-BEI,CAT_558,Accessories,Bags,nike,SUPP_10053,325.02,TBD,2020-10-21 00:00:00,0.145,Large,Black,One Size Fits All,Plastic
+1657,Bose Mouse Sport,BO-EL0657-NAV,CAT_500,Audio,Miscellaneous,dell,SUPP_10062,392.88,897.26,2024-12-07 00:00:00,7.508,  72x42x31  ,Brown,Small,Fabric
+1210,Product,SA-AC0106-PIN,,Audio,General,Nike Inc.,SUPP_999,,TBD,,Light,Small,,,
+1915,HP Screen Protector Sport,HP-AC0915-WHI*,  CAT_688  ,Gaming,Other,Under Armour,SUPP_10902,237.05,503.47,2022-05-06 00:00:00,3.508,25x60x14,Black,Medium,Wood
+1354,Nikon Laptop,NI-AC0354-YEL,CAT_587,Electronics,Wearables,HP,SUPP_10406,28.51,43.5,2023-10-28 00:00:00,2.831,32x25x3,Space Gray,"32""""",Carbon Fiber
+1648,HP Charger Advanced,  HP-EL0648-BLU  ,CAT_516,Apparel,Pants,AMAZON,SUPP_10164,265.82,557.26,2024-03-07 00:00:00,2.022,  85x49x8  ,Purple,Extra Large,Metal
+1499,Adidas Cable Premium,AD-HM0499-GOL,CAT_679,Audio,Miscellaneous,New Balance,  SUPP_10830  ,344.19,542.2,2021-03-23 00:00:00,3.488,69x75x100,Navy,Small,Wood
+1947,Google Case,GO-AC0947-PIN,CAT_540,Electronics,Mobile,Brooks,SUPP_10712,299.77,627.43,2024-05-12 00:00:00,6.682,16x91x35,Purple,Large,Synthetic
+1622,Lenovo Training Shoes,LE-CL0622-PIN,CAT_611,Footwear,  Outdoor  ,Under Armour,SUPP_10869,199.48,294.71,2023-06-10 00:00:00,0.33,26x18x15,Red,38,Synthetic
+1720,,,,  FITNESS  ,,Addidas,,,6.19,,,65 x 15 x 31,,  12  ,
+1521,LG Speaker Premium,LG-AC0521-TUR,  CAT_658  ,Equipment,General,LG,SUPP_10659,86.38,199.4,2020-12-08 00:00:00,3.212,  52x53x67  ,Silver,One Size,Metal
+1471,JBL Tablet Basic,JB-AC0471-GRE,CAT_614,  Electronics  ,Wearables,Lenovo,SUPP_10583,415.63,1031.91,2023-08-20 00:00:00,4.666,25x36x26,Gold,Large,Plastic
+1148,Nike Speaker Home,NI-SP0148-MIN,CAT_665,Fitness,Other,Google,SUPP_10305,345.36,630.72,2024-05-13 00:00:00,3.429,40x86x46,Navy,Large,Synthetic
+1974,Canon Smartphone,CA-AC0974-ORA,CAT_626,Electronics,Tablets,ASICS,SUPP_10329,  136.32  ,212.03,2020-11-04 00:00:00,0.226,13x6x0.8,Gold,Standard,Glass
+1129,Google Keyboard,GO-EL0129-BLU,CAT_540,Technology,Other,Google,SUPP_10846,355.31,705.04,2025-06-13 00:00:00,2.229,46x23x16,Green,Large,Metal
+1958,JBL Training Shoes Home,JB-CL0958-RED,  CAT_583  ,Footwear,Basketball,Under Armour,SUPP_10540,375.56,927.21,2025-05-05 00:00:00,0.979,27x16x13,Black,6,Leather
+1811,Nike Tablet Basic,NI-AC0811-RED,CAT_534,Electronics,COMPUTERS,Sony,SUPP_10314,45.91,67.14,2025-10-05 00:00:00,1.596,37x49x17,Space Gray,Compact,Steel
+1180,Test,000000,,Electronics,,Appl,,,4.96,,,"34,14,70",,28,
+1679,BROOKS BACKPACK BASIC,BR-AC0679-NAV,CAT_686,Sports,Nutrition,Samsung,SUPP_10983,365.14,  635.4  ,2025-08-12 00:00:00,0.13,84x92x32,Yellow,Large,Wood
+1863,Saucony Charger Office,SA-EL0863-GRA,CAT_576,Photography,Other,  HP  ,SUPP_10654,308.13,714.2,2022-05-16 00:00:00,8.997,64x6x47,Coral,LARGE,Fabric
+1693,HP Running Shoes,HP-CL0693-BLU,CAT_533,Footwear,Casual,LG,SUPP_10732,466,681.95,2023-04-25 00:00:00,1.391,31x15x13,Gray,7,Mesh
+1448,Sony Case Essential,SO-SP0448-WHI,CAT_693,Fashion,Miscellaneous,Sony,SUPP_10412,338.34,609.57,2024-07-30 00:00:00,7.654,71x63x11,Blue,Small,Fabric
+1831,Panasonic Training Shoes,  PA-HM0831-BEI  ,  CAT_546  ,Footwear,  Basketball  ,Nike,SUPP_10369,430.01,  599.67  ,2024-08-12 00:00:00,0.347,27x18x15,Blue,45,Nylon
+1822,Dell Running Shoes Ultra,DE-CL0822-WHI,CAT_563,Footwear,Basketball,Google,SUPP_10468,153.45,237.03,2023-11-02 00:00:00,0.47,26x15x12,White,45,Mesh
+1360,Nikon Camera Advanced,000000,,technology,,Samung,,,7.75,,,"34,98,47",,32,
+1714,Puma Smartphone Essential,PU-EL0714-COR,CAT_698,Electronics,Wearables,Panasonic,SUPP_10921,332.26,502.85,2022-03-14 00:00:00,  0.12  ,12x7x1.2,Black,Large,Carbon Fiber
+1599,Bose Charger Professional,BO-CL0599-BLU,CAT_657,Footwear,Running,Nike,SUPP_10634,34.51,41.91,2022-08-28 00:00:00,2.815,5x43x61,Yellow,One Size,Composite
+1497,Amazon Keyboard Advanced,AM-EL0497-BEI,CAT_522,Footwear,Running,Dell,SUPP_10747,52.34,84.41,2025-01-28 00:00:00,6.304,7x26x6,Gold,Large,  Metal  
+1186,Saucony Basketball Shoes Advanced,SA-CL0186-RED,CAT_554,Footwear,Outdoor,Panasonic,SUPP_10804,175.83,336.85,2025-06-21 00:00:00,1.106,25x16x13,Black/White,6,Nylon
+1684,Nikon Running Shoes Max,NI-AC0684-MIN,CAT_688,Footwear,Outdoor,Sony,SUPP_10417,32.6,  49.03  ,2024-01-03 00:00:00,0.687,26x15x10,Black/White,11.5,  Mesh  
+1935,Canon Smartwatch Sport Pink Edition with Extra Features and Extended Warranty Limited Time Offer,SKU-935!@#,CAT_555,,Tablets,,SUPP_10015,290.5,999999.99,2025-04-03 00:00:00,2.584,x37x15,Space Gray,Medium (M),  Magnesium Alloy  
+  1390  ,Test,TE-CL0390-GRA,,Aparrel,General,Nike,SUPP_999,Free,884.7405,,Heavy,30cm x 19cm x 29cm,Various,  XS  ,Mixed
+1627,Reebok Headphones Premium,RE-SP0627-SIL,CAT_539,Electronics,Accessories,Dell,SUPP_10251,395.59,642.09,2023-08-27 00:00:00,0.134,14x6x1.0,Black,"27""""",Plastic
+1466,Google Cable Home,GO-SP0466-SIL,CAT_613,Gaming,General,Nikon,  SUPP_10009  ,238.56,585.82,2023-12-21 00:00:00,4.854,76x32x57,  White  ,One Size,Mixed Materials
+1636,LG Monitor Sport,  LG-HM0636-PUR  ,CAT_576,Electronics,Computers,Lenovo,SUPP_10166,315.3,767.14,2023-05-25 00:00:00,3.483,30x13x18,Space Gray,"27""""",Plastic
+1059,Reebok Backpack,RE-HM0059-GRA,CAT_585,Footwear,Outdoor,ASICS,SUPP_10144,459.21,736.25,2021-07-25 00:00:00,6.595,89x55x21,Blue,Large,Wood
+1817,Amazon Training Shoes Office,AM-SP0817-GRE,CAT_578,Footwear,Casual,Apple,SUPP_10810,449.38,896.77,2021-05-19 00:00:00,0.714,  34x19x11  ,Navy/Red,43,Synthetic
+1377,Saucony Cable,SA-CL0377-YEL,CAT_609,Outdoor,General,Adidas,SUPP_10098,184.24,334.59,2023-10-17 00:00:00,9.456,20x70x88,Purple,One Size,  Metal  
+1629,JBL Mouse,JB-EL0629-GOL,CAT_518,Fitness,Miscellaneous,Google,SUPP_10118,306.15,531.52,2022-03-22 00:00:00,3.822,52x8x45,Turquoise,Medium,MIXED MATERIALS
+1599,Bose Charger Professional,BO-CL0599-BLU,CAT_657,Footwear,Running,Nike,SUPP_10634,34.51,41.91,2022-08-28 00:00:00,2.815,5x43x61,Yellow,One Size,Composite
+1561,Adidas Charger,AD-SP0561-RED,CAT_543,Electronics,Accessories,Nike,SUPP_10004,  170.16  ,271.94,  2022-05-21  ,8.02,77x77x52,  Blue  ,Medium,  Composite  
+1823,Amazon Smartwatch Plus,AM-AC0823-WHI,CAT_539,ELECTRONICS,Computers,New Balance,SUPP_10678,486.42,860.77,2021-02-07 00:00:00,  1.787  ,39x26x11,Black,"21""""",Plastic
+1016,New Balance Speaker Home,NE-HM0016-PUR,CAT_507,Footwear,Casual,Dell,SUPP_10594,481.64,744.18,2023-10-18 00:00:00,1.173,60x49x98,Purple,Extra Large,Wood
+1344,sony speaker office,SO-AC0344-GOL,CAT_686,Footwear,Formal,ASICS,SUPP_10629,41.79,77.78,2023-08-30 00:00:00,7.538,87x70x52,Turquoise,  One Size  ,Metal
+1125,REEBOK SCREEN PROTECTOR ELITE,,CAT_563,,Miscellaneous,,SUPP_10937,362.94,,2022-10-17 00:00:00,2.785,,Blue,,wood
+1788,Adidas Training Shoes,AD-SP0788-TUR,CAT_571,Footwear,Basketball,Saucony,SUPP_10134,463.03,1073.46,2022-08-04 00:00:00,1.172,26x18x12,Gray,  43  ,Suede
+1526,Lenovo T-Shirt,LE-HM0526-COR,CAT_579,Apparel,Sportswear,Samsung,SUPP_10774,473.39,868.13,2021-01-28 00:00:00,0.706,70x65x68,Silver,M,Polyester
+1749,Nike Headphones,NI-SP0749-RED,CAT_523,Electronics,Tablets,JBL,SUPP_10834,478.71,906.4,2025-09-06 00:00:00,0.203,15x6x0.5,Gold,"13""""",Aluminum
+1132,Lenovo Screen Protector Premium,LE-EL0132-YEL,CAT_682,Home & Office,Miscellaneous,Reebok,SUPP_10800,  247.49  ,590.63,2021-06-06 00:00:00,5.074,54x39x28,Black,Large,Wood
+1277,Dell Headphones,DE-HM0277-GRE,CAT_548,Electronics,Accessories,Under Armour,SUPP_10706,417.39,786.09,2021-05-28 00:00:00,0.206,16x6x0.9,Black,"14""""",Plastic
+1766,Microsoft Tablet Essential,MI-AC0766-GRA,CAT_611,Electronics,Tablets,Dell,SUPP_10166,79.05,191.77,2022-01-15 00:00:00,2.004,47x14x19,Black,"21""""",Magnesium Alloy
+1646,New Balance Running Shoes,NE-AC0646-BLU,CAT_584,Footwear,Basketball,Bose,SUPP_10021,58.74,141.59,2021-08-29 00:00:00,1.15,27x20x12,Black/White,  10  ,Mesh
+1032,Google Smartphone,GO-SP0032-BEI,CAT_518,Electronics,Mobile,Microsoft,SUPP_10806,397.71,782.19,2023-06-12 00:00:00,0.261,13x9x0.6,Silver,Large,Plastic
+1608,Puma Case Basic,PU-AC0608-BLA,CAT_597,Electronics,Wearables,Mizuno,SUPP_10927,52.55,80.29,2023-03-16 00:00:00,1.011,36x97x96,Red,Extra Large,Metal
+,,,,,,,,,,,,,,,
+1759,Adidas Laptop Basic,AD-HM0759-MIN,CAT_673,Electronics,Wearables,Brooks,  SUPP_10395  ,69.63,133.14,2023-12-08 00:00:00,3.081,33x25x2,Black,"21""""",Aluminum
+1932,Mizuno Casual Shoes Premium,MI-AC0932-GOL,CAT_650,Footwear,  casual  ,Dell,SUPP_10661,  16.23  ,37.43,2022-05-12,0.42,27x16x12,Black,10.5,rubber
+1504,Panasonic Keyboard Professional,PA-EL0504-YEL,CAT_532,Home & Office,General,Panasonic,SUPP_10791,170.28,267.03,2021-04-25 00:00:00,6.78,59x81x55,Mint,Small,Fabric
+1135,JBL Jacket Édition Spéciale,N/A*,CAT_595,Travel,Sportswear,Addidas,SUPP_10344,157.86,78.93,2021-02-20 00:00:00,0.359,25 x 98 x 60,  Purple  ,7,Denim
+1878,Panasonic Speaker Advanced,PA-AC0878-GOL,CAT_512,Gaming,General,Sony,SUPP_10559,205.68,432.5,2021-01-10,1.781,24x9x9,Purple,Medium,Metal
+1445,Canon Jacket Pro,CA-EL0445-NAV,CAT_535,Apparel,Jackets,Google,SUPP_10804,430.92,889.82,2023-12-07 00:00:00,1.561,24x16x96,Navy,M,Silk
+1420,,SA-EL0255-WHI,,Fashion,,  NIKE  ,,,TBD,,,Compact,,,
+1534,nike backpack pro,NI-HM0534-YEL,CAT_504,Electronics,Mobile,Amazon,SUPP_10437,83.74,193.63,2021-02-12 00:00:00,5.885,46x73x63,Gold,One Size,Fabric
+1748,Samsung Backpack Essential,  SA-HM0748-ORA  ,CAT_558,Equipment,General,Nike,SUPP_10711,466.64,818.09,2020-12-28 00:00:00,  8.57  ,20x27x24,Pink,Medium,Metal
+  1515  ,Nike Charger Professional,NI-AC0515-SIL,CAT_674,Equipment,General,Panasonic,SUPP_10594,330.02,814,2022-09-20 00:00:00,4.162,86x8x84,Green,Medium,Wood
+1253,  Adidas Screen Protector Basic  ,AD-EL0253-ORA,cat_636,Fashion,Miscellaneous,  Apple  ,  SUPP_10861  ,235.22,516.65,2025-01-16 00:00:00,6.513,  27x75x10  ,Yellow,Medium,Fabric
+1072,Canon Monitor Air,CA-CL0072-PUR,CAT_664,Electronics,Computers,Nikon,supp_10477,343.25,565.63,2025-03-02 00:00:00,4.451,45x50x23,  Silver  ,"""  15.6""""  """,Carbon Fiber
+1664,HP Running Shoes,  HP-AC0664-WHI  ,CAT_669,Footwear,Formal,Lenovo,SUPP_10633,75.91,102.72,2023-04-13 00:00:00,1.386,28x17x15,Navy/Red,10.5,Nylon
+1028,Panasonic Basketball Shoes Essential,PA-SP0028-TUR,CAT_641,Footwear,  Outdoor  ,LG,SUPP_10435,498.35,954.59,2021-10-27 00:00:00,0.657,  32x17x12  ,BLUE,9.5,Leather
+1937,Canon Tablet Home,CA-SP0937-RED,cat_630,Electronics,  Accessories  ,Nikon,SUPP_10020,  499.02  ,1141.09,2022-03-24 00:00:00,2.725,49x46x11,Silver,"21""""",  Magnesium Alloy  
+,Nike Running Shoes Professional,,,,,,,,,Invalid,,,,,
