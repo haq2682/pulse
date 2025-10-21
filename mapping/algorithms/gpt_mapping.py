@@ -108,6 +108,10 @@ def fuzzy_column_mapping(missing_cols, extra_cols):
     remaining_missing = missing_cols.copy()
     remaining_extra = extra_cols.copy()
 
+    print(
+        f"  Starting fuzzy matching for {len(missing_cols)} missing cols and {len(extra_cols)} extra cols"
+    )
+
     for missing_col in missing_cols:
         best_match = None
         best_score = 0.6  # Minimum similarity threshold
@@ -126,11 +130,15 @@ def fuzzy_column_mapping(missing_cols, extra_cols):
 
         if best_match:
             mappings[missing_col] = best_match
-            remaining_missing.remove(missing_col)
-            remaining_extra.remove(best_match)
+            if best_match in remaining_extra:
+                remaining_extra.remove(best_match)
+            if missing_col in remaining_missing:
+                remaining_missing.remove(missing_col)
             print(
                 f"  Fuzzy matched: '{best_match}' -> '{missing_col}' (score: {best_score:.2f})"
             )
+        else:
+            print(f"  No match found for: '{missing_col}'")
 
     return {
         "mapped_cols": mappings,
@@ -147,11 +155,19 @@ def gpt_schema_mapping(df, missing_cols, extra_cols, mapped_cols):
         df: Spark DataFrame
         missing_cols: List of missing columns
         extra_cols: List of extra columns
-        mapped_cols: Dictionary of mapped columns
+        mapped_cols: Dictionary of mapped columns (target_col: source_col)
 
     Returns:
         Tuple of (df, missing_cols, extra_cols, mapped_cols)
     """
+
+    print(f"\n🔍 DEBUG - Input to gpt_schema_mapping:")
+    print(f"  DataFrame columns: {df.columns}")
+    print(f"  Missing cols: {missing_cols}")
+    print(f"  Extra cols: {extra_cols}")
+    print(f"  Mapped cols (should be renamed): {mapped_cols}")
+    print()
+
     pdf = df.limit(5).toPandas()
 
     # Simplify sample data to avoid safety filter triggers
@@ -196,6 +212,11 @@ Instructions:
 }}
 """
 
+    # Store the new mappings from this iteration
+    new_mappings = {}
+    updated_missing_cols = missing_cols.copy()
+    updated_extra_cols = extra_cols.copy()
+
     try:
         result_text = call_gemini_with_retry(prompt)
         print(
@@ -231,48 +252,91 @@ Instructions:
         if not all(key in model_mapping for key in required_keys):
             raise ValueError(f"Response missing required keys: {required_keys}")
 
-        mapped_cols.update(model_mapping["mapped_cols"])
-        missing_cols = model_mapping["remaining_missing_cols"]
-        extra_cols = model_mapping["remaining_extra_cols"]
+        new_mappings = model_mapping["mapped_cols"]
+        updated_missing_cols = model_mapping["remaining_missing_cols"]
+        updated_extra_cols = model_mapping["remaining_extra_cols"]
 
-        print(f"✓ Mapped columns: {model_mapping['mapped_cols']}")
-        print(f"✓ Remaining missing: {missing_cols}")
-        print(f"✓ Remaining extra: {extra_cols}")
+        print(f"✓ Mapped columns: {new_mappings}")
+        print(f"✓ Remaining missing: {updated_missing_cols}")
+        print(f"✓ Remaining extra: {updated_extra_cols}")
 
     except json.JSONDecodeError as e:
         print(f"✗ JSON parsing error: {e}")
         if "result_text" in locals():
             print(f"Raw response: {result_text[:500]}")
         print("⚠ Falling back to fuzzy column matching...")
-        model_mapping = fuzzy_column_mapping(missing_cols, extra_cols)
-        mapped_cols.update(model_mapping["mapped_cols"])
-        missing_cols = model_mapping["remaining_missing_cols"]
-        extra_cols = model_mapping["remaining_extra_cols"]
+
+        # Get current DataFrame columns to match against
+        current_df_cols = df.columns
+        # Filter extra_cols to only include columns that actually exist in the DataFrame
+        available_extra_cols = [col for col in extra_cols if col in current_df_cols]
+
+        model_mapping = fuzzy_column_mapping(missing_cols, available_extra_cols)
+        new_mappings = model_mapping["mapped_cols"]
+        updated_missing_cols = model_mapping["remaining_missing_cols"]
+        updated_extra_cols = model_mapping["remaining_extra_cols"]
 
     except Exception as e:
         print(f"✗ Gemini API error: {e}")
         print("⚠ Falling back to fuzzy column matching...")
-        model_mapping = fuzzy_column_mapping(missing_cols, extra_cols)
-        mapped_cols.update(model_mapping["mapped_cols"])
-        missing_cols = model_mapping["remaining_missing_cols"]
-        extra_cols = model_mapping["remaining_extra_cols"]
 
-    # Apply transformations to DataFrame
-    for schema_col, df_col in model_mapping.get("mapped_cols", {}).items():
-        if df_col in df.columns:
-            df = df.withColumnRenamed(df_col, schema_col)
-            print(f"  ✓ Renamed: '{df_col}' -> '{schema_col}'")
+        # Get current DataFrame columns to match against
+        current_df_cols = df.columns
+        # Filter extra_cols to only include columns that actually exist in the DataFrame
+        available_extra_cols = [col for col in extra_cols if col in current_df_cols]
+
+        model_mapping = fuzzy_column_mapping(missing_cols, available_extra_cols)
+        new_mappings = model_mapping["mapped_cols"]
+        updated_missing_cols = model_mapping["remaining_missing_cols"]
+        updated_extra_cols = model_mapping["remaining_extra_cols"]
+
+    # CRITICAL: Apply ALL mappings from mapped_cols (not just new_mappings)
+    # This ensures that columns that were supposed to be renamed in previous steps
+    # but weren't (due to errors) are renamed now
+
+    print(f"\n🔧 Applying column transformations:")
+    print(f"  New mappings from this iteration: {new_mappings}")
+    print(f"  Existing mappings to apply: {mapped_cols}")
+
+    # First, apply all existing mappings that haven't been applied yet
+    for target_col, source_col in mapped_cols.items():
+        if source_col in df.columns and target_col not in df.columns:
+            df = df.withColumnRenamed(source_col, target_col)
+            print(f"  ✓ Renamed (from mapped_cols): '{source_col}' -> '{target_col}'")
+        elif source_col not in df.columns and target_col in df.columns:
+            print(f"  ℹ Already renamed: '{source_col}' -> '{target_col}'")
+        elif source_col not in df.columns and target_col not in df.columns:
+            print(
+                f"  ⚠ Warning: Neither '{source_col}' nor '{target_col}' found in DataFrame"
+            )
+
+    # Then apply new mappings from this iteration
+    for target_col, source_col in new_mappings.items():
+        if source_col in df.columns and target_col not in df.columns:
+            df = df.withColumnRenamed(source_col, target_col)
+            print(f"  ✓ Renamed (new): '{source_col}' -> '{target_col}'")
+        elif target_col in df.columns:
+            print(
+                f"  ℹ Column '{target_col}' already exists, skipping rename from '{source_col}'"
+            )
         else:
-            print(f"  ⚠ Warning: Column '{df_col}' not found in DataFrame")
+            print(f"  ⚠ Warning: Column '{source_col}' not found in DataFrame")
 
-    cols_to_drop = [col for col in extra_cols if col in df.columns]
+    # Update the mapped_cols dictionary with new mappings
+    mapped_cols.update(new_mappings)
+
+    # Drop unmapped extra columns (only those that still exist in the DataFrame)
+    cols_to_drop = [col for col in updated_extra_cols if col in df.columns]
     if cols_to_drop:
         df = df.drop(*cols_to_drop)
         print(f"  ✓ Dropped {len(cols_to_drop)} unmapped columns: {cols_to_drop}")
 
-    for col in missing_cols:
+    # Add missing columns with null values
+    for col in updated_missing_cols:
         if col not in df.columns:
             df = df.withColumn(col, lit(None))
             print(f"  ✓ Added missing column: '{col}' (null values)")
 
-    return df, missing_cols, extra_cols, mapped_cols
+    print(f"\n📊 Final DataFrame columns: {df.columns}\n")
+
+    return df, updated_missing_cols, updated_extra_cols, mapped_cols

@@ -32,9 +32,9 @@ from utils.helpers import (
 load_dotenv(find_dotenv())
 
 minio_client = Minio(
-    "localhost:9000",
-    access_key="minioadmin",
-    secret_key="minioadmin",
+    os.getenv("MINIO_ENDPOINT"),
+    access_key=os.getenv("MINIO_ACCESS_KEY"),
+    secret_key=os.getenv("MINIO_SECRET_KEY"),
     secure=False,
 )
 
@@ -42,9 +42,9 @@ bucket_name = "pulse-bucket-1"
 
 spark = (
     SparkSession.builder.appName("NormalizeData")
-    .config("spark.hadoop.fs.s3a.endpoint", "http://localhost:9000")
-    .config("spark.hadoop.fs.s3a.access.key", "minioadmin")
-    .config("spark.hadoop.fs.s3a.secret.key", "minioadmin")
+    .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
+    .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
+    .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
     .config("spark.hadoop.fs.s3a.path.style.access", "true")
     .config("inferSchema", "true")
     .config("mergeSchema", "true")
@@ -137,7 +137,7 @@ def mapping(df, column_variants, mapped):
         print(new_df.columns)
         print("Implementing RapidFuzz Mapping...")
         new_df, missing_cols, extra_cols, mapped_cols = rapidfuzz_column_mapping(
-            df, missing_cols, extra_cols, mapped_cols, threshold=70
+            df, missing_cols, extra_cols, mapped_cols, threshold=87
         )
 
     if missing_cols:
@@ -164,7 +164,7 @@ def mapping(df, column_variants, mapped):
         print(new_df.columns)
         print("Implementing spaCy Mapping...")
         new_df, missing_cols, extra_cols, mapped_cols = spacy_column_mapping(
-            df, missing_cols, extra_cols, mapped_cols, threshold=0.7
+            df, missing_cols, extra_cols, mapped_cols, threshold=0.87
         )
 
     if missing_cols:
@@ -182,7 +182,7 @@ def mapping(df, column_variants, mapped):
         print(new_df.columns)
         print("Implementing BERT Mapping...")
         new_df, missing_cols, extra_cols, mapped_cols = roberta_similarity(
-            df, missing_cols, extra_cols, mapped_cols, threshold=0.7
+            df, missing_cols, extra_cols, mapped_cols, threshold=0.87
         )
 
     if missing_cols:
@@ -299,12 +299,6 @@ def save_dataframes_to_minio(results, client, bucket_name):
         client: MinIO client instance
         bucket_name: Name of the bucket to save to
     """
-    client = Minio(
-        "localhost:9000",
-        access_key="minioadmin",
-        secret_key="minioadmin",
-        secure=False,
-    )
 
     # bucket_name = "mapped"
 
