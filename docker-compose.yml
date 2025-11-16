@@ -1,0 +1,55 @@
+services:
+  minio:
+    build:
+      context: .
+      dockerfile: .docker/minio/Dockerfile
+    container_name: minio
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.3
+    volumes:
+      - ./minio_data:/data
+    restart: always
+    command: server /data --console-address ":9001"
+
+  spark_master:
+    build:
+      context: .
+      dockerfile: .docker/spark/Dockerfile
+    container_name: spark_master
+    environment:
+      - SPARK_MASTER_HOST=${SPARK_MASTER_HOST}
+      - SPARK_LOCAL_IP=${SPARK_MASTER_HOST}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+      - "4040:4040"
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.2
+    volumes:
+      - ./spark_data:/opt/spark/data
+      - ./scripts:/opt/spark/scripts
+    restart: always
+    depends_on:
+      - minio
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    env_file:
+      - .env
+
+networks:
+  spark-network:
+    name: spark-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.5.0.0/16
