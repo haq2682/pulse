@@ -1,4 +1,20 @@
 services:
+  postgresql:
+    build:
+      context: .
+      dockerfile: .docker/postgresql/Dockerfile
+    container_name: postgresql
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DATABASE_NAME}
+    ports:
+      - "5432:5432"
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.4
+    volumes:
+      - ./.docker/filesystem/postgres_data:/var/lib/postgresql/data
   minio:
     build:
       context: .
@@ -14,7 +30,7 @@ services:
       spark-network:
         ipv4_address: 10.5.0.3
     volumes:
-      - ./minio_data:/data
+      - ./.docker/filesystem/minio_data:/data
     restart: always
     command: server /data --console-address ":9001"
 
@@ -37,7 +53,7 @@ services:
       spark-network:
         ipv4_address: 10.5.0.2
     volumes:
-      - ./spark_data:/opt/spark/data
+      - ./.docker/filesystem/spark_data:/opt/spark/data
       - ./scripts:/opt/spark/scripts
     restart: always
     depends_on:
