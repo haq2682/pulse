@@ -52,6 +52,9 @@ bucket_name = "pulse-bucket-1"
 spark = (
     SparkSession.builder.appName("NormalizeData")
     .master("spark://localhost:7077")
+    .config("spark.executor.memory", "4g")
+    .config("spark.executor.cores", "1")
+    .config("spark.executor.instances", "2")
     .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
     .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
     .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
@@ -168,14 +171,14 @@ def mapping(df, column_variants, mapped):
             df, missing_cols, extra_cols, mapped_cols, threshold=0.7
         )
 
-    if missing_cols:
-        print("\nAfter WordNet Semantic Mapping:")
-        print(f"Missing columns: {missing_cols}")
-        print(new_df.columns)
-        print("Implementing spaCy Mapping...")
-        new_df, missing_cols, extra_cols, mapped_cols = spacy_column_mapping(
-            df, missing_cols, extra_cols, mapped_cols, threshold=0.87
-        )
+    # if missing_cols:
+    #     print("\nAfter WordNet Semantic Mapping:")
+    #     print(f"Missing columns: {missing_cols}")
+    #     print(new_df.columns)
+    #     print("Implementing spaCy Mapping...")
+    #     new_df, missing_cols, extra_cols, mapped_cols = spacy_column_mapping(
+    #         df, missing_cols, extra_cols, mapped_cols, threshold=0.87
+    #     )
 
     if missing_cols:
         print("\nAfter spaCy Mapping:")
@@ -370,7 +373,7 @@ if __name__ == "__main__":
     conn.close()
 
     results = process_all_dataframes(all_dataframes, columns_info, mapping_list)
-    save_dataframes_to_minio(results, minio_client, bucket_name)
+    # save_dataframes_to_minio(results, minio_client, bucket_name)
 
     print("\n" + "=" * 50)
     print("Processing complete!")

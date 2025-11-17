@@ -4,13 +4,14 @@ faker
 openpyxl
 findspark
 pyspark==4.0.1
-psycopg2
+psycopg2-binary
 minio
 dotenv
 rapidfuzz
 nltk
 sentence_transformers
-torch
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.9.1
 spacy
 gensim
 uuid

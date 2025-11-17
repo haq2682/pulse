@@ -1,15 +1,13 @@
-import os
-import tempfile
 import pandas as pd
 from io import BytesIO
+import os
 import re
-import uuid
 from utils.helpers import normalize_name
 
 
 def load_all_files_from_minio(minio_client, bucket_name, spark):
     """
-    Load all supported files from MinIO bucket.
+    Load all supported files from a MinIO bucket directly into Spark DataFrames.
 
     Args:
         minio_client: MinIO client instance
@@ -20,7 +18,6 @@ def load_all_files_from_minio(minio_client, bucket_name, spark):
         Dictionary of {df_name: Spark DataFrame}
     """
     dataframes = {}
-
     objects = minio_client.list_objects(bucket_name, recursive=True)
     print("Listing available files in the bucket...")
 
@@ -28,12 +25,7 @@ def load_all_files_from_minio(minio_client, bucket_name, spark):
         file_name = obj.object_name
         print(f"Processing file: {file_name}")
 
-        if not (
-            file_name.endswith(".csv")
-            or file_name.endswith(".xlsx")
-            or file_name.endswith(".parquet")
-            or file_name.endswith(".json")
-        ):
+        if not any(file_name.endswith(ext) for ext in [".csv", ".xlsx", ".parquet", ".json"]):
             print(f"Skipping {file_name} - unsupported format")
             continue
 
@@ -44,10 +36,11 @@ def load_all_files_from_minio(minio_client, bucket_name, spark):
             if norm_name is None:
                 print(f"No match found for {base_name}, skipping.")
                 continue
-            df = load_file_from_minio(minio_client, bucket_name, file_name, spark)
-            df_name = f"{norm_name}"
-            dataframes[df_name] = df
-            print(f"✅ Successfully loaded {file_name} as {df_name}")
+
+            spark_df = load_file_from_minio(minio_client, bucket_name, file_name, spark)
+            dataframes[norm_name] = spark_df
+            print(f"✅ Successfully loaded {file_name} as {norm_name}")
+
         except Exception as e:
             print(f"Error processing {file_name}: {str(e)}")
 
@@ -57,7 +50,7 @@ def load_all_files_from_minio(minio_client, bucket_name, spark):
 
 def load_file_from_minio(minio_client, bucket_name, file_name, spark):
     """
-    Load a single file from MinIO and convert to Spark DataFrame.
+    Load a single file from MinIO and convert it to a Spark DataFrame in-memory.
 
     Args:
         minio_client: MinIO client instance
@@ -73,6 +66,7 @@ def load_file_from_minio(minio_client, bucket_name, file_name, spark):
     obj.close()
     obj.release_conn()
 
+    # Read into Pandas
     if file_name.endswith(".csv"):
         pdf = pd.read_csv(BytesIO(data))
     elif file_name.endswith(".xlsx"):
@@ -84,18 +78,7 @@ def load_file_from_minio(minio_client, bucket_name, file_name, spark):
     else:
         raise ValueError(f"Unsupported file format: {file_name}")
 
-    temp_csv = os.path.join(
-        tempfile.gettempdir(),
-        f"temp_{uuid.uuid4().hex}_{os.path.basename(file_name)}.csv",
-    )
-    pdf.to_csv(temp_csv, index=False)
-
-    spark_df = spark.read.csv(temp_csv, header=True, inferSchema=True).cache()
-    _ = spark_df.count()
-
-    try:
-        os.remove(temp_csv)
-    except Exception:
-        pass
-
+    # Convert Pandas DataFrame directly to Spark DataFrame
+    spark_df = spark.createDataFrame(pdf).cache()
+    _ = spark_df.count()  # Force Spark to load the data
     return spark_df

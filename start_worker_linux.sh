@@ -17,7 +17,7 @@ sudo docker run -d \
   --network spark-network \
   --name "$WORKER_NAME" \
   -e SPARK_WORKER_CORES=2 \
-  -e SPARK_WORKER_MEMORY=2g \
+  -e SPARK_WORKER_MEMORY=4g \
   -e MINIO_ENDPOINT="$MINIO_ENDPOINT" \
   -e MINIO_ACCESS_KEY="$MINIO_ACCESS_KEY" \
   -e MINIO_SECRET_KEY="$MINIO_SECRET_KEY" \
