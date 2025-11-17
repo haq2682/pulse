@@ -2,7 +2,7 @@ import os
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = (
     "--packages "
-    "org.apache.hadoop:hadoop-aws:3.4.1,"
+    "org.apache.hadoop:hadoop-aws:3.4.0,"
     "software.amazon.awssdk:bundle:2.25.69,"
     "software.amazon.awssdk:url-connection-client:2.25.69 "
     "pyspark-shell"
@@ -51,7 +51,7 @@ bucket_name = "pulse-bucket-1"
 
 spark = (
     SparkSession.builder.appName("NormalizeData")
-    .master("spark://10.5.0.2:7077")
+    .master("spark://localhost:7077")
     .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
     .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
     .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))

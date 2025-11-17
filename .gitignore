@@ -5,3 +5,4 @@
 *gpt
 *.md
 !requirements.txt
+!packages.txt

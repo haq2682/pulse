@@ -1,0 +1,13 @@
+*.docx
+*.txt
+*gpt
+*.md
+.git/
+!requirements.txt
+!packages.txt
+*/**/__pycache__/
+.vscode/
+start/
+.gitignore
+*.sh
+*/**/*.ipynb

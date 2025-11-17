@@ -14,7 +14,10 @@ services:
       spark-network:
         ipv4_address: 10.5.0.4
     volumes:
-      - ./.docker/filesystem/postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - .env
+
   minio:
     build:
       context: .
@@ -30,7 +33,7 @@ services:
       spark-network:
         ipv4_address: 10.5.0.3
     volumes:
-      - ./.docker/filesystem/minio_data:/data
+      - minio_data:/data
     restart: always
     command: server /data --console-address ":9001"
 
@@ -53,7 +56,7 @@ services:
       spark-network:
         ipv4_address: 10.5.0.2
     volumes:
-      - ./.docker/filesystem/spark_data:/opt/spark/data
+      - spark_data:/opt/spark/data
       - ./scripts:/opt/spark/scripts
     restart: always
     depends_on:
@@ -70,3 +73,8 @@ networks:
     ipam:
       config:
         - subnet: 10.5.0.0/16
+
+volumes:
+  postgres_data:
+  minio_data:
+  spark_data:

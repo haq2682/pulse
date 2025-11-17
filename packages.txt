@@ -1,0 +1,17 @@
+pandas
+numpy
+faker
+openpyxl
+findspark
+pyspark==4.0.1
+psycopg2
+minio
+dotenv
+rapidfuzz
+nltk
+sentence_transformers
+torch
+spacy
+gensim
+uuid
+google-generativeai
