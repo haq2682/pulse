@@ -49,36 +49,25 @@ def load_all_files_from_minio(minio_client, bucket_name, spark):
 
 
 def load_file_from_minio(minio_client, bucket_name, file_name, spark):
-    """
-    Load a single file from MinIO and convert it to a Spark DataFrame in-memory.
-
-    Args:
-        minio_client: MinIO client instance
-        bucket_name: Name of the bucket
-        file_name: Name of the file
-        spark: SparkSession instance
-
-    Returns:
-        Spark DataFrame
-    """
     obj = minio_client.get_object(bucket_name, file_name)
     data = obj.read()
     obj.close()
     obj.release_conn()
 
-    # Read into Pandas
+    # Read into Pandas, forcing all columns to string
     if file_name.endswith(".csv"):
-        pdf = pd.read_csv(BytesIO(data))
+        pdf = pd.read_csv(BytesIO(data), dtype=str)
     elif file_name.endswith(".xlsx"):
-        pdf = pd.read_excel(BytesIO(data))
+        pdf = pd.read_excel(BytesIO(data), dtype=str)
     elif file_name.endswith(".parquet"):
         pdf = pd.read_parquet(BytesIO(data))
+        pdf = pdf.astype(str)  # parquet often safe but mixed columns can still break
     elif file_name.endswith(".json"):
-        pdf = pd.read_json(BytesIO(data))
+        pdf = pd.read_json(BytesIO(data), dtype=str)
     else:
         raise ValueError(f"Unsupported file format: {file_name}")
 
-    # Convert Pandas DataFrame directly to Spark DataFrame
-    spark_df = spark.createDataFrame(pdf).cache()
-    _ = spark_df.count()  # Force Spark to load the data
+    spark_df = spark.createDataFrame(pdf)
+    spark_df.cache()
+    spark_df.count()
     return spark_df
