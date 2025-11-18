@@ -1,12 +1,12 @@
 import os
 
-os.environ["PYSPARK_SUBMIT_ARGS"] = (
-    "--packages "
-    "org.apache.hadoop:hadoop-aws:3.4.0,"
-    "software.amazon.awssdk:bundle:2.25.69,"
-    "software.amazon.awssdk:url-connection-client:2.25.69 "
-    "pyspark-shell"
-)
+# os.environ["PYSPARK_SUBMIT_ARGS"] = (
+#     "--packages "
+#     "org.apache.hadoop:hadoop-aws:3.4.0,"
+#     "software.amazon.awssdk:bundle:2.25.69,"
+#     "software.amazon.awssdk:url-connection-client:2.25.69 "
+#     "pyspark-shell"
+# )
 
 import sys
 import pandas as pd
@@ -55,6 +55,11 @@ spark = (
     .config("spark.executor.memory", "4g")
     .config("spark.executor.cores", "1")
     .config("spark.executor.instances", "2")
+    .config(
+        "spark.jars.packages",
+        "org.apache.hadoop:hadoop-aws:3.3.4,"
+        "com.amazonaws:aws-java-sdk-bundle:1.12.262",
+    )
     .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
     .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
     .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))

@@ -5,13 +5,14 @@ export MSYS2_ARG_CONV_EXCL="*"
 
 source .env
 
-sudo docker run -d \
+docker run -d \
   --network spark-network \
   --name "$WORKER_NAME" \
   -e SPARK_WORKER_CORES=2 \
   -e SPARK_WORKER_MEMORY=6g \
   -e PYSPARK_PYTHON=python3.10 \
   -e PYSPARK_DRIVER_PYTHON=python3.10 \
+  -e SPARK_WORKER_OPTS="-Dspark.shuffle.service.enabled=true" \
   -e MINIO_ENDPOINT="$MINIO_ENDPOINT" \
   -e MINIO_ACCESS_KEY="$MINIO_ACCESS_KEY" \
   -e MINIO_SECRET_KEY="$MINIO_SECRET_KEY" \

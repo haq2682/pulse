@@ -23,10 +23,11 @@ def create_spark_session():
     """
     spark = (
         SparkSession.builder.appName("Cleaning")
-        .master("spark://localhost:7077")
-        .config("spark.executor.memory", "4g")
-        .config("spark.executor.cores", "1")
-        .config("spark.executor.instances", "2")
+        .master("local[*]")
+        .config("spark.dynamicAllocation.enabled", "true")
+        .config("spark.dynamicAllocation.minExecutors", "0")
+        .config("spark.dynamicAllocation.maxExecutors", "8")
+        .config("spark.dynamicAllocation.initialExecutors", "1")
         # S3A/MinIO JAR dependencies for PySpark 3.5.0
         .config(
             "spark.jars.packages",
