@@ -2,7 +2,7 @@
 Schema module for casting DataFrames to correct data types.
 """
 from pyspark.sql.types import *
-from pyspark.sql.functions import col
+from pyspark.sql.functions import col, when, from_unixtime
 
 
 def cast_dataframes(dataframes):
@@ -198,7 +198,7 @@ def cast_dataframes(dataframes):
             col("campaign_name").cast(StringType()),
             col("campaign_type").cast(StringType()),
             col("start_date").cast(DateType()),
-            col("end_date").cast(DateType()),
+            when(col("end_date").isNotNull(), from_unixtime(col("end_date")).cast(DateType())).otherwise(None).alias("end_date"),
             col("budget").cast(FloatType()),
             col("spent_amount").cast(FloatType()),
             col("impressions").cast(IntegerType()),
