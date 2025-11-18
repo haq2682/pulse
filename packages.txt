@@ -3,7 +3,7 @@ numpy
 faker
 openpyxl
 findspark
-pyspark==4.0.1
+pyspark==3.5.0
 psycopg2-binary
 minio
 dotenv

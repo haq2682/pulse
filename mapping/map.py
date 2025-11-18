@@ -172,7 +172,7 @@ def mapping(df, column_variants, mapped):
         )
 
     if missing_cols:
-    	print("\nAfter WordNet Semantic Mapping:")
+        print("\nAfter WordNet Semantic Mapping:")
         print(f"Missing columns: {missing_cols}")
         print(new_df.columns)
         print("Implementing spaCy Mapping...")
@@ -373,7 +373,7 @@ if __name__ == "__main__":
     conn.close()
 
     results = process_all_dataframes(all_dataframes, columns_info, mapping_list)
-    # save_dataframes_to_minio(results, minio_client, bucket_name)
+    save_dataframes_to_minio(results, minio_client, bucket_name)
 
     print("\n" + "=" * 50)
     print("Processing complete!")

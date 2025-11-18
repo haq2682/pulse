@@ -41,6 +41,7 @@ services:
     build:
       context: .
       dockerfile: .docker/spark/Dockerfile
+    image: spark-master-py310
     container_name: spark_master
     environment:
       - SPARK_MASTER_HOST=10.5.0.2
@@ -48,6 +49,8 @@ services:
       - MINIO_ENDPOINT=${MINIO_ENDPOINT}
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - PYSPARK_PYTHON=python3.10
+      - PYSPARK_DRIVER_PYTHON=python3.10
     ports:
       - "8080:8080"
       - "7077:7077"

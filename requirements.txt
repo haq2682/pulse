@@ -1,5 +1,4 @@
-pyspark==4.0.1
-minio==7.2.11
+minio
 boto3==1.35.76
 botocore==1.35.76
 python-dotenv==1.0.1
