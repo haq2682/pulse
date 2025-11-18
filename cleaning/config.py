@@ -23,7 +23,7 @@ def create_spark_session():
     """
     spark = (
         SparkSession.builder.appName("Cleaning")
-        .master("local[*]")
+        .master("spark://localhost:7077")
         .config("spark.dynamicAllocation.enabled", "true")
         .config("spark.dynamicAllocation.minExecutors", "0")
         .config("spark.dynamicAllocation.maxExecutors", "8")
@@ -32,7 +32,7 @@ def create_spark_session():
         .config(
             "spark.jars.packages",
             "org.apache.hadoop:hadoop-aws:3.3.4,"
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262",
+            "com.amazonaws:aws-java-sdk-bundle:1.12.263",
         )
         # S3A/MinIO configuration
         .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))

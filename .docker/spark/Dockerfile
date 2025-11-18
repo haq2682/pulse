@@ -7,13 +7,13 @@ RUN apt-get update && \
     apt-get install -y wget build-essential libssl-dev zlib1g-dev libbz2-dev \
     libreadline-dev libsqlite3-dev curl llvm libncurses5-dev \
     libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev git && \
-    wget https://www.python.org/ftp/python/3.10.15/Python-3.10.15.tgz && \
-    tar xvf Python-3.10.15.tgz && \
-    cd Python-3.10.15 && \
+    wget https://www.python.org/ftp/python/3.10.19/Python-3.10.19.tgz && \
+    tar xvf Python-3.10.19.tgz && \
+    cd Python-3.10.19 && \
     ./configure --enable-optimizations && \
     make -j$(nproc) && \
     make altinstall && \
-    cd .. && rm -rf Python-3.10.15 Python-3.10.15.tgz
+    cd .. && rm -rf Python-3.10.19 Python-3.10.19.tgz
 
 # Ensure python3 points to python3.10
 RUN ln -sf /usr/local/bin/python3.10 /usr/local/bin/python3
