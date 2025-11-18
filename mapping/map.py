@@ -51,7 +51,7 @@ bucket_name = "pulse-bucket-1"
 
 spark = (
     SparkSession.builder.appName("NormalizeData")
-    .master("spark://localhost:7077")
+    .master("local[*]")
     .config("spark.executor.memory", "4g")
     .config("spark.executor.cores", "1")
     .config("spark.executor.instances", "2")

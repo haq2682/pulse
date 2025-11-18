@@ -268,6 +268,7 @@ mapping_dict_customer_sessions = {
         "SessionID",
         "sessionId",
         "SessionId",
+        "session_ref"
         "sid",
         "s_id",
         "unique_session_id",
@@ -1735,6 +1736,7 @@ mapping_dict_marketing_campaigns = {
         "actual_spent",
         "used_budget",
         "spent",
+        "current_spend",
         "consumed_budget",
         "expense",
         "marketing_cost",
