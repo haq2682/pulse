@@ -37,7 +37,7 @@ bucket_name = "pulse-bucket-1"
 
 spark = (
     SparkSession.builder.appName("NormalizeData")
-    .master("spark://localhost:7077")
+    .master("spark://10.5.0.3:7077")
     .config("spark.dynamicAllocation.enabled", "true")
     .config("spark.dynamicAllocation.minExecutors", "0")
     .config("spark.dynamicAllocation.maxExecutors", "8")
@@ -345,7 +345,7 @@ if __name__ == "__main__":
     all_dataframes = load_all_files_from_minio(minio_client, bucket_name, spark)
 
     conn = psycopg2.connect(
-        host="localhost",
+        host="10.5.0.5",
         database=os.getenv("POSTGRES_DATABASE_NAME"),
         user=os.getenv("POSTGRES_USER"),
         password=os.getenv("POSTGRES_PASSWORD"),

@@ -77,10 +77,10 @@ docker cp "$PYTHON_FILE" python:/app/"$SCRIPT_NAME"
 
 # Execute the Python file in the container
 if [ "$SAVE_LOG" = true ]; then
-    docker exec python python "/app/$SCRIPT_NAME" "$@" 2>&1 | tee "$LOG_FILE"
+    docker exec python python3.10 "/app/$SCRIPT_NAME" "$@" 2>&1 | tee "$LOG_FILE"
     EXIT_CODE=${PIPESTATUS[0]}
 else
-    docker exec python python "/app/$SCRIPT_NAME" "$@"
+    docker exec python python3.10 "/app/$SCRIPT_NAME" "$@"
     EXIT_CODE=$?
 fi
 
