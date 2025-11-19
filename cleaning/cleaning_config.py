@@ -23,7 +23,7 @@ def create_spark_session():
     """
     spark = (
         SparkSession.builder.appName("Cleaning")
-        .master("spark://localhost:7077")
+        .master("spark://10.5.0.3:7077")
         .config("spark.dynamicAllocation.enabled", "true")
         .config("spark.dynamicAllocation.minExecutors", "0")
         .config("spark.dynamicAllocation.maxExecutors", "8")

@@ -365,7 +365,7 @@ if __name__ == "__main__":
     conn.close()
 
     results = process_all_dataframes(all_dataframes, columns_info, mapping_list)
-    # save_dataframes_to_minio(results, minio_client, bucket_name)
+    save_dataframes_to_minio(results, minio_client, bucket_name)
 
     print("\n" + "=" * 50)
     print("Processing complete!")
