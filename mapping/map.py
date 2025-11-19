@@ -51,10 +51,11 @@ bucket_name = "pulse-bucket-1"
 
 spark = (
     SparkSession.builder.appName("NormalizeData")
-    .master("local[*]")
-    .config("spark.executor.memory", "4g")
-    .config("spark.executor.cores", "1")
-    .config("spark.executor.instances", "2")
+    .master("spark://localhost:7077")
+    .config("spark.dynamicAllocation.enabled", "true")
+    .config("spark.dynamicAllocation.minExecutors", "0")
+    .config("spark.dynamicAllocation.maxExecutors", "8")
+    .config("spark.dynamicAllocation.initialExecutors", "1")
     .config(
         "spark.jars.packages",
         "org.apache.hadoop:hadoop-aws:3.3.4,"
