@@ -15,6 +15,9 @@ RUN apt-get update && \
     make altinstall && \
     cd .. && rm -rf Python-3.10.19 Python-3.10.19.tgz
 
+RUN wget https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.12/3.5.0/spark-sql-kafka-0-10_2.12-3.5.0.jar \
+    -P /opt/spark/jars/
+
 # Ensure python3 points to python3.10
 RUN ln -sf /usr/local/bin/python3.10 /usr/local/bin/python3
 

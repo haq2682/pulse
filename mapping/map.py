@@ -1,18 +1,3 @@
-import os
-
-# os.environ["PYSPARK_SUBMIT_ARGS"] = (
-#     "--packages "
-#     "org.apache.hadoop:hadoop-aws:3.4.0,"
-#     "software.amazon.awssdk:bundle:2.25.69,"
-#     "software.amazon.awssdk:url-connection-client:2.25.69 "
-#     "pyspark-shell"
-# )
-
-import sys
-import pandas as pd
-import findspark
-
-findspark.init()
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit
 import List as mapping_list
@@ -20,7 +5,6 @@ import psycopg2
 from io import BytesIO
 from minio import Minio
 from dotenv import load_dotenv, find_dotenv
-
 from algorithms.rapidfuzz_mapping import rapidfuzz_column_mapping
 from algorithms.nltk_mapping import mapping_with_nltk
 from algorithms.wordnet_mapping import semantic_column_mapping
@@ -28,15 +12,17 @@ from algorithms.spacy_mapping import spacy_column_mapping
 from algorithms.word2vec_mapping import word2vec_column_mapping
 from algorithms.roberta_mapping import roberta_similarity
 from algorithms.gpt_mapping import gpt_schema_mapping
-from utils.file_loader import load_all_files_from_minio, load_file_from_minio
+from utils.file_loader import load_all_files_from_minio
 from utils.helpers import (
-    normalize_name,
-    get_table_name,
     safe_serialize,
-    make_json_safe,
     detect_table,
     split_unified_dataframe,
 )
+import os
+
+import findspark
+
+findspark.init()
 
 load_dotenv(find_dotenv())
 
@@ -242,20 +228,20 @@ def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="bat
         Dict with results per canonical table.
     """
 
-    df_to_mapping_dict = {
-        "customer_df": mapping_list.mapping_dict_customers,
-        "product_df": mapping_list.mapping_dict_products,
-        "inventory_df": mapping_list.mapping_dict_inventory,
-        "orders_df": mapping_list.mapping_dict_orders,
-        "reviews_df": mapping_list.mapping_dict_reviews,
-        "wishlist_df": mapping_list.mapping_dict_wishlist,
-        "payments_df": mapping_list.mapping_dict_payments,
-        "order_items_df": mapping_list.mapping_dict_order_items,
-        "shopping_cart_df": mapping_list.mapping_dict_shopping_cart,
-        "customer_sessions_df": mapping_list.mapping_dict_customer_sessions,
-        "marketing_campaigns_df": mapping_list.mapping_dict_marketing_campaigns,
-        "suppliers_df": mapping_list.mapping_dict_suppliers,
-    }
+    # df_to_mapping_dict = {
+    #     "customer_df": mapping_list.mapping_dict_customers,
+    #     "product_df": mapping_list.mapping_dict_products,
+    #     "inventory_df": mapping_list.mapping_dict_inventory,
+    #     "orders_df": mapping_list.mapping_dict_orders,
+    #     "reviews_df": mapping_list.mapping_dict_reviews,
+    #     "wishlist_df": mapping_list.mapping_dict_wishlist,
+    #     "payments_df": mapping_list.mapping_dict_payments,
+    #     "order_items_df": mapping_list.mapping_dict_order_items,
+    #     "shopping_cart_df": mapping_list.mapping_dict_shopping_cart,
+    #     "customer_sessions_df": mapping_list.mapping_dict_customer_sessions,
+    #     "marketing_campaigns_df": mapping_list.mapping_dict_marketing_campaigns,
+    #     "suppliers_df": mapping_list.mapping_dict_suppliers,
+    # }
 
     results = {}
 
@@ -379,7 +365,7 @@ if __name__ == "__main__":
     conn.close()
 
     results = process_all_dataframes(all_dataframes, columns_info, mapping_list)
-    save_dataframes_to_minio(results, minio_client, bucket_name)
+    # save_dataframes_to_minio(results, minio_client, bucket_name)
 
     print("\n" + "=" * 50)
     print("Processing complete!")

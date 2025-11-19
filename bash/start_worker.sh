@@ -1,9 +1,20 @@
 #!/bin/bash
+set -e
 
-export MSYS_NO_PATHCONV=1 
-export MSYS2_ARG_CONV_EXCL="*"
+if [ -f ".env" ]; then
+  export $(grep -v '^#' .env | xargs)
+else
+  echo ".env file not found!"
+  exit 1
+fi
 
-source .env
+WORKER_NAME="spark_worker_$(date +%s)"
+LOG_FILE="logs/${WORKER_NAME}.log"
+
+# Create logs directory if it doesn't exist
+mkdir -p logs
+
+echo "Starting Spark worker: $WORKER_NAME"
 
 docker run -d \
   --network spark-network \
@@ -18,4 +29,7 @@ docker run -d \
   -e MINIO_SECRET_KEY="$MINIO_SECRET_KEY" \
   -v "$(pwd)/scripts:/opt/spark/scripts" \
   spark-master-py310 \
-  /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://10.5.0.2:7077 >> log.txt 2>&1
+  /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://10.5.0.3:7077 >> "$LOG_FILE" 2>&1
+
+echo "✓ Spark worker started: $WORKER_NAME"
+echo "  Logs: $LOG_FILE"
