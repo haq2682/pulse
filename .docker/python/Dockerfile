@@ -7,18 +7,13 @@ COPY requirements.txt packages.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -r packages.txt
 
+# Download spaCy model during build
+RUN python -m spacy download en_core_web_md
+
 # Copy bash scripts
 COPY ./bash /app/bash
 RUN chmod +x /app/bash/*.sh
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
-# Download spaCy model during build (this is safe)
-RUN python -m spacy download en_core_web_md
-
-# Copy application code
-COPY ./app /app
-
-# Use entrypoint script instead of direct CMD
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
-
-ENTRYPOINT ["/docker-entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]

@@ -13,7 +13,7 @@ echo "✓ PostgreSQL is ready"
 
 # Wait for MinIO
 echo "Waiting for MinIO..."
-until curl -sf http://minio:9000/minio/health/live > /dev/null; do
+until curl -sf http://localhost:9000/minio/health/live > /dev/null; do
   echo "MinIO is unavailable - sleeping"
   sleep 2
 done
@@ -29,7 +29,7 @@ echo "✓ Kafka is ready"
 
 # Wait for Spark Master
 echo "Waiting for Spark Master..."
-until curl -sf http://spark_master:8080 > /dev/null; do
+until curl -sf http://localhost:8080 > /dev/null; do
   echo "Spark Master is unavailable - sleeping"
   sleep 2
 done
