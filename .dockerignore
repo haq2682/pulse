@@ -9,5 +9,4 @@
 .vscode/
 start/
 .gitignore
-*.sh
 */**/*.ipynb

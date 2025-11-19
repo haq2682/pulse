@@ -46,9 +46,9 @@ echo "Setting up Kafka..."
 
 echo "=== Phase 5: Start Worker ==="
 echo "Starting Spark Worker 1..."
-./bash/start_worker.sh
+./bash/start_worker_linux.sh
 echo "Starting Spark Worker 2..."
-./bash/start_worker.sh
+./bash/start_worker_linux.sh
 
 echo ""
 echo "=========================================="

@@ -12,7 +12,7 @@ This script orchestrates the complete data cleaning process including:
 - Saving cleaned data back to MinIO
 """
 
-from config import create_spark_session, create_minio_client, get_bucket_name
+from cleaning_config import create_spark_session, create_minio_client, get_bucket_name
 from schema import cast_dataframes
 from merge import merge_tables
 from data_cleaning import (
@@ -28,7 +28,7 @@ from standardization import (
     validate_dates_and_timestamps,
     detect_gibberish_patterns,
 )
-from utils import load_data_from_minio, save_data_to_minio, display_summary
+from cleaning_utils import load_data_from_minio, save_data_to_minio, display_summary
 
 
 def main():
