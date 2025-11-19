@@ -30,9 +30,9 @@ echo "✓ Spark services started"
 echo ""
 
 # Phase 3: Start Python service
-echo "=== Phase 3: Starting Python Service ==="
-echo "Starting Python application..."
-docker compose up -d python
+# echo "=== Phase 3: Starting Python Service ==="
+# echo "Starting Python application..."
+# docker compose up -d python
 
 echo ""
 echo "Waiting for Python service to be ready..."
@@ -47,6 +47,7 @@ echo "Setting up Kafka..."
 echo "=== Phase 5: Start Worker ==="
 echo "Starting Spark Worker 1..."
 ./bash/start_worker_linux.sh
+sleep 10
 echo "Starting Spark Worker 2..."
 ./bash/start_worker_linux.sh
 

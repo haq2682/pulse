@@ -14,26 +14,26 @@ RUN wget https://www.python.org/ftp/python/3.10.19/Python-3.10.19.tgz && \
     tar -xvzf Python-3.10.19.tgz && \
     cd Python-3.10.19 && \
     ./configure --enable-optimizations && \
-    make -j$(nproc) && \
+    make -j"$(nproc)" && \
     make altinstall && \
     cd / && rm -rf /tmp/Python-3.10.19 /tmp/Python-3.10.19.tgz
 
-# Set python3 to exact version
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python3.10 1 && \
-    update-alternatives --install /usr/bin/pip3 pip3 /usr/local/bin/pip3 1
+# Set python3 to exact version (no pip3 alternative)
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python3.10 1
 
 WORKDIR /app
 
 # Copy requirements and install
 COPY requirements.txt packages.txt ./
-RUN pip3 install --no-cache-dir -r requirements.txt && \
-    pip3 install --no-cache-dir -r packages.txt
+
+# Use python3 -m pip instead of pip3 and bootstrap pip explicitly
+RUN python3 -m ensurepip && \
+    python3 -m pip install --upgrade pip && \
+    python3 -m pip install --no-cache-dir -r requirements.txt && \
+    python3 -m pip install --no-cache-dir -r packages.txt
 
 # Download spaCy model
 RUN python3 -m spacy download en_core_web_md
-
-# Install PySpark 3.5.0
-RUN pip3 install pyspark==3.5.0
 
 # Copy scripts
 COPY ./bash /app/bash

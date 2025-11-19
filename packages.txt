@@ -16,3 +16,10 @@ spacy
 gensim
 uuid
 google-generativeai
+kafka-python
+pymongo
+mysql-connector-python
+pyodbc
+fastapi
+uvicorn[standard]
+pydantic
