@@ -32,7 +32,8 @@ def create_spark_session():
         .config(
             "spark.jars.packages",
             "org.apache.hadoop:hadoop-aws:3.3.4,"
-            "com.amazonaws:aws-java-sdk-bundle:1.12.263",
+            "com.amazonaws:aws-java-sdk-bundle:1.12.263,"
+            "org.postgresql:postgresql:42.5.0",
         )
         # S3A/MinIO configuration
         .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))

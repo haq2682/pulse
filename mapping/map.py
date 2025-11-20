@@ -46,6 +46,7 @@ spark = (
         "spark.jars.packages",
         "org.apache.hadoop:hadoop-aws:3.3.4,"
         "com.amazonaws:aws-java-sdk-bundle:1.12.262",
+        "org.postgresql:postgresql:42.5.0",
     )
     .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
     .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
@@ -77,23 +78,23 @@ df_to_table = {
 def resolve_table_splits(df_name, df, columns_info, mode):
     """
     Resolve table splits with fast-path optimization (Phase 6).
-    
+
     Fast path: Check df_to_table first (0.1ms) - works for 95% of streaming cases
     Fallback: Use detect_table (50ms) or split_unified_dataframe for unknown names
-    
+
     Args:
         df_name: Name of the DataFrame
         df: Spark DataFrame
         columns_info: List of (table, column, type) tuples
         mode: "batch" or "stream"
-    
+
     Returns:
         dict: {table_name: dataframe}
     """
     # Fast path: Known DataFrame name
     if df_name in df_to_table:
         return {df_to_table[df_name]: df}
-    
+
     # Fallback: Unknown name - use detection/splitting
     if mode == "stream":
         detected_table = detect_table(df, columns_info)
@@ -280,7 +281,7 @@ def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="bat
 
         # Phase 6 optimization: unified resolution with fast-path
         split_dfs = resolve_table_splits(df_name, df, columns_info, mode)
-        
+
         if not split_dfs:
             print(f"⚠️ Could not resolve table for {df_name}")
             continue
