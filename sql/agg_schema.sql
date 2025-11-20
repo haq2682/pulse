@@ -1,29 +1,29 @@
 -- ============================================================================
 -- AGGREGATED TABLES SCHEMA - THREE-TIER APPROACH
 -- ============================================================================
--- Tier 1: PRIMARY KEYS & CRITICAL FIELDS - NOT NULL
--- Tier 2: COUNTS, BOOLEANS, FLAGS - NOT NULL with DEFAULTS
+-- Tier 1: PRIMARY KEYS & CRITICAL FIELDS -
+-- Tier 2: COUNTS, BOOLEANS, FLAGS - with DEFAULTS
 -- Tier 3: DERIVED/CALCULATED FIELDS - NULLABLE
 -- ============================================================================
 
 -- 1. agg_customer_sessions
 CREATE TABLE agg_customer_sessions (
     -- Tier 1: Critical Fields
-    session_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    customer_id VARCHAR(255) NOT NULL,
-    session_start TIMESTAMP NOT NULL,
+    session_id VARCHAR(255) PRIMARY KEY,
+    customer_id VARCHAR(255),
+    session_start TIMESTAMP,
     
     -- Tier 2: Fields with Defaults
-    conversion_flag INTEGER DEFAULT 0 NOT NULL,
-    cart_abandonment_flag INTEGER DEFAULT 0 NOT NULL,
-    pages_viewed INTEGER DEFAULT 0 NOT NULL,
-    products_viewed INTEGER DEFAULT 0 NOT NULL,
-    total_pages_viewed INTEGER DEFAULT 0 NOT NULL,
-    total_products_viewed INTEGER DEFAULT 0 NOT NULL,
-    converted INTEGER DEFAULT 0 NOT NULL,
-    abandoned INTEGER DEFAULT 0 NOT NULL,
-    items_added_to_cart BIGINT DEFAULT 0 NOT NULL,
-    orders_from_session BIGINT DEFAULT 0 NOT NULL,
+    conversion_flag INTEGER DEFAULT 0,
+    cart_abandonment_flag INTEGER DEFAULT 0,
+    pages_viewed INTEGER DEFAULT 0,
+    products_viewed INTEGER DEFAULT 0,
+    total_pages_viewed INTEGER DEFAULT 0,
+    total_products_viewed INTEGER DEFAULT 0,
+    converted INTEGER DEFAULT 0,
+    abandoned INTEGER DEFAULT 0,
+    items_added_to_cart BIGINT DEFAULT 0,
+    orders_from_session BIGINT DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     session_end TIMESTAMP NULL,
@@ -44,25 +44,25 @@ CREATE TABLE agg_customer_sessions (
 -- 2. agg_customers
 CREATE TABLE agg_customers (
     -- Tier 1: Critical Fields
-    customer_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    account_created_at TIMESTAMP NOT NULL,
-    account_status VARCHAR(100) NOT NULL,
+    customer_id VARCHAR(255) PRIMARY KEY,
+    account_created_at TIMESTAMP,
+    account_status VARCHAR(100),
     
     -- Tier 2: Fields with Defaults
-    is_active BOOLEAN DEFAULT FALSE NOT NULL,
-    is_repeat_customer INTEGER DEFAULT 0 NOT NULL,
-    total_orders BIGINT DEFAULT 0 NOT NULL,
-    total_items_purchased BIGINT DEFAULT 0 NOT NULL,
-    total_cancelled_orders BIGINT DEFAULT 0 NOT NULL,
-    total_reviews_written BIGINT DEFAULT 0 NOT NULL,
-    total_sessions BIGINT DEFAULT 0 NOT NULL,
-    total_pages_viewed BIGINT DEFAULT 0 NOT NULL,
-    total_products_viewed BIGINT DEFAULT 0 NOT NULL,
-    wishlist_items_count BIGINT DEFAULT 0 NOT NULL,
-    total_carts_created BIGINT DEFAULT 0 NOT NULL,
-    total_abandoned_carts BIGINT DEFAULT 0 NOT NULL,
-    total_purchased_carts BIGINT DEFAULT 0 NOT NULL,
-    order_frequency BIGINT DEFAULT 0 NOT NULL,
+    is_active BOOLEAN DEFAULT FALSE,
+    is_repeat_customer INTEGER DEFAULT 0,
+    total_orders BIGINT DEFAULT 0,
+    total_items_purchased BIGINT DEFAULT 0,
+    total_cancelled_orders BIGINT DEFAULT 0,
+    total_reviews_written BIGINT DEFAULT 0,
+    total_sessions BIGINT DEFAULT 0,
+    total_pages_viewed BIGINT DEFAULT 0,
+    total_products_viewed BIGINT DEFAULT 0,
+    wishlist_items_count BIGINT DEFAULT 0,
+    total_carts_created BIGINT DEFAULT 0,
+    total_abandoned_carts BIGINT DEFAULT 0,
+    total_purchased_carts BIGINT DEFAULT 0,
+    order_frequency BIGINT DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     gender VARCHAR(50) NULL,
@@ -117,17 +117,17 @@ CREATE TABLE agg_customers (
 -- 3. agg_inventory
 CREATE TABLE agg_inventory (
     -- Tier 1: Critical Fields
-    inventory_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    product_id VARCHAR(255) NOT NULL,
-    supplier_id VARCHAR(255) NOT NULL,
+    inventory_id VARCHAR(255) PRIMARY KEY,
+    product_id VARCHAR(255),
+    supplier_id VARCHAR(255),
     
     -- Tier 2: Fields with Defaults
-    stock_quantity INTEGER DEFAULT 0 NOT NULL,
-    reserved_quantity INTEGER DEFAULT 0 NOT NULL,
-    minimum_stock_level INTEGER DEFAULT 0 NOT NULL,
-    available_stock INTEGER DEFAULT 0 NOT NULL,
-    reorder_point_breach INTEGER DEFAULT 0 NOT NULL,
-    total_sold BIGINT DEFAULT 0 NOT NULL,
+    stock_quantity INTEGER DEFAULT 0,
+    reserved_quantity INTEGER DEFAULT 0,
+    minimum_stock_level INTEGER DEFAULT 0,
+    available_stock INTEGER DEFAULT 0,
+    reorder_point_breach INTEGER DEFAULT 0,
+    total_sold BIGINT DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     last_restocked_date DATE NULL,
@@ -142,21 +142,21 @@ CREATE TABLE agg_inventory (
 -- 4. agg_marketing_campaigns
 CREATE TABLE agg_marketing_campaigns (
     -- Tier 1: Critical Fields
-    campaign_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    campaign_name VARCHAR(500) NOT NULL,
-    campaign_type VARCHAR(100) NOT NULL,
-    start_date DATE NOT NULL,
-    campaign_status VARCHAR(100) NOT NULL,
+    campaign_id VARCHAR(255) PRIMARY KEY,
+    campaign_name VARCHAR(500),
+    campaign_type VARCHAR(100),
+    start_date DATE,
+    campaign_status VARCHAR(100),
     
     -- Tier 2: Fields with Defaults
-    impressions INTEGER DEFAULT 0 NOT NULL,
-    clicks INTEGER DEFAULT 0 NOT NULL,
-    conversions INTEGER DEFAULT 0 NOT NULL,
-    total_impressions INTEGER DEFAULT 0 NOT NULL,
-    total_clicks INTEGER DEFAULT 0 NOT NULL,
-    total_conversions INTEGER DEFAULT 0 NOT NULL,
-    orders_from_campaign BIGINT DEFAULT 0 NOT NULL,
-    days_active INTEGER DEFAULT 0 NOT NULL,
+    impressions INTEGER DEFAULT 0,
+    clicks INTEGER DEFAULT 0,
+    conversions INTEGER DEFAULT 0,
+    total_impressions INTEGER DEFAULT 0,
+    total_clicks INTEGER DEFAULT 0,
+    total_conversions INTEGER DEFAULT 0,
+    orders_from_campaign BIGINT DEFAULT 0,
+    days_active INTEGER DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     end_date DATE NULL,
@@ -192,12 +192,12 @@ CREATE TABLE agg_marketing_campaigns (
 -- 5. agg_order_items
 CREATE TABLE agg_order_items (
     -- Tier 1: Critical Fields
-    order_item_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    order_id VARCHAR(255) NOT NULL,
-    product_id VARCHAR(255) NOT NULL,
+    order_item_id VARCHAR(255) PRIMARY KEY,
+    order_id VARCHAR(255),
+    product_id VARCHAR(255),
     
     -- Tier 2: Fields with Defaults
-    quantity INTEGER DEFAULT 0 NOT NULL,
+    quantity INTEGER DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     discount_amount DOUBLE PRECISION NULL,
@@ -207,18 +207,18 @@ CREATE TABLE agg_order_items (
 -- 6. agg_orders
 CREATE TABLE agg_orders (
     -- Tier 1: Critical Fields
-    order_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    customer_id VARCHAR(255) NOT NULL,
-    order_status VARCHAR(100) NOT NULL,
-    order_placed_at TIMESTAMP NOT NULL,
+    order_id VARCHAR(255) PRIMARY KEY,
+    customer_id VARCHAR(255),
+    order_status VARCHAR(100),
+    order_placed_at TIMESTAMP,
     
     -- Tier 2: Fields with Defaults
-    order_placed_year INTEGER DEFAULT 0 NOT NULL,
-    order_placed_month INTEGER DEFAULT 0 NOT NULL,
-    order_placed_quarter INTEGER DEFAULT 0 NOT NULL,
-    order_placed_day_of_week INTEGER DEFAULT 0 NOT NULL,
-    order_placed_week_of_year INTEGER DEFAULT 0 NOT NULL,
-    order_placed_day_of_month INTEGER DEFAULT 0 NOT NULL,
+    order_placed_year INTEGER DEFAULT 0,
+    order_placed_month INTEGER DEFAULT 0,
+    order_placed_quarter INTEGER DEFAULT 0,
+    order_placed_day_of_week INTEGER DEFAULT 0,
+    order_placed_week_of_year INTEGER DEFAULT 0,
+    order_placed_day_of_month INTEGER DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     subtotal DOUBLE PRECISION NULL,
@@ -275,11 +275,11 @@ CREATE TABLE agg_orders (
 -- 7. agg_payments
 CREATE TABLE agg_payments (
     -- Tier 1: Critical Fields
-    payment_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    order_id VARCHAR(255) NOT NULL,
-    payment_method VARCHAR(100) NOT NULL,
-    payment_status VARCHAR(100) NOT NULL,
-    payment_date DATE NOT NULL,
+    payment_id VARCHAR(255) PRIMARY KEY,
+    order_id VARCHAR(255),
+    payment_method VARCHAR(100),
+    payment_status VARCHAR(100),
+    payment_date DATE,
     
     -- Tier 3: Nullable Derived Fields
     payment_provider VARCHAR(255) NULL,
@@ -292,22 +292,22 @@ CREATE TABLE agg_payments (
 -- 8. agg_products
 CREATE TABLE agg_products (
     -- Tier 1: Critical Fields
-    product_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    product_name VARCHAR(500) NOT NULL,
-    sku VARCHAR(255) NOT NULL,
-    category VARCHAR(255) NOT NULL,
+    product_id VARCHAR(255) PRIMARY KEY,
+    product_name VARCHAR(500),
+    sku VARCHAR(255),
+    category VARCHAR(255),
     
     -- Tier 2: Fields with Defaults
-    current_stock_level INTEGER DEFAULT 0 NOT NULL,
-    total_units_sold BIGINT DEFAULT 0 NOT NULL,
-    total_orders BIGINT DEFAULT 0 NOT NULL,
-    unique_customers BIGINT DEFAULT 0 NOT NULL,
-    total_reviews BIGINT DEFAULT 0 NOT NULL,
-    total_wishlist_adds BIGINT DEFAULT 0 NOT NULL,
-    total_cart_adds BIGINT DEFAULT 0 NOT NULL,
-    stockout_occurrences BIGINT DEFAULT 0 NOT NULL,
-    products_in_category BIGINT DEFAULT 0 NOT NULL,
-    current_stock INTEGER DEFAULT 0 NOT NULL,
+    current_stock_level INTEGER DEFAULT 0,
+    total_units_sold BIGINT DEFAULT 0,
+    total_orders BIGINT DEFAULT 0,
+    unique_customers BIGINT DEFAULT 0,
+    total_reviews BIGINT DEFAULT 0,
+    total_wishlist_adds BIGINT DEFAULT 0,
+    total_cart_adds BIGINT DEFAULT 0,
+    stockout_occurrences BIGINT DEFAULT 0,
+    products_in_category BIGINT DEFAULT 0,
+    current_stock INTEGER DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     sub_category VARCHAR(255) NULL,
@@ -355,13 +355,13 @@ CREATE TABLE agg_products (
 -- 9. agg_reviews
 CREATE TABLE agg_reviews (
     -- Tier 1: Critical Fields
-    review_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    product_id VARCHAR(255) NOT NULL,
-    customer_id VARCHAR(255) NOT NULL,
-    review_date TIMESTAMP NOT NULL,
+    review_id VARCHAR(255) PRIMARY KEY,
+    product_id VARCHAR(255),
+    customer_id VARCHAR(255),
+    review_date TIMESTAMP,
     
     -- Tier 2: Fields with Defaults
-    rating INTEGER DEFAULT 0 NOT NULL,
+    rating INTEGER DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     review_title VARCHAR(500) NULL,
@@ -372,14 +372,14 @@ CREATE TABLE agg_reviews (
 -- 10. agg_shopping_cart
 CREATE TABLE agg_shopping_cart (
     -- Tier 1: Critical Fields
-    cart_id VARCHAR(255) NOT NULL,
-    customer_id VARCHAR(255) NOT NULL,
-    product_id VARCHAR(255) NOT NULL,
-    added_date DATE NOT NULL,
-    cart_status VARCHAR(100) NOT NULL,
+    cart_id VARCHAR(255),
+    customer_id VARCHAR(255),
+    product_id VARCHAR(255),
+    added_date DATE,
+    cart_status VARCHAR(100),
     
     -- Tier 2: Fields with Defaults
-    quantity INTEGER DEFAULT 0 NOT NULL,
+    quantity INTEGER DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     session_id VARCHAR(255) NULL,
@@ -393,17 +393,17 @@ CREATE TABLE agg_shopping_cart (
 -- 11. agg_suppliers
 CREATE TABLE agg_suppliers (
     -- Tier 1: Critical Fields
-    supplier_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    supplier_status VARCHAR(100) NOT NULL,
+    supplier_id VARCHAR(255) PRIMARY KEY,
+    supplier_status VARCHAR(100),
     
     -- Tier 2: Fields with Defaults
-    is_preferred BOOLEAN DEFAULT FALSE NOT NULL,
-    is_verified BOOLEAN DEFAULT FALSE NOT NULL,
-    total_products_supplied BIGINT DEFAULT 0 NOT NULL,
-    total_units_sold BIGINT DEFAULT 0 NOT NULL,
-    total_orders_fulfilled BIGINT DEFAULT 0 NOT NULL,
-    total_reviews BIGINT DEFAULT 0 NOT NULL,
-    total_stockouts BIGINT DEFAULT 0 NOT NULL,
+    is_preferred BOOLEAN DEFAULT FALSE,
+    is_verified BOOLEAN DEFAULT FALSE,
+    total_products_supplied BIGINT DEFAULT 0,
+    total_units_sold BIGINT DEFAULT 0,
+    total_orders_fulfilled BIGINT DEFAULT 0,
+    total_reviews BIGINT DEFAULT 0,
+    total_stockouts BIGINT DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     supplier_rating DOUBLE PRECISION NULL,
@@ -435,10 +435,10 @@ CREATE TABLE agg_suppliers (
 -- 12. agg_wishlist
 CREATE TABLE agg_wishlist (
     -- Tier 1: Critical Fields
-    wishlist_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    customer_id VARCHAR(255) NOT NULL,
-    product_id VARCHAR(255) NOT NULL,
-    added_date DATE NOT NULL,
+    wishlist_id VARCHAR(255) PRIMARY KEY,
+    customer_id VARCHAR(255),
+    product_id VARCHAR(255),
+    added_date DATE,
     
     -- Tier 3: Nullable Derived Fields
     purchased_date DATE NULL,
@@ -449,17 +449,17 @@ CREATE TABLE agg_wishlist (
 -- 13. agg_categories
 CREATE TABLE agg_categories (
     -- Tier 1: Critical Fields
-    category VARCHAR(255) PRIMARY KEY NOT NULL,
+    category VARCHAR(255) PRIMARY KEY,
     
     -- Tier 2: Fields with Defaults
-    total_products_in_category BIGINT DEFAULT 0 NOT NULL,
-    total_units_sold BIGINT DEFAULT 0 NOT NULL,
-    total_orders BIGINT DEFAULT 0 NOT NULL,
-    unique_customers BIGINT DEFAULT 0 NOT NULL,
-    total_reviews BIGINT DEFAULT 0 NOT NULL,
-    revenue_rank INTEGER DEFAULT 0 NOT NULL,
-    rating_rank INTEGER DEFAULT 0 NOT NULL,
-    growth_rank INTEGER DEFAULT 0 NOT NULL,
+    total_products_in_category BIGINT DEFAULT 0,
+    total_units_sold BIGINT DEFAULT 0,
+    total_orders BIGINT DEFAULT 0,
+    unique_customers BIGINT DEFAULT 0,
+    total_reviews BIGINT DEFAULT 0,
+    revenue_rank INTEGER DEFAULT 0,
+    rating_rank INTEGER DEFAULT 0,
+    growth_rank INTEGER DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     total_revenue DOUBLE PRECISION NULL,
@@ -480,19 +480,19 @@ CREATE TABLE agg_categories (
 -- 14. agg_daily_aggregations
 CREATE TABLE agg_daily_aggregations (
     -- Tier 1: Critical Fields
-    order_date DATE PRIMARY KEY NOT NULL,
-    order_year INTEGER NOT NULL,
-    order_month INTEGER NOT NULL,
+    order_date DATE PRIMARY KEY,
+    order_year INTEGER,
+    order_month INTEGER,
     
     -- Tier 2: Fields with Defaults
-    total_orders BIGINT DEFAULT 0 NOT NULL,
-    total_customers BIGINT DEFAULT 0 NOT NULL,
-    new_customers BIGINT DEFAULT 0 NOT NULL,
-    returning_customers BIGINT DEFAULT 0 NOT NULL,
-    total_units_sold BIGINT DEFAULT 0 NOT NULL,
-    total_sessions BIGINT DEFAULT 0 NOT NULL,
-    total_conversions BIGINT DEFAULT 0 NOT NULL,
-    prev_day_customers BIGINT DEFAULT 0 NOT NULL,
+    total_orders BIGINT DEFAULT 0,
+    total_customers BIGINT DEFAULT 0,
+    new_customers BIGINT DEFAULT 0,
+    returning_customers BIGINT DEFAULT 0,
+    total_units_sold BIGINT DEFAULT 0,
+    total_sessions BIGINT DEFAULT 0,
+    total_conversions BIGINT DEFAULT 0,
+    prev_day_customers BIGINT DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     total_revenue DOUBLE PRECISION NULL,
@@ -506,19 +506,19 @@ CREATE TABLE agg_daily_aggregations (
 -- 15. agg_weekly_aggregations
 CREATE TABLE agg_weekly_aggregations (
     -- Tier 1: Critical Fields
-    year_week VARCHAR(50) PRIMARY KEY NOT NULL,
-    order_year INTEGER NOT NULL,
-    order_week INTEGER NOT NULL,
+    year_week VARCHAR(50) PRIMARY KEY,
+    order_year INTEGER,
+    order_week INTEGER,
     
     -- Tier 2: Fields with Defaults
-    total_orders BIGINT DEFAULT 0 NOT NULL,
-    total_customers BIGINT DEFAULT 0 NOT NULL,
-    new_customers BIGINT DEFAULT 0 NOT NULL,
-    returning_customers BIGINT DEFAULT 0 NOT NULL,
-    total_units_sold BIGINT DEFAULT 0 NOT NULL,
-    total_sessions BIGINT DEFAULT 0 NOT NULL,
-    total_conversions BIGINT DEFAULT 0 NOT NULL,
-    prev_week_customers BIGINT DEFAULT 0 NOT NULL,
+    total_orders BIGINT DEFAULT 0,
+    total_customers BIGINT DEFAULT 0,
+    new_customers BIGINT DEFAULT 0,
+    returning_customers BIGINT DEFAULT 0,
+    total_units_sold BIGINT DEFAULT 0,
+    total_sessions BIGINT DEFAULT 0,
+    total_conversions BIGINT DEFAULT 0,
+    prev_week_customers BIGINT DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     total_revenue DOUBLE PRECISION NULL,
@@ -532,19 +532,19 @@ CREATE TABLE agg_weekly_aggregations (
 -- 16. agg_monthly_aggregations
 CREATE TABLE agg_monthly_aggregations (
     -- Tier 1: Critical Fields
-    year_month VARCHAR(50) PRIMARY KEY NOT NULL,
-    order_year INTEGER NOT NULL,
-    order_month INTEGER NOT NULL,
+    year_month VARCHAR(50) PRIMARY KEY,
+    order_year INTEGER,
+    order_month INTEGER,
     
     -- Tier 2: Fields with Defaults
-    total_orders BIGINT DEFAULT 0 NOT NULL,
-    total_customers BIGINT DEFAULT 0 NOT NULL,
-    new_customers BIGINT DEFAULT 0 NOT NULL,
-    returning_customers BIGINT DEFAULT 0 NOT NULL,
-    total_units_sold BIGINT DEFAULT 0 NOT NULL,
-    total_sessions BIGINT DEFAULT 0 NOT NULL,
-    total_conversions BIGINT DEFAULT 0 NOT NULL,
-    prev_month_customers BIGINT DEFAULT 0 NOT NULL,
+    total_orders BIGINT DEFAULT 0,
+    total_customers BIGINT DEFAULT 0,
+    new_customers BIGINT DEFAULT 0,
+    returning_customers BIGINT DEFAULT 0,
+    total_units_sold BIGINT DEFAULT 0,
+    total_sessions BIGINT DEFAULT 0,
+    total_conversions BIGINT DEFAULT 0,
+    prev_month_customers BIGINT DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     total_revenue DOUBLE PRECISION NULL,
@@ -559,12 +559,12 @@ CREATE TABLE agg_monthly_aggregations (
 -- 17. agg_country_aggregations
 CREATE TABLE agg_country_aggregations (
     -- Tier 1: Critical Fields
-    country VARCHAR(255) PRIMARY KEY NOT NULL,
+    country VARCHAR(255) PRIMARY KEY,
     
     -- Tier 2: Fields with Defaults
-    total_customers BIGINT DEFAULT 0 NOT NULL,
-    total_orders BIGINT DEFAULT 0 NOT NULL,
-    total_suppliers BIGINT DEFAULT 0 NOT NULL,
+    total_customers BIGINT DEFAULT 0,
+    total_orders BIGINT DEFAULT 0,
+    total_suppliers BIGINT DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     total_revenue DOUBLE PRECISION NULL,
@@ -578,13 +578,13 @@ CREATE TABLE agg_country_aggregations (
 -- 18. agg_state_aggregations
 CREATE TABLE agg_state_aggregations (
     -- Tier 1: Critical Fields
-    country VARCHAR(255) NOT NULL,
-    state_province VARCHAR(255) NOT NULL,
+    country VARCHAR(255),
+    state_province VARCHAR(255),
     
     -- Tier 2: Fields with Defaults
-    total_customers BIGINT DEFAULT 0 NOT NULL,
-    total_orders BIGINT DEFAULT 0 NOT NULL,
-    total_suppliers BIGINT DEFAULT 0 NOT NULL,
+    total_customers BIGINT DEFAULT 0,
+    total_orders BIGINT DEFAULT 0,
+    total_suppliers BIGINT DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     total_revenue DOUBLE PRECISION NULL,
@@ -600,15 +600,15 @@ CREATE TABLE agg_state_aggregations (
 -- 19. agg_city_aggregations
 CREATE TABLE agg_city_aggregations (
     -- Tier 1: Critical Fields
-    country VARCHAR(255) NOT NULL,
-    state_province VARCHAR(255) NOT NULL,
-    city VARCHAR(255) NOT NULL,
+    country VARCHAR(255),
+    state_province VARCHAR(255),
+    city VARCHAR(255),
     
     -- Tier 2: Fields with Defaults
-    total_customers BIGINT DEFAULT 0 NOT NULL,
-    total_orders BIGINT DEFAULT 0 NOT NULL,
-    total_suppliers BIGINT DEFAULT 0 NOT NULL,
-    customer_density BIGINT DEFAULT 0 NOT NULL,
+    total_customers BIGINT DEFAULT 0,
+    total_orders BIGINT DEFAULT 0,
+    total_suppliers BIGINT DEFAULT 0,
+    customer_density BIGINT DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     total_revenue DOUBLE PRECISION NULL,
@@ -624,17 +624,17 @@ CREATE TABLE agg_city_aggregations (
 -- 20. agg_cart_abandonment_analysis
 CREATE TABLE agg_cart_abandonment_analysis (
     -- Tier 1: Critical Fields
-    cart_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    cart_status VARCHAR(100) NOT NULL,
-    cart_added_date DATE NOT NULL,
-    customer_id VARCHAR(255) NOT NULL,
+    cart_id VARCHAR(255) PRIMARY KEY,
+    cart_status VARCHAR(100),
+    cart_added_date DATE,
+    customer_id VARCHAR(255),
     
     -- Tier 2: Fields with Defaults
-    cart_items_count BIGINT DEFAULT 0 NOT NULL,
-    session_converted INTEGER DEFAULT 0 NOT NULL,
-    time_in_cart_days INTEGER DEFAULT 0 NOT NULL,
-    time_in_cart_hours INTEGER DEFAULT 0 NOT NULL,
-    recovery_potential_score INTEGER DEFAULT 0 NOT NULL,
+    cart_items_count BIGINT DEFAULT 0,
+    session_converted INTEGER DEFAULT 0,
+    time_in_cart_days INTEGER DEFAULT 0,
+    time_in_cart_hours INTEGER DEFAULT 0,
+    recovery_potential_score INTEGER DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     cart_total_value DOUBLE PRECISION NULL,
@@ -654,17 +654,17 @@ CREATE TABLE agg_cart_abandonment_analysis (
 -- 21. agg_product_inventory_health
 CREATE TABLE agg_product_inventory_health (
     -- Tier 1: Critical Fields
-    product_id VARCHAR(255) PRIMARY KEY NOT NULL,
-    supplier_id VARCHAR(255) NOT NULL,
+    product_id VARCHAR(255) PRIMARY KEY,
+    supplier_id VARCHAR(255),
     
     -- Tier 2: Fields with Defaults
-    current_stock INTEGER DEFAULT 0 NOT NULL,
-    available_stock INTEGER DEFAULT 0 NOT NULL,
-    reorder_point_breach_count BIGINT DEFAULT 0 NOT NULL,
-    stockout_frequency BIGINT DEFAULT 0 NOT NULL,
-    reserved_quantity INTEGER DEFAULT 0 NOT NULL,
-    minimum_stock_level INTEGER DEFAULT 0 NOT NULL,
-    stock_health_score INTEGER DEFAULT 0 NOT NULL,
+    current_stock INTEGER DEFAULT 0,
+    available_stock INTEGER DEFAULT 0,
+    reorder_point_breach_count BIGINT DEFAULT 0,
+    stockout_frequency BIGINT DEFAULT 0,
+    reserved_quantity INTEGER DEFAULT 0,
+    minimum_stock_level INTEGER DEFAULT 0,
+    stock_health_score INTEGER DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     avg_stock_quantity DOUBLE PRECISION NULL,
@@ -684,14 +684,14 @@ CREATE TABLE agg_product_inventory_health (
 -- 22. agg_supplier_inventory_health
 CREATE TABLE agg_supplier_inventory_health (
     -- Tier 1: Critical Fields
-    supplier_id VARCHAR(255) PRIMARY KEY NOT NULL,
+    supplier_id VARCHAR(255) PRIMARY KEY,
     
     -- Tier 2: Fields with Defaults
-    total_products BIGINT DEFAULT 0 NOT NULL,
-    total_current_stock BIGINT DEFAULT 0 NOT NULL,
-    total_available_stock BIGINT DEFAULT 0 NOT NULL,
-    total_reorder_breaches BIGINT DEFAULT 0 NOT NULL,
-    total_stockouts BIGINT DEFAULT 0 NOT NULL,
+    total_products BIGINT DEFAULT 0,
+    total_current_stock BIGINT DEFAULT 0,
+    total_available_stock BIGINT DEFAULT 0,
+    total_reorder_breaches BIGINT DEFAULT 0,
+    total_stockouts BIGINT DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     total_storage_cost DOUBLE PRECISION NULL,
@@ -707,10 +707,10 @@ CREATE TABLE agg_supplier_inventory_health (
 -- 23. agg_rfm_segmentation
 CREATE TABLE agg_rfm_segmentation (
     -- Tier 1: Critical Fields
-    customer_id VARCHAR(255) PRIMARY KEY NOT NULL,
+    customer_id VARCHAR(255) PRIMARY KEY,
     
     -- Tier 2: Fields with Defaults
-    total_orders_rfm BIGINT DEFAULT 0 NOT NULL,
+    total_orders_rfm BIGINT DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     days_since_last_order INTEGER NULL,
@@ -731,10 +731,10 @@ CREATE TABLE agg_rfm_segmentation (
 -- 24. agg_rfm_segment_summary
 CREATE TABLE agg_rfm_segment_summary (
     -- Tier 1: Critical Fields
-    customer_segment_label VARCHAR(100) PRIMARY KEY NOT NULL,
+    customer_segment_label VARCHAR(100) PRIMARY KEY,
     
     -- Tier 2: Fields with Defaults
-    customer_count BIGINT DEFAULT 0 NOT NULL,
+    customer_count BIGINT DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     avg_revenue DOUBLE PRECISION NULL,
@@ -746,14 +746,14 @@ CREATE TABLE agg_rfm_segment_summary (
 -- 25. agg_product_affinity
 CREATE TABLE agg_product_affinity (
     -- Tier 1: Critical Fields
-    product_a_id VARCHAR(255) NOT NULL,
-    product_b_id VARCHAR(255) NOT NULL,
+    product_a_id VARCHAR(255),
+    product_b_id VARCHAR(255),
     
     -- Tier 2: Fields with Defaults
-    co_occurrence_count BIGINT DEFAULT 0 NOT NULL,
-    product_a_count BIGINT DEFAULT 0 NOT NULL,
-    product_b_count BIGINT DEFAULT 0 NOT NULL,
-    is_cross_category BOOLEAN DEFAULT FALSE NOT NULL,
+    co_occurrence_count BIGINT DEFAULT 0,
+    product_a_count BIGINT DEFAULT 0,
+    product_b_count BIGINT DEFAULT 0,
+    is_cross_category BOOLEAN DEFAULT FALSE,
     
     -- Tier 3: Nullable Derived Fields
     support DOUBLE PRECISION NULL,
@@ -777,14 +777,14 @@ CREATE TABLE agg_product_affinity (
 -- 26. agg_top_product_pairs
 CREATE TABLE agg_top_product_pairs (
     -- Tier 1: Critical Fields
-    product_a_id VARCHAR(255) NOT NULL,
-    product_b_id VARCHAR(255) NOT NULL,
+    product_a_id VARCHAR(255),
+    product_b_id VARCHAR(255),
     
     -- Tier 2: Fields with Defaults
-    co_occurrence_count BIGINT DEFAULT 0 NOT NULL,
-    product_a_count BIGINT DEFAULT 0 NOT NULL,
-    product_b_count BIGINT DEFAULT 0 NOT NULL,
-    is_cross_category BOOLEAN DEFAULT FALSE NOT NULL,
+    co_occurrence_count BIGINT DEFAULT 0,
+    product_a_count BIGINT DEFAULT 0,
+    product_b_count BIGINT DEFAULT 0,
+    is_cross_category BOOLEAN DEFAULT FALSE,
     
     -- Tier 3: Nullable Derived Fields
     support DOUBLE PRECISION NULL,
@@ -808,10 +808,10 @@ CREATE TABLE agg_top_product_pairs (
 -- 27. agg_product_recommendations
 CREATE TABLE agg_product_recommendations (
     -- Tier 1: Critical Fields
-    product_a_id VARCHAR(255) PRIMARY KEY NOT NULL,
+    product_a_id VARCHAR(255) PRIMARY KEY,
     
     -- Tier 2: Fields with Defaults
-    recommendation_count BIGINT DEFAULT 0 NOT NULL,
+    recommendation_count BIGINT DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     product_a_name VARCHAR(500) NULL,
@@ -822,12 +822,12 @@ CREATE TABLE agg_product_recommendations (
 -- 28. agg_category_affinity
 CREATE TABLE agg_category_affinity (
     -- Tier 1: Critical Fields
-    product_a_category VARCHAR(255) NOT NULL,
-    product_b_category VARCHAR(255) NOT NULL,
+    product_a_category VARCHAR(255),
+    product_b_category VARCHAR(255),
     
     -- Tier 2: Fields with Defaults
-    pair_count BIGINT DEFAULT 0 NOT NULL,
-    total_co_occurrences BIGINT DEFAULT 0 NOT NULL,
+    pair_count BIGINT DEFAULT 0,
+    total_co_occurrences BIGINT DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
     avg_lift_between_categories DOUBLE PRECISION NULL,
@@ -839,8 +839,8 @@ CREATE TABLE agg_category_affinity (
 -- 29. agg_global_aggregations
 CREATE TABLE agg_global_aggregations (
     -- Tier 1: Critical Fields
-    metric_name VARCHAR(255) PRIMARY KEY NOT NULL,
-    calculated_at VARCHAR(50) NOT NULL,
+    metric_name VARCHAR(255) PRIMARY KEY,
+    calculated_at VARCHAR(50),
     
     -- Tier 3: Nullable Derived Fields
     metric_value DOUBLE PRECISION NULL
@@ -853,13 +853,13 @@ CREATE TABLE agg_global_aggregations (
 -- Customer Sessions Indexes
 CREATE INDEX idx_agg_customer_sessions_customer ON agg_customer_sessions(customer_id);
 CREATE INDEX idx_agg_customer_sessions_start ON agg_customer_sessions(session_start);
-CREATE INDEX idx_agg_customer_sessions_device ON agg_customer_sessions(device_type) WHERE device_type IS NOT NULL;
+CREATE INDEX idx_agg_customer_sessions_device ON agg_customer_sessions(device_type) WHERE device_type IS;
 
 -- Customers Indexes
-CREATE INDEX idx_agg_customers_country ON agg_customers(country) WHERE country IS NOT NULL;
-CREATE INDEX idx_agg_customers_segment ON agg_customers(customer_segment) WHERE customer_segment IS NOT NULL;
-CREATE INDEX idx_agg_customers_rfm ON agg_customers(rfm_segment) WHERE rfm_segment IS NOT NULL;
-CREATE INDEX idx_agg_customers_churn ON agg_customers(churn_risk) WHERE churn_risk IS NOT NULL;
+CREATE INDEX idx_agg_customers_country ON agg_customers(country) WHERE country IS;
+CREATE INDEX idx_agg_customers_segment ON agg_customers(customer_segment) WHERE customer_segment IS;
+CREATE INDEX idx_agg_customers_rfm ON agg_customers(rfm_segment) WHERE rfm_segment IS;
+CREATE INDEX idx_agg_customers_churn ON agg_customers(churn_risk) WHERE churn_risk IS;
 CREATE INDEX idx_agg_customers_active ON agg_customers(is_active);
 CREATE INDEX idx_agg_customers_status ON agg_customers(account_status);
 
@@ -868,7 +868,7 @@ CREATE INDEX idx_agg_orders_customer ON agg_orders(customer_id);
 CREATE INDEX idx_agg_orders_placed_at ON agg_orders(order_placed_at);
 CREATE INDEX idx_agg_orders_status ON agg_orders(order_status);
 CREATE INDEX idx_agg_orders_year_month ON agg_orders(order_placed_year, order_placed_month);
-CREATE INDEX idx_agg_orders_season ON agg_orders(season) WHERE season IS NOT NULL;
+CREATE INDEX idx_agg_orders_season ON agg_orders(season) WHERE season IS;
 
 -- Order Items Indexes
 CREATE INDEX idx_agg_order_items_order ON agg_order_items(order_id);
@@ -876,21 +876,21 @@ CREATE INDEX idx_agg_order_items_product ON agg_order_items(product_id);
 
 -- Products Indexes
 CREATE INDEX idx_agg_products_category ON agg_products(category);
-CREATE INDEX idx_agg_products_supplier ON agg_products(supplier_id) WHERE supplier_id IS NOT NULL;
-CREATE INDEX idx_agg_products_stock_status ON agg_products(stock_status) WHERE stock_status IS NOT NULL;
-CREATE INDEX idx_agg_products_performance ON agg_products(product_performance_score) WHERE product_performance_score IS NOT NULL;
+CREATE INDEX idx_agg_products_supplier ON agg_products(supplier_id) WHERE supplier_id IS;
+CREATE INDEX idx_agg_products_stock_status ON agg_products(stock_status) WHERE stock_status IS;
+CREATE INDEX idx_agg_products_performance ON agg_products(product_performance_score) WHERE product_performance_score IS;
 CREATE INDEX idx_agg_products_sku ON agg_products(sku);
 
 -- Inventory Indexes
 CREATE INDEX idx_agg_inventory_product ON agg_inventory(product_id);
 CREATE INDEX idx_agg_inventory_supplier ON agg_inventory(supplier_id);
-CREATE INDEX idx_agg_inventory_status ON agg_inventory(stock_status) WHERE stock_status IS NOT NULL;
+CREATE INDEX idx_agg_inventory_status ON agg_inventory(stock_status) WHERE stock_status IS;
 CREATE INDEX idx_agg_inventory_reorder ON agg_inventory(reorder_point_breach) WHERE reorder_point_breach = 1;
 
 -- Marketing Campaigns Indexes
 CREATE INDEX idx_agg_campaigns_dates ON agg_marketing_campaigns(start_date, end_date);
 CREATE INDEX idx_agg_campaigns_status ON agg_marketing_campaigns(campaign_status);
-CREATE INDEX idx_agg_campaigns_tier ON agg_marketing_campaigns(performance_tier) WHERE performance_tier IS NOT NULL;
+CREATE INDEX idx_agg_campaigns_tier ON agg_marketing_campaigns(performance_tier) WHERE performance_tier IS;
 CREATE INDEX idx_agg_campaigns_type ON agg_marketing_campaigns(campaign_type);
 
 -- Payments Indexes
@@ -902,13 +902,13 @@ CREATE INDEX idx_agg_payments_date ON agg_payments(payment_date);
 -- Reviews Indexes
 CREATE INDEX idx_agg_reviews_product ON agg_reviews(product_id);
 CREATE INDEX idx_agg_reviews_customer ON agg_reviews(customer_id);
-CREATE INDEX idx_agg_reviews_sentiment ON agg_reviews(review_sentiment) WHERE review_sentiment IS NOT NULL;
+CREATE INDEX idx_agg_reviews_sentiment ON agg_reviews(review_sentiment) WHERE review_sentiment IS;
 CREATE INDEX idx_agg_reviews_date ON agg_reviews(review_date);
 CREATE INDEX idx_agg_reviews_rating ON agg_reviews(rating);
 
 -- Shopping Cart Indexes
 CREATE INDEX idx_agg_cart_customer ON agg_shopping_cart(customer_id);
-CREATE INDEX idx_agg_cart_session ON agg_shopping_cart(session_id) WHERE session_id IS NOT NULL;
+CREATE INDEX idx_agg_cart_session ON agg_shopping_cart(session_id) WHERE session_id IS;
 CREATE INDEX idx_agg_cart_status ON agg_shopping_cart(cart_status);
 CREATE INDEX idx_agg_cart_added_date ON agg_shopping_cart(added_date);
 
@@ -935,28 +935,28 @@ CREATE INDEX idx_agg_city_country_state ON agg_city_aggregations(country, state_
 CREATE INDEX idx_agg_cart_abandon_customer ON agg_cart_abandonment_analysis(customer_id);
 CREATE INDEX idx_agg_cart_abandon_status ON agg_cart_abandonment_analysis(cart_status);
 CREATE INDEX idx_agg_cart_abandon_date ON agg_cart_abandonment_analysis(cart_added_date);
-CREATE INDEX idx_agg_cart_abandon_tier ON agg_cart_abandonment_analysis(cart_value_tier) WHERE cart_value_tier IS NOT NULL;
+CREATE INDEX idx_agg_cart_abandon_tier ON agg_cart_abandonment_analysis(cart_value_tier) WHERE cart_value_tier IS;
 
 -- Inventory Health Indexes
 CREATE INDEX idx_agg_prod_inv_health_supplier ON agg_product_inventory_health(supplier_id);
-CREATE INDEX idx_agg_prod_inv_health_status ON agg_product_inventory_health(stock_status) WHERE stock_status IS NOT NULL;
-CREATE INDEX idx_agg_prod_inv_health_urgency ON agg_product_inventory_health(reorder_urgency) WHERE reorder_urgency IS NOT NULL;
+CREATE INDEX idx_agg_prod_inv_health_status ON agg_product_inventory_health(stock_status) WHERE stock_status IS;
+CREATE INDEX idx_agg_prod_inv_health_urgency ON agg_product_inventory_health(reorder_urgency) WHERE reorder_urgency IS;
 
 -- RFM Indexes
-CREATE INDEX idx_agg_rfm_segment ON agg_rfm_segmentation(customer_segment_label) WHERE customer_segment_label IS NOT NULL;
-CREATE INDEX idx_agg_rfm_churn ON agg_rfm_segmentation(churn_risk) WHERE churn_risk IS NOT NULL;
-CREATE INDEX idx_agg_rfm_category ON agg_rfm_segmentation(rfm_category) WHERE rfm_category IS NOT NULL;
+CREATE INDEX idx_agg_rfm_segment ON agg_rfm_segmentation(customer_segment_label) WHERE customer_segment_label IS;
+CREATE INDEX idx_agg_rfm_churn ON agg_rfm_segmentation(churn_risk) WHERE churn_risk IS;
+CREATE INDEX idx_agg_rfm_category ON agg_rfm_segmentation(rfm_category) WHERE rfm_category IS;
 
 -- Product Affinity Indexes
 CREATE INDEX idx_agg_affinity_product_a ON agg_product_affinity(product_a_id);
 CREATE INDEX idx_agg_affinity_product_b ON agg_product_affinity(product_b_id);
-CREATE INDEX idx_agg_affinity_strength ON agg_product_affinity(affinity_strength) WHERE affinity_strength IS NOT NULL;
+CREATE INDEX idx_agg_affinity_strength ON agg_product_affinity(affinity_strength) WHERE affinity_strength IS;
 CREATE INDEX idx_agg_affinity_cross_category ON agg_product_affinity(is_cross_category);
 
 -- Top Product Pairs Indexes
 CREATE INDEX idx_agg_top_pairs_product_a ON agg_top_product_pairs(product_a_id);
 CREATE INDEX idx_agg_top_pairs_product_b ON agg_top_product_pairs(product_b_id);
-CREATE INDEX idx_agg_top_pairs_score ON agg_top_product_pairs(affinity_score) WHERE affinity_score IS NOT NULL;
+CREATE INDEX idx_agg_top_pairs_score ON agg_top_product_pairs(affinity_score) WHERE affinity_score IS;
 
 -- Global Aggregations Index
 CREATE INDEX idx_agg_global_calculated ON agg_global_aggregations(calculated_at);
@@ -989,64 +989,64 @@ COMMENT ON COLUMN agg_marketing_campaigns.roas IS 'Return on Ad Spend. NULL unti
 COMMENT ON COLUMN agg_product_affinity.lift_a_to_b IS 'Association rule lift. NULL if insufficient co-purchase data.';
 COMMENT ON COLUMN agg_cart_abandonment_analysis.abandonment_risk_score IS 'Risk score (0-100). NULL for carts less than 1 hour old.';
 
--- ============================================================================
--- DATA QUALITY VIEWS (Optional - Helps Monitor NULL Values)
--- ============================================================================
+-- -- ============================================================================
+-- -- DATA QUALITY VIEWS (Optional - Helps Monitor NULL Values)
+-- -- ============================================================================
 
--- View to monitor NULL percentages in critical tables
-CREATE OR REPLACE VIEW v_agg_data_quality_metrics AS
-SELECT 
-    'agg_customers' as table_name,
-    COUNT(*) as total_records,
-    COUNT(*) FILTER (WHERE rfm_overall_score IS NULL) as null_rfm_scores,
-    ROUND(100.0 * COUNT(*) FILTER (WHERE rfm_overall_score IS NULL) / COUNT(*), 2) as pct_null_rfm,
-    COUNT(*) FILTER (WHERE total_revenue IS NULL) as null_revenues,
-    ROUND(100.0 * COUNT(*) FILTER (WHERE total_revenue IS NULL) / COUNT(*), 2) as pct_null_revenue
-FROM agg_customers
-UNION ALL
-SELECT 
-    'agg_orders',
-    COUNT(*),
-    COUNT(*) FILTER (WHERE order_profit IS NULL),
-    ROUND(100.0 * COUNT(*) FILTER (WHERE order_profit IS NULL) / COUNT(*), 2),
-    COUNT(*) FILTER (WHERE order_delivered_at IS NULL),
-    ROUND(100.0 * COUNT(*) FILTER (WHERE order_delivered_at IS NULL) / COUNT(*), 2)
-FROM agg_orders
-UNION ALL
-SELECT 
-    'agg_products',
-    COUNT(*),
-    COUNT(*) FILTER (WHERE product_performance_score IS NULL),
-    ROUND(100.0 * COUNT(*) FILTER (WHERE product_performance_score IS NULL) / COUNT(*), 2),
-    COUNT(*) FILTER (WHERE total_revenue IS NULL),
-    ROUND(100.0 * COUNT(*) FILTER (WHERE total_revenue IS NULL) / COUNT(*), 2)
-FROM agg_products;
+-- -- View to monitor NULL percentages in critical tables
+-- CREATE OR REPLACE VIEW v_agg_data_quality_metrics AS
+-- SELECT 
+--     'agg_customers' as table_name,
+--     COUNT(*) as total_records,
+--     COUNT(*) FILTER (WHERE rfm_overall_score IS NULL) as null_rfm_scores,
+--     ROUND(100.0 * COUNT(*) FILTER (WHERE rfm_overall_score IS NULL) / COUNT(*), 2) as pct_null_rfm,
+--     COUNT(*) FILTER (WHERE total_revenue IS NULL) as null_revenues,
+--     ROUND(100.0 * COUNT(*) FILTER (WHERE total_revenue IS NULL) / COUNT(*), 2) as pct_null_revenue
+-- FROM agg_customers
+-- UNION ALL
+-- SELECT 
+--     'agg_orders',
+--     COUNT(*),
+--     COUNT(*) FILTER (WHERE order_profit IS NULL),
+--     ROUND(100.0 * COUNT(*) FILTER (WHERE order_profit IS NULL) / COUNT(*), 2),
+--     COUNT(*) FILTER (WHERE order_delivered_at IS NULL),
+--     ROUND(100.0 * COUNT(*) FILTER (WHERE order_delivered_at IS NULL) / COUNT(*), 2)
+-- FROM agg_orders
+-- UNION ALL
+-- SELECT 
+--     'agg_products',
+--     COUNT(*),
+--     COUNT(*) FILTER (WHERE product_performance_score IS NULL),
+--     ROUND(100.0 * COUNT(*) FILTER (WHERE product_performance_score IS NULL) / COUNT(*), 2),
+--     COUNT(*) FILTER (WHERE total_revenue IS NULL),
+--     ROUND(100.0 * COUNT(*) FILTER (WHERE total_revenue IS NULL) / COUNT(*), 2)
+-- FROM agg_products;
 
-COMMENT ON VIEW v_agg_data_quality_metrics IS 'Monitor NULL value percentages in key aggregated tables to identify data quality issues.';
+-- COMMENT ON VIEW v_agg_data_quality_metrics IS 'Monitor NULL value percentages in key aggregated tables to identify data quality issues.';
 
--- ============================================================================
--- HELPFUL NULL-HANDLING FUNCTIONS
--- ============================================================================
+-- -- ============================================================================
+-- -- HELPFUL NULL-HANDLING FUNCTIONS
+-- -- ============================================================================
 
--- Function to safely calculate percentages (returns 0 instead of NULL)
-CREATE OR REPLACE FUNCTION safe_percentage(numerator NUMERIC, denominator NUMERIC)
-RETURNS NUMERIC AS $$
-BEGIN
-    IF denominator IS NULL OR denominator = 0 THEN
-        RETURN 0;
-    END IF;
-    RETURN ROUND(100.0 * COALESCE(numerator, 0) / denominator, 2);
-END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+-- -- Function to safely calculate percentages (returns 0 instead of NULL)
+-- CREATE OR REPLACE FUNCTION safe_percentage(numerator NUMERIC, denominator NUMERIC)
+-- RETURNS NUMERIC AS $$
+-- BEGIN
+--     IF denominator IS NULL OR denominator = 0 THEN
+--         RETURN 0;
+--     END IF;
+--     RETURN ROUND(100.0 * COALESCE(numerator, 0) / denominator, 2);
+-- END;
+-- $$ LANGUAGE plpgsql IMMUTABLE;
 
-COMMENT ON FUNCTION safe_percentage IS 'Calculate percentage safely, returning 0 when denominator is NULL or zero.';
+-- COMMENT ON FUNCTION safe_percentage IS 'Calculate percentage safely, returning 0 when denominator is NULL or zero.';
 
--- Function to get non-null count
-CREATE OR REPLACE FUNCTION coalesce_to_zero(val NUMERIC)
-RETURNS NUMERIC AS $$
-BEGIN
-    RETURN COALESCE(val, 0);
-END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+-- -- Function to get non-null count
+-- CREATE OR REPLACE FUNCTION coalesce_to_zero(val NUMERIC)
+-- RETURNS NUMERIC AS $$
+-- BEGIN
+--     RETURN COALESCE(val, 0);
+-- END;
+-- $$ LANGUAGE plpgsql IMMUTABLE;
 
-COMMENT ON FUNCTION coalesce_to_zero IS 'Convert NULL numeric values to 0 for aggregations.';
+-- COMMENT ON FUNCTION coalesce_to_zero IS 'Convert NULL numeric values to 0 for aggregations.';
