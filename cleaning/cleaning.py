@@ -9,6 +9,7 @@ This script orchestrates the complete data cleaning process including:
 - Removing outliers
 - Validating dates and timestamps
 - Detecting and cleaning gibberish patterns
+- Advanced text cleaning and validation
 - Saving cleaned data back to MinIO
 """
 
@@ -29,6 +30,14 @@ from standardization import (
     detect_gibberish_patterns,
 )
 from cleaning_utils import load_data_from_minio, save_data_to_minio, display_summary
+from advanced_cleaning import (
+    clean_text_columns,
+    clean_numeric_strings,
+    clean_whitespace_issues,
+    clean_mixed_scripts,
+    validate_all_cleaned_data,
+)
+from pyspark.sql.functions import regexp_extract, col, when
 
 
 def main():
@@ -67,6 +76,23 @@ def main():
 
     dataframes = load_data_from_minio(spark, minio_client, bucket_name, table_names)
     print(f"✅ Loaded {len(dataframes)} tables")
+
+    # 2a. Clean ID columns with regex
+    print("\n🔌 Step 2a: Cleaning ID columns with regex extraction...")
+    for table in dataframes.keys():
+        df = dataframes[table]
+        for column in df.columns:
+            if column.endswith("_id") and not column.startswith("session_id"):
+                # Extract only numeric part of IDs, set non-numeric to NULL
+                df = df.withColumn(
+                    column,
+                    when(
+                        regexp_extract(col(column), r"(\d+)", 1) == "",
+                        None,
+                    ).otherwise(regexp_extract(col(column), r"(\d+)", 1)),
+                )
+        dataframes[table] = df
+    print("✅ ID columns cleaned")
 
     # 3. Cast data types
     print("\n📌 Step 3: Casting DataFrames to correct data types...")
@@ -119,16 +145,36 @@ def main():
     print("\n📌 Step 13: Detecting and cleaning gibberish patterns...")
     dataframes = detect_gibberish_patterns(dataframes)
 
-    # 14. Display summary
-    print("\n📌 Step 14: Generating summary...")
+    # 14. Clean text columns for gibberish using linguistic analysis
+    print("\n📌 Step 14: Cleaning text columns with linguistic analysis...")
+    dataframes = clean_text_columns(dataframes)
+
+    # 15. Clean numeric strings (IDs, status codes, validation)
+    print("\n📌 Step 15: Cleaning numeric strings...")
+    dataframes = clean_numeric_strings(dataframes)
+
+    # 16. Clean whitespace and formatting issues
+    print("\n📌 Step 16: Cleaning whitespace and formatting...")
+    dataframes = clean_whitespace_issues(dataframes)
+
+    # 17. Clean mixed scripts and non-ASCII characters
+    print("\n📌 Step 17: Cleaning mixed scripts and non-ASCII characters...")
+    dataframes = clean_mixed_scripts(dataframes)
+
+    # 18. Final data validation
+    print("\n📌 Step 18: Running final data validation...")
+    dataframes = validate_all_cleaned_data(dataframes)
+
+    # 19. Display summary
+    print("\n📌 Step 19: Generating summary...")
     display_summary(dataframes)
 
-    # 15. Save cleaned data
-    print("\n📌 Step 15: Saving cleaned data to MinIO...")
+    # 20. Save cleaned data
+    print("\n📌 Step 20: Saving cleaned data to MinIO...")
     save_data_to_minio(dataframes, minio_client, bucket_name)
 
-    # 16. Stop Spark session
-    print("\n📌 Step 16: Stopping Spark session...")
+    # 21. Stop Spark session
+    print("\n📌 Step 21: Stopping Spark session...")
     spark.stop()
     print("✅ Spark session stopped")
 

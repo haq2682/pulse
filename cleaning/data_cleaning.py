@@ -9,14 +9,15 @@ from pyspark.ml.feature import Imputer
 def check_duplicates(dataframes):
     """
     Check for duplicate rows in all DataFrames.
+    Shows actual number of duplicate row groups, not just row count difference.
     
     Args:
         dataframes (dict): Dictionary of table names to DataFrames
     """
     for table in dataframes.keys():
-        total_count = dataframes[table].count()
-        distinct_count = dataframes[table].distinct().count()
-        duplicate_count = total_count - distinct_count
+        # Group by all columns and count occurrences
+        dup_rows = dataframes[table].groupBy(*dataframes[table].columns).count().filter("count > 1")
+        duplicate_count = dup_rows.count()
         print(f"The number of duplicate rows in {table} is: {duplicate_count}")
 
 
@@ -115,7 +116,7 @@ def fill_null_values(dataframes):
             "account_status": "Unknown",
             "city": "Unknown",
             "state_province": "Unknown",
-            "postal_code": "Unknown",
+            "postal_code": "00000",
             "country": "Unknown",
             "date_of_birth": "1900-01-01",
             "account_created_at": "1900-01-01",
@@ -135,7 +136,7 @@ def fill_null_values(dataframes):
             "contract_end_date": "1900-01-01",
             "city": "Unknown",
             "state": "Unknown",
-            "zip_code": "Unknown",
+            "zip_code": "00000",
             "country": "Unknown",
         })
     else:
@@ -228,6 +229,7 @@ def fill_null_values(dataframes):
 def impute_missing_values(dataframes, table, numeric_cols):
     """
     Impute missing numeric values using median strategy.
+    Handles all-NULL columns by filling with 0 first.
     
     Args:
         dataframes (dict): Dictionary of table names to DataFrames
@@ -241,23 +243,34 @@ def impute_missing_values(dataframes, table, numeric_cols):
     total_rows = df.count()
     print(f"Total rows: {total_rows}")
     
+    # Get non-null counts for all columns at once
+    non_null_counts = df.select([F.count(F.col(c)).alias(c) for c in numeric_cols]).collect()[0]
+    
     valid_cols = []
     all_null_cols = []
     
-    for col in numeric_cols:
-        non_null_count = df.filter(F.col(col).isNotNull()).count()
-        null_count = total_rows - non_null_count
+    for col_name in numeric_cols:
+        non_null_count = non_null_counts[col_name]
         
         if non_null_count == 0:
-            all_null_cols.append(col)
-            print(f"⚠️ {col}: All values are NULL - skipping")
+            all_null_cols.append(col_name)
+            print(f"🚫 {col_name}: ALL NULL - will fill with 0")
         else:
-            valid_cols.append(col)
-            print(f"✅ {col}: {non_null_count} non-null, {null_count} null - will impute")
+            valid_cols.append(col_name)
+            null_count = total_rows - non_null_count
+            print(f"✅ {col_name}: {non_null_count} non-null, {null_count} null - will impute")
     
     print(f"\nAll-NULL columns: {all_null_cols}")
     print(f"Valid columns for imputation: {valid_cols}")
     
+    # Fill all-NULL columns with 0
+    if all_null_cols:
+        fill_dict = {col: 0 for col in all_null_cols}
+        df = df.fillna(fill_dict)
+        dataframes[table] = df
+        print(f"✅ Filled all-NULL columns with 0: {all_null_cols}")
+    
+    # Impute valid columns with median
     if valid_cols:
         imputer = Imputer(
             inputCols=valid_cols,
@@ -269,9 +282,11 @@ def impute_missing_values(dataframes, table, numeric_cols):
         df_imputed = model.transform(df)
         dataframes[table] = df_imputed
         print(f"✅ Successfully imputed columns with median: {valid_cols}")
+    else:
+        print("⚠️ No valid columns found for imputation")
     
     print("\n" + "="*50)
-    print("🔍 Final check for NULL values in inventory:")
+    print(f"🔍 Final check for NULL values in {table}:")
     print("="*50)
     
     return dataframes
