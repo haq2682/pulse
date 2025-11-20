@@ -73,7 +73,7 @@ echo "================================================"
 echo ""
 
 # Copy the Python file to container
-docker cp "$PYTHON_FILE" python:/app/"$SCRIPT_NAME"
+# docker cp "$PYTHON_FILE" python:/app/"$SCRIPT_NAME"
 
 # Execute the Python file in the container
 if [ "$SAVE_LOG" = true ]; then

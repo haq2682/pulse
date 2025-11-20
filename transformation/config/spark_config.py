@@ -15,9 +15,7 @@ def create_spark_session():
         .config("spark.dynamicAllocation.initialExecutors", "1")
         .config(
             "spark.jars.packages",
-            "org.apache.hadoop:hadoop-aws:3.3.4,"
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,"
-            "org.postgresql:postgresql:42.5.0",
+            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
         )
         .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
         .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
