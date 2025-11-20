@@ -162,7 +162,7 @@ CREATE TABLE agg_marketing_campaigns (
     end_date DATE NULL,
     budget DOUBLE PRECISION NULL,
     spent_amount DOUBLE PRECISION NULL,
-    target_audience DOUBLE PRECISION NULL,
+    target_audience VARCHAR(100) NULL,
     campaign_duration_days INTEGER NULL,
     campaign_roi DOUBLE PRECISION NULL,
     click_through_rate DOUBLE PRECISION NULL,
@@ -807,15 +807,10 @@ CREATE TABLE agg_top_product_pairs (
 
 -- 27. agg_product_recommendations
 CREATE TABLE agg_product_recommendations (
-    -- Tier 1: Critical Fields
     product_a_id VARCHAR(255) PRIMARY KEY,
-    
-    -- Tier 2: Fields with Defaults
     recommendation_count BIGINT DEFAULT 0,
-    
-    -- Tier 3: Nullable Derived Fields
     product_a_name VARCHAR(500) NULL,
-    recommended_products TEXT[] NULL,
+    recommended_products TEXT NULL,
     avg_affinity_score DOUBLE PRECISION NULL
 );
 

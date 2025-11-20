@@ -22,59 +22,18 @@ def load_data_from_minio(spark, minio_client, bucket_name, table_names):
     import pandas as pd
     from io import BytesIO
     import time
-    
-    print(f"📂 Scanning bucket '{bucket_name}' for mapped files...")
-    
-    try:
-        objects = list(minio_client.list_objects(bucket_name, prefix="mapped_", recursive=True))
-        print(f"✅ Found {len(objects)} files")
-    except Exception as e:
-        print(f"❌ Error accessing MinIO: {e}")
-        return {}
-    
+
+    objects = minio_client.list_objects(bucket_name, prefix="mapped_", recursive=True)
     dataframes = {}
-    
-    for idx, obj in enumerate(objects, 1):
+    for obj in objects:
+        df = (
+            spark.read.option("header", "true")
+            .option("inferSchema", "true")
+            .csv(f"s3a://{bucket_name}/{obj.object_name}")
+        )
         object_name = obj.object_name.replace("mapped_", "").replace(".csv", "")
-        
-        # Filter if needed
-        if table_names and object_name not in table_names:
-            continue
-        
-        print(f"\n[{idx}/{len(objects)}] 📥 Downloading: {obj.object_name} ({obj.size / 1024:.2f} KB)")
-        
-        start_time = time.time()
-        
-        try:
-            # Download from MinIO
-            response = minio_client.get_object(bucket_name, obj.object_name)
-            data = response.read()
-            response.close()
-            response.release_conn()
-            
-            # Parse CSV with pandas
-            df_pandas = pd.read_csv(BytesIO(data))
-            
-            # Convert to Spark DataFrame
-            df_spark = spark.createDataFrame(df_pandas)
-            
-            load_time = time.time() - start_time
-            
-            dataframes[object_name] = df_spark
-            
-            print(f"   ✅ Loaded: {len(df_pandas):,} rows × {len(df_pandas.columns)} cols in {load_time:.2f}s")
-            print(f"   📊 Schema: {list(df_pandas.columns)[:5]}")
-            
-        except Exception as e:
-            print(f"   ❌ Error loading {obj.object_name}: {e}")
-            continue
-    
-    print(f"\n{'='*60}")
-    print(f"✅ Total tables loaded: {len(dataframes)}")
-    for name, df in dataframes.items():
-        print(f"   • {name}: {df.count():,} rows")
-    print(f"{'='*60}\n")
-    
+        dataframes[object_name] = df
+        print(f"Loaded {object_name} with {df.count()} rows")
     return dataframes
 
 
