@@ -166,7 +166,7 @@ def detect_gibberish_patterns(dataframes):
     print("🔍 DETECTING AND CLEANING GIBBERISH PATTERNS")
     print("="*60)
 
-    # 1. Clean postal/zip code columns
+    # 1. Clean postal/zip code columns - Relaxed for international formats
     postal_columns = {"customers": "postal_code", "suppliers": "zip_code"}
 
     for table, col_name in postal_columns.items():
@@ -178,9 +178,9 @@ def detect_gibberish_patterns(dataframes):
                     when(
                         # Check for characters outside of letters, numbers, space, and hyphen
                         (col(col_name).rlike(r"[^a-zA-Z0-9 -]")) 
-                        # Check for excessive length
+                        # Check for excessive length (permissive for international codes)
                         | (length(trim(col(col_name))) > 15) 
-                        # Check for repeating patterns
+                        # Check for repeating patterns (e.g., AAAA, 1111)
                         | (col(col_name).rlike(r"(.)\\1{3,}")), 
                         F.lit(None)
                     ).otherwise(col(col_name))
@@ -188,7 +188,28 @@ def detect_gibberish_patterns(dataframes):
                 dataframes[table] = df
                 print(f"✅ Cleaned {col_name} in {table}")
 
-    # 2. Clean state/province columns
+    # 2. Clean dimensions column in products - Updated for 2D/3D and 'x'/'*' separators
+    if "products" in dataframes:
+        df = dataframes["products"]
+        if "dimensions" in df.columns:
+            # Regex accepts:
+            # - Numeric/decimal values ([\d\.])
+            # - Separators 'x', 'X', or '*' ([xX*])
+            # - Optional second/third segment for 3D dimensions
+            dimension_pattern = r"^\s*[\d\.]+[xX*][\d\.]+(?:[xX*][\d\.]+)?\s*$"
+            
+            df = df.withColumn(
+                "dimensions",
+                when(
+                    # Only keep values that match the expected dimension format
+                    col("dimensions").rlike(dimension_pattern),
+                    trim(col("dimensions"))
+                ).otherwise(F.lit(None))
+            )
+            dataframes["products"] = df
+            print("✅ Cleaned dimensions in products (accepts 2D/3D with x or * separators)")
+
+    # 3. Clean state/province columns
     state_columns = {"customers": "state_province", "suppliers": "state"}
     
     for table, col_name in state_columns.items():
@@ -207,7 +228,7 @@ def detect_gibberish_patterns(dataframes):
                 dataframes[table] = df
                 print(f"✅ Cleaned {col_name} in {table}")
 
-    # 3. Clean city columns
+    # 4. Clean city columns
     city_columns = {"customers": "city", "suppliers": "city"}
     
     for table, col_name in city_columns.items():
@@ -226,7 +247,7 @@ def detect_gibberish_patterns(dataframes):
                 dataframes[table] = df
                 print(f"✅ Cleaned {col_name} in {table}")
 
-    # 4. Clean country columns
+    # 5. Clean country columns
     country_columns = {"customers": "country", "suppliers": "country"}
     
     for table, col_name in country_columns.items():
@@ -245,7 +266,7 @@ def detect_gibberish_patterns(dataframes):
                 dataframes[table] = df
                 print(f"✅ Cleaned {col_name} in {table}")
 
-    # 5. Clean SKU in products
+    # 6. Clean SKU in products
     if "products" in dataframes:
         df = dataframes["products"]
         if "sku" in df.columns:
@@ -261,7 +282,7 @@ def detect_gibberish_patterns(dataframes):
             dataframes["products"] = df
             print("✅ Cleaned SKU in products")
 
-    # 6. Validate status columns
+    # 7. Validate status columns
     status_validations = {
         "customers": {"account_status": ["Active", "Inactive", "Blocked", "Suspended"]},
         "marketing_campaigns": {"campaign_status": ["Active", "Paused", "Completed", "Draft"]},
@@ -283,7 +304,7 @@ def detect_gibberish_patterns(dataframes):
                     dataframes[table] = df
                     print(f"✅ Validated {col_name} in {table} (filtered {removed} invalid values)")
 
-    # 7. Validate gender
+    # 8. Validate gender
     if "customers" in dataframes:
         df = dataframes["customers"]
         if "gender" in df.columns:
@@ -292,7 +313,7 @@ def detect_gibberish_patterns(dataframes):
             dataframes["customers"] = df
             print("✅ Validated gender in customers")
 
-    # 8. Validate currency codes
+    # 9. Validate currency codes
     if "orders" in dataframes:
         df = dataframes["orders"]
         if "currency" in df.columns:
