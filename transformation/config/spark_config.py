@@ -4,10 +4,11 @@ from pyspark.sql import SparkSession
 
 findspark.init()
 
+
 def create_spark_session():
     return (
         SparkSession.builder.appName("Transformation")
-        .master("local[*]")
+        .master(os.getenv("SPARK_SERVER", "local[*]"))
         .config("spark.dynamicAllocation.enabled", "true")
         .config("spark.dynamicAllocation.minExecutors", "0")
         .config("spark.dynamicAllocation.maxExecutors", "8")

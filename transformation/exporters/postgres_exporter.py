@@ -33,6 +33,7 @@ TABLE_MAPPINGS = {
     "global_aggregations": "agg_global_aggregations",
 }
 
+
 def export_to_postgres(dataframes):
     conn = psycopg2.connect(
         host=os.getenv("POSTGRES_SERVER", "localhost"),
@@ -49,13 +50,21 @@ def export_to_postgres(dataframes):
         cursor.execute(f"TRUNCATE TABLE {table_name} CASCADE")
 
     print("\nLoading data to PostgreSQL...")
-    jdbc_url = f"jdbc:postgresql://{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5432')}/pulse"
+    jdbc_url = f"jdbc:postgresql://{os.getenv('POSTGRES_SERVER', 'localhost')}:{os.getenv('POSTGRES_PORT', '5432')}/pulse"
 
     try:
         for df_name, table_name in TABLE_MAPPINGS.items():
             if df_name in dataframes:
                 print(f"  Loading {table_name}...")
-                dataframes[df_name].write.format("jdbc").option("url", jdbc_url).option("dbtable", table_name).option("user", os.getenv("POSTGRES_USER")).option("password", os.getenv("POSTGRES_PASSWORD")).option("driver", "org.postgresql.Driver").mode("append").save()
+                dataframes[df_name].write.format("jdbc").option("url", jdbc_url).option(
+                    "dbtable", table_name
+                ).option("user", os.getenv("POSTGRES_USER")).option(
+                    "password", os.getenv("POSTGRES_PASSWORD")
+                ).option(
+                    "driver", "org.postgresql.Driver"
+                ).mode(
+                    "append"
+                ).save()
                 print(f"    ✓ Done")
         print("\n✅ All data loaded successfully!")
     except Exception as e:
