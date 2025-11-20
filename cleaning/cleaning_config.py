@@ -31,9 +31,7 @@ def create_spark_session():
         # S3A/MinIO JAR dependencies for PySpark 3.5.0
         .config(
             "spark.jars.packages",
-            "org.apache.hadoop:hadoop-aws:3.3.4,"
-            "com.amazonaws:aws-java-sdk-bundle:1.12.263,"
-            "org.postgresql:postgresql:42.5.0",
+            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
         )
         # S3A/MinIO configuration
         .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
