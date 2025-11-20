@@ -390,6 +390,94 @@ def clean_text_columns(dataframes):
     """
     Clean gibberish from text columns across all tables using linguistic analysis.
 
+    Args:
+        dataframes (dict): Dictionary of table names to DataFrames
+
+    Returns:
+        dict: Updated dictionary with cleaned text
+    """
+
+    def is_gibberish_text(text):
+        """Detect gibberish strings based on character ratios and patterns."""
+        if not text or len(str(text)) < 3:
+            return False
+
+        text = str(text).lower()
+
+        # Skip if text contains only alphanumeric (likely an ID/code)
+        if text.replace("_", "").replace("-", "").isalnum() and any(
+            c.isdigit() for c in text
+        ):
+            return False
+
+        vowels = len(re.findall(r"[aeiou]", text))
+        vowel_ratio = vowels / len(text)
+
+        # English text typically has 30-40% vowels
+        if vowel_ratio < 0.15 or vowel_ratio > 0.7:
+            return True
+
+        # Check for excessive consonant clusters (5+ in a row)
+        if re.search(r"[bcdfghjklmnpqrstvwxyz]{5,}", text):
+            return True
+
+        # Check for repeating patterns (same char 4+ times)
+        if re.search(r"(.)\1{3,}", text):
+            return True
+
+        return False
+
+    is_gibberish_udf = udf(is_gibberish_text, BooleanType())
+
+    print("\n" + "=" * 60)
+    print("📝 CLEANING TEXT COLUMNS FOR GIBBERISH")
+    print("=" * 60)
+
+    # Patterns to identify columns that should NOT be cleaned
+    skip_patterns = [
+        "id",
+        "key",
+        "sku",
+        "code",
+        "zip",
+        "postal",
+        "dimension",
+        "transaction",
+    ]
+
+    for table_name, df in dataframes.items():
+        print(f"\n🔍 Checking {table_name}...")
+
+        # Get string columns, excluding IDs and codes
+        string_cols = [
+            field.name
+            for field in df.schema.fields
+            if isinstance(field.dataType, StringType)
+            and not any(pattern in field.name.lower() for pattern in skip_patterns)
+        ]
+
+        for col_name in string_cols:
+            gibberish_count = df.filter(is_gibberish_udf(col(col_name))).count()
+
+            if gibberish_count > 0:
+                df = df.withColumn(
+                    col_name,
+                    when(is_gibberish_udf(col(col_name)), F.lit(None)).otherwise(
+                        col(col_name)
+                    ),
+                )
+                print(f"  ✅ Fixed {gibberish_count} gibberish values in {col_name}")
+
+        dataframes[table_name] = df
+
+    print("\n" + "=" * 60)
+    print("✅ TEXT CLEANING COMPLETED")
+    print("=" * 60)
+
+    return dataframes
+    """
+    Clean gibberish from text columns across all tables using linguistic analysis.
+
     Uses a UDF to detect gibberish based on:
     - Vowel-to-consonant ratios
     - Excessive consonant clusters
