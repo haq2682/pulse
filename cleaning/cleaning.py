@@ -73,7 +73,7 @@ def main():
     ]
 
     dataframes = load_data_from_minio(spark, minio_client, bucket_name, table_names)
-    print(f"✅ Loaded {len(dataframes)} tables")
+    # print(f"✅ Loaded {len(dataframes)} tables")
 
     # 2a. Clean ID columns with regex
     print("\n🔌 Step 2a: Cleaning ID columns with regex extraction...")
@@ -146,7 +146,6 @@ def main():
     # 14. Clean text columns for gibberish using linguistic analysis
     print("\n📌 Step 14: Cleaning text columns with linguistic analysis...")
     dataframes = clean_text_columns(dataframes)
-
     # 15. Clean numeric strings (IDs, status codes, validation)
     print("\n📌 Step 15: Cleaning numeric strings...")
     dataframes = clean_numeric_strings(dataframes)
@@ -154,22 +153,18 @@ def main():
     # 16. Clean whitespace and formatting issues
     print("\n📌 Step 16: Cleaning whitespace and formatting...")
     dataframes = clean_whitespace_issues(dataframes)
-
     # 17. Clean mixed scripts and non-ASCII characters
     print("\n📌 Step 17: Cleaning mixed scripts and non-ASCII characters...")
     dataframes = clean_mixed_scripts(dataframes)
-
     # 18. Final data validation
     print("\n📌 Step 18: Running final data validation...")
     dataframes = validate_all_cleaned_data(dataframes)
-
     # 19. Display summary
     print("\n📌 Step 19: Generating summary...")
     display_summary(dataframes)
-
     # 20. Save cleaned data
     print("\n📌 Step 20: Saving cleaned data to MinIO...")
-    save_data_to_minio(dataframes, minio_client, bucket_name)
+    # save_data_to_minio(dataframes, minio_client, bucket_name)
 
     # 21. Stop Spark session
     print("\n📌 Step 21: Stopping Spark session...")

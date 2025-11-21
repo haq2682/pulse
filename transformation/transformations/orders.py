@@ -1,17 +1,28 @@
 from pyspark.sql.functions import *
 from pyspark.sql.window import Window
 
+
 def transform_orders(dataframes):
     placed_timestamp = to_timestamp(col("order_placed_at"))
     shipped_timestamp = to_timestamp(col("order_shipped_at"))
     delivered_timestamp = to_timestamp(col("order_delivered_at"))
 
+    # FIX: Aggregate order_items per order to avoid duplicates
+    order_items_agg = (
+        dataframes["order_items"]
+        .groupBy("order_id")
+        .agg(
+            sum(col("product_cost") * col("quantity")).alias("total_product_cost"),
+            sum("quantity").alias("total_quantity"),
+        )
+    )
+
     dataframes["orders"] = (
         dataframes["orders"]
         .join(
-            dataframes["order_items"].select("order_id", "product_cost", "quantity"),
+            order_items_agg,  # Use aggregated data instead
             "order_id",
-            "inner",
+            "left",  # Changed to left join to keep orders without items
         )
         .withColumns(
             {
@@ -25,13 +36,16 @@ def transform_orders(dataframes):
                     col("order_placed_at").isNotNull(), quarter(col("order_placed_at"))
                 ),
                 "order_placed_day_of_week": when(
-                    col("order_placed_at").isNotNull(), dayofweek(col("order_placed_at"))
+                    col("order_placed_at").isNotNull(),
+                    dayofweek(col("order_placed_at")),
                 ),
                 "order_placed_week_of_year": when(
-                    col("order_placed_at").isNotNull(), weekofyear(col("order_placed_at"))
+                    col("order_placed_at").isNotNull(),
+                    weekofyear(col("order_placed_at")),
                 ),
                 "order_placed_day_of_month": when(
-                    col("order_placed_at").isNotNull(), dayofmonth(col("order_placed_at"))
+                    col("order_placed_at").isNotNull(),
+                    dayofmonth(col("order_placed_at")),
                 ),
                 "order_shipped_year": when(
                     col("order_shipped_at").isNotNull(), year(col("order_shipped_at"))
@@ -40,22 +54,28 @@ def transform_orders(dataframes):
                     col("order_shipped_at").isNotNull(), month(col("order_shipped_at"))
                 ),
                 "order_shipped_quarter": when(
-                    col("order_shipped_at").isNotNull(), quarter(col("order_shipped_at"))
+                    col("order_shipped_at").isNotNull(),
+                    quarter(col("order_shipped_at")),
                 ),
                 "order_shipped_day_of_week": when(
-                    col("order_shipped_at").isNotNull(), dayofweek(col("order_shipped_at"))
+                    col("order_shipped_at").isNotNull(),
+                    dayofweek(col("order_shipped_at")),
                 ),
                 "order_shipped_week_of_year": when(
-                    col("order_shipped_at").isNotNull(), weekofyear(col("order_shipped_at"))
+                    col("order_shipped_at").isNotNull(),
+                    weekofyear(col("order_shipped_at")),
                 ),
                 "order_shipped_day_of_month": when(
-                    col("order_shipped_at").isNotNull(), dayofmonth(col("order_shipped_at"))
+                    col("order_shipped_at").isNotNull(),
+                    dayofmonth(col("order_shipped_at")),
                 ),
                 "order_delivered_year": when(
-                    col("order_delivered_at").isNotNull(), year(col("order_delivered_at"))
+                    col("order_delivered_at").isNotNull(),
+                    year(col("order_delivered_at")),
                 ),
                 "order_delivered_month": when(
-                    col("order_delivered_at").isNotNull(), month(col("order_delivered_at"))
+                    col("order_delivered_at").isNotNull(),
+                    month(col("order_delivered_at")),
                 ),
                 "order_delivered_quarter": when(
                     col("order_delivered_at").isNotNull(),
@@ -117,11 +137,15 @@ def transform_orders(dataframes):
                 ),
                 "order_processing_months_diff": when(
                     placed_timestamp.isNotNull() & shipped_timestamp.isNotNull(),
-                    greatest(datediff(shipped_timestamp, placed_timestamp) / 30, lit(0)),
+                    greatest(
+                        datediff(shipped_timestamp, placed_timestamp) / 30, lit(0)
+                    ),
                 ),
                 "order_processing_years_diff": when(
                     placed_timestamp.isNotNull() & shipped_timestamp.isNotNull(),
-                    greatest(datediff(shipped_timestamp, placed_timestamp) / 365, lit(0)),
+                    greatest(
+                        datediff(shipped_timestamp, placed_timestamp) / 365, lit(0)
+                    ),
                 ),
                 "delivery_seconds_diff": when(
                     shipped_timestamp.isNotNull() & delivered_timestamp.isNotNull(),
@@ -163,11 +187,15 @@ def transform_orders(dataframes):
                 ),
                 "delivery_weeks_diff": when(
                     shipped_timestamp.isNotNull() & delivered_timestamp.isNotNull(),
-                    greatest(datediff(delivered_timestamp, shipped_timestamp) / 7, lit(0)),
+                    greatest(
+                        datediff(delivered_timestamp, shipped_timestamp) / 7, lit(0)
+                    ),
                 ),
                 "delivery_months_diff": when(
                     shipped_timestamp.isNotNull() & delivered_timestamp.isNotNull(),
-                    greatest(datediff(delivered_timestamp, shipped_timestamp) / 30, lit(0)),
+                    greatest(
+                        datediff(delivered_timestamp, shipped_timestamp) / 30, lit(0)
+                    ),
                 ),
                 "delivery_years_diff": when(
                     shipped_timestamp.isNotNull() & delivered_timestamp.isNotNull(),
@@ -212,12 +240,10 @@ def transform_orders(dataframes):
                 ),
                 "order_profit": when(
                     col("subtotal").isNotNull()
-                    & col("product_cost").isNotNull()
-                    & col("quantity").isNotNull()
+                    & col("total_product_cost").isNotNull()  # Changed reference
                     & (col("subtotal") != 0)
-                    & (col("quantity") != 0)
-                    & (col("product_cost") != 0),
-                    col("subtotal") - (col("product_cost") * col("quantity")),
+                    & (col("total_product_cost") != 0),
+                    col("subtotal") - col("total_product_cost"),  # Use aggregated cost
                 ),
                 "net_revenue": when(
                     col("total_amount").isNotNull()
@@ -244,22 +270,27 @@ def transform_orders(dataframes):
                 ),
                 "average_item_value": when(
                     col("subtotal").isNotNull()
-                    & col("quantity").isNotNull()
+                    & col("total_quantity").isNotNull()  # Changed reference
                     & (col("subtotal") != 0)
-                    & (col("quantity") != 0),
-                    col("subtotal") / col("quantity"),
+                    & (col("total_quantity") != 0),
+                    col("subtotal") / col("total_quantity"),  # Use aggregated quantity
                 ),
                 "cost_per_item": when(
-                    col("product_cost").isNotNull()
-                    & col("quantity").isNotNull()
-                    & (col("product_cost") != 0)
-                    & (col("quantity") != 0),
-                    col("product_cost") / col("quantity"),
+                    col("total_product_cost").isNotNull()  # Changed reference
+                    & col("total_quantity").isNotNull()  # Changed reference
+                    & (col("total_product_cost") != 0)
+                    & (col("total_quantity") != 0),
+                    col("total_product_cost")
+                    / col("total_quantity"),  # Use aggregated values
                 ),
                 "order_size_category": when(
-                    col("quantity").isNotNull() & (col("quantity") != 0),
-                    when(col("quantity") < 3, "Small")
-                    .when((col("quantity") >= 3) & (col("quantity") < 7), "Medium")
+                    col("total_quantity").isNotNull()
+                    & (col("total_quantity") != 0),  # Changed reference
+                    when(col("total_quantity") < 3, "Small")
+                    .when(
+                        (col("total_quantity") >= 3) & (col("total_quantity") < 7),
+                        "Medium",
+                    )
                     .otherwise("Large"),
                 ),
                 "season": when(
@@ -271,5 +302,5 @@ def transform_orders(dataframes):
                 ),
             }
         )
-        .drop("product_cost", "quantity")
+        .drop("total_product_cost", "total_quantity")  # Clean up temporary columns
     )

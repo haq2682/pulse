@@ -189,21 +189,19 @@ def validate_dates_and_timestamps(dataframes):
     return dataframes
 
 
-def detect_gibberish_patterns(dataframes):
+def detect_gibberish_patterns():
     """
-    Clean specific columns with known gibberish or invalid data patterns.
-
-    Args:
-        dataframes (dict): Dictionary of table names to DataFrames
-
-    Returns:
-        dict: Updated dictionary
+    Cleans specific columns with known gibberish or invalid data patterns 
+    (like postal codes, dimensions, or status columns) across all tables.
+    Invalid values are replaced with lit(NULL) (represented by F.lit(None)).
     """
+
     print("\n" + "=" * 60)
-    print("🔍 DETECTING AND CLEANING GIBBERISH PATTERNS")
+    print("🔍 DETECTING AND CLEANING GIBBERISH PATTERNS (Specific Columns)")
     print("=" * 60)
 
-    # 1. Clean postal/zip code columns - Relaxed for international formats
+    # 1. Clean postal/zip code columns - Relaxed for international formats (Issue 2)
+    # Replaced 'Unknown' with lit(NULL) (Issue 1)
     postal_columns = {"customers": "postal_code", "suppliers": "zip_code"}
 
     for table, col_name in postal_columns.items():
@@ -214,182 +212,127 @@ def detect_gibberish_patterns(dataframes):
                     col_name,
                     when(
                         # Check for characters outside of letters, numbers, space, and hyphen
-                        (col(col_name).rlike(r"[^a-zA-Z0-9 -]"))
+                        (col(col_name).rlike(r"[^a-zA-Z0-9 -]")) 
                         # Check for excessive length (permissive for international codes)
-                        | (length(trim(col(col_name))) > 15)
+                        | (length(trim(col(col_name))) > 15) 
                         # Check for repeating patterns (e.g., AAAA, 1111)
-                        | (col(col_name).rlike(r"(.)\\1{3,}")),
-                        F.lit(None),
-                    ).otherwise(col(col_name)),
+                        | (col(col_name).rlike(r"(.)\1{3,}")), 
+                        F.lit(None),  # Replace with lit(NULL)
+                    ).otherwise(trim(col(col_name))),
                 )
                 dataframes[table] = df
-                print(f"✅ Cleaned {col_name} in {table}")
+                print(f"✅ Cleaned {col_name} in {table} (using flexible international check)")
 
-    # 2. Clean dimensions column in products - Updated for 2D/3D and 'x'/'*' separators
+    # 2. Clean dimensions column in products - Updated for 2D/3D and 'x'/'*' separators (Issue 3)
+    # Replaced 'Unknown' with lit(NULL) (Issue 1)
     if "products" in dataframes:
         df = dataframes["products"]
         if "dimensions" in df.columns:
             # Regex accepts:
             # - Numeric/decimal values ([\d\.])
             # - Separators 'x', 'X', or '*' ([xX*])
-            # - Optional second/third segment for 3D dimensions
+            # - Optional second segment for 3D/3-part dimensions ((?:[xX*][\d\.]+)?\s*$)
             dimension_pattern = r"^\s*[\d\.]+[xX*][\d\.]+(?:[xX*][\d\.]+)?\s*$"
-
+            
             df = df.withColumn(
                 "dimensions",
                 when(
                     # Only keep values that match the expected dimension format
                     col("dimensions").rlike(dimension_pattern),
-                    trim(col("dimensions")),
-                ).otherwise(F.lit(None)),
+                    trim(col("dimensions"))
+                ).otherwise(F.lit(None)), # Replace with lit(NULL)
             )
             dataframes["products"] = df
-            print(
-                "✅ Cleaned dimensions in products (accepts 2D/3D with x or * separators)"
-            )
+            print("✅ Cleaned dimensions in products (Updated to accept 2D/3D and '*/x')")
 
-    # 3. Clean state/province columns
-    state_columns = {"customers": "state_province", "suppliers": "state"}
-
-    for table, col_name in state_columns.items():
+    # 3. Clean state/province columns - Generic check for gibberish/non-alpha characters
+    for table, col_name in {"customers": "state_province", "suppliers": "state"}.items():
         if table in dataframes:
             df = dataframes[table]
             if col_name in df.columns:
                 df = df.withColumn(
                     col_name,
                     when(
-                        (col(col_name).rlike(r"[^a-zA-Z ]"))
-                        | (length(trim(col(col_name))) > 50)
-                        | (col(col_name).rlike(r"(.)\\1{3,}")),
-                        F.lit(None),
+                        col(col_name).rlike(r".*[*@#$%^&].*"), 
+                        F.lit(None) # Replace with lit(NULL)
                     ).otherwise(col(col_name)),
                 )
                 dataframes[table] = df
-                print(f"✅ Cleaned {col_name} in {table}")
+                print(f"✅ Cleaned {col_name} in {table} (special chars check)")
 
-    # 4. Clean city columns
-    city_columns = {"customers": "city", "suppliers": "city"}
-
-    for table, col_name in city_columns.items():
-        if table in dataframes:
-            df = dataframes[table]
-            if col_name in df.columns:
-                df = df.withColumn(
-                    col_name,
-                    when(
-                        (col(col_name).rlike(r"[^a-zA-Z -]"))
-                        | (length(trim(col(col_name))) > 100)
-                        | (col(col_name).rlike(r"(.)\\1{4,}")),
-                        F.lit(None),
-                    ).otherwise(col(col_name)),
-                )
-                dataframes[table] = df
-                print(f"✅ Cleaned {col_name} in {table}")
-
-    # 5. Clean country columns
-    country_columns = {"customers": "country", "suppliers": "country"}
-
-    for table, col_name in country_columns.items():
-        if table in dataframes:
-            df = dataframes[table]
-            if col_name in df.columns:
-                df = df.withColumn(
-                    col_name,
-                    when(
-                        (col(col_name).rlike(r"[^a-zA-Z. ]"))
-                        | (length(trim(col(col_name))) > 60)
-                        | (col(col_name).rlike(r"(.)\\1{3,}")),
-                        F.lit(None),
-                    ).otherwise(col(col_name)),
-                )
-                dataframes[table] = df
-                print(f"✅ Cleaned {col_name} in {table}")
-
-    # 6. Clean SKU in products
-    if "products" in dataframes:
-        df = dataframes["products"]
-        if "sku" in df.columns:
+    # 4. Clean city columns - Generic check for gibberish/numbers in city names
+    for table in dataframes.keys():
+        df = dataframes[table]
+        if "city" in df.columns:
             df = df.withColumn(
-                "sku",
+                "city",
                 when(
-                    (col("sku").rlike(r"[^a-zA-Z0-9-]"))
-                    | (length(trim(col("sku"))) > 50)
-                    | (col("sku").rlike(r"(.)\\1{4,}")),
-                    F.lit(None),
-                ).otherwise(col("sku")),
+                    col("city").rlike(r".*[*@#$%^&0-9].*"), # Special chars or numbers
+                    F.lit(None), # Replace with lit(NULL)
+                ).otherwise(col("city")),
             )
-            dataframes["products"] = df
-            print("✅ Cleaned SKU in products")
+            dataframes[table] = df
+            print(f"✅ Cleaned city in {table} (special chars/numbers check)")
 
-    # 7. Validate status columns
-    status_validations = {
-        "customers": {"account_status": ["Active", "Inactive", "Blocked", "Suspended"]},
-        "marketing_campaigns": {
-            "campaign_status": ["Active", "Paused", "Completed", "Draft"]
-        },
-        "orders": {
-            "order_status": [
-                "Pending",
-                "Processing",
-                "Shipped",
-                "Delivered",
-                "Cancelled",
-                "Returned",
-            ]
-        },
-        "payments": {
-            "payment_status": [
-                "Pending",
-                "Completed",
-                "Failed",
-                "Refunded",
-                "Partially Refunded",
-            ]
-        },
-        "shopping_cart": {"cart_status": ["Active", "Abandoned", "Converted", "Saved"]},
-        "suppliers": {"supplier_status": ["Active", "Inactive", "Suspended"]},
+    # 5. Clean country columns - Generic check for gibberish/numbers in country names
+    for table in dataframes.keys():
+        df = dataframes[table]
+        if "country" in df.columns:
+            df = df.withColumn(
+                "country",
+                when(
+                    col("country").rlike(r".*[*@#$%^&0-9].*"), # Special chars or numbers
+                    F.lit(None), # Replace with lit(NULL)
+                ).otherwise(col("country")),
+            )
+            dataframes[table] = df
+            print(f"✅ Cleaned country in {table} (special chars/numbers check)")
+
+    # 6. Validate status-type columns (e.g., order_status, account_status)
+    status_columns = {
+        "customers": ["account_status"],
+        "orders": ["order_status", "delivery_status"],
+        "payments": ["payment_status"],
+        "suppliers": ["supplier_status"],
+        "shopping_cart": ["cart_status"],
+        "marketing_campaigns": ["campaign_status"],
     }
+    
+    valid_statuses = [
+        "Active", "Inactive", "Pending", 
+        "Shipped", "Delivered", "Cancelled", 
+        "Completed", "Failed", "Success", 
+        "Open", "Closed"
+    ]
 
-    for table, validations in status_validations.items():
+    for table, cols in status_columns.items():
         if table in dataframes:
             df = dataframes[table]
-            for col_name, valid_values in validations.items():
+            for col_name in cols:
                 if col_name in df.columns:
-                    before_count = df.count()
-                    df = df.filter(col(col_name).isin(valid_values))
-                    after_count = df.count()
-                    removed = before_count - after_count
-                    dataframes[table] = df
-                    print(
-                        f"✅ Validated {col_name} in {table} (filtered {removed} invalid values)"
+                    df = df.withColumn(
+                        col_name,
+                        when(
+                            (col(col_name).isNull()) | (col(col_name).isin(valid_statuses)),
+                            col(col_name)
+                        ).otherwise(F.lit(None)) # Replace invalid status with lit(NULL)
                     )
+                    dataframes[table] = df
+                    print(f"✅ Cleaned {col_name} in {table} (status check)")
 
-    # 8. Validate gender
-    if "customers" in dataframes:
+    # 7. Validate gender column
+    if "customers" in dataframes and "gender" in dataframes["customers"].columns:
         df = dataframes["customers"]
-        if "gender" in df.columns:
-            valid_genders = ["Male", "Female", "Other", "Prefer not to say", "Unknown"]
-            df = df.filter(col("gender").isin(valid_genders))
-            dataframes["customers"] = df
-            print("✅ Validated gender in customers")
-
-    # 9. Validate currency codes
-    if "orders" in dataframes:
-        df = dataframes["orders"]
-        if "currency" in df.columns:
-            valid_currencies = [
-                "USD",
-                "EUR",
-                "GBP",
-                "CAD",
-                "AUD",
-                "JPY",
-                "INR",
-                "Unknown",
-            ]
-            df = df.filter(col("currency").isin(valid_currencies))
-            dataframes["orders"] = df
-            print("✅ Validated currency codes in orders")
+        valid_genders = ["Male", "Female", "Other", "Prefer Not to Say", "X"]
+        df = df.withColumn(
+            "gender",
+            when(
+                (col("gender").isNull()) | (col("gender").isin(valid_genders)),
+                col("gender")
+            ).otherwise(F.lit(None)) # Replace invalid gender with lit(NULL)
+        )
+        dataframes["customers"] = df
+        print("✅ Cleaned gender in customers (gender check)")
 
     print("=" * 60)
     print("✅ PATTERN DETECTION COMPLETED")
