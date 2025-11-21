@@ -44,7 +44,17 @@ echo "=== Phase 4: Setup Kafka ==="
 echo "Setting up Kafka..."
 ./bash/setup_kafka.sh
 
-echo "=== Phase 5: Start Worker ==="
+# Phase 5: Start FastAPI Backend
+echo "=== Phase 5: Starting FastAPI Backend ==="
+echo "Starting FastAPI backend..."
+docker compose up -d api
+
+# Phase 6: Start React Frontend
+echo "=== Phase 6: Starting React Frontend ==="
+echo "Starting React frontend..."
+docker compose up -d frontend
+
+echo "=== Phase 7: Start Worker ==="
 echo "Starting Spark Worker 1..."
 ./bash/start_worker.sh
 echo "Starting Spark Worker 2..."

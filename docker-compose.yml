@@ -1,9 +1,73 @@
 services:
+  frontend:
+    build:
+      context: .
+      dockerfile: .docker/frontend/Dockerfile
+    container_name: frontend
+    env_file:
+      - .env
+    environment:
+      - REACT_APP_POSTGRES_USER=${POSTGRES_USER}
+      - REACT_APP_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - REACT_APP_POSTGRES_DB=${POSTGRES_DATABASE_NAME}
+      - REACT_APP_POSTGRES_SERVER=${POSTGRES_SERVER}
+      - REACT_APP_MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - REACT_APP_MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - REACT_APP_MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - REACT_APP_KAFKA_BOOTSTRAP=${KAFKA_BOOTSTRAP_EXTERNAL}
+      - CHOKIDAR_USEPOLLING=true
+      - FAST_REFRESH=false
+      - WATCHPACK_POLLING=true
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.8
+    restart: always
+  
+  api:
+    build:
+      context: .
+      dockerfile: .docker/api/Dockerfile
+    container_name: api
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DATABASE_NAME}
+      - POSTGRES_SERVER=${POSTGRES_SERVER}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - KAFKA_BOOTSTRAP=${KAFKA_BOOTSTRAP}
+      - KAFKA_BOOTSTRAP_EXTERNAL=${KAFKA_BOOTSTRAP_EXTERNAL}
+    depends_on:
+      - postgresql
+      - python
+      - minio
+    volumes:
+      - ./api:/app
+      - ./cleaning:/app/cleaning
+      - ./mapping:/app/mapping
+      - ./transformation:/app/transformation
+    ports:
+      - "8000:8000"
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.9
+    restart: always
   python:
     build:
       context: .
       dockerfile: .docker/python/Dockerfile
     container_name: python
+    image: python-py310
     env_file:
       - .env
     environment:
