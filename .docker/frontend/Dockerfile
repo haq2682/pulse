@@ -8,9 +8,9 @@ RUN npm install
 
 COPY ./frontend/ ./
 
-EXPOSE 3000
+EXPOSE 5173
 
-CMD ["npm", "start"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 # FROM nginx:stable-alpine
 # COPY --from=build /app/build /usr/share/nginx/html
