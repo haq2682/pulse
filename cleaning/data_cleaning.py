@@ -200,15 +200,6 @@ def fill_null_values(dataframes):
             {"last_restocked_date": "1900-01-01"}
         )
 
-    if "wishlist" in dataframes.keys():
-        dataframes["wishlist"] = dataframes["wishlist"].fillna(
-            {
-                "added_date": "1900-01-01",
-                "purchased_date": "1900-01-01",
-                "removed_date": "1900-01-01",
-            }
-        )
-
     if "shopping_cart" in dataframes.keys():
         dataframes["shopping_cart"] = dataframes["shopping_cart"].fillna(
             {"added_date": "1900-01-01", "cart_status": "Unknown"}
@@ -220,8 +211,6 @@ def fill_null_values(dataframes):
                 "order_status": "Unknown",
                 "currency": "Unknown",
                 "order_placed_at": "1900-01-01",
-                "order_shipped_at": "1900-01-01",
-                "order_delivered_at": "1900-01-01",
             }
         )
 
@@ -232,7 +221,6 @@ def fill_null_values(dataframes):
                 "payment_provider": "Unknown",
                 "payment_status": "Unknown",
                 "transaction_id": "Unknown",
-                "refund_date": "1900-01-01",
                 "payment_date": "1900-01-01",
             }
         )
@@ -252,7 +240,6 @@ def fill_null_values(dataframes):
                 "campaign_name": "Unknown",
                 "campaign_type": "Unknown",
                 "start_date": "1900-01-01",
-                "end_date": "1900-01-01",
                 "target_audience": "Unknown",
                 "campaign_status": "Unknown",
             }
