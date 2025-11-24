@@ -262,6 +262,11 @@ CREATE TABLE agg_orders (
     total_order_fulfillment_time_weeks DOUBLE PRECISION NULL,
     total_order_fulfillment_time_months DOUBLE PRECISION NULL,
     total_order_fulfillment_time_years DOUBLE PRECISION NULL,
+    total_product_cost DOUBLE PRECISION DEFAULT 0,
+    total_quantity INTEGER DEFAULT 0,
+    avg_product_cost DOUBLE PRECISION DEFAULT 0,
+    max_item_discount DOUBLE PRECISION DEFAULT 0,
+    unique_products_ordered INTEGER DEFAULT 0,
     order_profit DOUBLE PRECISION NULL,
     net_revenue DOUBLE PRECISION NULL,
     net_profit DOUBLE PRECISION NULL,
@@ -410,9 +415,9 @@ CREATE TABLE agg_suppliers (
     contract_start_date DATE NULL,
     contract_end_date DATE NULL,
     city VARCHAR(255) NULL,
-    state DOUBLE PRECISION NULL,
-    zip_code DOUBLE PRECISION NULL,
-    country DOUBLE PRECISION NULL,
+    state VARCHAR(255) NULL,
+    zip_code VARCHAR(255) NULL,
+    country VARCHAR(255) NULL,
     total_revenue_generated DOUBLE PRECISION NULL,
     avg_profit_margin DOUBLE PRECISION NULL,
     avg_product_rating DOUBLE PRECISION NULL,
@@ -474,7 +479,11 @@ CREATE TABLE agg_categories (
     category_popularity_score DOUBLE PRECISION NULL,
     product_diversity_index DOUBLE PRECISION NULL,
     avg_orders_per_product DOUBLE PRECISION NULL,
-    peak_season DOUBLE PRECISION NULL
+    peak_season DOUBLE PRECISION NULL,
+    seasonal_index_fall DOUBLE PRECISION NULL,
+    seasonal_index_winter DOUBLE PRECISION NULL,
+    seasonal_index_spring DOUBLE PRECISION NULL,
+    seasonal_index_summer DOUBLE PRECISION NULL
 );
 
 -- 14. agg_daily_aggregations
