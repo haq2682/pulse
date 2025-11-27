@@ -189,9 +189,9 @@ def validate_dates_and_timestamps(dataframes):
     return dataframes
 
 
-def detect_gibberish_patterns():
+def detect_gibberish_patterns(dataframes):
     """
-    Cleans specific columns with known gibberish or invalid data patterns 
+    Cleans specific columns with known gibberish or invalid data patterns
     (like postal codes, dimensions, or status columns) across all tables.
     Invalid values are replaced with lit(NULL) (represented by F.lit(None)).
     """
@@ -212,16 +212,18 @@ def detect_gibberish_patterns():
                     col_name,
                     when(
                         # Check for characters outside of letters, numbers, space, and hyphen
-                        (col(col_name).rlike(r"[^a-zA-Z0-9 -]")) 
+                        (col(col_name).rlike(r"[^a-zA-Z0-9 -]"))
                         # Check for excessive length (permissive for international codes)
-                        | (length(trim(col(col_name))) > 15) 
+                        | (length(trim(col(col_name))) > 15)
                         # Check for repeating patterns (e.g., AAAA, 1111)
-                        | (col(col_name).rlike(r"(.)\1{3,}")), 
+                        | (col(col_name).rlike(r"(.)\1{3,}")),
                         F.lit(None),  # Replace with lit(NULL)
                     ).otherwise(trim(col(col_name))),
                 )
                 dataframes[table] = df
-                print(f"✅ Cleaned {col_name} in {table} (using flexible international check)")
+                print(
+                    f"✅ Cleaned {col_name} in {table} (using flexible international check)"
+                )
 
     # 2. Clean dimensions column in products - Updated for 2D/3D and 'x'/'*' separators (Issue 3)
     # Replaced 'Unknown' with lit(NULL) (Issue 1)
@@ -233,28 +235,35 @@ def detect_gibberish_patterns():
             # - Separators 'x', 'X', or '*' ([xX*])
             # - Optional second segment for 3D/3-part dimensions ((?:[xX*][\d\.]+)?\s*$)
             dimension_pattern = r"^\s*[\d\.]+[xX*][\d\.]+(?:[xX*][\d\.]+)?\s*$"
-            
+
             df = df.withColumn(
                 "dimensions",
                 when(
                     # Only keep values that match the expected dimension format
                     col("dimensions").rlike(dimension_pattern),
-                    trim(col("dimensions"))
-                ).otherwise(F.lit(None)), # Replace with lit(NULL)
+                    trim(col("dimensions")),
+                ).otherwise(
+                    F.lit(None)
+                ),  # Replace with lit(NULL)
             )
             dataframes["products"] = df
-            print("✅ Cleaned dimensions in products (Updated to accept 2D/3D and '*/x')")
+            print(
+                "✅ Cleaned dimensions in products (Updated to accept 2D/3D and '*/x')"
+            )
 
     # 3. Clean state/province columns - Generic check for gibberish/non-alpha characters
-    for table, col_name in {"customers": "state_province", "suppliers": "state"}.items():
+    for table, col_name in {
+        "customers": "state_province",
+        "suppliers": "state",
+    }.items():
         if table in dataframes:
             df = dataframes[table]
             if col_name in df.columns:
                 df = df.withColumn(
                     col_name,
                     when(
-                        col(col_name).rlike(r".*[*@#$%^&].*"), 
-                        F.lit(None) # Replace with lit(NULL)
+                        col(col_name).rlike(r".*[*@#$%^&].*"),
+                        F.lit(None),  # Replace with lit(NULL)
                     ).otherwise(col(col_name)),
                 )
                 dataframes[table] = df
@@ -267,8 +276,8 @@ def detect_gibberish_patterns():
             df = df.withColumn(
                 "city",
                 when(
-                    col("city").rlike(r".*[*@#$%^&0-9].*"), # Special chars or numbers
-                    F.lit(None), # Replace with lit(NULL)
+                    col("city").rlike(r".*[*@#$%^&0-9].*"),  # Special chars or numbers
+                    F.lit(None),  # Replace with lit(NULL)
                 ).otherwise(col("city")),
             )
             dataframes[table] = df
@@ -281,8 +290,10 @@ def detect_gibberish_patterns():
             df = df.withColumn(
                 "country",
                 when(
-                    col("country").rlike(r".*[*@#$%^&0-9].*"), # Special chars or numbers
-                    F.lit(None), # Replace with lit(NULL)
+                    col("country").rlike(
+                        r".*[*@#$%^&0-9].*"
+                    ),  # Special chars or numbers
+                    F.lit(None),  # Replace with lit(NULL)
                 ).otherwise(col("country")),
             )
             dataframes[table] = df
@@ -297,12 +308,19 @@ def detect_gibberish_patterns():
         "shopping_cart": ["cart_status"],
         "marketing_campaigns": ["campaign_status"],
     }
-    
+
     valid_statuses = [
-        "Active", "Inactive", "Pending", 
-        "Shipped", "Delivered", "Cancelled", 
-        "Completed", "Failed", "Success", 
-        "Open", "Closed"
+        "Active",
+        "Inactive",
+        "Pending",
+        "Shipped",
+        "Delivered",
+        "Cancelled",
+        "Completed",
+        "Failed",
+        "Success",
+        "Open",
+        "Closed",
     ]
 
     for table, cols in status_columns.items():
@@ -313,9 +331,12 @@ def detect_gibberish_patterns():
                     df = df.withColumn(
                         col_name,
                         when(
-                            (col(col_name).isNull()) | (col(col_name).isin(valid_statuses)),
-                            col(col_name)
-                        ).otherwise(F.lit(None)) # Replace invalid status with lit(NULL)
+                            (col(col_name).isNull())
+                            | (col(col_name).isin(valid_statuses)),
+                            col(col_name),
+                        ).otherwise(
+                            F.lit(None)
+                        ),  # Replace invalid status with lit(NULL)
                     )
                     dataframes[table] = df
                     print(f"✅ Cleaned {col_name} in {table} (status check)")
@@ -328,8 +349,10 @@ def detect_gibberish_patterns():
             "gender",
             when(
                 (col("gender").isNull()) | (col("gender").isin(valid_genders)),
-                col("gender")
-            ).otherwise(F.lit(None)) # Replace invalid gender with lit(NULL)
+                col("gender"),
+            ).otherwise(
+                F.lit(None)
+            ),  # Replace invalid gender with lit(NULL)
         )
         dataframes["customers"] = df
         print("✅ Cleaned gender in customers (gender check)")
