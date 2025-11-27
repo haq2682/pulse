@@ -45,13 +45,6 @@ echo "Setting up Kafka..."
 sleep 30
 ./bash/setup_kafka.sh
 
-echo "=== Phase 5: Start Worker ==="
-echo "Starting Spark Worker 1..."
-./bash/start_worker_linux.sh
-sleep 10
-echo "Starting Spark Worker 2..."
-./bash/start_worker_linux.sh
-
 # Phase 5: Start FastAPI Backend
 echo "=== Phase 5: Starting FastAPI Backend ==="
 echo "Starting FastAPI backend..."
