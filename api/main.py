@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 origins = [
-    "http://localhost:3000",
+    "http://localhost:5173",
 ]
 
 app = FastAPI()
@@ -20,4 +20,4 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return "Changes Made"
+    return {"client": "FastAPI", "message": "Hello from FastAPI!"}

@@ -143,12 +143,12 @@ def fill_null_values(dataframes):
     if "customers" in dataframes.keys():
         dataframes["customers"] = dataframes["customers"].fillna(
             {
-                "gender": "Unknown",
-                "account_status": "Unknown",
-                "city": "Unknown",
-                "state_province": "Unknown",
+                "gender": "",
+                "account_status": "",
+                "city": "",
+                "state_province": "",
                 "postal_code": "00000",
-                "country": "Unknown",
+                "country": "",
                 "date_of_birth": "1900-01-01",
                 "account_created_at": "1900-01-01",
                 "last_login_date": "1900-01-01",
@@ -162,15 +162,15 @@ def fill_null_values(dataframes):
         dataframes["suppliers"] = dataframes["suppliers"].fillna(
             {
                 "supplier_rating": 0.0,
-                "supplier_status": "Unknown",
+                "supplier_status": "",
                 "is_preferred": "false",
                 "is_verified": "false",
                 "contract_start_date": "1900-01-01",
                 "contract_end_date": "1900-01-01",
-                "city": "Unknown",
-                "state": "Unknown",
+                "city": "",
+                "state": "",
                 "zip_code": "00000",
-                "country": "Unknown",
+                "country": "",
             }
         )
     else:
@@ -179,17 +179,17 @@ def fill_null_values(dataframes):
     if "products" in dataframes.keys():
         dataframes["products"] = dataframes["products"].fillna(
             {
-                "product_name": "Unknown",
-                "sku": "Unknown",
-                "category": "Unknown",
-                "sub_category": "Unknown",
-                "brand": "Unknown",
+                "product_name": "",
+                "sku": "",
+                "category": "",
+                "sub_category": "",
+                "brand": "",
                 "launch_date": "1900-01-01",
                 "weight": "0.0",
-                "dimensions": "Unknown",
-                "color": "Unknown",
-                "size": "Unknown",
-                "material": "Unknown",
+                "dimensions": "",
+                "color": "",
+                "size": "",
+                "material": "",
             }
         )
     else:
@@ -202,15 +202,14 @@ def fill_null_values(dataframes):
 
     if "shopping_cart" in dataframes.keys():
         dataframes["shopping_cart"] = dataframes["shopping_cart"].fillna(
-            {"added_date": "1900-01-01",
-            "cart_status": "Unknown"}
+            {"added_date": "1900-01-01", "cart_status": ""}
         )
 
     if "orders" in dataframes.keys():
         dataframes["orders"] = dataframes["orders"].fillna(
             {
-                "order_status": "Unknown",
-                "currency": "Unknown",
+                "order_status": "",
+                "currency": "",
                 "order_placed_at": "1900-01-01",
             }
         )
@@ -218,19 +217,19 @@ def fill_null_values(dataframes):
     if "payments" in dataframes.keys():
         dataframes["payments"] = dataframes["payments"].fillna(
             {
-                "payment_method": "Unknown",
-                "payment_provider": "Unknown",
-                "payment_status": "Unknown",
-                "transaction_id": "Unknown",
-                "payment_date": "1900-01-01"
+                "payment_method": "",
+                "payment_provider": "",
+                "payment_status": "",
+                "transaction_id": "",
+                "payment_date": "1900-01-01",
             }
         )
 
     if "reviews" in dataframes.keys():
         dataframes["reviews"] = dataframes["reviews"].fillna(
             {
-                "review_title": "Unknown",
-                "review_desc": "Unknown",
+                "review_title": "",
+                "review_desc": "",
                 "review_date": "1900-01-01",
             }
         )
@@ -238,11 +237,11 @@ def fill_null_values(dataframes):
     if "marketing_campaigns" in dataframes.keys():
         dataframes["marketing_campaigns"] = dataframes["marketing_campaigns"].fillna(
             {
-                "campaign_name": "Unknown",
-                "campaign_type": "Unknown",
+                "campaign_name": "",
+                "campaign_type": "",
                 "start_date": "1900-01-01",
-                "target_audience": "Unknown",
-                "campaign_status": "Unknown",
+                "target_audience": "",
+                "campaign_status": "",
             }
         )
 
@@ -251,8 +250,8 @@ def fill_null_values(dataframes):
             {
                 "session_start": "1900-01-01",
                 "session_end": "1900-01-01",
-                "device_type": "Unknown",
-                "referrer_source": "Unknown",
+                "device_type": "",
+                "referrer_source": "",
                 "conversion_flag": "false",
                 "cart_abandonment_flag": "false",
             }
