@@ -1,5 +1,23 @@
-from pyspark.sql.functions import *
-from pyspark.sql.window import Window
+from pyspark.sql.functions import (
+    col,
+    year,
+    month,
+    quarter,
+    dayofweek,
+    weekofyear,
+    dayofmonth,
+    unix_timestamp,
+    floor,
+    datediff,
+    greatest,
+    lit,
+    when,
+    countDistinct,
+    to_timestamp,
+    sum as spark_sum,
+    avg as spark_avg,
+    max as spark_max,
+)
 
 
 def transform_orders(dataframes):
@@ -7,22 +25,24 @@ def transform_orders(dataframes):
     shipped_timestamp = to_timestamp(col("order_shipped_at"))
     delivered_timestamp = to_timestamp(col("order_delivered_at"))
 
-    # FIX: Aggregate order_items per order to avoid duplicates
-    order_items_agg = (
+    order_metrics = (
         dataframes["order_items"]
         .groupBy("order_id")
         .agg(
-            sum(col("product_cost") * col("quantity")).alias("total_product_cost"),
-            sum("quantity").alias("total_quantity"),
+            spark_sum("product_cost").alias("total_product_cost"),
+            spark_sum("quantity").alias("total_quantity"),
+            spark_avg("product_cost").alias("avg_product_cost"),
+            spark_max("discount_amount").alias("max_item_discount"),
+            countDistinct("product_id").alias("unique_products_ordered"),
         )
     )
 
     dataframes["orders"] = (
         dataframes["orders"]
         .join(
-            order_items_agg,  # Use aggregated data instead
+            order_metrics,
             "order_id",
-            "left",  # Changed to left join to keep orders without items
+            "inner",
         )
         .withColumns(
             {
@@ -240,10 +260,13 @@ def transform_orders(dataframes):
                 ),
                 "order_profit": when(
                     col("subtotal").isNotNull()
-                    & col("total_product_cost").isNotNull()  # Changed reference
+                    & col("total_product_cost").isNotNull()
+                    & col("total_quantity").isNotNull()
                     & (col("subtotal") != 0)
+                    & (col("total_quantity") != 0)
                     & (col("total_product_cost") != 0),
-                    col("subtotal") - col("total_product_cost"),  # Use aggregated cost
+                    col("subtotal")
+                    - (col("total_product_cost") * col("total_quantity")),
                 ),
                 "net_revenue": when(
                     col("total_amount").isNotNull()
@@ -270,22 +293,20 @@ def transform_orders(dataframes):
                 ),
                 "average_item_value": when(
                     col("subtotal").isNotNull()
-                    & col("total_quantity").isNotNull()  # Changed reference
+                    & col("total_quantity").isNotNull()
                     & (col("subtotal") != 0)
                     & (col("total_quantity") != 0),
-                    col("subtotal") / col("total_quantity"),  # Use aggregated quantity
+                    col("subtotal") / col("total_quantity"),
                 ),
                 "cost_per_item": when(
-                    col("total_product_cost").isNotNull()  # Changed reference
-                    & col("total_quantity").isNotNull()  # Changed reference
+                    col("total_product_cost").isNotNull()
+                    & col("total_quantity").isNotNull()
                     & (col("total_product_cost") != 0)
                     & (col("total_quantity") != 0),
-                    col("total_product_cost")
-                    / col("total_quantity"),  # Use aggregated values
+                    col("total_product_cost") / col("total_quantity"),
                 ),
                 "order_size_category": when(
-                    col("total_quantity").isNotNull()
-                    & (col("total_quantity") != 0),  # Changed reference
+                    col("total_quantity").isNotNull() & (col("total_quantity") != 0),
                     when(col("total_quantity") < 3, "Small")
                     .when(
                         (col("total_quantity") >= 3) & (col("total_quantity") < 7),
@@ -302,5 +323,4 @@ def transform_orders(dataframes):
                 ),
             }
         )
-        .drop("total_product_cost", "total_quantity")  # Clean up temporary columns
-    )
+    ).dropDuplicates(["order_id"])
