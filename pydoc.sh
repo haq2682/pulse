@@ -77,15 +77,15 @@ echo ""
 
 # Execute the Python file in the container
 if [ "$SAVE_LOG" = true ]; then
-    docker exec python python3.10 "/app/$SCRIPT_NAME" "$@" 2>&1 | tee "$LOG_FILE"
+    docker exec python python3.10 "/app/$PYTHON_FILE" "$@" 2>&1 | tee "$LOG_FILE"
     EXIT_CODE=${PIPESTATUS[0]}
 else
-    docker exec python python3.10 "/app/$SCRIPT_NAME" "$@"
+    docker exec python python3.10 "/app/$PYTHON_FILE" "$@"
     EXIT_CODE=$?
 fi
 
 # Cleanup: remove the copied file from container
-docker exec python rm "/app/$SCRIPT_NAME" 2>/dev/null || true
+docker exec python rm "/app/$PYTHON_FILE" 2>/dev/null || true
 
 echo ""
 if [ $EXIT_CODE -eq 0 ]; then
