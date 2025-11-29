@@ -1,0 +1,254 @@
+/* Gradient Text Utilities */
+.gradient-text {
+    background: radial-gradient(circle, var(--color-g2) 0%, var(--color-g1) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    --webkit-text-fill-color: transparent;
+}
+
+.gradient-text-linear {
+    background: linear-gradient(135deg, var(--color-g1) 0%, var(--color-g2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    --webkit-text-fill-color: transparent;
+}
+
+/* Heading Shadows */
+.heading-shadow {
+    text-shadow: var(--shadow-heading);
+}
+
+/* PrimeReact Button Overrides - Preserve Ripple Effect */
+.p-button {
+    transition: all 0.2s ease-in-out;
+}
+
+.p-button .p-ink {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Custom Primary Button */
+.btn-primary {
+    background: linear-gradient(135deg, var(--color-g1) 0%, var(--color-g2) 100%);
+    color: white;
+    border: none;
+    padding: var(--spacing-btn-y) var(--spacing-btn-x);
+    border-radius: 0.5rem;
+    font-weight: 500;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow-primary);
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    box-shadow: 0 6px 20px 0 rgba(0, 197, 151, 0.5);
+    transform: translateY(-2px);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-primary:disabled {
+    opacity: 0. 6;
+    cursor: not-allowed;
+}
+
+/* Custom Secondary Button */
+.btn-secondary {
+    background: white !important;
+    border: none;
+    padding: var(--spacing-btn-y) var(--spacing-btn-x);
+    border-radius: 0.5rem;
+    font-weight: 500;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow-secondary);
+    transition: all 0.3s ease;
+}
+
+.btn-secondary .btn-text {
+    background: radial-gradient(circle, var(--color-g1) 0%, var(--color-g2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.btn-secondary:hover {
+    box-shadow: 0 6px 20px 0 rgba(0, 197, 151, 0.35);
+    transform: translateY(-2px);
+}
+
+.btn-secondary:active {
+    transform: translateY(0);
+}
+
+.btn-secondary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Links */
+.custom-link {
+    background: radial-gradient(circle, var(--color-g1) 0%, var(--color-g2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-decoration: underline;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.custom-link:hover {
+    opacity: 0.8;
+}
+
+/* Geometrical Shapes */
+.shape-gradient {
+    background: radial-gradient(circle, var(--color-g1) 0%, var(--color-g2) 100%);
+}
+
+.shape-gradient-linear {
+    background: linear-gradient(135deg, var(--color-g1) 0%, var(--color-g2) 100%);
+}
+
+.p-inputtext {
+    border-color: #d1d5db;
+    border-width: 1px;
+    border-radius: 7px;
+    color: var(--color-text-primary);
+    padding: 8px 10px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.p-inputtext:enabled:hover {
+    border-color: var(--color-g2);
+}
+
+.p-inputtext:enabled:focus {
+    outline: 0 none;
+    outline-offset: 0;
+    box-shadow: 0 0 0 0.2rem rgba(18, 239, 188, 0.25);
+    border-color: var(--color-g2);
+}
+
+/* Input with filled state */
+.p-inputtext .p-filled {
+    border-color: var(--color-g2);
+}
+
+/* ----- Textarea ----- */
+.p-inputtextarea {
+    border-color: #d1d5db;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.p-inputtextarea:enabled:hover {
+    border-color: var(--color-g2);
+}
+
+.p-inputtextarea:enabled:focus {
+    outline: 0 none;
+    outline-offset: 0;
+    box-shadow: 0 0 0 0.2rem rgba(18, 239, 188, 0.25);
+    border-color: var(--color-g2);
+}
+
+/* ----- Toggle Button / InputSwitch ----- */
+.p-inputswitch .p-inputswitch-checked .p-inputswitch-slider {
+    background: linear-gradient(135deg, var(--color-g1) 0%, var(--color-g2) 100%) !important;
+}
+
+.p-inputswitch .p-inputswitch-slider {
+    transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.p-inputswitch:not(.p-disabled):hover .p-inputswitch-slider {
+    background: #d1d5db;
+}
+
+.p-inputswitch .p-inputswitch-checked:not(.p-disabled):hover .p-inputswitch-slider {
+    background: linear-gradient(135deg, var(--color-g1) 0%, var(--color-g2) 100%) !important;
+    opacity: 0.9;
+}
+
+.p-inputswitch .p-focus .p-inputswitch-slider {
+    outline: 0 none;
+    outline-offset: 0;
+    box-shadow: 0 0 0 0.2rem rgba(18, 239, 188, 0.25);
+}
+
+.p-inputswitch .p-inputswitch-slider:before {
+    margin-top: -0.625rem !important;
+}
+
+/* ----- Slider ----- */
+.p-slider .p-slider-range {
+    background: linear-gradient(135deg, var(--color-g1) 0%, var(--color-g2) 100%) !important;
+}
+
+.p-slider .p-slider-handle {
+    background: var(--color-g2) !important;
+    border-color: var(--color-g2) !important;
+    top: -150%;
+}
+
+.p-slider:not(.p-disabled) .p-slider-handle:hover {
+    background: var(--color-g1) !important;
+    border-color: var(--color-g1) !important;
+}
+
+.p-slider .p-slider-handle:focus {
+    outline: 0 none;
+
+    outline-offset: 0;
+    box-shadow: 0 0 0 0.2rem rgba(18, 239, 188, 0.25);
+}
+
+/* ----- Calendar / DatePicker ----- */
+.p-calendar .p-inputtext {
+    border-color: #d1d5db;
+}
+
+.p-calendar .p-inputtext:enabled:hover {
+    border-color: var(--color-g2);
+}
+
+.p-calendar .p-inputtext:enabled:focus {
+    box-shadow: 0 0 0 0.2rem rgba(18, 239, 188, 0.25);
+    border-color: var(--color-g2);
+}
+
+.p-datepicker .p-datepicker-header {
+    background: linear-gradient(135deg, var(--color-g1) 0%, var(--color-g2) 100%);
+    color: #ffffff;
+}
+
+.p-datepicker table td>span .p-highlight {
+    background: linear-gradient(135deg, var(--color-g1) 0%, var(--color-g2) 100%);
+    color: #ffffff;
+}
+
+.p-datepicker table td>span:hover {
+    background: rgba(18, 239, 188, 0.2);
+    color: var(--color-g1);
+}
+
+.p-datepicker table td .p-datepicker-today>span {
+    background: rgba(18, 239, 188, 0.1);
+    color: var(--color-g1);
+    border-color: var(--color-g2);
+}
+
+.p-datepicker-year {
+    padding-left: 10px;
+}
+
+.p-button {
+    background-color: var(--color-g2);
+}
