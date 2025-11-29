@@ -37,8 +37,8 @@ RUN python3 -m spacy download en_core_web_md
 
 # Copy scripts
 COPY ./bash /app/bash
-COPY ./mapping /app
-COPY ./cleaning /app
-COPY ./transformation /app
+COPY ./mapping /app/mapping
+COPY ./cleaning /app/cleaning
+COPY ./transformation /app/transformation
 
 CMD ["tail", "-f", "/dev/null"]
