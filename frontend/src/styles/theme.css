@@ -95,13 +95,23 @@
 
 /* Links */
 .custom-link {
-    background: radial-gradient(circle, var(--color-g1) 0%, var(--color-g2) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    position: relative;
+    display: inline-block;
+
+    background: radial-gradient(circle, var(--color-g2) 0%, var(--color-g1) 100%);
     background-clip: text;
-    text-decoration: underline;
-    cursor: pointer;
-    transition: opacity 0.2s ease;
+    -webkit-text-fill-color: transparent;
+}
+
+.custom-link::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: 20px;
+    height: 1px;
+    background: radial-gradient(circle, var(--color-g2) 0%, var(--color-g1) 100%);
 }
 
 .custom-link:hover {
@@ -110,7 +120,7 @@
 
 /* Geometrical Shapes */
 .shape-gradient {
-    background: radial-gradient(circle, var(--color-g1) 0%, var(--color-g2) 100%);
+    background: radial-gradient(circle, var(--color-g2) 0%, var(--color-g1) 100%);
 }
 
 .shape-gradient-linear {
