@@ -1,12 +1,12 @@
 import React from 'react';
 
-const Text = ({ 
-  children, 
+const Text = ({
+  children,
   className = '',
-  ...props 
+  ...props
 }) => {
   return (
-    <p className={`text-[var(--color-text-primary)] ${className}`} {...props}>
+    <p className={`text-[var(--color-text-primary)] ${className}`} {...props} style={{ textShadow: '1px 1px 3px rgba(0, 0, 0, 0.2)' }}>
       {children}
     </p>
   );

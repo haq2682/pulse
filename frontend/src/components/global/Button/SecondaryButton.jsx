@@ -1,14 +1,14 @@
 import React from 'react';
 import { Button } from 'primereact/button';
 
-const SecondaryButton = ({ 
-  label, 
-  icon, 
-  onClick, 
-  disabled = false, 
+const SecondaryButton = ({
+  label,
+  icon,
+  onClick,
+  disabled = false,
   loading = false,
   className = '',
-  ...props 
+  ...props
 }) => {
   return (
     <Button
@@ -16,9 +16,9 @@ const SecondaryButton = ({
       disabled={disabled}
       loading={loading}
       className={`btn-secondary ${className}`}
-      {... props}
+      {...props}
     >
-      <span className="btn-text flex items-center gap-2">
+      <span className="btn-text">
         {icon && <i className={icon}></i>}
         {label}
       </span>
