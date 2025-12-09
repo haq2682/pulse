@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import Landing from "@/pages/landing/index.jsx";
 import ThemeReference from "@/pages/ThemeReference/index.jsx";
 import ThemeReferenceV2 from "@/pages/ThemeReferenceV2/index.jsx";
+import Signup from "@/pages/signup/index.jsx";
 
 // PrimeReact configuration
 const primeReactConfig = {
@@ -25,6 +26,7 @@ createRoot(document.getElementById('root')).render(
           <Route path="/" element={<Landing />} />
           <Route path="/theme" element={<ThemeReference />} />
           <Route path="/theme2" element={<ThemeReferenceV2 />} />
+          <Route path="/signup" element={<Signup />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
