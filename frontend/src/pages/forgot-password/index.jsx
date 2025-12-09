@@ -102,7 +102,7 @@ const ForgotPassword = () => {
                                 <Text className="text-sm inline">
                                     Remember your password?{' '}
                                 </Text>
-                                <CustomLink className="text-sm font-semibold cursor-pointer">
+                                <CustomLink href="/login" className="text-sm font-semibold cursor-pointer">
                                     Back to Login
                                 </CustomLink>
                             </div>
