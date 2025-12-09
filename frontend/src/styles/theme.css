@@ -262,3 +262,21 @@
 .p-button {
     background-color: var(--color-g2);
 }
+
+.p-checkbox-box {
+    border: rgb(170, 170, 170) 1px solid;
+}
+
+.p-icon-field {
+    width: 100%;
+}
+
+.p-password-show-icon {
+    color: var(--color-g2);
+    transform: translateY(-50%) scale(1.5);
+}
+
+.p-password-hide-icon {
+    color: var(--color-g1);
+    transform: translateY(-50%) scale(1.5);
+}
