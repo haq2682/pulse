@@ -10,7 +10,6 @@ from pyspark.sql.functions import (
     current_date,
 )
 
-
 def aggregate_campaigns(dataframes):
 
     campaign_revenue = (
