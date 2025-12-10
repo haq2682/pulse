@@ -164,7 +164,7 @@ def main():
     display_summary(dataframes)
     # 20. Save cleaned data
     print("\n📌 Step 20: Saving cleaned data to MinIO...")
-    # save_data_to_minio(dataframes, minio_client, bucket_name)
+    save_data_to_minio(dataframes, minio_client, bucket_name)
 
     # 21. Stop Spark session
     print("\n📌 Step 21: Stopping Spark session...")
