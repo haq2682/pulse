@@ -280,3 +280,17 @@
     color: var(--color-g1);
     transform: translateY(-50%) scale(1.5);
 }
+
+.p-dropdown-item {
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
+.p-dropdown {
+    border-color: #d1d5db;
+    border-width: 1px;
+}
+
+.p-dropdown-label {
+    border: 0;
+}

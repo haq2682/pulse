@@ -5,6 +5,7 @@ const Heading = ({
   level = 1,
   gradient = true,
   white = false,
+  black = false,
   className = '',
   ...props
 }) => {
@@ -15,6 +16,8 @@ const Heading = ({
 
     if (white) {
       classes += 'text-white ';
+    } else if (black) {
+      classes += 'text-black ';
     } else if (gradient) {
       classes += 'gradient-text heading-shadow ';
     } else {
