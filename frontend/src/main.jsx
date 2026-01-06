@@ -14,6 +14,11 @@ import Login from "@/pages/login/index.jsx";
 import ForgotPassword from '@/pages/forgot-password/index.jsx';
 import ResetPassword from '@/pages/reset-password/index.jsx';
 import ResetPasswordEmail from '@/pages/reset-password-email/index.jsx';
+import Dashboard from '@/pages/dashboard/index.jsx';
+import AddBusiness from '@/pages/onboarding/business/index.jsx';
+import DataType from '@/pages/onboarding/data-type/index.jsx';
+import Connect from '@/pages/onboarding/connect/index.jsx';
+import Mapping from '@/pages/onboarding/mapping/index.jsx';
 
 // PrimeReact configuration
 const primeReactConfig = {
@@ -35,6 +40,11 @@ createRoot(document.getElementById('root')).render(
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/reset-password-email" element={<ResetPasswordEmail />} />
+          <Route path="/analytics" element={<Dashboard />} />
+          <Route path="/onboarding/business" element={<AddBusiness />} />
+          <Route path="/onboarding/data-type" element={<DataType />} />
+          <Route path="/onboarding/connect" element={<Connect />} />
+          <Route path="/onboarding/mapping" element={<Mapping />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
