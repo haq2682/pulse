@@ -31,6 +31,7 @@ from data_cleaning import (
 )
 from standardization import (
     remove_all_outliers,
+    normalize_dates_and_timestamps,
     validate_dates_and_timestamps,
     detect_gibberish_patterns,
 )
@@ -136,7 +137,8 @@ def main():
     print("✅ Outliers removed")
 
     # 12. Validate dates and timestamps
-    print("\n📌 Step 12: Validating dates and timestamps...")
+    print("\n📌 Step 12: Normalizing & Validating dates and timestamps...")
+    dataframes = normalize_dates_and_timestamps(dataframes)
     dataframes = validate_dates_and_timestamps(dataframes)
 
     # 13. Detect and clean gibberish patterns
