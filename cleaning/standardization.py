@@ -6,6 +6,11 @@ import pyspark.sql.functions as F
 from pyspark.sql.functions import (
     current_date,
     current_timestamp,
+    to_date,
+    to_timestamp,
+    coalesce,
+    regexp_replace,
+    from_utc_timestamp,
     when,
     col,
     length,
@@ -13,6 +18,7 @@ from pyspark.sql.functions import (
 )
 from pyspark.sql.types import (
     DateType,
+    StringType,
     TimestampType,
     IntegerType,
     LongType,
@@ -20,6 +26,7 @@ from pyspark.sql.types import (
     DoubleType,
     DecimalType,
 )
+import re
 
 
 def remove_outliers(dataframes, table_name, columns):
@@ -116,6 +123,127 @@ def remove_all_outliers(dataframes):
 
     return dataframes
 
+def normalize_dates_and_timestamps(
+    dataframes,
+    timestamp_formats=None,
+    date_formats=None,
+    sample_size=50,
+    default_timezone="UTC",
+):
+    """
+    Optimized normalization with:
+    - Automatic timezone inference per column
+    - Safe multi-format parsing
+    - Designed for very wide tables
+
+    Args:
+        dataframes (dict): table_name -> DataFrame
+        timestamp_formats (list): timestamp patterns
+        date_formats (list): date patterns
+        sample_size (int): rows to sample per column
+        default_timezone (str): assumed TZ if none present
+
+    Returns:
+        dict: Updated dictionary of DataFrames
+    """
+
+    print("⚡ Normalizing dates & timestamps (optimized)...")
+
+    timestamp_formats = timestamp_formats or [
+        "yyyy-MM-dd HH:mm:ss",
+        "yyyy-MM-dd HH:mm:ss.SSS",
+        "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS",
+        "yyyy-MM-dd'T'HH:mm:ssX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSX",
+        "yyyy/MM/dd HH:mm:ss",
+        "MM/dd/yyyy HH:mm:ss",
+    ]
+
+    date_formats = date_formats or [
+        "yyyy-MM-dd",
+        "yyyy/MM/dd",
+        "MM/dd/yyyy",
+        "dd-MM-yyyy",
+    ]
+
+    date_regex = re.compile(r"\d{4}[-/]\d{2}[-/]\d{2}")
+    timestamp_regex = re.compile(r"\d{2}:\d{2}:\d{2}")
+    tz_regex = re.compile(r"(Z|[+-]\d{2}:?\d{2})$")
+
+    for table_name, df in dataframes.items():
+        print(f"\n📄 Processing {table_name}...")
+
+        for field in df.schema.fields:
+            col_name = field.name
+            col_type = field.dataType
+
+            # Skip non-string and already parsed columns
+            if not isinstance(col_type, StringType):
+                continue
+
+            # Sample once per column (bounded cost)
+            sample = (
+                df.select(col_name)
+                .where(col(col_name).isNotNull())
+                .limit(sample_size)
+                .rdd.map(lambda r: r[0])
+                .collect()
+            )
+
+            if not sample:
+                continue
+
+            looks_like_ts = any(timestamp_regex.search(str(v)) for v in sample)
+            looks_like_date = any(date_regex.search(str(v)) for v in sample)
+
+            # Infer timezone presence
+            has_explicit_tz = any(tz_regex.search(str(v)) for v in sample)
+
+            # Normalize timezone offset format: +0000 → +00:00
+            df = df.withColumn(
+                col_name,
+                regexp_replace(
+                    col(col_name),
+                    r"([+-]\d{2})(\d{2})$",
+                    r"\1:\2",
+                ),
+            )
+
+            if looks_like_ts:
+                inferred_tz = "embedded" if has_explicit_tz else default_timezone
+                print(
+                    f"  🕒 {col_name}: timestamp "
+                    f"(timezone={'detected' if has_explicit_tz else default_timezone})"
+                )
+
+                parsed_ts = coalesce(
+                    *[to_timestamp(col(col_name), f) for f in timestamp_formats]
+                )
+
+                # If timestamps include timezone info, Spark parses to UTC automatically
+                # If not, assume default timezone
+                if has_explicit_tz:
+                    df = df.withColumn(col_name, parsed_ts)
+                else:
+                    df = df.withColumn(
+                        col_name,
+                        from_utc_timestamp(parsed_ts, default_timezone),
+                    )
+
+            elif looks_like_date:
+                print(f"  📅 {col_name}: date")
+
+                parsed_date = coalesce(
+                    *[to_date(col(col_name), f) for f in date_formats]
+                )
+
+                df = df.withColumn(col_name, parsed_date)
+
+        dataframes[table_name] = df
+
+    print("\n🎉 Optimized date & timestamp normalization completed!")
+    return dataframes
 
 def validate_dates_and_timestamps(dataframes):
     """
@@ -159,9 +287,9 @@ def validate_dates_and_timestamps(dataframes):
                             col(col_name)
                         ),
                     )
-                    print(f"    ✅ Updated {future_count} future dates to current date")
+                    print(f"✅ Updated {future_count} future dates to current date")
                 else:
-                    print(f"    ✅ No future dates found in {col_name}")
+                    print(f"✅ No future dates found in {col_name}")
 
             elif isinstance(col_type, TimestampType):
                 # Check for future timestamps

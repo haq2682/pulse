@@ -29,7 +29,7 @@ def transform_orders(dataframes):
         dataframes["order_items"]
         .groupBy("order_id")
         .agg(
-            spark_sum("product_cost").alias("total_product_cost"),
+            spark_sum(col("product_cost") * col("quantity")).alias("total_product_cost"),
             spark_sum("quantity").alias("total_quantity"),
             spark_avg("product_cost").alias("avg_product_cost"),
             spark_max("discount_amount").alias("max_item_discount"),
@@ -265,8 +265,7 @@ def transform_orders(dataframes):
                     & (col("subtotal") != 0)
                     & (col("total_quantity") != 0)
                     & (col("total_product_cost") != 0),
-                    col("subtotal")
-                    - (col("total_product_cost") * col("total_quantity")),
+                    col("subtotal") - col("total_product_cost"),
                 ),
                 "net_revenue": when(
                     col("total_amount").isNotNull()
