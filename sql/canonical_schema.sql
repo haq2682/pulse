@@ -78,6 +78,7 @@ CREATE TABLE inventory (
     minimum_stock_level INTEGER DEFAULT 0,
     last_restocked_date TIMESTAMP,
     storage_cost DECIMAL(10, 2),
+    stock_status VARCHAR(50) DEFAULT 'In Stock',
     FOREIGN KEY (product_id) REFERENCES products(product_id),
     FOREIGN KEY (supplier_id) REFERENCES suppliers(supplier_id)
 );
