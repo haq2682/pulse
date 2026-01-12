@@ -1279,6 +1279,8 @@ mapping_dict_order_items = {
         "count",
         "number_of_units",
         "ordered_units",
+        "qty_ordered",
+        "num_items",
     ],
     "discount_amount": [
         "discount_amount",
