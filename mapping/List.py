@@ -1297,20 +1297,19 @@ mapping_dict_order_items = {
         "deduction",
         "markdown",
     ],
-    "product_cost": [
-        "product_cost",
-        "cost",
-        "item_cost",
-        "productCost",
-        "prod_cost",
-        "unit_cost",
-        "purchase_cost",
-        "buying_price",
-        "base_cost",
-        "manufacturing_cost",
-        "cogs",
-        "cost_of_goods",
-    ],
+    "product_price": [
+        "product_price",
+        "price",
+        "item_price",
+        "selling_price",
+        "sale_price",
+        "retail_price",
+        "final_price",
+        "market_price",
+        "store_price",
+        "unit_selling_price",
+        "price_per_unit",
+    ]
 }
 
 mapping_dict_payments = {

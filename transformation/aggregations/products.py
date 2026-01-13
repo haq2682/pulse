@@ -31,7 +31,7 @@ def aggregate_products(dataframes):
             "product_id",
             "quantity",
             "discount_amount",
-            "product_cost",
+            "product_price",
             "sell_price",
             "cost_price",
         )

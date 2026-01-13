@@ -31,11 +31,12 @@ def transform_orders(dataframes):
         order_items
         .groupBy("order_id")
         .agg(
-            spark_sum(col("product_cost") * col("quantity")).alias("total_product_cost"),
+            spark_sum(col("product_price") * col("quantity")).alias("total_product_price"),
             spark_sum("quantity").alias("total_quantity"),
-            spark_avg("product_cost").alias("avg_product_cost"),
+            spark_avg("product_price").alias("avg_product_price"),
             spark_max("discount_amount").alias("max_item_discount"),
             countDistinct("product_id").alias("unique_products_ordered"),
+            spark_sum("discount_amount").alias("total_discount_from_items")
         )
     )
 
@@ -121,14 +122,14 @@ def transform_orders(dataframes):
             col("order_processing_years_diff") + col("delivery_years_diff"),
 
         # ---- Financial metrics (simplified & correct)
-        "order_profit": col("subtotal") - col("total_product_cost"),
-        "net_revenue": col("total_amount") - col("total_discount") - col("shipping_cost"),
+        "order_profit": col("subtotal") - col("total_product_price"),
+        "net_revenue": col("total_amount") - col("total_discount_from_items") - col("shipping_cost"),
         "net_profit": col("order_profit") - col("shipping_cost"),
 
         # ---- Ratios (division guarded)
         "discount_percentage": when(
             col("subtotal") > 0,
-            (col("total_discount") / col("subtotal")) * 100
+            (col("total_discount_from_items") / col("subtotal")) * 100
         ),
 
         "average_item_value": when(
@@ -138,7 +139,7 @@ def transform_orders(dataframes):
 
         "cost_per_item": when(
             col("total_quantity") > 0,
-            col("total_product_cost") / col("total_quantity")
+            col("total_product_price") / col("total_quantity")
         ),
 
         # ---- Categoricals

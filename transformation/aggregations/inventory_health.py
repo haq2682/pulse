@@ -108,10 +108,10 @@ def inventory_health_aggregations(dataframes):
             spark_sum(
                 when(
                     col("quantity").isNotNull()
-                    & col("product_cost").isNotNull()
+                    & col("product_price").isNotNull()
                     & (col("quantity") > 0)
-                    & (col("product_cost") > 0),
-                    col("quantity") * col("product_cost"),
+                    & (col("product_price") > 0),
+                    col("quantity") * col("product_price"),
                 )
             ).alias("total_cogs")
         )

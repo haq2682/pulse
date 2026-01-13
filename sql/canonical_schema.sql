@@ -133,7 +133,7 @@ CREATE TABLE order_items (
     product_id VARCHAR(50) NOT NULL,
     quantity INT NOT NULL,
     discount_amount DECIMAL(10, 2) DEFAULT 0,
-    product_cost DECIMAL(10, 2),
+    product_price DECIMAL(10, 2),
     FOREIGN KEY (order_id) REFERENCES orders(order_id),
     FOREIGN KEY (product_id) REFERENCES products(product_id)
 );

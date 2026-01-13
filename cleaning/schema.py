@@ -158,7 +158,7 @@ def cast_dataframes(dataframes):
             col("product_id").cast(StringType()),
             col("quantity").cast(IntegerType()),
             col("discount_amount").cast(FloatType()),
-            col("product_cost").cast(FloatType())
+            col("product_price").cast(FloatType())
         )
         print("Cast order_items DataFrame")
 
