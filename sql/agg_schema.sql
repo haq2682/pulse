@@ -201,7 +201,7 @@ CREATE TABLE agg_order_items (
     
     -- Tier 3: Nullable Derived Fields
     discount_amount DOUBLE PRECISION NULL,
-    product_cost DOUBLE PRECISION NULL
+    product_price DOUBLE PRECISION NULL
 );
 
 -- 6. agg_orders

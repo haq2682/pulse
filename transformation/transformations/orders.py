@@ -23,6 +23,30 @@ from pyspark.sql.functions import (
 def transform_orders(dataframes):
     orders = dataframes["orders"]
     order_items = dataframes["order_items"]
+    products = dataframes["products"]
+
+    # -------------------------
+    # Join order_items with products to get cost_price
+    # -------------------------
+    order_items = order_items.join(
+        products.select("product_id", "cost_price"),
+        on="product_id",
+        how="left"
+    )
+
+    # -------------------------
+    # Calculate line_total and item_cogs
+    # -------------------------
+    order_items = order_items.withColumn(
+        "line_total",
+        greatest(
+            (col("product_price") * col("quantity")) - col("discount_amount"),
+            lit(0)
+        )
+    ).withColumn(
+        "item_cogs",
+        col("cost_price") * col("quantity")
+    )
 
     # -------------------------
     # Aggregate order items
@@ -31,7 +55,12 @@ def transform_orders(dataframes):
         order_items
         .groupBy("order_id")
         .agg(
-            spark_sum(col("product_price") * col("quantity")).alias("total_product_price"),
+            # Gross revenue (before discounts)
+            spark_sum(col("product_price") * col("quantity")).alias("gross_product_total"),
+            # Net revenue (after discounts)
+            spark_sum("line_total").alias("total_product_price"),
+            # Cost of goods sold
+            spark_sum("item_cogs").alias("total_cogs"),
             spark_sum("quantity").alias("total_quantity"),
             spark_avg("product_price").alias("avg_product_price"),
             spark_max("discount_amount").alias("max_item_discount"),
@@ -100,46 +129,57 @@ def transform_orders(dataframes):
         "delivery_years_diff": greatest(datediff(delivered_ts, shipped_ts) / 365, lit(0)),
 
         # ---- Fulfillment totals
-        "total_order_fulfillment_time_seconds":
-            col("order_processing_seconds_diff") + col("delivery_seconds_diff"),
+        "total_order_fulfillment_time_seconds": 
+            greatest(processing_seconds, lit(0)) + greatest(delivery_seconds, lit(0)),
 
         "total_order_fulfillment_time_minutes":
-            col("order_processing_minutes_diff") + col("delivery_minutes_diff"),
+            greatest(floor(processing_seconds / 60), lit(0)) +
+            greatest(floor(delivery_seconds / 60), lit(0)),
 
-        "total_order_fulfillment_time_hours":
-            col("order_processing_hours_diff") + col("delivery_hours_diff"),
+        "total_order_fulfillment_time_hours": 
+            greatest(floor(processing_seconds / 3600), lit(0)) +
+            greatest(floor(delivery_seconds / 3600), lit(0)),
 
         "total_order_fulfillment_time_days":
-            col("order_processing_days_diff") + col("delivery_days_diff"),
+            greatest(datediff(shipped_ts, placed_ts), lit(0)) +
+            greatest(datediff(delivered_ts, shipped_ts), lit(0)),
 
         "total_order_fulfillment_time_weeks":
-            col("order_processing_weeks_diff") + col("delivery_weeks_diff"),
+            greatest(datediff(shipped_ts, placed_ts) / 7, lit(0)) +
+            greatest(datediff(delivered_ts, shipped_ts) / 7, lit(0)),
 
         "total_order_fulfillment_time_months":
-            col("order_processing_months_diff") + col("delivery_months_diff"),
+            greatest(datediff(shipped_ts, placed_ts) / 30, lit(0)) +
+            greatest(datediff(delivered_ts, shipped_ts) / 30, lit(0)),
 
         "total_order_fulfillment_time_years":
-            col("order_processing_years_diff") + col("delivery_years_diff"),
+            greatest(datediff(shipped_ts, placed_ts) / 365, lit(0)) +
+            greatest(datediff(delivered_ts, shipped_ts) / 365, lit(0)),
 
-        # ---- Financial metrics (simplified & correct)
-        "order_profit": col("subtotal") - col("total_product_price"),
-        "net_revenue": col("total_amount") - col("total_discount_from_items") - col("shipping_cost"),
-        "net_profit": col("order_profit") - col("shipping_cost"),
+        # ---- Financial metrics (using COGS from products table)
+        # order_profit = Revenue (after discounts) - Cost of Goods Sold
+        "order_profit": col("total_product_price") - col("total_cogs"),
 
-        # ---- Ratios (division guarded)
+        # net_revenue = Revenue after discounts minus shipping
+        "net_revenue": col("total_product_price") - col("shipping_cost"),
+
+        # net_profit = Revenue - COGS - Shipping
+        "net_profit": col("total_product_price") - col("total_cogs") - col("shipping_cost"),
+
+        # ---- Ratios
         "discount_percentage": when(
-            col("subtotal") > 0,
-            (col("total_discount_from_items") / col("subtotal")) * 100
+            col("gross_product_total") > 0,
+            (col("total_discount_from_items") / col("gross_product_total")) * 100
         ),
 
         "average_item_value": when(
             col("total_quantity") > 0,
-            col("subtotal") / col("total_quantity")
+            col("total_product_price") / col("total_quantity")
         ),
 
         "cost_per_item": when(
             col("total_quantity") > 0,
-            col("total_product_price") / col("total_quantity")
+            col("total_cogs") / col("total_quantity")
         ),
 
         # ---- Categoricals
@@ -157,6 +197,9 @@ def transform_orders(dataframes):
             col("order_placed_month").isin(6, 7, 8), "Summer"
         ).otherwise("Fall"),
     })
+
+    # Drop intermediate columns before saving
+    orders = orders.drop("gross_product_total", "total_cogs")
 
     dataframes["orders"] = orders.dropDuplicates(["order_id"])
     return dataframes
