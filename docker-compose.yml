@@ -229,10 +229,19 @@ services:
       VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
       CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
       CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes: 
+      - redis_data:/data
     networks:
       spark-network:
         ipv4_address: 10.5.0.10
     restart: always
+    command: redis-server --appendonly yes
 
 networks:
   spark-network:
@@ -250,3 +259,4 @@ volumes:
   zookeeper_logs:
   kafka_data:
   app:
+  redis_data:
