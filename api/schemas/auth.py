@@ -10,7 +10,7 @@ from typing import Optional
 class UserRegister(BaseModel):
     """Data needed to register a new user"""
     email: EmailStr
-    full_name: str = Field(..., min_length=2, max_length=100)
+    username: str = Field(..., min_length=2, max_length=100)
     password: str = Field(..., min_length=8)
 
 
