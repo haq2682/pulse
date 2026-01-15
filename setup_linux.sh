@@ -9,8 +9,8 @@ echo ""
 
 # Phase 1: Start core services
 echo "=== Phase 1: Starting Core Services ==="
-echo "Starting PostgreSQL, MinIO, Zookeeper, and Kafka..."
-docker compose up -d postgresql minio zookeeper kafka
+echo "Starting PostgreSQL, MinIO, Redis, Zookeeper, and Kafka..."
+docker compose up -d postgresql minio redis zookeeper kafka
 
 echo ""
 echo "Waiting for services to be ready..."
