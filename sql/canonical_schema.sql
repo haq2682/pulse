@@ -1,4 +1,23 @@
 -- Address Table
+
+-- User table
+CREATE TABLE users (
+    user_id VARCHAR(50) PRIMARY KEY,
+    username VARCHAR(100) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL
+);
+
+-- Business table
+CREATE TABLE businesses (
+    business_id VARCHAR(50) PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    business_name VARCHAR(255) NOT NULL,
+    business_region VARCHAR(100),
+    business_currency VARCHAR(50),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
 CREATE TABLE addresses (
     address_id VARCHAR(50) PRIMARY KEY, -- Unique ID for each address
     city VARCHAR(100) NOT NULL, -- City name, e.g., 'New York'
