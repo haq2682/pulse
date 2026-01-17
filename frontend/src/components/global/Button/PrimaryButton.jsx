@@ -12,7 +12,10 @@ const PrimaryButton = ({
 }) => {
   return (
     <Button
-      label={label}
+      // FIX: Hide the label when loading. 
+      // This removes the text, allowing the spinner to automatically center.
+      label={loading ? null : label} 
+      
       icon={icon}
       onClick={onClick}
       disabled={disabled}

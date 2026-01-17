@@ -174,6 +174,36 @@ def auth_status(request: Request):
             }
         }
     return {"authenticated": False, "user": None}
+@router.get("/session/validate")
+def validate_session(request: Request, db=Depends(get_db)):
+    token = request.cookies.get(COOKIE_NAME) # Ensure this is COOKIE_NAME constant
+    if not token:
+        return {"authenticated": False, "user": None}
+
+    session_data = session_service.get_session(token)
+    if not session_data:
+        return {"authenticated": False, "user": None}
+
+    user_id = session_data.get("user_id")
+
+    # FIX: Removed 'auth_provider' and 'is_active' because they don't exist in your DB yet
+    row = db.execute(
+        text("SELECT user_id, username, email FROM users WHERE user_id = :uid"),
+        {"uid": user_id}
+    ).mappings().fetchone()
+
+    if row:
+        return {
+            "authenticated": True,
+            "user": {
+                "user_id": row["user_id"],
+                "username": row["username"],
+                "email": row["email"]
+                # Removed the extra fields here too
+            }
+        }
+    
+    return {"authenticated": False, "user": None}
 
 @router.post("/business")
 def create_business(user_id: str, business_name: str, region: str, currency: str, db=Depends(get_db)):

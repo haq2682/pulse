@@ -4,8 +4,13 @@ import { Password } from 'primereact/password';
 import { PrimaryButton } from '@/components/global/Button';
 import { Heading, Text, CustomLink } from '@/components/global/Typography';
 import RegistrationBackground from '@/assets/registration-background.png';
+// 1. Import Auth Hook
+import { useAuth } from '@/context/AuthContext';
 
 const Login = () => {
+    // 2. Get login functions
+    const { login, loginWithGoogle, loading, error } = useAuth();
+    
     const [formData, setFormData] = useState({
         email: '',
         password: '',
@@ -16,10 +21,10 @@ const Login = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log('Form submitted:', formData);
-        // Add your signup logic here
+        // 3. Call Login API
+        await login(formData.email, formData.password);
     };
 
     return (
@@ -80,6 +85,13 @@ const Login = () => {
                             <Text className="text-base">Enter your credentials to continue</Text>
                         </div>
 
+                        {/* 4. Error Message Display */}
+                        {error && (
+                            <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm text-center border border-red-100">
+                                {error}
+                            </div>
+                        )}
+
                         <form onSubmit={handleSubmit} className="space-y-5">
 
                             {/* Email */}
@@ -109,30 +121,32 @@ const Login = () => {
                                     name="password"
                                     value={formData.password}
                                     onChange={handleInputChange}
-                                    placeholder="Create a password"
+                                    placeholder="Enter your password"
                                     className="w-full"
                                     inputClassName="w-full"
                                     toggleMask
                                     required
                                     feedback={false}
                                 />
+                                {/* Forgot Password Link inside password block if needed, or add separately */}
                             </div>
 
                             {/* Submit Button */}
                             <PrimaryButton
-                                label="Create Account"
+                                label="Log In" // Corrected from "Create Account"
                                 type="submit"
                                 className="w-full text-base font-semibold"
-                                disabled={!formData.agreeToTerms}
+                                loading={loading} // Add loading spinner
+                                // Removed disabled={!formData.agreeToTerms} because Login has no checkbox
                             />
 
-                            {/* Sign In Link */}
+                            {/* Sign Up Link */}
                             <div className="text-center">
                                 <Text className="text-sm inline">
                                     New to Pulse Analytics?{' '}
                                 </Text>
-                                <CustomLink className="text-sm font-semibold cursor-pointer">
-                                    Log In
+                                <CustomLink href="/signup" className="text-sm font-semibold cursor-pointer">
+                                    Sign Up
                                 </CustomLink>
                             </div>
 
@@ -144,11 +158,12 @@ const Login = () => {
 
                             <PrimaryButton
                                 label="Log In with Google"
-                                type="submit"
+                                type="button" // Changed to button to prevent form submit
+                                onClick={loginWithGoogle}
                                 iconPos="right"
                                 icon="pi pi-google"
                                 className="w-full text-base font-semibold"
-                                disabled={!formData.agreeToTerms}
+                                // Removed disabled check
                             />
                         </form>
                     </div>

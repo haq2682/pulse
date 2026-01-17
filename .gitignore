@@ -39,6 +39,12 @@ api/__pycache__/*
 # testing
 frontend/coverage
 
+# ignore zip files
+*.zip
+
+# ignore dump files
+*.dump
+
 # production
 frontend/build
 
