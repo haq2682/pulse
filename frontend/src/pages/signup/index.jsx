@@ -5,8 +5,16 @@ import { Checkbox } from 'primereact/checkbox';
 import { PrimaryButton } from '@/components/global/Button';
 import { Heading, Text, CustomLink } from '@/components/global/Typography';
 import RegistrationBackground from '@/assets/registration-background.png';
+// 1. Import Auth Hook
+import { useAuth } from '@/context/AuthContext';
 
 const Signup = () => {
+    // 2. Destructure Auth functions
+    const { register, loginWithGoogle, loading, error } = useAuth();
+    
+    // Local state for validation errors (like password mismatch)
+    const [validationError, setValidationError] = useState('');
+
     const [formData, setFormData] = useState({
         fullName: '',
         email: '',
@@ -24,10 +32,18 @@ const Signup = () => {
         setFormData(prev => ({ ...prev, agreeToTerms: e.checked }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log('Form submitted:', formData);
-        // Add your signup logic here
+        setValidationError('');
+
+        // 3. Basic Validation Logic
+        if (formData.password !== formData.confirmPassword) {
+            setValidationError("Passwords do not match");
+            return;
+        }
+
+        // 4. Call Register API
+        await register(formData.fullName, formData.email, formData.password);
     };
 
     return (
@@ -88,6 +104,13 @@ const Signup = () => {
                             </Heading>
                             <Text className="text-base">Join us and start analyzing your data</Text>
                         </div>
+
+                        {/* 5. Error Message Display (Only visual addition needed for functionality) */}
+                        {(error || validationError) && (
+                            <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm text-center border border-red-100">
+                                {error || validationError}
+                            </div>
+                        )}
 
                         <form onSubmit={handleSubmit} className="space-y-5">
                             {/* Full Name */}
@@ -187,7 +210,8 @@ const Signup = () => {
                                 label="Create Account"
                                 type="submit"
                                 className="w-full text-base font-semibold"
-                                disabled={!formData.agreeToTerms}
+                                disabled={!formData.agreeToTerms || loading} // Disable while loading
+                                loading={loading} // Show spinner
                             />
 
                             {/* Sign In Link */}
@@ -195,7 +219,7 @@ const Signup = () => {
                                 <Text className="text-sm inline">
                                     Already have an account?{' '}
                                 </Text>
-                                <CustomLink className="text-sm font-semibold cursor-pointer">
+                                <CustomLink href="/login" className="text-sm font-semibold cursor-pointer">
                                     Sign In
                                 </CustomLink>
                             </div>
@@ -208,7 +232,8 @@ const Signup = () => {
 
                             <PrimaryButton
                                 label="Sign Up with Google"
-                                type="submit"
+                                type="button" // Changed from submit to button
+                                onClick={loginWithGoogle} // Added onClick handler
                                 iconPos="right"
                                 icon="pi pi-google"
                                 className="w-full text-base font-semibold"
