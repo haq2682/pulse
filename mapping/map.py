@@ -67,6 +67,7 @@ df_to_table = {
     "payments_df": "payments",
     "order_items_df": "order_items",
     "shopping_carts_df": "shopping_cart",
+    "cart_items_df": "cart_items",
     "customer_sessions_df": "customer_sessions",
     "marketing_campaigns_df": "marketing_campaigns",
     "suppliers_df": "suppliers",

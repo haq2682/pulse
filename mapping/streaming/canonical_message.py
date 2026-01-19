@@ -11,6 +11,7 @@ import json
 VALID_SOURCES = ["db", "api"]
 VALID_TABLES = [
     "addresses",
+    "cart_items",
     "categories",
     "customer_sessions",
     "customers",
