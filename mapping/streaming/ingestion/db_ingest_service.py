@@ -133,14 +133,25 @@ def send_records_to_kafka(
     records: List[Dict],
     canonical_table: str,
     vendor: str = "custom",
+    operation: str = "c",
 ):
-    """Send records to Kafka with canonical message format."""
+    """
+    Send records to Kafka with canonical message format and CDC operation.
+    
+    Args:
+        producer: Kafka producer instance
+        records: List of records to send
+        canonical_table: Target canonical table name
+        vendor: Vendor identifier
+        operation: CDC operation (c=create, u=update, d=delete, r=read)
+    """
     for record in records:
         message = create_message(
             table=canonical_table,
             payload=serialize_record(record),
             source_type="db",
             vendor=vendor,
+            operation=operation,
         )
         topic = get_topic(canonical_table)
         producer.send(topic, value=message)

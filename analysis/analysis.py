@@ -3,7 +3,7 @@ Main execution script for E-commerce Data Analysis.
 """
 import pyspark.sql.functions as F
 from pyspark.sql import Window
-from analysis_config import create_spark_session, DB_CONFIG
+from analysis_config import create_spark_session
 from analysis_utils import (
     get_agg_tables,
     add_time_grain,
@@ -53,11 +53,11 @@ def main():
     spark = create_spark_session("Ecommerce_Analysis_Main")
 
     # ---------------------------------------------------------
-    # 2. Load Data (from Postgres)
+    # 2. Load Data (from MinIO transformed/ directory)
     # ---------------------------------------------------------
-    print("\n📥 Loading Aggregated Tables from Database...")
-    # This uses the credentials from config and logic from utils
-    dataframes = get_agg_tables(spark, DB_CONFIG)
+    print("\n📥 Loading Aggregated Tables from MinIO...")
+    # Load transformed data from MinIO bucket
+    dataframes = get_agg_tables(spark)
     
     if not dataframes:
         print("❌ No tables loaded. Exiting.")
