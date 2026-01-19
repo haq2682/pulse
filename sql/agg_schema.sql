@@ -925,7 +925,7 @@ CREATE INDEX idx_agg_reviews_rating ON agg_reviews(rating);
 
 -- Shopping Cart Indexes
 CREATE INDEX idx_agg_cart_customer ON agg_shopping_cart(customer_id);
-CREATE INDEX idx_agg_cart_session ON agg_shopping_cart(session_id) WHERE session_id IS;
+CREATE INDEX idx_agg_cart_session ON agg_shopping_cart(session_id) WHERE session_id IS NOT NULL;
 CREATE INDEX idx_agg_cart_status ON agg_shopping_cart(cart_status);
 CREATE INDEX idx_agg_cart_created_at ON agg_shopping_cart(created_at);
 
