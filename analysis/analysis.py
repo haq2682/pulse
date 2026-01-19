@@ -5835,31 +5835,69 @@ def main():
 
     # Basic cart creation & status distribution
 
-    if not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_id") and not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_status"):
-        analysis["cart_overall_stats"] = dataframes["agg_shopping_cart"].agg(
-            F.countDistinct("cart_id").alias("total_carts"),
-            F.count("*").alias("total_cart_lines")
-        ).fillna({
-            "total_carts": 0,
-            "total_cart_lines": 0
-        })
+    has_cart = "agg_shopping_cart" in dataframes and not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_id")
+    has_cart_items = "agg_cart_items" in dataframes and not is_column_all_null_or_zero(dataframes["agg_cart_items"], "cart_item_id")
+
+    if has_cart and not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_status"):
+        if has_cart_items:
+            # Compute cart lines per cart once (used for both overall stats and status distribution)
+            cart_items_per_cart = (
+                dataframes["agg_cart_items"]
+                .groupBy("cart_id")
+                .agg(F.count("*").alias("cart_lines_count"))
+            )
+            cart_with_lines = (
+                dataframes["agg_shopping_cart"]
+                .join(cart_items_per_cart, on="cart_id", how="left")
+                .fillna({"cart_lines_count": 0})
+            )
+
+            # Cart overall stats: total carts and total cart lines
+            analysis["cart_overall_stats"] = cart_with_lines.agg(
+                F.countDistinct("cart_id").alias("total_carts"),
+                F.sum("cart_lines_count").alias("total_cart_lines")
+            ).fillna({
+                "total_carts": 0,
+                "total_cart_lines": 0
+            })
+
+            # Cart status distribution with lines count per status
+            analysis["cart_status_distribution"] = (
+                cart_with_lines
+                .groupBy("cart_status")
+                .agg(
+                    F.countDistinct("cart_id").alias("carts_count"),
+                    F.sum("cart_lines_count").alias("cart_lines_count")
+                ).fillna({
+                    "carts_count": 0,
+                    "cart_lines_count": 0
+                })
+                .orderBy("cart_status")
+            )
+        else:
+            # Fallback when agg_cart_items is not available
+            analysis["cart_overall_stats"] = dataframes["agg_shopping_cart"].agg(
+                F.countDistinct("cart_id").alias("total_carts"),
+                F.lit(0).alias("total_cart_lines")
+            ).fillna({
+                "total_carts": 0,
+                "total_cart_lines": 0
+            })
+
+            analysis["cart_status_distribution"] = (
+                dataframes["agg_shopping_cart"]
+                .groupBy("cart_status")
+                .agg(
+                    F.countDistinct("cart_id").alias("carts_count"),
+                    F.lit(0).alias("cart_lines_count")
+                ).fillna({
+                    "carts_count": 0,
+                    "cart_lines_count": 0
+                })
+                .orderBy("cart_status")
+            )
     else:
-        print("cart_id or cart_status column is all NULL or zero; skipping overall cart statistics analysis.")
-    if not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_status"):
-        analysis["cart_status_distribution"] = (
-            dataframes["agg_shopping_cart"]
-            .groupBy("cart_status")
-            .agg(
-                F.countDistinct("cart_id").alias("carts_count"),
-            F.count("*").alias("cart_lines_count")
-        ).fillna({
-            "carts_count": 0,
-            "cart_lines_count": 0
-        })
-        .orderBy("cart_status")
-    )
-    else:
-        print("cart_status column is all NULL or zero; skipping cart status distribution analysis.")
+        print("cart_id or cart_status column is all NULL or zero; skipping overall cart statistics and cart status distribution analysis.")
 
 
     
