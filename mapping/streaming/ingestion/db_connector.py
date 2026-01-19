@@ -98,18 +98,24 @@ def connect_oracle(uri: str) -> Any:
             dsn=dsn
         )
     except ImportError:
-        import cx_Oracle
-        parsed = urlparse(uri)
-        dsn = cx_Oracle.makedsn(
-            parsed.hostname,
-            parsed.port or 1521,
-            service_name=parsed.path.lstrip('/')
-        )
-        return cx_Oracle.connect(
-            user=parsed.username,
-            password=parsed.password,
-            dsn=dsn
-        )
+        try:
+            import cx_Oracle
+            parsed = urlparse(uri)
+            dsn = cx_Oracle.makedsn(
+                parsed.hostname,
+                parsed.port or 1521,
+                service_name=parsed.path.lstrip('/')
+            )
+            return cx_Oracle.connect(
+                user=parsed.username,
+                password=parsed.password,
+                dsn=dsn
+            )
+        except ImportError:
+            raise ImportError(
+                "Oracle database support requires either 'oracledb' or 'cx_Oracle' package. "
+                "Install with: pip install oracledb  (recommended) or pip install cx_Oracle"
+            )
 
 
 def connect_db2(uri: str) -> Any:
@@ -118,17 +124,23 @@ def connect_db2(uri: str) -> Any:
     Requires ibm_db or ibm_db_dbi package.
     URI format: db2://user:pass@host:port/database
     """
-    import ibm_db
-    parsed = urlparse(uri)
-    conn_str = (
-        f"DATABASE={parsed.path.lstrip('/')};"
-        f"HOSTNAME={parsed.hostname};"
-        f"PORT={parsed.port or 50000};"
-        f"PROTOCOL=TCPIP;"
-        f"UID={parsed.username};"
-        f"PWD={parsed.password};"
-    )
-    return ibm_db.connect(conn_str, "", "")
+    try:
+        import ibm_db
+        parsed = urlparse(uri)
+        conn_str = (
+            f"DATABASE={parsed.path.lstrip('/')};"
+            f"HOSTNAME={parsed.hostname};"
+            f"PORT={parsed.port or 50000};"
+            f"PROTOCOL=TCPIP;"
+            f"UID={parsed.username};"
+            f"PWD={parsed.password};"
+        )
+        return ibm_db.connect(conn_str, "", "")
+    except ImportError:
+        raise ImportError(
+            "IBM Db2 database support requires 'ibm_db' package. "
+            "Install with: pip install ibm_db"
+        )
 
 
 def connect_vitess(uri: str) -> Any:
@@ -216,17 +228,23 @@ def discover_tables(conn: Any, db_type: str) -> List[str]:
         return tables
     
     elif db_type == 'db2':
-        import ibm_db_dbi
-        # Convert ibm_db connection to DBI connection for cursor operations
-        cursor = ibm_db_dbi.Connection(conn).cursor()
-        cursor.execute("""
-            SELECT TABNAME FROM SYSCAT.TABLES 
-            WHERE TABSCHEMA = CURRENT SCHEMA AND TYPE = 'T'
-            ORDER BY TABNAME
-        """)
-        tables = [row[0] for row in cursor.fetchall()]
-        cursor.close()
-        return tables
+        try:
+            import ibm_db_dbi
+            # Convert ibm_db connection to DBI connection for cursor operations
+            cursor = ibm_db_dbi.Connection(conn).cursor()
+            cursor.execute("""
+                SELECT TABNAME FROM SYSCAT.TABLES 
+                WHERE TABSCHEMA = CURRENT SCHEMA AND TYPE = 'T'
+                ORDER BY TABNAME
+            """)
+            tables = [row[0] for row in cursor.fetchall()]
+            cursor.close()
+            return tables
+        except ImportError:
+            raise ImportError(
+                "IBM Db2 table discovery requires 'ibm_db_dbi' package. "
+                "Install with: pip install ibm_db"
+            )
     
     elif db_type == 'vitess':
         # Vitess uses MySQL protocol

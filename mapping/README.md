@@ -102,7 +102,7 @@ Remote Database
 
 ### PostgreSQL
 
-PostgreSQL requires the most configuration for Debezium CDC due to its logical replication requirements.
+PostgreSQL requires the most configuration for Debezium CDC because of its logical replication requirements.
 
 #### 1. Prerequisites
 
