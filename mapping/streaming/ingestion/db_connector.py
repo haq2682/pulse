@@ -18,6 +18,8 @@ def detect_db_type(uri: str) -> str:
     
     Supported databases: PostgreSQL, MySQL, MongoDB, SQL Server, Oracle, IBM Db2, Vitess.
     Note: Cassandra and Spanner use configuration-based connections, not URIs.
+    
+    Vitess: Can use either 'mysql://' or 'vitess://' scheme (both use MySQL protocol).
     See mapping/README.md for detailed setup instructions.
     """
     scheme = urlparse(uri).scheme.lower()
@@ -32,7 +34,7 @@ def detect_db_type(uri: str) -> str:
         'sqlserver': 'mssql',
         'oracle': 'oracle',
         'db2': 'db2',
-        'vitess': 'vitess'
+        'vitess': 'vitess'  # Vitess uses MySQL protocol but can be specified explicitly
     }
     
     db_type = db_map.get(scheme)
@@ -148,6 +150,9 @@ def connect_vitess(uri: str) -> Any:
     Connect to Vitess (uses MySQL protocol).
     Vitess is MySQL-compatible, so we use MySQL connector.
     URI format: mysql://user:pass@vtgate-host:port/keyspace
+              or vitess://user:pass@vtgate-host:port/keyspace
+    
+    Both schemes are supported; Vitess uses MySQL protocol internally.
     """
     return connect_mysql(uri)
 
