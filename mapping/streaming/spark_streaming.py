@@ -45,48 +45,42 @@ def create_spark_session() -> SparkSession:
 
 
 def get_canonical_schema() -> StructType:
-    """Define canonical message schema for standard messages"""
+    """
+    Define canonical message schema with optional CDC operation field.
+    The operation field is used for database ingestion with CDC support.
+    """
     return StructType([
         StructField("source_type", StringType()),
         StructField("vendor", StringType()),
         StructField("table", StringType()),
         StructField("schema_version", StringType()),
-        StructField("payload", MapType(StringType(), StringType()))
-    ])
-
-
-def get_debezium_schema() -> StructType:
-    """Define Debezium CDC message schema"""
-    return StructType([
-        StructField("source_type", StringType()),
-        StructField("vendor", StringType()),
-        StructField("table", StringType()),
-        StructField("schema_version", StringType()),
-        StructField("operation", StringType()),  # 'c', 'u', 'd', 'r' for CDC operations
+        StructField("operation", StringType(), True),  # CDC operation: 'c', 'u', 'd', 'r' (optional, nullable)
         StructField("payload", MapType(StringType(), StringType()))
     ])
 
 
 def read_kafka_stream(spark: SparkSession) -> DataFrame:
     """
-    Read from Kafka topics with Debezium CDC support.
+    Read from Kafka ecom.* topics with CDC support for database ingestion.
     
-    Topic naming conventions:
-    - 'ecom.*' topics: Standard messages from API/DB ingestion (e.g., ecom.customers, ecom.orders)
-    - 'debezium.*' topics: Debezium CDC messages with operation field (e.g., debezium.customers)
+    Topic naming convention:
+    - 'ecom.*' topics: Messages from API/DB ingestion (e.g., ecom.customers, ecom.orders)
     
-    Both topic patterns use the same Debezium-compatible schema with optional operation field.
+    Database ingestion messages include an optional 'operation' field for CDC:
+    - 'c' or 'create': New record
+    - 'u' or 'update': Updated record  
+    - 'd' or 'delete': Deleted record
+    - 'r' or 'read': Snapshot/initial load
     """
     return (
         spark.readStream
         .format("kafka")
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP)
-        # Subscribe to both standard ecom topics and debezium CDC topics
-        .option("subscribePattern", "ecom\\..*|debezium\\..*")
+        .option("subscribePattern", "ecom\\..*")
         .option("startingOffsets", "latest")
         .load()
         .selectExpr("CAST(value AS STRING) as json_str")
-        .select(from_json(col("json_str"), get_debezium_schema()).alias("data"))
+        .select(from_json(col("json_str"), get_canonical_schema()).alias("data"))
         .select("data.*")
     )
 

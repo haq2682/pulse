@@ -1,7 +1,7 @@
 """
 Canonical Kafka message format for Pulse e-commerce streaming.
 Functional approach - simple functions, no classes.
-Supports both standard messages and Debezium CDC messages.
+Supports CDC operations for database ingestion.
 """
 
 from typing import Dict, Any, Optional
@@ -9,7 +9,7 @@ from datetime import datetime
 import json
 
 
-VALID_SOURCES = ["db", "api", "debezium"]
+VALID_SOURCES = ["db", "api"]
 VALID_TABLES = [
     "addresses",
     "cart_items",
@@ -28,7 +28,7 @@ VALID_TABLES = [
     "wishlist",
 ]
 
-# CDC operations: c=create, u=update, d=delete, r=read/snapshot
+# CDC operations for database ingestion: c=create, u=update, d=delete, r=read/snapshot
 VALID_CDC_OPERATIONS = ["c", "u", "d", "r", "create", "update", "delete", "read"]
 
 TOPIC_MAP = {table: f"ecom.{table}" for table in VALID_TABLES}
@@ -43,15 +43,15 @@ def create_message(
     operation: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Create canonical message with optional CDC operation.
+    Create canonical message with optional CDC operation for database ingestion.
     
     Args:
         table: Target table name
         payload: Data payload
-        source_type: Source type (db, api, debezium)
+        source_type: Source type (db, api)
         vendor: Vendor identifier
         schema_version: Schema version
-        operation: CDC operation (c=create, u=update, d=delete, r=read)
+        operation: CDC operation for db source (c=create, u=update, d=delete, r=read)
         
     Returns:
         Canonical message dictionary
@@ -72,51 +72,16 @@ def create_message(
         "payload": payload,
     }
     
-    # Add operation field for CDC messages
+    # Add operation field for CDC messages (used with db source type)
     if operation:
         message["operation"] = operation
     
     return message
 
 
-def create_debezium_message(
-    table: str,
-    payload: Dict[str, Any],
-    operation: str,
-    vendor: str = "debezium",
-    schema_version: str = "v1",
-) -> Dict[str, Any]:
-    """
-    Create a Debezium CDC message.
-    
-    Args:
-        table: Target table name
-        payload: Data payload (after state for c/u/r, before state for d)
-        operation: CDC operation (c=create, u=update, d=delete, r=read)
-        vendor: Vendor identifier
-        schema_version: Schema version
-        
-    Returns:
-        Debezium-style canonical message
-    """
-    return create_message(
-        table=table,
-        payload=payload,
-        source_type="debezium",
-        vendor=vendor,
-        schema_version=schema_version,
-        operation=operation,
-    )
-
-
 def get_topic(table: str) -> str:
     """Get Kafka topic name for table."""
     return f"ecom.{table}"
-
-
-def get_debezium_topic(table: str) -> str:
-    """Get Debezium-specific Kafka topic name for table."""
-    return f"debezium.{table}"
 
 
 def validate_message(message: Dict[str, Any]) -> bool:
@@ -129,8 +94,9 @@ def validate_cdc_message(message: Dict[str, Any]) -> bool:
     """Validate CDC message structure including operation field."""
     if not validate_message(message):
         return False
-    if message.get("source_type") == "debezium":
-        return "operation" in message and message["operation"] in VALID_CDC_OPERATIONS
+    # Validate operation whenever it's present, regardless of source_type
+    if message.get("operation"):
+        return message["operation"] in VALID_CDC_OPERATIONS
     return True
 
 
