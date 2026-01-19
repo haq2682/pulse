@@ -2,6 +2,15 @@
 Database ingestion service: DB URI → Kafka
 Auto-discovers tables, maps to canonical schema, creates topics dynamically.
 Frontend will provide database URI - for now using dummy variable.
+
+IMPORTANT: Before using this service with an external database, the database
+administrator must complete the prerequisites outlined in mapping/README.md,
+including:
+- Creating a dedicated streaming user with appropriate permissions
+- Granting replication/CDC roles
+- Configuring database for logical replication (if applicable)
+
+See mapping/README.md for detailed setup instructions for each database type.
 """
 
 import time
@@ -259,11 +268,25 @@ def ingest_from_uri(
 # ============================================================================
 # DUMMY DATABASE URI - Replace this with frontend input later
 # ============================================================================
+#
+# IMPORTANT: Before providing a database URI, ensure the database administrator
+# has completed the setup steps documented in mapping/README.md
+#
+# Required setup includes:
+# 1. Create a dedicated streaming user (e.g., debezium_user)
+# 2. Grant appropriate permissions (SELECT, REPLICATION, etc.)
+# 3. Configure database for CDC/logical replication
+# 4. Provide the connection URI in the format: protocol://user:pass@host:port/db
+#
+# See mapping/README.md for database-specific instructions.
+# ============================================================================
 
 DUMMY_DB_URI = "postgresql://user:password@localhost:5432/ecommerce"
 
 # When frontend is ready, replace above with:
 # db_uri = request.json.get('database_uri')  # From React frontend
+# Alternatively, use environment variable from .env:
+# DUMMY_DB_URI = os.getenv('STREAMING_DB_URI', 'postgresql://user:password@localhost:5432/ecommerce')
 
 
 if __name__ == "__main__":

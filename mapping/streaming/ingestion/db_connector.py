@@ -1,6 +1,10 @@
 """
 Database connector with auto-detection from URI.
 Functional approach - simple functions for all DB types.
+
+IMPORTANT: Database connections require proper user permissions.
+See mapping/README.md for database administrator prerequisites
+including user creation, role assignments, and replication setup.
 """
 
 from urllib.parse import urlparse
