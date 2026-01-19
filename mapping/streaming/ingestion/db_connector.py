@@ -13,7 +13,13 @@ import os
 
 
 def detect_db_type(uri: str) -> str:
-    """Detect database type from URI scheme."""
+    """
+    Detect database type from URI scheme.
+    
+    Supported databases: PostgreSQL, MySQL, MongoDB, SQL Server, Oracle, IBM Db2, Vitess.
+    Note: Cassandra and Spanner use configuration-based connections, not URIs.
+    See mapping/README.md for detailed setup instructions.
+    """
     scheme = urlparse(uri).scheme.lower()
     
     db_map = {
@@ -23,12 +29,19 @@ def detect_db_type(uri: str) -> str:
         'mongodb+srv': 'mongo',
         'mysql': 'mysql',
         'mssql': 'mssql',
-        'sqlserver': 'mssql'
+        'sqlserver': 'mssql',
+        'oracle': 'oracle',
+        'db2': 'db2',
+        'vitess': 'vitess'
     }
     
     db_type = db_map.get(scheme)
     if not db_type:
-        raise ValueError(f"Unsupported database type: {scheme}")
+        raise ValueError(
+            f"Unsupported database type: {scheme}. "
+            f"Supported types: {', '.join(set(db_map.values()))}. "
+            f"See mapping/README.md for setup instructions."
+        )
     
     return db_type
 
@@ -65,10 +78,78 @@ def connect_mssql(uri: str) -> Any:
     return pyodbc.connect(uri)
 
 
+def connect_oracle(uri: str) -> Any:
+    """
+    Connect to Oracle Database.
+    Requires cx_Oracle or oracledb package.
+    URI format: oracle://user:pass@host:port/service_name
+    """
+    try:
+        import oracledb
+        parsed = urlparse(uri)
+        dsn = oracledb.makedsn(
+            parsed.hostname,
+            parsed.port or 1521,
+            service_name=parsed.path.lstrip('/')
+        )
+        return oracledb.connect(
+            user=parsed.username,
+            password=parsed.password,
+            dsn=dsn
+        )
+    except ImportError:
+        import cx_Oracle
+        parsed = urlparse(uri)
+        dsn = cx_Oracle.makedsn(
+            parsed.hostname,
+            parsed.port or 1521,
+            service_name=parsed.path.lstrip('/')
+        )
+        return cx_Oracle.connect(
+            user=parsed.username,
+            password=parsed.password,
+            dsn=dsn
+        )
+
+
+def connect_db2(uri: str) -> Any:
+    """
+    Connect to IBM Db2.
+    Requires ibm_db or ibm_db_dbi package.
+    URI format: db2://user:pass@host:port/database
+    """
+    import ibm_db
+    parsed = urlparse(uri)
+    conn_str = (
+        f"DATABASE={parsed.path.lstrip('/')};"
+        f"HOSTNAME={parsed.hostname};"
+        f"PORT={parsed.port or 50000};"
+        f"PROTOCOL=TCPIP;"
+        f"UID={parsed.username};"
+        f"PWD={parsed.password};"
+    )
+    return ibm_db.connect(conn_str, "", "")
+
+
+def connect_vitess(uri: str) -> Any:
+    """
+    Connect to Vitess (uses MySQL protocol).
+    Vitess is MySQL-compatible, so we use MySQL connector.
+    URI format: mysql://user:pass@vtgate-host:port/keyspace
+    """
+    return connect_mysql(uri)
+
+
 def get_connection(uri: str) -> Tuple[Any, str]:
     """
     Auto-detect DB type and return connection.
     Returns: (connection, db_type)
+    
+    Supported databases: PostgreSQL, MySQL, MongoDB, SQL Server, 
+    Oracle, IBM Db2, Vitess.
+    
+    Note: Cassandra and Spanner require configuration-based setup
+    rather than URI connections. See mapping/README.md for details.
     """
     db_type = detect_db_type(uri)
     
@@ -76,7 +157,10 @@ def get_connection(uri: str) -> Tuple[Any, str]:
         'postgres': connect_postgres,
         'mysql': connect_mysql,
         'mongo': connect_mongo,
-        'mssql': connect_mssql
+        'mssql': connect_mssql,
+        'oracle': connect_oracle,
+        'db2': connect_db2,
+        'vitess': connect_vitess
     }
     
     conn = connectors[db_type](uri)
@@ -87,6 +171,8 @@ def discover_tables(conn: Any, db_type: str) -> List[str]:
     """
     Auto-discover all tables/collections in database.
     Returns list of table/collection names.
+    
+    Supported for: PostgreSQL, MySQL, MongoDB, SQL Server, Oracle, Db2, Vitess.
     """
     if db_type == 'mongo':
         db = conn.get_default_database()
@@ -119,13 +205,45 @@ def discover_tables(conn: Any, db_type: str) -> List[str]:
         cursor.close()
         return tables
     
+    elif db_type == 'oracle':
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT table_name FROM user_tables
+            ORDER BY table_name
+        """)
+        tables = [row[0] for row in cursor.fetchall()]
+        cursor.close()
+        return tables
+    
+    elif db_type == 'db2':
+        import ibm_db_dbi
+        # Convert ibm_db connection to DBI connection for cursor operations
+        cursor = ibm_db_dbi.Connection(conn).cursor()
+        cursor.execute("""
+            SELECT TABNAME FROM SYSCAT.TABLES 
+            WHERE TABSCHEMA = CURRENT SCHEMA AND TYPE = 'T'
+            ORDER BY TABNAME
+        """)
+        tables = [row[0] for row in cursor.fetchall()]
+        cursor.close()
+        return tables
+    
+    elif db_type == 'vitess':
+        # Vitess uses MySQL protocol
+        cursor = conn.cursor()
+        cursor.execute("SHOW TABLES")
+        tables = [row[0] for row in cursor.fetchall()]
+        cursor.close()
+        return tables
+    
     return []
 
 
 def fetch_new_records(conn: Any, db_type: str, table: str, last_timestamp: str = None) -> List[Dict]:
     """
     Fetch new records from database.
-    Works for SQL databases. MongoDB needs different logic.
+    Works for SQL databases (PostgreSQL, MySQL, SQL Server, Oracle, Db2, Vitess).
+    MongoDB needs different logic.
     """
     if db_type == 'mongo':
         return fetch_mongo_records(conn, table, last_timestamp)
