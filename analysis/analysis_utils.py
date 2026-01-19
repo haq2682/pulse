@@ -1,53 +1,75 @@
-import psycopg2
+import os
 import pyspark.sql.functions as F
 from pyspark.sql import Window
+from minio import Minio
 
 
-def get_agg_tables(spark, db_config):
+def get_minio_client():
+    """Create and return a MinIO client instance."""
+    return Minio(
+        os.getenv("MINIO_ENDPOINT"),
+        access_key=os.getenv("MINIO_ACCESS_KEY"),
+        secret_key=os.getenv("MINIO_SECRET_KEY"),
+        secure=False,
+    )
+
+
+def get_agg_tables(spark, db_config=None):
+    """
+    Load aggregated tables from MinIO transformed/ directory.
+    
+    Args:
+        spark: SparkSession
+        db_config: Deprecated parameter kept for backward compatibility
+        
+    Returns:
+        dict: Dictionary of table names to Spark DataFrames
+    """
     try:
-        print(f"Connecting to Postgres at {db_config['host']}:{db_config['port']}...")
-        conn = psycopg2.connect(
-            host=db_config['host'],
-            port=db_config['port'],
-            database=db_config['database'],
-            user=db_config['user'],
-            password=db_config['password']
-        )
-        cursor = conn.cursor()
-
-        cursor.execute("""
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public' 
-            AND table_name LIKE 'agg_%'
-        """)
+        minio_client = get_minio_client()
+        bucket_name = os.getenv("MINIO_BUCKET", "pulse-bucket-1")
         
-        tables = [row[0] for row in cursor.fetchall()]
-        print(f"Found tables: {tables}")
-
+        print(f"Loading aggregated tables from MinIO bucket: {bucket_name}")
+        print(f"Directory: transformed/")
+        
+        # List all CSV files in the transformed/ directory
+        objects = minio_client.list_objects(bucket_name, prefix="transformed/", recursive=True)
+        
         spark_dfs = {}
+        tables_found = []
         
-        connection_properties = {
-            "user": db_config['user'],
-            "password": db_config['password'],
-            "driver": db_config['driver']
-        }
-
-        for table in tables:
-            print(f"Processing table: {table}...")
-            df = spark.read.jdbc(
-                url=db_config['url'], 
-                table=f'"{table}"', 
-                properties=connection_properties
-            )
-            spark_dfs[table] = df
-
-        cursor.close()
-        conn.close()
+        for obj in objects:
+            if not obj.object_name.endswith(".csv"):
+                continue
+                
+            # Extract table name from path: transformed/{table_name}.csv
+            table_name = obj.object_name.replace("transformed/", "").replace(".csv", "")
+            tables_found.append(table_name)
+        
+        print(f"Found tables: {tables_found}")
+        
+        for table_name in tables_found:
+            try:
+                file_path = f"transformed/{table_name}.csv"
+                print(f"Loading table: {table_name}...")
+                
+                df = (
+                    spark.read
+                    .option("header", "true")
+                    .option("inferSchema", "true")
+                    .csv(f"s3a://{bucket_name}/{file_path}")
+                )
+                
+                spark_dfs[table_name] = df
+                print(f"  ✅ Loaded {table_name}: {df.count()} rows")
+                
+            except Exception as e:
+                print(f"  ❌ Error loading {table_name}: {e}")
+        
         return spark_dfs
 
     except Exception as e:
-        print(f"Error loading tables: {e}")
+        print(f"Error loading tables from MinIO: {e}")
         import traceback
         traceback.print_exc()
         return {}
