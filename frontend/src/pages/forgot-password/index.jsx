@@ -6,21 +6,33 @@ import Text from '@/components/global/Typography/Text';
 import CustomLink from '@/components/global/Typography/CustomLink';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import HeroBackground from '@/assets/hero-background.png';
+import { useAuth } from '@/context/AuthContext';
 
 const ForgotPassword = () => {
+    const { forgotPassword } = useAuth();
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
+    const [errorMsg, setErrorMsg] = useState(''); // Only need error state now
+    
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setErrorMsg('');
 
-        // TODO: Add your forgot password API call here
-        setTimeout(() => {
-            setLoading(false);
-            // navigate to success page or show success message
-        }, 1500);
+        // 1. Call API
+        const result = await forgotPassword(email);
+
+        setLoading(false);
+
+        if (result.success) {
+            // 2. SUCCESS: Redirect to the confirmation page immediately
+            navigate('/reset-password-email');
+        } else {
+            // 3. ERROR: Stay on this page and show error
+            setErrorMsg(result.error || 'Failed to send reset link.');
+        }
     };
 
     return (
@@ -32,9 +44,8 @@ const ForgotPassword = () => {
                     className="h-full w-full object-cover"
                 />
             </div>
-            {/* Card Container */}
+            
             <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 md:p-10 z-1">
-                {/* Header */}
                 <div className="text-center mb-6">
                     <Heading level={2} gradient={true} className="text-3xl md:text-4xl mb-2">
                         Forgot Password?
@@ -44,9 +55,14 @@ const ForgotPassword = () => {
                     </Text>
                 </div>
 
-                {/* Form */}
+                {/* Display Error Message Only */}
+                {errorMsg && (
+                    <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm text-center border border-red-100">
+                        {errorMsg}
+                    </div>
+                )}
+
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Email Input */}
                     <div className="space-y-2">
                         <label
                             htmlFor="email"
@@ -66,16 +82,14 @@ const ForgotPassword = () => {
                         />
                     </div>
 
-                    {/* Submit Button */}
                     <PrimaryButton
                         label="Send Link"
-                        onClick={handleSubmit}
+                        type="submit"
                         loading={loading}
                         disabled={loading || !email}
                         className="w-full"
                     />
 
-                    {/* Return to Login Link */}
                     <div className="text-center pt-2">
                         <CustomLink
                             href="/login"

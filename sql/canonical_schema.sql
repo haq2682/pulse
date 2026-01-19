@@ -197,14 +197,14 @@ CREATE TABLE customer_sessions (
     FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
 );
 
--- User table
-CREATE TABLE users (
+-- User tableCREATE TABLE users (
     user_id VARCHAR(50) PRIMARY KEY,
     username VARCHAR(100) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL
+    password_hash VARCHAR(255) NULL,
+    reset_token TEXT NULL,
+    reset_token_expires TIMESTAMP NULL
 );
-
 -- Business table
 CREATE TABLE businesses (
     business_id VARCHAR(50) PRIMARY KEY,

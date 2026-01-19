@@ -9,7 +9,7 @@ class EmailService:
     @staticmethod
     async def send_password_reset_email(to_email: str, reset_token:  str, user_name: str):
         """Send password reset email."""
-        reset_link = f"{settings.frontend_url}/reset-password? token={reset_token}"
+        reset_link = f"{settings.frontend_url}/reset-password?token={reset_token}"
         
         message = MIMEMultipart("alternative")
         message["Subject"] = "Reset Your Password - Pulse Analytics"

@@ -1,4 +1,5 @@
 import httpx
+import urllib.parse  # <--- NEW IMPORT
 from typing import Optional
 from config import get_settings
 
@@ -21,7 +22,10 @@ class GoogleOAuthService:
             "access_type": "offline",
             "prompt": "consent"
         }
-        query_string = "&".join(f"{k}={v}" for k, v in params.items())
+        
+        # FIX: Use urlencode to safely handle special characters (like http://)
+        query_string = urllib.parse.urlencode(params)
+        
         return f"{GoogleOAuthService.GOOGLE_AUTH_URL}?{query_string}"
     
     @staticmethod
