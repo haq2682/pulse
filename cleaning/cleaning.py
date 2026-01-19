@@ -69,6 +69,7 @@ def main():
         "products",
         "reviews",
         "shopping_cart",
+        "cart_items",
         "suppliers",
         "wishlist",
     ]

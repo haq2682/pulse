@@ -101,6 +101,8 @@ def remove_all_outliers(dataframes):
         "payment_id",
         "campaign_id",
         "cart_id",
+        "cart_item_id",
+        "inventory_id",
         "review_id",
         "wishlist_id",
     ]
