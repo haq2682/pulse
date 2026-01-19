@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { InputText } from 'primereact/inputtext';
 import { Password } from 'primereact/password';
+import { useNavigate } from 'react-router'; // <--- 1. Import useNavigate
 import { PrimaryButton } from '@/components/global/Button';
 import { Heading, Text, CustomLink } from '@/components/global/Typography';
 import RegistrationBackground from '@/assets/registration-background.png';
-// 1. Import Auth Hook
+// Import Auth Hook
 import { useAuth } from '@/context/AuthContext';
 
 const Login = () => {
-    // 2. Get login functions
+    // Get login functions
     const { login, loginWithGoogle, loading, error } = useAuth();
+    const navigate = useNavigate(); // <--- 2. Initialize Hook
     
     const [formData, setFormData] = useState({
         email: '',
@@ -23,7 +25,7 @@ const Login = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        // 3. Call Login API
+        // Call Login API
         await login(formData.email, formData.password);
     };
 
@@ -85,7 +87,7 @@ const Login = () => {
                             <Text className="text-base">Enter your credentials to continue</Text>
                         </div>
 
-                        {/* 4. Error Message Display */}
+                        {/* Error Message Display */}
                         {error && (
                             <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm text-center border border-red-100">
                                 {error}
@@ -113,9 +115,23 @@ const Login = () => {
 
                             {/* Password */}
                             <div className="w-full">
-                                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                                    Password
-                                </label>
+                                {/* <--- 3. ADDED: Flex container for Label + Forgot Password Link ---> */}
+                                <div className="flex items-center justify-between mb-2">
+                                    <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                                        Password
+                                    </label>
+                                    <CustomLink 
+                                        href="/forgot-password"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            navigate('/forgot-password');
+                                        }}
+                                        className="text-sm font-semibold text-[var(--color-primary)] hover:opacity-80 cursor-pointer"
+                                    >
+                                        Forgot Password?
+                                    </CustomLink>
+                                </div>
+
                                 <Password
                                     id="password"
                                     name="password"
@@ -128,16 +144,14 @@ const Login = () => {
                                     required
                                     feedback={false}
                                 />
-                                {/* Forgot Password Link inside password block if needed, or add separately */}
                             </div>
 
                             {/* Submit Button */}
                             <PrimaryButton
-                                label="Log In" // Corrected from "Create Account"
+                                label="Log In" 
                                 type="submit"
                                 className="w-full text-base font-semibold"
-                                loading={loading} // Add loading spinner
-                                // Removed disabled={!formData.agreeToTerms} because Login has no checkbox
+                                loading={loading} 
                             />
 
                             {/* Sign Up Link */}
@@ -158,12 +172,11 @@ const Login = () => {
 
                             <PrimaryButton
                                 label="Log In with Google"
-                                type="button" // Changed to button to prevent form submit
+                                type="button" 
                                 onClick={loginWithGoogle}
                                 iconPos="right"
                                 icon="pi pi-google"
                                 className="w-full text-base font-semibold"
-                                // Removed disabled check
                             />
                         </form>
                     </div>

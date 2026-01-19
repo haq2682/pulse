@@ -7,13 +7,14 @@
 -- ============================================================================
 
 -- User table
+
 CREATE TABLE users (
     user_id VARCHAR(50) PRIMARY KEY,
     username VARCHAR(100) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    reset_token VARCHAR(255),
-    reset_token_expires TIMESTAMP
+    password_hash VARCHAR(255) NULL,
+    reset_token TEXT NULL,
+    reset_token_expires TIMESTAMP NULL
 );
 -- Business table
 CREATE TABLE businesses (

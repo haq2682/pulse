@@ -1,34 +1,56 @@
 import React, { useState } from 'react';
 import { Password } from 'primereact/password';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router'; // NOTE: useSearchParams imports from 'react-router-dom' usually, but 'react-router' in v6
 import Heading from '@/components/global/Typography/Heading';
 import Text from '@/components/global/Typography/Text';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import HeroBackground from '@/assets/hero-background.png';
+// 1. Import Auth Hook
+import { useAuth } from '@/context/AuthContext';
 
 const ResetPassword = () => {
+    const { resetPassword } = useAuth();
+    const navigate = useNavigate();
+    
+    // 2. Get Token from URL Query Params
+    const [searchParams] = useSearchParams();
+    const token = searchParams.get('token');
+
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const navigate = useNavigate();
+    const [msg, setMsg] = useState({ type: '', content: '' });
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setMsg({ type: '', content: '' });
 
-        // Validation
+        if (!token) {
+            setMsg({ type: 'error', content: 'Invalid or missing reset token.' });
+            return;
+        }
+
         if (password !== confirmPassword) {
-            // TODO: Show error message - passwords don't match
+            setMsg({ type: 'error', content: 'Passwords do not match.' });
             return;
         }
 
         setLoading(true);
 
-        // TODO: Add your reset password API call here
-        setTimeout(() => {
-            setLoading(false);
-            // Navigate to login page on success
-            navigate('/login');
-        }, 1500);
+        // 3. Call API
+        const result = await resetPassword(token, password);
+
+        setLoading(false);
+
+        if (result.success) {
+            setMsg({ type: 'success', content: 'Password reset successful! Redirecting to login...' });
+            // Redirect after 2 seconds so user sees the success message
+            setTimeout(() => {
+                navigate('/login');
+            }, 2000);
+        } else {
+            setMsg({ type: 'error', content: result.error || 'Failed to reset password.' });
+        }
     };
 
     const isFormValid = password && confirmPassword && password === confirmPassword;
@@ -42,9 +64,7 @@ const ResetPassword = () => {
                     className="h-full w-full object-cover"
                 />
             </div>
-            {/* Card Container */}
             <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 md:p-10 z-1">
-                {/* Header */}
                 <div className="mb-6">
                     <Heading level={2} gradient={true} className="text-3xl md:text-4xl mb-2">
                         Reset Password
@@ -54,14 +74,20 @@ const ResetPassword = () => {
                     </Text>
                 </div>
 
-                {/* Form */}
+                {/* Display Messages */}
+                {msg.content && (
+                    <div className={`mb-4 p-3 rounded-lg text-sm text-center border ${
+                        msg.type === 'success' 
+                        ? 'bg-green-50 text-green-600 border-green-100' 
+                        : 'bg-red-50 text-red-600 border-red-100'
+                    }`}>
+                        {msg.content}
+                    </div>
+                )}
+
                 <form onSubmit={handleSubmit} className="space-y-5">
-                    {/* Password Input */}
                     <div className="space-y-2">
-                        <label
-                            htmlFor="password"
-                            className="block text-sm font-medium text-[var(--color-text-primary)]"
-                        >
+                        <label htmlFor="password" className="block text-sm font-medium text-[var(--color-text-primary)]">
                             Password
                         </label>
                         <Password
@@ -78,12 +104,8 @@ const ResetPassword = () => {
                         />
                     </div>
 
-                    {/* Confirm Password Input */}
                     <div className="space-y-2">
-                        <label
-                            htmlFor="confirmPassword"
-                            className="block text-sm font-medium text-[var(--color-text-primary)]"
-                        >
+                        <label htmlFor="confirmPassword" className="block text-sm font-medium text-[var(--color-text-primary)]">
                             Confirm Password
                         </label>
                         <Password
@@ -100,11 +122,10 @@ const ResetPassword = () => {
                         />
                     </div>
 
-                    {/* Submit Button */}
                     <div className="pt-2">
                         <PrimaryButton
                             label="Confirm Password Change"
-                            onClick={handleSubmit}
+                            type="submit"
                             loading={loading}
                             disabled={loading || !isFormValid}
                             className="w-full"
