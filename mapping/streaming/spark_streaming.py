@@ -68,11 +68,20 @@ def get_debezium_schema() -> StructType:
 
 
 def read_kafka_stream(spark: SparkSession) -> DataFrame:
-    """Read from Kafka topics with Debezium CDC support"""
+    """
+    Read from Kafka topics with Debezium CDC support.
+    
+    Topic naming conventions:
+    - 'ecom.*' topics: Standard messages from API/DB ingestion (e.g., ecom.customers, ecom.orders)
+    - 'debezium.*' topics: Debezium CDC messages with operation field (e.g., debezium.customers)
+    
+    Both topic patterns use the same Debezium-compatible schema with optional operation field.
+    """
     return (
         spark.readStream
         .format("kafka")
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP)
+        # Subscribe to both standard ecom topics and debezium CDC topics
         .option("subscribePattern", "ecom\\..*|debezium\\..*")
         .option("startingOffsets", "latest")
         .load()

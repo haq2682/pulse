@@ -1,6 +1,7 @@
 import os
 from io import BytesIO
 from minio import Minio
+from minio.commonconfig import CopySource
 
 # Mapping from dataframe names to output file names (aligned with agg_schema.sql)
 TABLE_MAPPINGS = {
@@ -75,6 +76,9 @@ def export_to_minio(dataframes, bucket_name=None):
     successful = 0
     failed = 0
     
+    # Threshold for large datasets - use chunked processing above this
+    LARGE_DATASET_THRESHOLD = 100000
+    
     for df_name, table_name in TABLE_MAPPINGS.items():
         if df_name in dataframes and dataframes[df_name] is not None:
             try:
@@ -85,25 +89,49 @@ def export_to_minio(dataframes, bucket_name=None):
                     print(f"  ⏭️  {table_name}: Skipped (empty)")
                     continue
                 
-                # Convert to Pandas and save as CSV
-                pdf = df.toPandas()
-                csv_buffer = BytesIO()
-                pdf.to_csv(csv_buffer, index=False)
-                csv_buffer.seek(0)
-                
                 # File path: transformed/{agg_table_name}.csv
                 file_path = f"transformed/{table_name}.csv"
                 
-                minio_client.put_object(
-                    bucket_name,
-                    file_path,
-                    csv_buffer,
-                    length=len(csv_buffer.getvalue()),
-                    content_type="text/csv",
-                )
+                if row_count > LARGE_DATASET_THRESHOLD:
+                    # For large datasets, use Spark's native CSV writer
+                    # Write to a temp S3 path and then copy to final location
+                    temp_path = f"s3a://{bucket_name}/temp_{table_name}"
+                    df.coalesce(1).write.mode("overwrite").option("header", "true").csv(temp_path)
+                    
+                    # Find the CSV file in the temp directory and rename it
+                    temp_objects = list(minio_client.list_objects(bucket_name, prefix=f"temp_{table_name}/", recursive=True))
+                    csv_file = next((obj for obj in temp_objects if obj.object_name.endswith(".csv")), None)
+                    
+                    if csv_file:
+                        # Copy the CSV file to the final location using CopySource
+                        minio_client.copy_object(
+                            bucket_name,
+                            file_path,
+                            CopySource(bucket_name, csv_file.object_name)
+                        )
+                        # Clean up temp files
+                        for obj in temp_objects:
+                            minio_client.remove_object(bucket_name, obj.object_name)
+                    
+                    print(f"  ✅ {table_name}: {row_count} rows saved (large dataset)")
+                else:
+                    # For smaller datasets, use Pandas conversion
+                    pdf = df.toPandas()
+                    csv_buffer = BytesIO()
+                    pdf.to_csv(csv_buffer, index=False)
+                    csv_buffer.seek(0)
+                    
+                    minio_client.put_object(
+                        bucket_name,
+                        file_path,
+                        csv_buffer,
+                        length=len(csv_buffer.getvalue()),
+                        content_type="text/csv",
+                    )
+                    
+                    csv_buffer.close()
+                    print(f"  ✅ {table_name}: {row_count} rows saved")
                 
-                csv_buffer.close()
-                print(f"  ✅ {table_name}: {row_count} rows saved")
                 successful += 1
                 
             except Exception as e:

@@ -527,11 +527,13 @@ def save_dataframes_to_minio(results, client, bucket_name, operation=None, prima
         existing_pdf = None
         try:
             response = client.get_object(bucket_name, file_name)
-            existing_data = response.read().decode("utf-8")
-            response.close()
-            response.release_conn()
-            existing_pdf = pd.read_csv(StringIO(existing_data))
-            print(f"  Loaded existing data: {len(existing_pdf)} rows")
+            try:
+                existing_data = response.read().decode("utf-8")
+                existing_pdf = pd.read_csv(StringIO(existing_data))
+                print(f"  Loaded existing data: {len(existing_pdf)} rows")
+            finally:
+                response.close()
+                response.release_conn()
         except Exception:
             # File doesn't exist, will create new
             existing_pdf = None
@@ -540,32 +542,47 @@ def save_dataframes_to_minio(results, client, bucket_name, operation=None, prima
         # Handle Debezium CDC operations
         if operation and pk_col and pk_col in new_pdf.columns:
             if operation in ("d", "delete"):
-                # Delete operation: remove rows with matching primary keys
+                # Delete operation: remove rows with matching primary keys using merge
                 if existing_pdf is not None and pk_col in existing_pdf.columns:
-                    keys_to_delete = set(new_pdf[pk_col].astype(str).tolist())
-                    existing_pdf = existing_pdf[~existing_pdf[pk_col].astype(str).isin(keys_to_delete)]
-                    result_pdf = existing_pdf
-                    print(f"  Deleted {len(keys_to_delete)} rows")
+                    # Use merge with indicator for efficient deletion
+                    merged = existing_pdf.merge(
+                        new_pdf[[pk_col]].drop_duplicates(), 
+                        on=pk_col, 
+                        how='left', 
+                        indicator=True
+                    )
+                    result_pdf = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
+                    deleted_count = len(existing_pdf) - len(result_pdf)
+                    print(f"  Deleted {deleted_count} rows")
                 else:
                     result_pdf = pd.DataFrame(columns=new_pdf.columns)
             elif operation in ("u", "update"):
-                # Update operation: replace rows with matching primary keys
+                # Update operation: replace rows with matching primary keys using merge
                 if existing_pdf is not None and pk_col in existing_pdf.columns:
-                    keys_to_update = set(new_pdf[pk_col].astype(str).tolist())
-                    # Remove old rows with same keys
-                    existing_pdf = existing_pdf[~existing_pdf[pk_col].astype(str).isin(keys_to_update)]
-                    # Append updated rows
-                    result_pdf = pd.concat([existing_pdf, new_pdf], ignore_index=True)
-                    print(f"  Updated {len(keys_to_update)} rows")
+                    # Use merge with indicator for efficient update
+                    merged = existing_pdf.merge(
+                        new_pdf[[pk_col]].drop_duplicates(), 
+                        on=pk_col, 
+                        how='left', 
+                        indicator=True
+                    )
+                    existing_without_updates = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
+                    result_pdf = pd.concat([existing_without_updates, new_pdf], ignore_index=True)
+                    print(f"  Updated {len(new_pdf)} rows")
                 else:
                     result_pdf = new_pdf
             elif operation in ("c", "create", "r", "read"):
                 # Create/Read operation: append new rows
                 if existing_pdf is not None:
-                    # Avoid duplicates based on primary key
+                    # Avoid duplicates using merge with indicator
                     if pk_col in existing_pdf.columns:
-                        existing_keys = set(existing_pdf[pk_col].astype(str).tolist())
-                        new_rows = new_pdf[~new_pdf[pk_col].astype(str).isin(existing_keys)]
+                        merged = new_pdf.merge(
+                            existing_pdf[[pk_col]].drop_duplicates(), 
+                            on=pk_col, 
+                            how='left', 
+                            indicator=True
+                        )
+                        new_rows = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
                         result_pdf = pd.concat([existing_pdf, new_rows], ignore_index=True)
                         print(f"  Appended {len(new_rows)} new rows")
                     else:
@@ -582,9 +599,14 @@ def save_dataframes_to_minio(results, client, bucket_name, operation=None, prima
             # No CDC operation specified - append mode with deduplication
             if existing_pdf is not None:
                 if pk_col and pk_col in new_pdf.columns and pk_col in existing_pdf.columns:
-                    # Deduplicate based on primary key - keep new rows
-                    existing_keys = set(existing_pdf[pk_col].astype(str).tolist())
-                    new_rows = new_pdf[~new_pdf[pk_col].astype(str).isin(existing_keys)]
+                    # Deduplicate using merge with indicator - more efficient for large datasets
+                    merged = new_pdf.merge(
+                        existing_pdf[[pk_col]].drop_duplicates(), 
+                        on=pk_col, 
+                        how='left', 
+                        indicator=True
+                    )
+                    new_rows = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
                     result_pdf = pd.concat([existing_pdf, new_rows], ignore_index=True)
                     print(f"  Appended {len(new_rows)} new rows (deduplicated)")
                 else:
