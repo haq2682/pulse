@@ -13,6 +13,7 @@ def load_data_from_minio(spark, minio_client, bucket_name):
         "customer_sessions": ["session_id"],
         "wishlist": ["wishlist_id"],
         "shopping_cart": ["cart_id"],
+        "cart_items": ["cart_item_id"],
         "reviews": ["review_id"],
         "payments": ["payment_id"],
         "marketing_campaigns": ["campaign_id"],

@@ -11,6 +11,7 @@ TABLE_MAPPINGS = {
     "customer_sessions": "agg_customer_sessions",
     "wishlist": "agg_wishlist",
     "shopping_cart": "agg_shopping_cart",
+    "cart_items": "agg_cart_items",
     "reviews": "agg_reviews",
     "order_items": "agg_order_items",
     "payments": "agg_payments",

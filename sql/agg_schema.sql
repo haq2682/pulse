@@ -378,22 +378,34 @@ CREATE TABLE agg_reviews (
 -- 10. agg_shopping_cart
 CREATE TABLE agg_shopping_cart (
     -- Tier 1: Critical Fields
-    cart_id VARCHAR(255),
+    cart_id VARCHAR(255) PRIMARY KEY,
     customer_id VARCHAR(255),
-    product_id VARCHAR(255),
-    added_date DATE,
     cart_status VARCHAR(100),
+    created_at TIMESTAMP,
+    
+    -- Tier 3: Nullable Derived Fields
+    session_id VARCHAR(255) NULL,
+    updated_at TIMESTAMP NULL,
+    cart_abandonment_flag VARCHAR(50) NULL
+);
+
+-- 10b. agg_cart_items
+CREATE TABLE agg_cart_items (
+    -- Tier 1: Critical Fields
+    cart_item_id BIGINT PRIMARY KEY,
+    cart_id VARCHAR(255) NOT NULL,
+    product_id VARCHAR(255) NOT NULL,
     
     -- Tier 2: Fields with Defaults
     quantity INTEGER DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
-    session_id VARCHAR(255) NULL,
     unit_price DOUBLE PRECISION NULL,
-    cart_age_time BIGINT NULL,
-    cart_abandonment_flag VARCHAR(50) NULL,
-    
-    PRIMARY KEY (cart_id, product_id)
+    total_price DOUBLE PRECISION NULL,
+    added_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL,
+    item_status VARCHAR(20) NULL,
+    cart_age_time BIGINT NULL
 );
 
 -- 11. agg_suppliers
@@ -915,7 +927,12 @@ CREATE INDEX idx_agg_reviews_rating ON agg_reviews(rating);
 CREATE INDEX idx_agg_cart_customer ON agg_shopping_cart(customer_id);
 CREATE INDEX idx_agg_cart_session ON agg_shopping_cart(session_id) WHERE session_id IS;
 CREATE INDEX idx_agg_cart_status ON agg_shopping_cart(cart_status);
-CREATE INDEX idx_agg_cart_added_date ON agg_shopping_cart(added_date);
+CREATE INDEX idx_agg_cart_created_at ON agg_shopping_cart(created_at);
+
+-- Cart Items Indexes
+CREATE INDEX idx_agg_cart_items_cart ON agg_cart_items(cart_id);
+CREATE INDEX idx_agg_cart_items_product ON agg_cart_items(product_id);
+CREATE INDEX idx_agg_cart_items_added_at ON agg_cart_items(added_at);
 
 -- Suppliers Indexes
 CREATE INDEX idx_agg_suppliers_status ON agg_suppliers(supplier_status);

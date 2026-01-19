@@ -44,6 +44,7 @@ def main():
     transform_inventory(dataframes)
     transform_customer_sessions(dataframes)
     transform_reviews(dataframes)
+    transform_carts(dataframes)
 
     aggregate_customers(dataframes)
     aggregate_products(dataframes)
