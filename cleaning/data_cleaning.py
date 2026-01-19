@@ -104,6 +104,8 @@ def drop_null_keys(dataframes):
         "payment_id",
         "campaign_id",
         "cart_id",
+        "cart_item_id",
+        "inventory_id",
         "review_id",
         "wishlist_id",
     ]
@@ -202,7 +204,20 @@ def fill_null_values(dataframes):
 
     if "shopping_cart" in dataframes.keys():
         dataframes["shopping_cart"] = dataframes["shopping_cart"].fillna(
-            {"added_date": "1900-01-01", "cart_status": ""}
+            {
+                "cart_status": "",
+                "created_at": "1900-01-01",
+                "updated_at": "1900-01-01",
+            }
+        )
+
+    if "cart_items" in dataframes.keys():
+        dataframes["cart_items"] = dataframes["cart_items"].fillna(
+            {
+                "item_status": "",
+                "added_at": "1900-01-01",
+                "updated_at": "1900-01-01",
+            }
         )
 
     if "orders" in dataframes.keys():
@@ -349,6 +364,8 @@ def impute_all_numeric(dataframes):
         "payment_id",
         "campaign_id",
         "cart_id",
+        "cart_item_id",
+        "inventory_id",
         "review_id",
         "wishlist_id",
     ]
