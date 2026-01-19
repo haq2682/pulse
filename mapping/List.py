@@ -299,7 +299,6 @@ mapping_dict_customer_sessions = {
         "account_id",
         "acc_id",
         "member_id",
-        "customer_number",
         "customer_code",
         "customer_ref",
         "customer_key",
