@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router'; // or 'react-router-dom'
+import { useNavigate } from 'react-router'; 
 import authApi from '@/services/api/authApi';
 
 const AuthContext = createContext(null);
@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
 
     const checkAuth = useCallback(async () => {
         try {
-            setIsAppLoading(true); // Start Full Screen Spinner
+            setIsAppLoading(true); 
             const result = await authApi.validateSession();
             
             if (result.authenticated && result.user) {
@@ -35,14 +35,28 @@ export const AuthProvider = ({ children }) => {
             console.error('Auth check failed:', err);
             setUser(null);
         } finally {
-            setIsAppLoading(false); // Stop Full Screen Spinner
+            setIsAppLoading(false); 
         }
     }, []);
+
+    // --- HELPER: Safely extract error message from FastAPI ---
+    const parseError = (err, defaultMsg) => {
+        if (err.response?.data?.detail) {
+            const detail = err.response.data.detail;
+            // FastAPI 422 Validation Error returns an Array
+            if (Array.isArray(detail)) {
+                return detail[0].msg; // Return just the first message string
+            }
+            // Standard HTTP Error returns a String
+            return detail;
+        }
+        return defaultMsg || 'An unexpected error occurred';
+    };
 
     const login = async (email, password) => {
         try {
             setError(null);
-            setIsActionLoading(true); // Start Button Spinner
+            setIsActionLoading(true); 
             
             const data = await authApi.login({ email, password });
             
@@ -56,18 +70,18 @@ export const AuthProvider = ({ children }) => {
             navigate('/analytics');
             return { success: true };
         } catch (err) {
-            const message = err.response?.data?.detail || 'Login failed';
+            const message = parseError(err, 'Login failed'); // <--- Use Helper
             setError(message);
             return { success: false, error: message };
         } finally {
-            setIsActionLoading(false); // Stop Button Spinner (Even on error)
+            setIsActionLoading(false); 
         }
     };
 
     const register = async (fullName, email, password) => {
         try {
             setError(null);
-            setIsActionLoading(true); // Start Button Spinner
+            setIsActionLoading(true); 
             
             const data = await authApi.register({ 
                 username: fullName, 
@@ -85,11 +99,11 @@ export const AuthProvider = ({ children }) => {
             navigate('/analytics');
             return { success: true };
         } catch (err) {
-            const message = err.response?.data?.detail || 'Registration failed';
+            const message = parseError(err, 'Registration failed'); // <--- Use Helper
             setError(message);
             return { success: false, error: message };
         } finally {
-            setIsActionLoading(false); // Stop Button Spinner
+            setIsActionLoading(false); 
         }
     };
 
@@ -110,7 +124,7 @@ export const AuthProvider = ({ children }) => {
             const result = await authApi.forgotPassword(email);
             return { success: true, message: result.message };
         } catch (err) {
-            const message = err.response?.data?.detail || 'Request failed';
+            const message = parseError(err, 'Request failed'); // <--- Use Helper
             setError(message);
             return { success: false, error: message };
         }
@@ -122,7 +136,7 @@ export const AuthProvider = ({ children }) => {
             const result = await authApi.resetPassword(token, newPassword);
             return { success: true, message: result.message };
         } catch (err) {
-            const message = err.response?.data?.detail || 'Password reset failed';
+            const message = parseError(err, 'Password reset failed'); // <--- Use Helper
             setError(message);
             return { success: false, error: message };
         }
@@ -137,11 +151,8 @@ export const AuthProvider = ({ children }) => {
         error,
         isAuthenticated: !!user,
         
-        // This maps the INTERNAL 'action' loading to the PUBLIC 'loading' prop
-        // So your Login Page sees 'loading' as true when clicking buttons.
+        // Maps internal loading states to public props
         loading: isActionLoading, 
-        
-        // This is a NEW prop specifically for the Route Guards
         appLoading: isAppLoading,
 
         login,

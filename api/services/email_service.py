@@ -7,22 +7,48 @@ settings = get_settings()
 
 class EmailService:
     @staticmethod
-    async def send_password_reset_email(to_email: str, reset_token:  str, user_name: str):
-        """Send password reset email."""
+    async def send_password_reset_email(to_email: str, reset_token: str, user_name: str):
+        """Send password reset email to USERS."""
+        # Points to the USER frontend route
         reset_link = f"{settings.frontend_url}/reset-password?token={reset_token}"
         
+        await EmailService._send_email(
+            to_email, 
+            "Reset Your Password - Pulse Analytics",
+            user_name,
+            reset_link,
+            "Reset Password"
+        )
+
+    @staticmethod
+    async def send_admin_password_reset_email(to_email: str, reset_token: str, user_name: str):
+        """Send password reset email to ADMINS."""
+        # Points to the ADMIN frontend route
+        reset_link = f"{settings.frontend_url}/admin/reset-password?token={reset_token}"
+        
+        await EmailService._send_email(
+            to_email, 
+            "Admin Access Recovery - Pulse Analytics",
+            user_name,
+            reset_link,
+            "Recover Admin Account"
+        )
+
+    @staticmethod
+    async def _send_email(to_email, subject, name, link, button_text):
+        """Internal helper to send the actual email to avoid code duplication."""
         message = MIMEMultipart("alternative")
-        message["Subject"] = "Reset Your Password - Pulse Analytics"
+        message["Subject"] = subject
         message["From"] = settings.from_email
         message["To"] = to_email
         
         html_content = f"""
-        <! DOCTYPE html>
+        <!DOCTYPE html>
         <html>
         <head>
             <style>
                 body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                . container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
                 .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                            color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
                 .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
@@ -38,10 +64,10 @@ class EmailService:
                     <h1>Pulse Analytics</h1>
                 </div>
                 <div class="content">
-                    <h2>Hello {user_name},</h2>
+                    <h2>Hello {name},</h2>
                     <p>We received a request to reset your password. Click the button below to create a new password:</p>
                     <p style="text-align: center;">
-                        <a href="{reset_link}" class="button">Reset Password</a>
+                        <a href="{link}" class="button" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 15px 30px; border-radius: 5px; font-weight: bold;">{button_text}</a>
                     </p>
                     <p>This link will expire in {settings.password_reset_expire_minutes} minutes.</p>
                     <p>If you didn't request this, you can safely ignore this email.</p>
@@ -54,7 +80,7 @@ class EmailService:
         </html>
         """
         
-        message. attach(MIMEText(html_content, "html"))
+        message.attach(MIMEText(html_content, "html"))
         
         await aiosmtplib.send(
             message,

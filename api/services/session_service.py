@@ -24,24 +24,14 @@ class SessionService:
         self.prefix = "session:"
         self.expire_seconds = settings.session_expire_minutes * 60  # typically 60*24
     
-    def create_session(self, user_id: str, email: str, name: str) -> str:
-        """
-        Create a new session after login or registration.
-
-        Args:
-            user_id (str): User's UUID (as string)
-            email (str): User's email
-            name (str): User's display name or username
-
-        Returns:
-            str: session_id (random token to send back as cookie)
-        """
+    def create_session(self, user_id: str, email: str, name: str, role: str = "user") -> str:
         session_id = secrets.token_urlsafe(32)
 
         session_data = {
             "user_id": user_id,
             "email": email,
             "name": name,
+            "role": role,  # <--- Store the role!
             "created_at": datetime.utcnow().isoformat()
         }
 

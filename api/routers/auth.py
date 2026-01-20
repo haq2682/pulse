@@ -301,12 +301,17 @@ async def google_callback(code: str, state: str, db=Depends(get_db)):
     
 @router.post("/business")
 def create_business(user_id: str, business_name: str, region: str, currency: str, db=Depends(get_db)):
-    result = db.execute(
-        text(
-            "INSERT INTO businesses (user_id, business_name, business_region, business_currency) "
-            "VALUES (:user_id, :business_name, :region, :currency) RETURNING business_id"
-        ),
+    # 1. Generate a unique Business ID
+    biz_id = str(uuid.uuid4()) 
+
+    # 2. Insert with the ID
+    db.execute(
+        text("""
+            INSERT INTO businesses (business_id, user_id, business_name, business_region, business_currency) 
+            VALUES (:biz_id, :user_id, :business_name, :region, :currency)
+        """),
         {
+            "biz_id": biz_id,  # <--- Pass the generated ID here
             "user_id": user_id,
             "business_name": business_name,
             "region": region,
@@ -314,5 +319,6 @@ def create_business(user_id: str, business_name: str, region: str, currency: str
         }
     )
     db.commit()
-    business_id = result.scalar()
-    return {"business_id": business_id, "message": "Business created"}
+    
+    # 3. Return the generated ID
+    return {"business_id": biz_id, "message": "Business created"}

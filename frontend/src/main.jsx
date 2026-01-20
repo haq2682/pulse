@@ -6,12 +6,16 @@ import './styles/theme.css';
 import './index.css'
 import { BrowserRouter, Routes, Route } from "react-router";
 import { ThemeProvider } from "@/context/ThemeContext";
-import { AuthProvider } from '@/context/AuthContext'; // IMPORT THIS
+import { AuthProvider } from '@/context/AuthContext'; 
+import { AdminAuthProvider } from '@/context/AdminAuthContext';
 
-// Import Guards
+// Guards
+import ProtectedAdminRoute from '@/components/auth/ProtectedAdminRoute';
+import GuestAdminRoute from '@/components/auth/GuestAdminRoute';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import GuestRoute from '@/components/auth/GuestRoute';
 
+// User Pages
 import Landing from "@/pages/landing/index.jsx";
 import ThemeReference from "@/pages/ThemeReference/index.jsx";
 import ThemeReferenceV2 from "@/pages/ThemeReferenceV2/index.jsx";
@@ -26,6 +30,15 @@ import DataType from '@/pages/onboarding/data-type/index.jsx';
 import Connect from '@/pages/onboarding/connect/index.jsx';
 import Mapping from '@/pages/onboarding/mapping/index.jsx';
 
+// Admin Pages
+import AdminLogin from "@/pages/admin/login/index.jsx";
+import AdminSignup from "@/pages/admin/signup/index.jsx";
+import AdminDashboard from "@/pages/admin/dashboard/index.jsx";
+// --- NEW ADMIN PAGES ---
+import AdminForgotPassword from "@/pages/admin/forgot-password/index.jsx";
+import AdminResetPassword from "@/pages/admin/reset-password/index.jsx";
+import AdminResetPasswordEmail from "@/pages/admin/reset-password-email/index.jsx";
+
 const primeReactConfig = {
   ripple: true,
   inputStyle: 'outlined',
@@ -38,26 +51,84 @@ createRoot(document.getElementById('root')).render(
       <BrowserRouter>
         {/* AuthProvider must be INSIDE BrowserRouter */}
         <AuthProvider>
-            <Routes>
-            {/* PUBLIC ROUTES */}
-            <Route path="/" element={<Landing />} />
-            <Route path="/theme" element={<ThemeReference />} />
-            <Route path="/theme2" element={<ThemeReferenceV2 />} />
+           {/* Nest AdminAuthProvider here so it can use Router and Auth hooks if needed */}
+           <AdminAuthProvider>
+                <Routes>
+                    {/* PUBLIC ROUTES */}
+                    <Route path="/" element={<Landing />} />
+                    <Route path="/theme" element={<ThemeReference />} />
+                    <Route path="/theme2" element={<ThemeReferenceV2 />} />
 
-            {/* GUEST ROUTES (Redirect to Dashboard if logged in) */}
-            <Route path="/signup" element={<GuestRoute><Signup /></GuestRoute>} />
-            <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
-            <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
-            <Route path="/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
-            <Route path="/reset-password-email" element={<GuestRoute><ResetPasswordEmail /></GuestRoute>} />
+                    {/* USER GUEST ROUTES */}
+                    <Route path="/signup" element={<GuestRoute><Signup /></GuestRoute>} />
+                    <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
+                    <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
+                    <Route path="/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
+                    <Route path="/reset-password-email" element={<GuestRoute><ResetPasswordEmail /></GuestRoute>} />
 
-            {/* PROTECTED ROUTES (Redirect to Login if NOT logged in) */}
-            <Route path="/analytics" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/onboarding/business" element={<ProtectedRoute><AddBusiness /></ProtectedRoute>} />
-            <Route path="/onboarding/data-type" element={<ProtectedRoute><DataType /></ProtectedRoute>} />
-            <Route path="/onboarding/connect" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
-            <Route path="/onboarding/mapping" element={<ProtectedRoute><Mapping /></ProtectedRoute>} />
-            </Routes>
+                    {/* USER PROTECTED ROUTES */}
+                    <Route path="/analytics" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                    <Route path="/onboarding/business" element={<ProtectedRoute><AddBusiness /></ProtectedRoute>} />
+                    <Route path="/onboarding/data-type" element={<ProtectedRoute><DataType /></ProtectedRoute>} />
+                    <Route path="/onboarding/connect" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
+                    <Route path="/onboarding/mapping" element={<ProtectedRoute><Mapping /></ProtectedRoute>} />
+
+                    {/* --- ADMIN ROUTES --- */}
+                    
+                    {/* Admin Guest Routes (Login/Signup/Recovery) */}
+                    <Route 
+                        path="/admin/login" 
+                        element={
+                            <GuestAdminRoute>
+                                <AdminLogin />
+                            </GuestAdminRoute>
+                        } 
+                    />
+                    <Route 
+                        path="/admin/signup" 
+                        element={
+                            <GuestAdminRoute>
+                                <AdminSignup />
+                            </GuestAdminRoute>
+                        } 
+                    />
+                    <Route 
+                        path="/admin/forgot-password" 
+                        element={
+                            <GuestAdminRoute>
+                                <AdminForgotPassword />
+                            </GuestAdminRoute>
+                        } 
+                    />
+                    <Route 
+                        path="/admin/reset-password" 
+                        element={
+                            <GuestAdminRoute>
+                                <AdminResetPassword />
+                            </GuestAdminRoute>
+                        } 
+                    />
+                    <Route 
+                        path="/admin/reset-password-email" 
+                        element={
+                            <GuestAdminRoute>
+                                <AdminResetPasswordEmail />
+                            </GuestAdminRoute>
+                        } 
+                    />
+
+                    {/* Admin Protected Routes (Dashboard) */}
+                    <Route 
+                        path="/admin/dashboard" 
+                        element={
+                            <ProtectedAdminRoute>
+                                <AdminDashboard />
+                            </ProtectedAdminRoute>
+                        } 
+                    />
+
+                </Routes>
+           </AdminAuthProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>
