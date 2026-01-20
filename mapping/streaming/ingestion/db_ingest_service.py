@@ -20,13 +20,13 @@ from kafka import KafkaProducer, KafkaAdminClient
 from kafka.admin import NewTopic
 from kafka.errors import TopicAlreadyExistsError
 from rapidfuzz import fuzz, process
-from db_connector import (
+from .db_connector import (
     get_connection,
     fetch_new_records,
     get_last_timestamp,
     discover_tables,
 )
-from canonical_message import create_message, get_topic, VALID_TABLES
+from ..canonical_message import create_message, get_topic, VALID_TABLES
 
 
 # Canonical table mapping (matches your map.py df_to_table)

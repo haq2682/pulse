@@ -10,6 +10,10 @@ from pyspark.sql.types import StructType, StructField, StringType, MapType
 from minio import Minio
 from dotenv import load_dotenv, find_dotenv
 
+import sys
+import os
+# Add parent directory to path to import from mapping root
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from map import process_all_dataframes, save_dataframes_to_minio, COLUMNS_INFO
 import List as mapping_list
 
@@ -17,7 +21,7 @@ load_dotenv(find_dotenv())
 
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "10.5.0.7:9092")
 CHECKPOINT_LOCATION = "s3a://pulse-checkpoints/normalize-stream"
-OUTPUT_BUCKET = "pulse-bucket-stream"
+OUTPUT_BUCKET = os.getenv("OUTPUT_BUCKET", "pulse-bucket-stream")
 
 
 def create_spark_session() -> SparkSession:
