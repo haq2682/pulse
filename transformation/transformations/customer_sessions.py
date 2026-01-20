@@ -52,13 +52,6 @@ def transform_customer_sessions(dataframes):
                     lit(0),
                 ),
             ),
-            "pages_per_minute": when(
-                col("session_duration_minutes").isNotNull()
-                & (col("session_duration_minutes") != 0)
-                & col("pages_viewed").isNotNull()
-                & (col("pages_viewed") != 0),
-                col("pages_viewed") / col("session_duration_minutes"),
-            ),
             "products_per_page": when(
                 col("pages_viewed").isNotNull()
                 & (col("pages_viewed") != 0)
@@ -69,18 +62,32 @@ def transform_customer_sessions(dataframes):
             "conversion_flag": when(
                 col("conversion_flag").isNotNull(),
                 when(
-                    (col("conversion_flag") == "true")
+                    (col("conversion_flag") == lit(True))
+                    | (col("conversion_flag") == "true")
                     | (col("conversion_flag") == "True"),
                     1,
                 ).otherwise(0),
-            ),
+            ).otherwise(0),
             "cart_abandonment_flag": when(
                 col("cart_abandonment_flag").isNotNull(),
                 when(
-                    (col("cart_abandonment_flag") == "true")
+                    (col("cart_abandonment_flag") == lit(True))
+                    | (col("cart_abandonment_flag") == "true")
                     | (col("cart_abandonment_flag") == "True"),
                     1,
                 ).otherwise(0),
-            ),
+            ).otherwise(0),
         }
+    )
+    
+    # Second pass: Calculate metrics that depend on duration columns
+    dataframes["customer_sessions"] = dataframes["customer_sessions"].withColumn(
+        "pages_per_minute",
+        when(
+            col("session_duration_minutes").isNotNull()
+            & (col("session_duration_minutes") > 0)
+            & col("pages_viewed").isNotNull()
+            & (col("pages_viewed") > 0),
+            col("pages_viewed") / col("session_duration_minutes"),
+        ),
     )

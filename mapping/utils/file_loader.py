@@ -7,7 +7,7 @@ from utils.helpers import normalize_name
 
 def load_all_files_from_minio(minio_client, bucket_name, spark):
     """
-    Load all supported files from a MinIO bucket directly into Spark DataFrames.
+    Load all supported files from the 'ingested' folder in a MinIO bucket directly into Spark DataFrames.
 
     Args:
         minio_client: MinIO client instance
@@ -18,8 +18,8 @@ def load_all_files_from_minio(minio_client, bucket_name, spark):
         Dictionary of {df_name: Spark DataFrame}
     """
     dataframes = {}
-    objects = minio_client.list_objects(bucket_name, recursive=True)
-    print("Listing available files in the bucket...")
+    objects = minio_client.list_objects(bucket_name, prefix="ingested/", recursive=True)
+    print("Listing available files in the ingested folder...")
 
     for obj in objects:
         file_name = obj.object_name

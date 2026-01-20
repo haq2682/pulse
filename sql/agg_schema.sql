@@ -221,7 +221,7 @@ CREATE TABLE agg_order_items (
     
     -- Tier 3: Nullable Derived Fields
     discount_amount DOUBLE PRECISION NULL,
-    product_cost DOUBLE PRECISION NULL
+    product_price DOUBLE PRECISION NULL
 );
 
 -- 6. agg_orders
@@ -282,14 +282,15 @@ CREATE TABLE agg_orders (
     total_order_fulfillment_time_weeks DOUBLE PRECISION NULL,
     total_order_fulfillment_time_months DOUBLE PRECISION NULL,
     total_order_fulfillment_time_years DOUBLE PRECISION NULL,
-    total_product_cost DOUBLE PRECISION DEFAULT 0,
+    total_product_price DOUBLE PRECISION DEFAULT 0,
     total_quantity INTEGER DEFAULT 0,
-    avg_product_cost DOUBLE PRECISION DEFAULT 0,
+    avg_product_price DOUBLE PRECISION DEFAULT 0,
     max_item_discount DOUBLE PRECISION DEFAULT 0,
     unique_products_ordered INTEGER DEFAULT 0,
     order_profit DOUBLE PRECISION NULL,
     net_revenue DOUBLE PRECISION NULL,
     net_profit DOUBLE PRECISION NULL,
+    total_discount_from_items DOUBLE PRECISION NULL,
     discount_percentage DOUBLE PRECISION NULL,
     average_item_value DOUBLE PRECISION NULL,
     cost_per_item DOUBLE PRECISION NULL,
@@ -397,22 +398,34 @@ CREATE TABLE agg_reviews (
 -- 10. agg_shopping_cart
 CREATE TABLE agg_shopping_cart (
     -- Tier 1: Critical Fields
-    cart_id VARCHAR(255),
+    cart_id VARCHAR(255) PRIMARY KEY,
     customer_id VARCHAR(255),
-    product_id VARCHAR(255),
-    added_date DATE,
     cart_status VARCHAR(100),
+    created_at TIMESTAMP,
+    
+    -- Tier 3: Nullable Derived Fields
+    session_id VARCHAR(255) NULL,
+    updated_at TIMESTAMP NULL,
+    cart_abandonment_flag VARCHAR(50) NULL
+);
+
+-- 10b. agg_cart_items
+CREATE TABLE agg_cart_items (
+    -- Tier 1: Critical Fields
+    cart_item_id BIGINT PRIMARY KEY,
+    cart_id VARCHAR(255) NOT NULL,
+    product_id VARCHAR(255) NOT NULL,
     
     -- Tier 2: Fields with Defaults
     quantity INTEGER DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
-    session_id VARCHAR(255) NULL,
     unit_price DOUBLE PRECISION NULL,
-    cart_age_time BIGINT NULL,
-    cart_abandonment_flag VARCHAR(50) NULL,
-    
-    PRIMARY KEY (cart_id, product_id)
+    total_price DOUBLE PRECISION NULL,
+    added_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL,
+    item_status VARCHAR(20) NULL,
+    cart_age_time BIGINT NULL
 );
 
 -- 11. agg_suppliers
@@ -932,9 +945,14 @@ CREATE INDEX idx_agg_reviews_rating ON agg_reviews(rating);
 
 -- Shopping Cart Indexes
 CREATE INDEX idx_agg_cart_customer ON agg_shopping_cart(customer_id);
-CREATE INDEX idx_agg_cart_session ON agg_shopping_cart(session_id) WHERE session_id IS;
+CREATE INDEX idx_agg_cart_session ON agg_shopping_cart(session_id) WHERE session_id IS NOT NULL;
 CREATE INDEX idx_agg_cart_status ON agg_shopping_cart(cart_status);
-CREATE INDEX idx_agg_cart_added_date ON agg_shopping_cart(added_date);
+CREATE INDEX idx_agg_cart_created_at ON agg_shopping_cart(created_at);
+
+-- Cart Items Indexes
+CREATE INDEX idx_agg_cart_items_cart ON agg_cart_items(cart_id);
+CREATE INDEX idx_agg_cart_items_product ON agg_cart_items(product_id);
+CREATE INDEX idx_agg_cart_items_added_at ON agg_cart_items(added_at);
 
 -- Suppliers Indexes
 CREATE INDEX idx_agg_suppliers_status ON agg_suppliers(supplier_status);

@@ -1,24 +1,30 @@
 """Spark Structured Streaming - Kafka Consumer with Existing Map Integration"""
 
 import os
+import sys
 import findspark
 findspark.init()
 
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import col, from_json
 from pyspark.sql.types import StructType, StructField, StringType, MapType
-import psycopg2
 from minio import Minio
 from dotenv import load_dotenv, find_dotenv
 
-from map import process_all_dataframes, save_dataframes_to_minio
+# Add parent directory to path to import from mapping root
+# This allows importing map.py and List.py from the mapping directory
+mapping_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if mapping_dir not in sys.path:
+    sys.path.insert(0, mapping_dir)
+
+from map import process_all_dataframes, save_dataframes_to_minio, COLUMNS_INFO
 import List as mapping_list
 
 load_dotenv(find_dotenv())
 
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "10.5.0.7:9092")
 CHECKPOINT_LOCATION = "s3a://pulse-checkpoints/normalize-stream"
-OUTPUT_BUCKET = "pulse-bucket-stream"
+OUTPUT_BUCKET = os.getenv("OUTPUT_BUCKET", "pulse-bucket-stream")
 
 
 def create_spark_session() -> SparkSession:
@@ -46,40 +52,33 @@ def create_spark_session() -> SparkSession:
 
 
 def get_canonical_schema() -> StructType:
-    """Define canonical message schema"""
+    """
+    Define canonical message schema with optional CDC operation field.
+    The operation field is used for database ingestion with CDC support.
+    """
     return StructType([
         StructField("source_type", StringType()),
         StructField("vendor", StringType()),
         StructField("table", StringType()),
         StructField("schema_version", StringType()),
+        StructField("operation", StringType(), True),  # CDC operation: 'c', 'u', 'd', 'r' (optional, nullable)
         StructField("payload", MapType(StringType(), StringType()))
     ])
 
 
-def load_postgres_schema():
-    """Load canonical schema from PostgreSQL"""
-    conn = psycopg2.connect(
-        host="10.5.0.5",
-        database=os.getenv("POSTGRES_DATABASE_NAME"),
-        user=os.getenv("POSTGRES_USER"),
-        password=os.getenv("POSTGRES_PASSWORD"),
-    )
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT table_name, column_name, data_type
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
-        """
-    )
-    columns_info = cur.fetchall()
-    cur.close()
-    conn.close()
-    return columns_info
-
-
 def read_kafka_stream(spark: SparkSession) -> DataFrame:
-    """Read from Kafka topics"""
+    """
+    Read from Kafka ecom.* topics with CDC support for database ingestion.
+    
+    Topic naming convention:
+    - 'ecom.*' topics: Messages from API/DB ingestion (e.g., ecom.customers, ecom.orders)
+    
+    Database ingestion messages include an optional 'operation' field for CDC:
+    - 'c' or 'create': New record
+    - 'u' or 'update': Updated record  
+    - 'd' or 'delete': Deleted record
+    - 'r' or 'read': Snapshot/initial load
+    """
     return (
         spark.readStream
         .format("kafka")
@@ -93,23 +92,30 @@ def read_kafka_stream(spark: SparkSession) -> DataFrame:
     )
 
 
-def extract_table_dataframes(batch_df: DataFrame) -> dict:
-    """Extract DataFrames per table from batch"""
+def extract_table_dataframes(batch_df: DataFrame) -> tuple:
+    """
+    Extract DataFrames per table from batch with CDC operation info.
+    
+    Returns:
+        tuple: (all_dataframes dict, operation dict mapping table to CDC operation)
+    """
     if batch_df.rdd.isEmpty():
-        return {}
+        return {}, {}
     
     table_names = [row["table"] for row in batch_df.select("table").distinct().collect()]
     all_dataframes = {}
+    operations = {}
     
     for table_name in table_names:
         table_df = batch_df.filter(col("table") == table_name)
         
-        # Get payload keys from first row
-        sample = table_df.select("payload").limit(1).collect()
+        # Get payload keys and operation from first row
+        sample = table_df.select("payload", "operation").limit(1).collect()
         if not sample:
             continue
         
         payload_keys = list(sample[0]["payload"].keys())
+        operation = sample[0]["operation"] if sample[0]["operation"] else "c"  # Default to create
         
         # Extract payload columns
         select_exprs = [col("payload").getItem(k).alias(k) for k in payload_keys]
@@ -118,23 +124,25 @@ def extract_table_dataframes(batch_df: DataFrame) -> dict:
         # Use naming convention expected by map.py
         df_name = f"{table_name}_df"
         all_dataframes[df_name] = payload_df
+        operations[table_name] = operation
     
-    return all_dataframes
+    return all_dataframes, operations
 
 
 def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_client):
-    """Process each micro-batch"""
+    """Process each micro-batch with CDC operation support"""
     print(f"\n{'='*60}")
     print(f"Processing batch {batch_id}")
     print(f"{'='*60}")
     
-    all_dataframes = extract_table_dataframes(batch_df)
+    all_dataframes, operations = extract_table_dataframes(batch_df)
     
     if not all_dataframes:
         print("No data in batch")
         return
     
     print(f"Tables in batch: {list(all_dataframes.keys())}")
+    print(f"Operations: {operations}")
     
     # Call existing mapping function with mode="stream"
     results = process_all_dataframes(
@@ -144,8 +152,17 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
         mode="stream"
     )
     
-    # Save results using existing function
-    save_dataframes_to_minio(results, minio_client, OUTPUT_BUCKET)
+    # Save results using existing function with CDC operation
+    # Determine the operation for each result
+    for result_key, result_data in results.items():
+        table_name = result_data["table_name"]
+        operation = operations.get(table_name, "c")
+        save_dataframes_to_minio(
+            {result_key: result_data}, 
+            minio_client, 
+            OUTPUT_BUCKET,
+            operation=operation
+        )
     
     print(f"✅ Batch {batch_id} completed: {len(results)} tables processed")
 
@@ -161,7 +178,8 @@ def run_streaming():
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
     
-    columns_info = load_postgres_schema()
+    # Use hardcoded columns_info from canonical schema
+    columns_info = COLUMNS_INFO
     print(f"Loaded {len(columns_info)} columns from canonical schema")
     
     minio_client = Minio(
