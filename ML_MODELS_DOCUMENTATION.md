@@ -3,6 +3,21 @@
 ## Overview
 This document outlines the machine learning models for the Pulse E-Commerce Analytics Engine, including classification, regression, clustering, and reinforcement learning models. Each model is designed to leverage the data from canonical and aggregated schemas to provide predictions, forecasts, and optimization recommendations.
 
+### Core ML Capabilities
+
+**Classification Models:**
+- **Customer Segmentation using RFM Metrics** - Categorize customers into behavioral segments based on Recency, Frequency, and Monetary values
+- **Product Categorization** - Automatically classify products based on descriptions and attributes
+- **Product Bundling** - Identify and classify complementary items for bundling opportunities
+
+**Regression Models:**
+- **Demand Forecasting** - Predict future sales with seasonal demand fluctuation analysis
+- **Customer Lifetime Value (CLV) Prediction** - Forecast total revenue a customer will generate over their lifetime relationship
+- **Inventory Management** - Estimate required safety stock levels and predict stockout probabilities
+
+**Clustering Models:**
+- **Geographic Sales Analysis** - Create sales maps identifying regional performance patterns and market characteristics
+
 ---
 
 ## Table of Contents
@@ -44,25 +59,30 @@ This document outlines the machine learning models for the Pulse E-Commerce Anal
 
 ---
 
-### 2. Customer Segment Classification
-**Task:** Classify customers into behavioral segments
+### 2. Customer Segment Classification (RFM-Based)
+**Task:** Categorize customers into different behavioral segments based on their RFM (Recency, Frequency, Monetary) metrics
+
+**Description:** Uses classification techniques to segment customers based on:
+- **Recency (R)** - How recently a customer made a purchase
+- **Frequency (F)** - How often a customer makes purchases
+- **Monetary (M)** - How much money a customer spends
 
 **Input Features (from `agg_customers`, `agg_rfm_segmentation`):**
 - `customer_id` (VARCHAR)
-- `total_orders` (BIGINT)
-- `total_revenue` (DOUBLE)
+- `recency_score` (INTEGER) - RFM Recency component (1-5 scale)
+- `frequency_score` (INTEGER) - RFM Frequency component (1-5 scale)
+- `monetary_score` (INTEGER) - RFM Monetary component (1-5 scale)
+- `days_since_last_order` (INTEGER) - Days since last purchase
+- `total_orders` (BIGINT) - Total number of orders
+- `total_revenue` (DOUBLE) - Total spending amount
 - `avg_order_value` (DOUBLE)
-- `recency_score` (INTEGER)
-- `frequency_score` (INTEGER)
-- `monetary_score` (INTEGER)
-- `days_since_last_order` (INTEGER)
 - `session_conversion_rate` (DOUBLE)
 - `cart_abandonment_rate` (DOUBLE)
 - `preferred_device_type` (VARCHAR)
 - `preferred_referrer_source` (VARCHAR)
 
 **Target Variable:**
-- `customer_segment_label` (VARCHAR) - Labels: 'Champions', 'Loyal', 'At Risk', 'Lost', etc.
+- `customer_segment_label` (VARCHAR) - Labels: 'Champions', 'Loyal Customers', 'Potential Loyalists', 'At Risk', 'Lost', 'Hibernating', etc.
 
 **Output Schema:** `ml_customer_segment_predictions`
 
@@ -106,30 +126,89 @@ This document outlines the machine learning models for the Pulse E-Commerce Anal
 
 ---
 
-### 5. Product Category Classification
-**Task:** Auto-classify products into categories based on attributes
+### 5. Product Category Classification Based on Description and Attributes
+**Task:** Automatically classify products into categories based on product descriptions and attributes
+
+**Description:** Uses Natural Language Processing (NLP) and classification algorithms to analyze product descriptions, names, and attributes to automatically assign products to the correct categories and sub-categories. This enables automated product cataloging and improved product organization.
 
 **Input Features (from `agg_products`):**
 - `product_id` (VARCHAR)
-- `product_name` (VARCHAR)
+- `product_name` (VARCHAR) - Product title/name (text feature)
+- `product_description` (TEXT) - Detailed product description (NLP feature)
 - `brand` (VARCHAR)
-- `material` (VARCHAR)
-- `color` (VARCHAR)
-- `size` (VARCHAR)
-- `weight` (DOUBLE)
-- `dimensions` (VARCHAR)
+- `material` (VARCHAR) - Product material attributes
+- `color` (VARCHAR) - Color attributes
+- `size` (VARCHAR) - Size attributes
+- `weight` (DOUBLE) - Physical weight
+- `dimensions` (VARCHAR) - Product dimensions
 - `cost_price` (DOUBLE)
 - `sell_price` (DOUBLE)
+- `tags` (ARRAY/JSON) - Product tags and keywords
+
+**Text Processing:**
+- TF-IDF vectorization of product descriptions
+- Word embeddings (Word2Vec, BERT) for semantic understanding
+- Feature extraction from product attributes
 
 **Target Variable:**
-- `category` (VARCHAR)
-- `sub_category` (VARCHAR)
+- `category` (VARCHAR) - Primary product category
+- `sub_category` (VARCHAR) - Product sub-category
 
 **Output Schema:** `ml_product_category_predictions`
 
 ---
 
-### 6. Cart Abandonment Risk Classification
+### 6. Product Bundling - Complementary Items Classification
+**Task:** Identify and classify complementary items that should be bundled together
+
+**Description:** Uses association rule mining and classification techniques to identify products that are frequently purchased together and should be bundled as complementary items. This enables creation of product bundles, cross-sell recommendations, and "frequently bought together" suggestions.
+
+**Input Features (from `agg_product_affinity`, `agg_order_items`, `agg_products`):**
+- `product_id` (VARCHAR) - Primary product
+- `category` (VARCHAR) - Product category
+- `sub_category` (VARCHAR)
+- `price_range` (VARCHAR) - Price tier
+- `co_purchase_frequency` (BIGINT) - How often bought with other items
+- `avg_basket_size` (DOUBLE) - Average items in cart when this product is present
+- `product_affinity_scores` (JSON) - Affinity scores with other products
+- `seasonal_pattern` (VARCHAR) - Seasonal buying pattern
+- `brand` (VARCHAR)
+
+**Association Metrics:**
+- **Support** - Frequency of product combinations
+- **Confidence** - Probability of buying product B given product A
+- **Lift** - Strength of association between products
+
+**Target Variable:**
+- `is_complementary_pair` (BOOLEAN) - Whether two products are complementary
+- `bundle_category` (VARCHAR) - Type of bundle: 'Essential Bundle', 'Accessory Bundle', 'Complete Set', etc.
+
+**Output Schema:** `ml_product_bundling_predictions`
+
+```sql
+CREATE TABLE ml_product_bundling_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    product_id_a VARCHAR(255) NOT NULL,
+    product_id_b VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    is_complementary BOOLEAN,
+    bundle_category VARCHAR(100),
+    affinity_score DOUBLE,  -- 0 to 1
+    support DOUBLE,
+    confidence DOUBLE,
+    lift DOUBLE,
+    expected_bundle_revenue DOUBLE,
+    recommended_bundle_discount DOUBLE,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (product_id_a) REFERENCES agg_products(product_id),
+    FOREIGN KEY (product_id_b) REFERENCES agg_products(product_id)
+);
+```
+
+---
+
+### 7. Cart Abandonment Risk Classification
 **Task:** Predict if a cart will be abandoned
 
 **Input Features (from `agg_cart_abandonment_analysis`, `agg_customer_sessions`):**
@@ -150,7 +229,7 @@ This document outlines the machine learning models for the Pulse E-Commerce Anal
 
 ---
 
-### 7. Stock Status Classification
+### 8. Stock Status Classification
 **Task:** Classify inventory stock health
 
 **Input Features (from `agg_product_inventory_health`, `agg_inventory`):**
@@ -198,24 +277,47 @@ This document outlines the machine learning models for the Pulse E-Commerce Anal
 
 ---
 
-### 2. Product Demand Forecasting
-**Task:** Forecast future product demand (units)
+### 2. Product Demand Forecasting with Seasonal Fluctuation Analysis
+**Task:** Predict future sales and forecast product demand with seasonal demand fluctuation patterns
+
+**Description:** Uses time-series regression models to forecast future product demand, accounting for:
+- **Trend Analysis** - Long-term sales growth or decline patterns
+- **Seasonal Fluctuation** - Recurring patterns based on seasons, holidays, and events
+- **Cyclical Patterns** - Business cycles and market dynamics
+- **Short-term Variations** - Promotional impacts and market changes
+
+**Time-Series Algorithms:**
+- ARIMA (AutoRegressive Integrated Moving Average)
+- SARIMA (Seasonal ARIMA)
+- Prophet (Facebook's forecasting tool)
+- LSTM (Long Short-Term Memory networks)
 
 **Input Features (from `agg_products`, `agg_orders`, time series data):**
 - `product_id` (VARCHAR)
 - `category` (VARCHAR)
-- `total_units_sold` (BIGINT) - Historical
-- `total_orders` (BIGINT) - Historical
+- `total_units_sold` (BIGINT) - Historical sales data
+- `total_orders` (BIGINT) - Historical order count
 - `avg_quantity_per_order` (DOUBLE)
 - `sell_price` (DOUBLE)
-- `season` (VARCHAR) - from orders
+- `season` (VARCHAR) - Season identifier (Spring, Summer, Fall, Winter)
+- `month_of_year` (INTEGER) - Month (1-12) for seasonality
+- `quarter` (INTEGER) - Quarter (Q1-Q4) for seasonal patterns
+- `week_of_year` (INTEGER) - Week number for granular seasonality
+- `is_holiday_season` (BOOLEAN) - Holiday period indicator
+- `promotional_period` (BOOLEAN) - Active promotion indicator
 - `days_since_launch` (INTEGER)
 - `avg_rating` (DOUBLE)
-- `order_placed_month` (INTEGER) - Time component
-- `order_placed_week` (INTEGER) - Time component
+- `historical_sales_trend` (DOUBLE) - Calculated trend component
+
+**Seasonal Components:**
+- Holiday season multipliers
+- Monthly seasonality factors
+- Day-of-week patterns
+- Special event indicators
 
 **Target Variable:**
 - `predicted_demand_units` (DOUBLE) - Forecasted units for next period
+- `seasonal_adjusted_demand` (DOUBLE) - Demand adjusted for seasonal factors
 
 **Output Schema:** `ml_demand_forecast_predictions`
 
@@ -286,7 +388,111 @@ This document outlines the machine learning models for the Pulse E-Commerce Anal
 
 ---
 
-### 6. Campaign ROI Prediction
+### 6. Safety Stock Level Prediction
+**Task:** Estimate required safety stock levels to prevent stockouts while minimizing holding costs
+
+**Description:** Uses regression models to calculate optimal safety stock levels based on demand variability, lead time uncertainty, and desired service levels. Safety stock acts as a buffer to handle demand fluctuations and supply chain uncertainties.
+
+**Safety Stock Formula Components:**
+- Demand variability (standard deviation of demand)
+- Lead time variability
+- Service level target (e.g., 95%, 99%)
+- Z-score based on service level
+
+**Input Features (from `agg_product_inventory_health`, `agg_products`, `agg_suppliers`):**
+- `product_id` (VARCHAR)
+- `avg_daily_sales` (DOUBLE) - Average demand
+- `sales_std_deviation` (DOUBLE) - Demand variability
+- `demand_volatility` (DOUBLE) - Coefficient of variation
+- `lead_time_days` (INTEGER) - Average supplier lead time
+- `lead_time_std_deviation` (DOUBLE) - Lead time variability
+- `service_level_target` (DOUBLE) - Desired service level (0.95, 0.99, etc.)
+- `current_stock` (INTEGER)
+- `stockout_frequency` (BIGINT) - Historical stockouts
+- `inventory_turnover_ratio` (DOUBLE)
+- `storage_cost_per_unit` (DOUBLE)
+- `stockout_cost_per_unit` (DOUBLE) - Lost sales penalty
+
+**Target Variable:**
+- `required_safety_stock_units` (DOUBLE) - Optimal safety stock level
+- `minimum_stock_level` (DOUBLE) - Reorder point (lead time demand + safety stock)
+
+**Output Schema:** `ml_safety_stock_predictions`
+
+```sql
+CREATE TABLE ml_safety_stock_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    required_safety_stock_units DOUBLE,
+    minimum_stock_level DOUBLE,
+    reorder_point DOUBLE,
+    service_level_target DOUBLE,
+    demand_variability DOUBLE,
+    lead_time_variability DOUBLE,
+    expected_stockout_probability DOUBLE,
+    holding_cost_impact DOUBLE,
+    confidence_interval_lower DOUBLE,
+    confidence_interval_upper DOUBLE,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (product_id) REFERENCES agg_products(product_id)
+);
+```
+
+---
+
+### 7. Stockout Probability Prediction
+**Task:** Predict the probability and timing of stockouts for proactive inventory management
+
+**Description:** Uses regression and time-series models to forecast when products are likely to experience stockouts based on current inventory levels, demand patterns, and replenishment schedules. Enables proactive restocking decisions.
+
+**Input Features (from `agg_product_inventory_health`, `agg_products`):**
+- `product_id` (VARCHAR)
+- `current_stock` (INTEGER) - Current inventory level
+- `available_stock` (INTEGER) - Available for sale
+- `reserved_quantity` (INTEGER) - Reserved/allocated items
+- `avg_daily_sales` (DOUBLE) - Daily sales rate
+- `sales_trend` (DOUBLE) - Increasing/decreasing trend
+- `demand_forecast_next_7_days` (DOUBLE) - Short-term demand
+- `demand_forecast_next_30_days` (DOUBLE) - Medium-term demand
+- `days_of_supply` (DOUBLE) - Current days of inventory
+- `lead_time_days` (INTEGER) - Supplier lead time
+- `pending_orders_quantity` (INTEGER) - Orders in transit
+- `expected_delivery_date` (DATE) - Next restock date
+- `seasonal_demand_multiplier` (DOUBLE) - Seasonal factor
+- `promotion_planned` (BOOLEAN) - Upcoming promotions
+
+**Target Variable:**
+- `stockout_probability` (DOUBLE) - Probability of stockout (0 to 1)
+- `days_until_stockout` (DOUBLE) - Estimated days until stockout
+- `stockout_risk_level` (VARCHAR) - 'Critical', 'High', 'Medium', 'Low'
+
+**Output Schema:** `ml_stockout_predictions`
+
+```sql
+CREATE TABLE ml_stockout_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    stockout_probability DOUBLE,
+    days_until_stockout DOUBLE,
+    expected_stockout_date DATE,
+    stockout_risk_level VARCHAR(50),
+    current_days_of_supply DOUBLE,
+    safety_stock_breach BOOLEAN,
+    reorder_recommended BOOLEAN,
+    recommended_reorder_quantity INTEGER,
+    urgency_score DOUBLE,  -- 0 to 100
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (product_id) REFERENCES agg_products(product_id)
+);
+```
+
+---
+
+### 8. Campaign ROI Prediction
 **Task:** Predict marketing campaign return on investment
 
 **Input Features (from `agg_marketing_campaigns`):**
@@ -310,7 +516,7 @@ This document outlines the machine learning models for the Pulse E-Commerce Anal
 
 ---
 
-### 7. Product Price Optimization
+### 9. Product Price Optimization
 **Task:** Predict optimal product price for maximizing revenue
 
 **Input Features (from `agg_products`, `agg_orders`):**
@@ -331,7 +537,7 @@ This document outlines the machine learning models for the Pulse E-Commerce Anal
 
 ---
 
-### 8. Delivery Time Prediction
+### 10. Delivery Time Prediction
 **Task:** Predict order delivery time
 
 **Input Features (from `agg_orders`, `agg_customers`):**
@@ -351,7 +557,7 @@ This document outlines the machine learning models for the Pulse E-Commerce Anal
 
 ---
 
-### 9. Session Conversion Value Prediction
+### 11. Session Conversion Value Prediction
 **Task:** Predict potential conversion value from a session
 
 **Input Features (from `agg_customer_sessions`):**
@@ -417,23 +623,50 @@ This document outlines the machine learning models for the Pulse E-Commerce Anal
 
 ---
 
-### 3. Geographic Market Segmentation
-**Task:** Cluster geographic regions by market characteristics
+### 3. Geographic Sales Clustering for Regional Performance Patterns
+**Task:** Create geographic sales maps identifying regional performance patterns and market characteristics
+
+**Description:** Uses clustering algorithms to segment geographic regions based on sales performance, customer behavior, and market potential. This creates visual sales maps showing regional patterns, identifying high-performing markets, growth opportunities, and underperforming regions requiring strategic attention.
+
+**Clustering Applications:**
+- **Sales Territory Optimization** - Identify optimal sales territories
+- **Regional Performance Benchmarking** - Compare region performance
+- **Market Expansion Planning** - Identify expansion opportunities
+- **Resource Allocation** - Allocate marketing and sales resources by region
+- **Regional Trend Analysis** - Discover region-specific patterns
+
+**Clustering Algorithms:**
+- K-Means clustering for region grouping
+- DBSCAN for density-based regional clusters
+- Hierarchical clustering for nested geographic hierarchies
 
 **Input Features (from `agg_country_aggregations`, `agg_state_aggregations`, `agg_city_aggregations`):**
 - `country` (VARCHAR)
 - `state_province` (VARCHAR)
 - `city` (VARCHAR)
-- `total_customers` (BIGINT)
-- `total_orders` (BIGINT)
-- `total_revenue` (DOUBLE)
-- `avg_order_value` (DOUBLE)
-- `avg_customer_lifetime_value` (DOUBLE)
-- `revenue_per_customer` (DOUBLE)
+- `total_customers` (BIGINT) - Customer base size
+- `total_orders` (BIGINT) - Order volume
+- `total_revenue` (DOUBLE) - Revenue performance
+- `revenue_growth_rate` (DOUBLE) - Growth trajectory
+- `avg_order_value` (DOUBLE) - Average transaction size
+- `avg_customer_lifetime_value` (DOUBLE) - Customer value
+- `revenue_per_customer` (DOUBLE) - Customer efficiency
+- `customer_acquisition_cost` (DOUBLE) - CAC by region
+- `market_penetration_rate` (DOUBLE) - Market share
+- `customer_density` (DOUBLE) - Customers per capita
+- `repeat_purchase_rate` (DOUBLE) - Customer retention
+
+**Geographic Performance Metrics:**
+- Revenue concentration (Pareto analysis)
+- Market maturity indicators
+- Growth potential scores
+- Competitive intensity
 
 **Output:**
-- `cluster_id` (INTEGER) - Geographic cluster
-- `market_segment` (VARCHAR) - 'High Value', 'Growth', 'Emerging', etc.
+- `cluster_id` (INTEGER) - Geographic cluster assignment
+- `market_segment` (VARCHAR) - 'High Value Market', 'Growth Market', 'Emerging Market', 'Mature Market', 'Declining Market'
+- `performance_tier` (VARCHAR) - 'Top Performer', 'Above Average', 'Average', 'Below Average'
+- `regional_sales_map_category` (VARCHAR) - Category for visualization
 
 **Output Schema:** `ml_geographic_clustering`
 
@@ -1243,17 +1476,70 @@ CREATE TABLE ml_prediction_logs (
 
 ## Summary
 
-This document outlines **40+ machine learning models** across four categories:
+This document outlines **30+ machine learning models** across four categories:
 
-- **7 Classification Models**: Churn, segmentation, payment success, sentiment, category classification, cart abandonment, stock status
-- **9 Regression Models**: CLV, demand forecasting, revenue forecasting, AOV, restock quantity, campaign ROI, price optimization, delivery time, session conversion
-- **6 Clustering Models**: Customer segmentation, product affinity, geographic markets, supplier performance, session behavior, product lifecycle
-- **5 Reinforcement Learning Models**: Inventory optimization, dynamic pricing, marketing budget allocation, cart recovery, supplier selection
+### Classification Models (8 Models)
+1. Customer Churn Prediction
+2. **Customer Segment Classification (RFM-Based)** - Categorize customers using Recency, Frequency, Monetary metrics
+3. Payment Success Prediction
+4. Review Sentiment Classification
+5. **Product Categorization Based on Description and Attributes** - Auto-classify products using NLP
+6. **Product Bundling - Complementary Items** - Identify products for bundling together
+7. Cart Abandonment Risk Classification
+8. Stock Status Classification
+
+### Regression Models (11 Models)
+1. **Customer Lifetime Value (CLV) Prediction** - Forecast total revenue a customer will generate over their relationship
+2. **Demand Forecasting with Seasonal Fluctuation** - Predict future sales with seasonal patterns
+3. Revenue Forecasting
+4. Average Order Value (AOV) Prediction
+5. **Inventory Restock Quantity Prediction** - Inventory management optimization
+6. **Safety Stock Level Prediction** - Estimate required safety stock levels
+7. **Stockout Probability Prediction** - Predict stockout probabilities and timing
+8. Campaign ROI Prediction
+9. Product Price Optimization
+10. Delivery Time Prediction
+11. Session Conversion Value Prediction
+
+### Clustering Models (6 Models)
+1. Customer Segmentation (RFM Clustering)
+2. Product Affinity Clustering
+3. **Geographic Sales Clustering for Regional Performance Patterns** - Create sales maps for regional analysis
+4. Supplier Performance Clustering
+5. Session Behavior Clustering
+6. Product Lifecycle Clustering
+
+### Reinforcement Learning Models (5 Models)
+1. Dynamic Inventory Optimization (Ray RLLib)
+2. Dynamic Pricing Optimization (Ray RLLib)
+3. Marketing Budget Allocation (Ray RLLib)
+4. Cart Recovery Optimization (Ray RLLib)
+5. Supplier Selection and Ordering (Ray RLLib)
+
+---
+
+### Key Model Capabilities
+
+**Classification Techniques:**
+- Customer segmentation based on RFM metrics
+- Product categorization from descriptions and attributes
+- Complementary items identification for bundling
+
+**Regression Models:**
+- Demand forecasting with seasonal fluctuation analysis
+- Customer Lifetime Value (CLV) prediction
+- Inventory management: safety stock levels and stockout predictions
+
+**Clustering Analysis:**
+- Geographic sales maps for regional performance patterns
+
+---
 
 Each model includes:
-- Clearly defined input features from aggregated schemas
+- Clearly defined input features from aggregated schemas (`agg_*` tables)
 - Target variables or objectives
-- Output schema for storing predictions
+- Complete output schemas for storing predictions
 - Use case and business value
+- Model-specific algorithms and techniques
 
-All models are designed to integrate seamlessly with the existing Pulse data pipeline and leverage the rich aggregated data available in the `agg_*` tables.
+All models are designed to integrate seamlessly with the existing Pulse data pipeline and leverage the rich aggregated data available in the canonical and aggregated schemas.
