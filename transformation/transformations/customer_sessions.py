@@ -57,7 +57,7 @@ def transform_customer_sessions(dataframes):
             "conversion_flag": when(
                 col("conversion_flag").isNotNull(),
                 when(
-                    (col("conversion_flag") == True)
+                    (col("conversion_flag") == lit(True))
                     | (col("conversion_flag") == "true")
                     | (col("conversion_flag") == "True"),
                     1,
@@ -66,7 +66,7 @@ def transform_customer_sessions(dataframes):
             "cart_abandonment_flag": when(
                 col("cart_abandonment_flag").isNotNull(),
                 when(
-                    (col("cart_abandonment_flag") == True)
+                    (col("cart_abandonment_flag") == lit(True))
                     | (col("cart_abandonment_flag") == "true")
                     | (col("cart_abandonment_flag") == "True"),
                     1,
