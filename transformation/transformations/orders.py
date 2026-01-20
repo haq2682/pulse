@@ -22,6 +22,13 @@ from pyspark.sql.functions import (
 
 
 def transform_orders(dataframes):
+    # Skip transformation if required dataframes don't exist
+    required_dataframes = ["orders", "order_items", "products"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping transform_orders: '{df_name}' dataframe not found")
+            return
+    
     orders = dataframes["orders"]
     order_items = dataframes["order_items"]
     products = dataframes["products"]

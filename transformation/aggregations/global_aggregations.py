@@ -14,6 +14,13 @@ from pyspark.sql.functions import (
 
 
 def global_aggregations(spark, dataframes):
+    # Skip aggregation if required dataframes don't exist
+    required_dataframes = ["orders", "customers", "products"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping global_aggregations: '{df_name}' dataframe not found")
+            return
+    
     # Calculate global metrics across entire dataset
     global_metrics = {}
 
