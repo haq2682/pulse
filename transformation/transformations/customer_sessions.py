@@ -82,7 +82,7 @@ def transform_customer_sessions(dataframes):
             col("session_duration_minutes").isNotNull()
             & (col("session_duration_minutes") > 0)
             & col("pages_viewed").isNotNull()
-            & (col("pages_viewed") >= 0),
+            & (col("pages_viewed") > 0),
             col("pages_viewed") / col("session_duration_minutes"),
         ),
     )
