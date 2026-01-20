@@ -1,75 +1,82 @@
-"""
-Utility functions for data loading and analytical calculations.
-"""
-import psycopg2
+import os
 import pyspark.sql.functions as F
 from pyspark.sql import Window
+from minio import Minio
 
-def get_agg_tables(spark, db_config):
+
+def get_minio_client():
+    """Create and return a MinIO client instance."""
+    return Minio(
+        os.getenv("MINIO_ENDPOINT"),
+        access_key=os.getenv("MINIO_ACCESS_KEY"),
+        secret_key=os.getenv("MINIO_SECRET_KEY"),
+        secure=False,
+    )
+
+
+def get_agg_tables(spark, db_config=None):
     """
-    Connects to Postgres, finds all tables starting with 'agg_', 
-    and loads them into Spark DataFrames.
-
+    Load aggregated tables from MinIO transformed/ directory.
+    
     Args:
-        spark (SparkSession): Active Spark session
-        db_config (dict): Database configuration dictionary
-
+        spark: SparkSession
+        db_config: Deprecated parameter kept for backward compatibility
+        
     Returns:
         dict: Dictionary of table names to Spark DataFrames
     """
     try:
-        print(f"Connecting to Postgres at {db_config['host']}:{db_config['port']}...")
-        conn = psycopg2.connect(
-            host=db_config['host'],
-            port=db_config['port'],
-            database=db_config['database'],
-            user=db_config['user'],
-            password=db_config['password']
-        )
-        cursor = conn.cursor()
-
-        cursor.execute("""
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public' 
-            AND table_name LIKE 'agg_%'
-        """)
+        minio_client = get_minio_client()
+        bucket_name = os.getenv("MINIO_BUCKET", "pulse-bucket-1")
         
-        tables = [row[0] for row in cursor.fetchall()]
-        print(f"Found tables: {tables}")
-
+        print(f"Loading aggregated tables from MinIO bucket: {bucket_name}")
+        print(f"Directory: transformed/")
+        
+        # List all CSV files in the transformed/ directory
+        objects = minio_client.list_objects(bucket_name, prefix="transformed/", recursive=True)
+        
         spark_dfs = {}
+        tables_found = []
         
-        connection_properties = {
-            "user": db_config['user'],
-            "password": db_config['password'],
-            "driver": db_config['driver']
-        }
-
-        for table in tables:
-            print(f"Processing table: {table}...")
-            df = spark.read.jdbc(
-                url=db_config['url'], 
-                table=f'"{table}"', 
-                properties=connection_properties
-            )
-            spark_dfs[table] = df
-
-        cursor.close()
-        conn.close()
+        for obj in objects:
+            if not obj.object_name.endswith(".csv"):
+                continue
+                
+            # Extract table name from path: transformed/{table_name}.csv
+            table_name = obj.object_name.replace("transformed/", "").replace(".csv", "")
+            tables_found.append(table_name)
+        
+        print(f"Found tables: {tables_found}")
+        
+        for table_name in tables_found:
+            try:
+                file_path = f"transformed/{table_name}.csv"
+                print(f"Loading table: {table_name}...")
+                
+                df = (
+                    spark.read
+                    .option("header", "true")
+                    .option("inferSchema", "true")
+                    .csv(f"s3a://{bucket_name}/{file_path}")
+                )
+                
+                spark_dfs[table_name] = df
+                print(f"  ✅ Loaded {table_name}: {df.count()} rows")
+                
+            except Exception as e:
+                print(f"  ❌ Error loading {table_name}: {e}")
+        
         return spark_dfs
 
     except Exception as e:
-        print(f"Error loading tables: {e}")
+        print(f"Error loading tables from MinIO: {e}")
         import traceback
         traceback.print_exc()
         return {}
 
+
 def is_column_all_null_or_zero(df, col_name):
-    """
-    Checks if a column in a dataframe is entirely Null or Zero.
-    """
-    if df is None:
+    if df is None: 
         return True                    
 
     if col_name not in df.columns:
@@ -97,25 +104,21 @@ def is_column_all_null_or_zero(df, col_name):
 
     return False
 
+
 def add_time_grain(df, date_col, grain="day"):
-    """
-    Adds time grain columns (day, week, or month) to a DataFrame.
-    """
-    if grain == "day":
+    if grain == "day": 
         return df.withColumn("grain_date", F.col(date_col))
     elif grain == "week":
         return df.withColumn("grain_year", F.year(date_col)) \
                  .withColumn("grain_week", F.weekofyear(date_col))
-    elif grain == "month":
+    elif grain == "month": 
         return df.withColumn("grain_year", F.year(date_col)) \
                  .withColumn("grain_month", F.month(date_col))
     else:
         raise ValueError("grain must be 'day', 'week', or 'month'")
 
 
-
 def check_null_dataframes(dataframe):
-    # Initialize tracking lists
     empty_dataframes = []
     all_null_dataframes = []
     has_null_values = []
@@ -124,7 +127,7 @@ def check_null_dataframes(dataframe):
         if df is None:
             empty_dataframes.append(key)
             print(f"dataframe['{key}'] is None")
-        else:
+        else: 
             row_count = df.count()
             
             if row_count == 0:
@@ -133,11 +136,9 @@ def check_null_dataframes(dataframe):
             else:
                 null_count = df.select([F.count(F.when(F.col(c).isNull(), c)).alias(c) for c in df.columns]).collect()[0]
                 
-                # Check if all columns are completely null
                 if all(null_count[c] == row_count for c in df.columns):
                     all_null_dataframes.append(key)
                     print(f"dataframe['{key}'] has all NULL values in every column for all {row_count} rows")
-                # Check if some columns have nulls
                 elif any(null_count[c] > 0 for c in df.columns):
                     null_cols = [c for c in df.columns if null_count[c] > 0]
                     has_null_values.append((key, null_cols))
@@ -145,7 +146,6 @@ def check_null_dataframes(dataframe):
                 else:
                     print(f"dataframe['{key}'] has no NULL values ({row_count} rows)")
 
-        # Summary report
     print("\n" + "="*80)
     print("SUMMARY REPORT")
     print("="*80)
@@ -153,9 +153,8 @@ def check_null_dataframes(dataframe):
     for key in empty_dataframes:
         print(f"   - {key}")
     print(f"\n⚠️  All-NULL DataFrames ({len(all_null_dataframes)}):")
-    for key in all_null_dataframes:
+    for key in all_null_dataframes: 
         print(f"   - {key}")
     print(f"\n⚡ DataFrames with Some NULL values ({len(has_null_values)}):")
-    for key, cols in has_null_values:
-        print(f"   - {key}: {cols}")
-        
+    for key, cols in has_null_values: 
+        print(f"   - {key}:  {cols}")

@@ -8,7 +8,7 @@ from kafka import KafkaProducer, KafkaAdminClient
 from kafka.admin import NewTopic
 from kafka.errors import TopicAlreadyExistsError
 from rapidfuzz import fuzz, process
-from canonical_message import create_message, VALID_TABLES
+from ..canonical_message import create_message, VALID_TABLES
 
 KAFKA_BOOTSTRAP = "10.5.0.7:9092"
 POLL_INTERVAL = 10
@@ -36,6 +36,10 @@ TABLE_MAP = {
     "shopping_carts": "shopping_cart",
     "cart": "shopping_cart",
     "carts": "shopping_cart",
+    "cart_items": "cart_items",
+    "cartitems": "cart_items",
+    "cart_item": "cart_items",
+    "shopping_cart_items": "cart_items",
     "sessions": "customer_sessions",
     "campaigns": "marketing_campaigns",
     "supplier": "suppliers",

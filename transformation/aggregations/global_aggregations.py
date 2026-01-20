@@ -5,6 +5,7 @@ from pyspark.sql.functions import (
     sum as spark_sum,
     avg as spark_avg,
     count,
+    current_timestamp,
     datediff,
     lower,
     lit,
@@ -250,7 +251,7 @@ def global_aggregations(spark, dataframes):
     global_aggregations_data = [(k, float(v)) for k, v in global_metrics.items()]
     global_aggregations_df = spark.createDataFrame(
         global_aggregations_data, ["metric_name", "metric_value"]
-    ).withColumn("calculated_at", lit("2025-11-14 16:34:39"))
+    ).withColumn("calculated_at", current_timestamp().cast("string"))
 
     dataframes["global_aggregations"] = global_aggregations_df
 

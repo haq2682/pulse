@@ -2,6 +2,15 @@
 Database ingestion service: DB URI → Kafka
 Auto-discovers tables, maps to canonical schema, creates topics dynamically.
 Frontend will provide database URI - for now using dummy variable.
+
+IMPORTANT: Before using this service with an external database, the database
+administrator must complete the prerequisites outlined in mapping/README.md,
+including:
+- Creating a dedicated streaming user with appropriate permissions
+- Granting replication/CDC roles
+- Configuring database for logical replication (if applicable)
+
+See mapping/README.md for detailed setup instructions for each database type.
 """
 
 import time
@@ -11,13 +20,13 @@ from kafka import KafkaProducer, KafkaAdminClient
 from kafka.admin import NewTopic
 from kafka.errors import TopicAlreadyExistsError
 from rapidfuzz import fuzz, process
-from db_connector import (
+from .db_connector import (
     get_connection,
     fetch_new_records,
     get_last_timestamp,
     discover_tables,
 )
-from canonical_message import create_message, get_topic, VALID_TABLES
+from ..canonical_message import create_message, get_topic, VALID_TABLES
 
 
 # Canonical table mapping (matches your map.py df_to_table)
@@ -47,6 +56,10 @@ CANONICAL_TABLE_MAP = {
     "shopping_carts": "shopping_cart",
     "shopping_cart": "shopping_cart",
     "cart": "shopping_cart",
+    "cart_items": "cart_items",
+    "cartitems": "cart_items",
+    "cart_item": "cart_items",
+    "shopping_cart_items": "cart_items",
     "customer_sessions": "customer_sessions",
     "sessions": "customer_sessions",
     "marketing_campaigns": "marketing_campaigns",
@@ -129,14 +142,25 @@ def send_records_to_kafka(
     records: List[Dict],
     canonical_table: str,
     vendor: str = "custom",
+    operation: str = "c",
 ):
-    """Send records to Kafka with canonical message format."""
+    """
+    Send records to Kafka with canonical message format and CDC operation.
+    
+    Args:
+        producer: Kafka producer instance
+        records: List of records to send
+        canonical_table: Target canonical table name
+        vendor: Vendor identifier
+        operation: CDC operation (c=create, u=update, d=delete, r=read)
+    """
     for record in records:
         message = create_message(
             table=canonical_table,
             payload=serialize_record(record),
             source_type="db",
             vendor=vendor,
+            operation=operation,
         )
         topic = get_topic(canonical_table)
         producer.send(topic, value=message)
@@ -244,11 +268,25 @@ def ingest_from_uri(
 # ============================================================================
 # DUMMY DATABASE URI - Replace this with frontend input later
 # ============================================================================
+#
+# IMPORTANT: Before providing a database URI, ensure the database administrator
+# has completed the setup steps documented in mapping/README.md
+#
+# Required setup includes:
+# 1. Create a dedicated streaming user (e.g., debezium_user)
+# 2. Grant appropriate permissions (SELECT, REPLICATION, etc.)
+# 3. Configure database for CDC/logical replication
+# 4. Provide the connection URI in the format: protocol://user:pass@host:port/db
+#
+# See mapping/README.md for database-specific instructions.
+# ============================================================================
 
 DUMMY_DB_URI = "postgresql://user:password@localhost:5432/ecommerce"
 
 # When frontend is ready, replace above with:
 # db_uri = request.json.get('database_uri')  # From React frontend
+# Alternatively, use environment variable from .env:
+# DUMMY_DB_URI = os.getenv('STREAMING_DB_URI', 'postgresql://user:password@localhost:5432/ecommerce')
 
 
 if __name__ == "__main__":

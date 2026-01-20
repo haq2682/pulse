@@ -1,0 +1,51 @@
+supplier_id,supplier_name,supplier_rating,supplier_status,is_preferred,is_verified,contract_start_date,contract_end_date,city,state,zip_code,country,tax_id,created_at,contact_email,phone_number
+SUPP_1,Sunrise Distribution Industries,4.12,Under Review,False,False,2024-02-24,2025-02-28,Manchester,Scotland,VM5 8WV,GB,GB854703521,2024-01-11T00:00:00Z,contact@sunrisedistributioni.com,+448806065459
+SUPP_2,Sunrise Distribution Inc.,3.05,Under Review,False,True,2023-05-23,2024-12-28,Edmonton,QC,Y2X 5T8,CA,556798440RC0001,2023-04-20T00:00:00Z,contact@sunrisedistributioni.net,+16045658016
+SUPP_3,Western Alliance Supply Group,4.49,Under Review,False,True,2019-07-19,2022-03-10,Winnipeg,NS,G2A 2E4,CA,272837246RC0001,2019-06-18T00:00:00Z,contact@westernalliancesuppl.net,+15146773520
+SUPP_4,Summit Distributors Corp.,4.37,Active,True,True,2023-12-31,2027-01-05,Toronto,SK,V5L 4B4,CA,716672648RC0001,2023-11-14T00:00:00Z,contact@summitdistributorsco.com,+16132341364
+SUPP_5,Phoenix Distribution Industries,3.83,Inactive,False,False,2018-09-25,2020-05-23,San Jose,IL,70037,US,77-5954897,2018-08-19T00:00:00Z,contact@phoenixdistributioni.biz,+13108790431
+SUPP_6,Reliable Wholesale Corp.,4.25,Active,True,True,2023-05-17,2026-06-08,Boston,VA,47814,US,27-1588150,2023-03-28T00:00:00Z,contact@reliablewholesalecor.biz,+14153738364
+SUPP_7,Sunrise Distribution Co.,4.25,Inactive,False,True,2018-03-25,2021-08-02,Manchester,Wales,ZZ5 3YA,GB,GB783937515,2018-03-14T00:00:00Z,contact@sunrisedistributionc.com,+449966988031
+SUPP_8,Coastal Distributors International,4.66,Inactive,False,True,2022-02-28,2025-08-08,Düsseldorf,Hesse,64627,DE,DE571420338,2022-01-19T00:00:00Z,contact@coastaldistributorsi.biz,+495956964971
+SUPP_9,Tech Supply Network Co.,3.92,Inactive,False,True,2021-07-06,2024-04-01,New York,PA,34836,US,42-3139693,2021-06-27T00:00:00Z,contact@techsupplynetworkco.com,+14049456327
+SUPP_10,Heritage Distributors Enterprises,2.76,Active,False,True,2024-10-25,2027-07-24,Phoenix,IL,33143,US,48-4724814,2024-08-27T00:00:00Z,contact@heritagedistributors.biz,+18186465953
+SUPP_11,National Supply Chain Ltd.,4.63,Under Review,False,True,2023-05-20,2025-12-21,Detroit,TX,81283,US,52-9103032,2023-04-16T00:00:00Z,contact@nationalsupplychainl.com,+12125415516
+SUPP_12,Vanguard Supply LLC,4.79,Under Review,False,True,2020-12-21,2023-03-17,Boston,FL,15055,US,14-7898539,2020-11-07T00:00:00Z,contact@vanguardsupplyllc.biz,+15125959034
+SUPP_13,Tech Supply Network International,4.31,Inactive,False,False,2021-12-19,2025-06-11,Ottawa,QC,A1T 5T1,CA,515746667RC0001,2021-11-07T00:00:00Z,contact@techsupplynetworkint.net,+16137073814
+SUPP_14,Keystone Trading Industries,4.22,Inactive,False,True,2019-07-06,2022-05-10,Hamburg,Saxony,62165,DE,DE611150448,2019-05-12T00:00:00Z,contact@keystonetradingindus.com,+492147767563
+SUPP_15,Horizon Imports LLC,4.02,Under Review,False,True,2020-01-29,2023-11-24,Quebec City,SK,J6V 1H2,CA,541010940RC0001,2019-12-03T00:00:00Z,contact@horizonimportsllc.biz,+14169651932
+SUPP_16,Lakeside Distribution International,2.49,Inactive,False,False,2019-06-08,2023-01-07,Columbus,OR,64960,US,16-2606664,2019-05-04T00:00:00Z,contact@lakesidedistribution.biz,+15124050987
+SUPP_17,Elite Trading Group,1.73,Active,False,True,2024-09-10,2029-07-24,Columbus,NY,80426,US,31-4425802,2024-09-06T00:00:00Z,contact@elitetradinggroup.net,+14043249839
+SUPP_18,Metro Logistics Co.,1.07,Inactive,False,False,2023-06-05,2025-05-13,Jacksonville,FL,81605,US,80-3434703,2023-04-17T00:00:00Z,contact@metrologisticsco.co,+13109912571
+SUPP_19,Sterling Wholesale LLC,4.63,Inactive,False,False,2022-10-02,2024-07-23,New York,MI,11995,US,81-5333772,2022-09-16T00:00:00Z,contact@sterlingwholesalellc.com,+17134856389
+SUPP_20,Apex Trading LLC,1.12,Under Review,False,True,2019-05-13,2020-10-12,Vancouver,QC,B7Y 5H6,CA,463890637RC0001,2019-03-30T00:00:00Z,contact@apextradingllc.com,+15149744401
+SUPP_21,Horizon Imports Inc.,4.27,Under Review,False,False,2020-02-01,2024-06-27,Nice,Île-de-France,23996,FR,FRSU451558036,2020-01-10T00:00:00Z,contact@horizonimportsinc.com,+33321956658
+SUPP_22,Success Distribution Co.,2.77,Suspended,False,False,2024-08-06,2026-01-10,Memphis,WA,66744,US,67-3185602,2024-07-06T00:00:00Z,contact@successdistributionc.net,+14042705999
+SUPP_23,Quality Distributors Corp.,2.8,Inactive,False,True,2020-01-26,2021-08-18,Stuttgart,Hesse,36970,DE,DE151338857,2020-01-11T00:00:00Z,contact@qualitydistributorsc.co,+499318913892
+SUPP_24,Urban Supply Chain Enterprises,4.96,Inactive,False,False,2018-05-11,2020-06-13,Munich,Bavaria,59025,DE,DE775472653,2018-03-16T00:00:00Z,contact@urbansupplychainente.com,+496923679862
+SUPP_25,Sterling Wholesale Solutions,3.75,Under Review,False,True,2018-09-23,2021-04-12,New York,NC,49010,US,74-4185810,2018-08-22T00:00:00Z,contact@sterlingwholesalesol.com,+18187261874
+SUPP_26,Smart Logistics Group,3.92,Active,False,True,2024-04-22,2026-05-14,Marseille,Occitanie,54009,FR,FROR162939852,2024-04-09T00:00:00Z,contact@smartlogisticsgroup.co,+33920181064
+SUPP_27,Legacy Supply Chain Inc.,3.71,Inactive,False,False,2023-04-30,2025-12-19,Nice,Île-de-France,51273,FR,FRFF951810667,2023-04-04T00:00:00Z,contact@legacysupplychaininc.net,+33956751182
+SUPP_28,Keystone Trading Co.,4.53,Under Review,False,False,2019-07-11,2022-03-10,Paris,Auvergne-Rhône-Alpes,61602,FR,FRBC367933082,2019-06-30T00:00:00Z,contact@keystonetradingco.com,+33705203248
+SUPP_29,Premier Wholesale Enterprises,4.16,Under Review,False,True,2022-03-16,2025-05-21,Columbus,FL,46233,US,15-5383063,2022-02-25T00:00:00Z,contact@premierwholesaleente.com,+16175759845
+SUPP_30,Northern Star Trading LLC,3.05,Inactive,False,True,2018-07-22,2023-04-03,Houston,IL,70543,US,48-4868456,2018-06-19T00:00:00Z,contact@northernstartradingl.net,+12122426727
+SUPP_31,Pacific Trading LLC,3.91,Inactive,False,True,2018-06-11,2019-09-14,Seattle,MI,31573,US,43-7516986,2018-06-06T00:00:00Z,contact@pacifictradingllc.com,+18187987047
+SUPP_32,Industrial Partners Co.,4.84,Inactive,False,True,2021-12-31,2023-11-25,Houston,OH,94677,US,26-9731999,2021-11-17T00:00:00Z,contact@industrialpartnersco.biz,+17139198351
+SUPP_33,Continental Goods Inc.,4.79,Inactive,False,True,2023-09-13,2025-11-14,Lyon,Nouvelle-Aquitaine,52133,FR,FRHI696365085,2023-07-27T00:00:00Z,contact@continentalgoodsinc.com,+33823392798
+SUPP_34,Peak Performance Supply Industries,3.59,Inactive,False,True,2023-05-06,2024-09-17,Edinburgh,England,PX7 1DI,GB,GB504560644,2023-04-16T00:00:00Z,contact@peakperformancesuppl.com,+445304970294
+SUPP_35,Trusted Distributors Corp.,4.17,Active,False,True,2024-04-21,2027-06-07,Strasbourg,Nouvelle-Aquitaine,99581,FR,FRSK143311644,2024-04-10T00:00:00Z,contact@trusteddistributorsc.biz,+33375530095
+SUPP_36,Apex Trading Corp.,4.9,Inactive,False,True,2020-10-02,2025-01-15,Denver,TX,32919,US,74-2575334,2020-08-15T00:00:00Z,contact@apextradingcorp.com,+16176279330
+SUPP_37,Metro Logistics Group,1.9,Inactive,False,True,2021-08-28,2024-05-18,Düsseldorf,Berlin,96482,DE,DE578527874,2021-07-22T00:00:00Z,contact@metrologisticsgroup.biz,+494623592676
+SUPP_38,Digital Goods Distribution International,4.36,Inactive,False,True,2020-01-30,2023-06-16,Strasbourg,Auvergne-Rhône-Alpes,17553,FR,FRMX503556704,2019-12-19T00:00:00Z,contact@digitalgoodsdistribu.com,+33504456356
+SUPP_39,Coastal Distributors Corp.,4.39,Inactive,False,True,2022-04-13,2025-01-18,Austin,GA,75840,US,37-7348314,2022-03-20T00:00:00Z,contact@coastaldistributorsc.biz,+18187035913
+SUPP_40,Apex Trading Solutions,3.33,Inactive,False,True,2020-10-01,2025-09-26,London,England,CO2 3KA,GB,GB505785396,2020-08-07T00:00:00Z,contact@apextradingsolutions.net,+444356242184
+SUPP_41,Southern Cross Imports Co.,1.13,Inactive,False,True,2021-06-09,2022-11-09,Düsseldorf,North Rhine-Westphalia,20327,DE,DE818996065,2021-04-22T00:00:00Z,contact@southerncrossimports.co,+492308832936
+SUPP_42,Foundation Supply Solutions,1.03,Active,False,False,2024-03-06,2026-07-15,Quebec City,MB,L3Y 9H7,CA,536166277RC0001,2024-02-29T00:00:00Z,contact@foundationsupplysolu.com,+14167301614
+SUPP_43,Valley Wholesale Inc.,3.83,Inactive,False,False,2018-01-22,2020-06-17,Los Angeles,CA,92051,US,33-8248967,2018-01-08T00:00:00Z,contact@valleywholesaleinc.biz,+14158914112
+SUPP_44,Quality Distributors International,3.65,Active,False,True,2021-07-17,2026-03-06,Frankfurt,Berlin,10853,DE,DE766599968,2021-06-13T00:00:00Z,contact@qualitydistributorsi.net,+491214955099
+SUPP_45,Horizon Imports Solutions,4.41,Inactive,False,False,2019-07-19,2022-05-03,Detroit,PA,55876,US,20-2646389,2019-05-24T00:00:00Z,contact@horizonimportssoluti.net,+13129572762
+SUPP_46,Digital Goods Distribution Corp.,4.24,Active,False,True,2022-06-24,2026-12-01,San Diego,NY,81232,US,38-7954806,2022-06-15T00:00:00Z,contact@digitalgoodsdistribu.net,+14158745386
+SUPP_47,Heritage Distributors Group,4.24,Inactive,False,True,2019-03-29,2023-11-26,Toronto,QC,L1T 4Y7,CA,922641689RC0001,2019-01-28T00:00:00Z,contact@heritagedistributors.co,+14037830945
+SUPP_48,Reliable Wholesale LLC,4.38,Active,False,True,2024-02-23,2028-06-05,Fort Worth,AZ,14494,US,12-8963560,2024-02-03T00:00:00Z,contact@reliablewholesalellc.biz,+15037568582
+SUPP_49,Prosperity Trading Co.,4.54,Inactive,False,False,2018-07-27,2023-05-03,Vancouver,NS,B5L 4H5,CA,551498879RC0001,2018-07-10T00:00:00Z,contact@prosperitytradingco.com,+14162832400
+SUPP_50,Phoenix Distribution Co.,4.82,Inactive,False,True,2018-12-26,2020-08-12,Bordeaux,Nouvelle-Aquitaine,31563,FR,FRUF365590663,2018-11-19T00:00:00Z,contact@phoenixdistributionc.com,+33765922468

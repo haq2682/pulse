@@ -1,0 +1,76 @@
+cat_id,cat_name,sub_cat,display_sequence,url_slug,active_flag,date_created,category_desc,hierarchy_level,product_count,breadcrumb_path,parent_cat_id
+1,Electronics,,10,electronics,True,2015-01-12T00:00:00Z,"Discover the latest electronic devices, gadgets, and accessories for your digital lifestyle.",0,1380,Electronics,
+2,Clothing,,20,clothing,True,2015-01-28T00:00:00Z,"Explore our wide range of fashionable apparel for men, women, and children.",0,1167,Clothing,
+3,Home & Garden,,30,home-and-garden,True,2015-01-28T00:00:00Z,"Transform your living spaces with our home decor, furniture, and gardening essentials.",0,876,Home & Garden,
+4,Sports & Outdoors,,40,sports-and-outdoors,True,2015-01-25T00:00:00Z,Gear up for adventure with our sporting equipment and outdoor recreation products.,0,1027,Sports & Outdoors,
+5,Beauty & Personal Care,,50,beauty-and-personal-care,True,2015-01-03T00:00:00Z,"Enhance your natural beauty with premium skincare, cosmetics, and personal care items.",0,586,Beauty & Personal Care,
+6,Books & Media,,60,books-and-media,True,2015-01-10T00:00:00Z,"Dive into our collection of books, music, movies, and digital entertainment.",0,665,Books & Media,
+7,Toys & Games,,70,toys-and-games,True,2015-01-23T00:00:00Z,"Find the perfect toys, games, and entertainment for kids of all ages.",0,891,Toys & Games,
+8,Food & Grocery,,80,food-and-grocery,True,2015-01-20T00:00:00Z,"Stock your pantry with quality groceries, gourmet foods, and everyday essentials.",0,738,Food & Grocery,
+9,Automotive,,90,automotive,True,2015-01-09T00:00:00Z,Keep your vehicle running smoothly with our automotive parts and accessories.,0,867,Automotive,
+10,Health & Wellness,,100,health-and-wellness,True,2015-01-27T00:00:00Z,"Support your wellbeing with vitamins, supplements, and health monitoring devices.",0,747,Health & Wellness,
+11,Smartphones,,10,smartphones,True,2015-01-26T00:00:00Z,Browse the newest smartphones from top brands with cutting-edge features.,1,235,Electronics > Smartphones,1.0
+12,Laptops,,20,laptops,True,2015-02-28T00:00:00Z,"Find powerful laptops for work, gaming, and everyday computing needs.",1,413,Electronics > Laptops,1.0
+13,Audio Equipment,Featured,30,audio-equipment,True,2015-03-01T00:00:00Z,"Experience superior sound quality with our headphones, speakers, and audio gear.",1,290,Electronics > Audio Equipment,1.0
+14,Cameras,Clearance,40,cameras,True,2015-02-03T00:00:00Z,Capture lifes moments with professional and consumer cameras and accessories.,1,184,Electronics > Cameras,1.0
+15,Wearable Technology,,50,wearable-technology,True,2015-01-17T00:00:00Z,"Stay connected with smartwatches, fitness trackers, and wearable devices.",1,85,Electronics > Wearable Technology,1.0
+16,Gaming,Bestseller,60,gaming,True,2015-02-25T00:00:00Z,"Level up your gaming experience with consoles, accessories, and peripherals.",1,151,Electronics > Gaming,1.0
+17,Mens Clothing,Seasonal,10,mens-clothing,True,2015-02-27T00:00:00Z,Stylish and comfortable clothing options for the modern man.,1,228,Clothing > Mens Clothing,2.0
+18,Womens Clothing,,20,womens-clothing,True,2015-01-31T00:00:00Z,Fashionable apparel and accessories for women of all styles.,1,383,Clothing > Womens Clothing,2.0
+19,Kids Clothing,,30,kids-clothing,True,2015-03-05T00:00:00Z,Durable and adorable clothing for children and toddlers.,1,220,Clothing > Kids Clothing,2.0
+20,Footwear,,40,footwear,True,2015-03-08T00:00:00Z,"Step out in style with our collection of shoes, boots, and sandals.",1,200,Clothing > Footwear,2.0
+21,Accessories,,50,accessories,True,2015-03-25T00:00:00Z,"Complete your look with belts, hats, scarves, and jewelry.",1,125,Clothing > Accessories,2.0
+22,Furniture,Bestseller,10,furniture,True,2015-02-14T00:00:00Z,"Furnish your home with our selection of sofas, beds, tables, and chairs.",1,143,Home & Garden > Furniture,3.0
+23,Kitchen,Bestseller,20,kitchen,True,2015-02-04T00:00:00Z,"Equip your kitchen with cookware, appliances, and dining essentials.",1,246,Home & Garden > Kitchen,3.0
+24,Bedding,Featured,30,bedding,True,2015-03-19T00:00:00Z,"Sleep in comfort with premium sheets, pillows, and comforters.",1,279,Home & Garden > Bedding,3.0
+25,Garden Supplies,New Arrivals,40,garden-supplies,True,2015-02-08T00:00:00Z,"Cultivate your garden with plants, tools, and outdoor decor.",1,70,Home & Garden > Garden Supplies,3.0
+26,Home Decor,,50,home-decor,True,2015-01-31T00:00:00Z,"Add personality to your space with art, lighting, and decorative accents.",1,131,Home & Garden > Home Decor,3.0
+27,Exercise Equipment,Clearance,10,exercise-equipment,True,2015-03-15T00:00:00Z,"Build your home gym with treadmills, weights, and fitness machines.",1,247,Sports & Outdoors > Exercise Equipment,4.0
+28,Outdoor Recreation,New Arrivals,20,outdoor-recreation,True,2015-03-02T00:00:00Z,"Explore the outdoors with camping, hiking, and adventure gear.",1,181,Sports & Outdoors > Outdoor Recreation,4.0
+29,Team Sports,Featured,30,team-sports,True,2015-01-29T00:00:00Z,"Get equipped for soccer, basketball, baseball, and other team activities.",1,239,Sports & Outdoors > Team Sports,4.0
+30,Water Sports,New Arrivals,40,water-sports,True,2015-02-15T00:00:00Z,"Dive into aquatic adventures with swimming, surfing, and boating gear.",1,125,Sports & Outdoors > Water Sports,4.0
+31,Cycling,Featured,50,cycling,True,2015-03-14T00:00:00Z,"Ride in style with bicycles, helmets, and cycling accessories.",1,193,Sports & Outdoors > Cycling,4.0
+32,Skincare,Clearance,10,skincare,True,2015-01-26T00:00:00Z,"Nourish your skin with cleansers, moisturizers, and treatments.",1,67,Beauty & Personal Care > Skincare,5.0
+33,Makeup,,20,makeup,True,2015-01-04T00:00:00Z,Express yourself with our range of cosmetics and beauty products.,1,179,Beauty & Personal Care > Makeup,5.0
+34,Hair Care,Bestseller,30,hair-care,True,2015-02-16T00:00:00Z,"Achieve salon-quality results with shampoos, styling tools, and treatments.",1,191,Beauty & Personal Care > Hair Care,5.0
+35,Fragrances,Featured,40,fragrances,True,2015-02-18T00:00:00Z,Discover your signature scent from our perfume and cologne collection.,1,111,Beauty & Personal Care > Fragrances,5.0
+36,Fiction,,10,fiction,True,2015-03-10T00:00:00Z,Escape into captivating stories across all fiction genres.,1,119,Books & Media > Fiction,6.0
+37,Non-Fiction,,20,non-fiction,True,2015-01-27T00:00:00Z,"Expand your knowledge with biographies, history, and educational titles.",1,288,Books & Media > Non-Fiction,6.0
+38,Music,Seasonal,30,music,True,2015-01-21T00:00:00Z,"Build your music collection with vinyl records, CDs, and digital albums.",1,94,Books & Media > Music,6.0
+39,Movies,Featured,40,movies,True,2015-02-08T00:00:00Z,"Enjoy blockbusters and indie films on DVD, Blu-ray, and digital formats.",1,133,Books & Media > Movies,6.0
+40,Action Figures,Featured,10,action-figures,True,2015-03-09T00:00:00Z,Collect your favorite characters and superheroes in action figure form.,1,96,Toys & Games > Action Figures,7.0
+41,Board Games,Seasonal,20,board-games,True,2015-02-11T00:00:00Z,Bring family and friends together with classic and modern board games.,1,191,Toys & Games > Board Games,7.0
+42,Building Sets,,30,building-sets,True,2015-01-24T00:00:00Z,Inspire creativity with construction toys and building block sets.,1,135,Toys & Games > Building Sets,7.0
+43,Dolls,Seasonal,40,dolls,True,2015-02-09T00:00:00Z,"Delight children with dolls, dollhouses, and accessories.",1,183,Toys & Games > Dolls,7.0
+44,Educational Toys,New Arrivals,50,educational-toys,True,2015-02-22T00:00:00Z,Make learning fun with STEM toys and educational games.,1,286,Toys & Games > Educational Toys,7.0
+45,Snacks,Featured,10,snacks,True,2015-01-29T00:00:00Z,"Satisfy your cravings with chips, cookies, and healthy snack options.",1,189,Food & Grocery > Snacks,8.0
+46,Beverages,Bestseller,20,beverages,True,2015-03-21T00:00:00Z,"Stay refreshed with coffee, tea, juices, and specialty drinks.",1,120,Food & Grocery > Beverages,8.0
+47,Pantry Staples,,30,pantry-staples,True,2015-02-23T00:00:00Z,"Stock up on rice, pasta, oils, and cooking essentials.",1,253,Food & Grocery > Pantry Staples,8.0
+48,Organic Foods,Seasonal,40,organic-foods,True,2015-02-18T00:00:00Z,Choose healthier options with our organic and natural food selection.,1,133,Food & Grocery > Organic Foods,8.0
+49,Car Parts,,10,car-parts,True,2015-02-11T00:00:00Z,Find replacement parts and components for vehicle maintenance and repair.,1,155,Automotive > Car Parts,9.0
+50,Car Accessories,Clearance,20,car-accessories,True,2015-02-15T00:00:00Z,Enhance your driving experience with interior and exterior accessories.,1,233,Automotive > Car Accessories,9.0
+51,Tools,New Arrivals,30,tools,True,2015-01-20T00:00:00Z,Tackle automotive projects with professional-grade tools and equipment.,1,206,Automotive > Tools,9.0
+52,Car Care,,40,car-care,True,2015-02-03T00:00:00Z,Keep your vehicle looking pristine with cleaning and detailing products.,1,249,Automotive > Car Care,9.0
+53,Vitamins,Featured,10,vitamins,True,2015-03-25T00:00:00Z,Support your health with essential vitamins and mineral supplements.,1,258,Health & Wellness > Vitamins,10.0
+54,Fitness Supplements,Clearance,20,fitness-supplements,True,2015-03-07T00:00:00Z,Fuel your workouts with protein powders and performance supplements.,1,186,Health & Wellness > Fitness Supplements,10.0
+55,Medical Supplies,Clearance,30,medical-supplies,True,2015-02-07T00:00:00Z,"Stock your first aid kit with bandages, monitors, and medical essentials.",1,147,Health & Wellness > Medical Supplies,10.0
+56,Wellness Devices,,40,wellness-devices,True,2015-03-06T00:00:00Z,Track and improve your health with monitors and therapeutic devices.,1,138,Health & Wellness > Wellness Devices,10.0
+57,iPhone,,10,iphone,True,2015-04-23T00:00:00Z,Apple iPhones featuring the latest iOS technology and innovations.,2,143,Electronics > Smartphones > iPhone,11.0
+58,Android Phones,New Arrivals,20,android-phones,True,2015-04-24T00:00:00Z,"Explore Android smartphones from Samsung, Google, and other brands.",2,73,Electronics > Smartphones > Android Phones,11.0
+59,Gaming Laptops,New Arrivals,10,gaming-laptops,True,2015-03-10T00:00:00Z,High-performance laptops designed for immersive gaming experiences.,2,171,Electronics > Laptops > Gaming Laptops,12.0
+60,Business Laptops,Bestseller,20,business-laptops,True,2015-03-31T00:00:00Z,Professional laptops optimized for productivity and enterprise use.,2,89,Electronics > Laptops > Business Laptops,12.0
+61,Ultrabooks,Clearance,30,ultrabooks,True,2015-03-18T00:00:00Z,Thin and lightweight laptops perfect for portability and everyday use.,2,153,Electronics > Laptops > Ultrabooks,12.0
+62,Headphones,,10,headphones,True,2015-03-28T00:00:00Z,"Over-ear, on-ear, and in-ear headphones for every listening preference.",2,192,Electronics > Audio Equipment > Headphones,13.0
+63,Speakers,,20,speakers,True,2015-03-02T00:00:00Z,"Bluetooth speakers, soundbars, and home audio systems for room-filling sound.",2,92,Electronics > Audio Equipment > Speakers,13.0
+64,Mens Shirts,Clearance,10,mens-shirts,True,2015-04-08T00:00:00Z,Casual and formal shirts for every occasion and style preference.,2,55,Clothing > Mens Clothing > Mens Shirts,17.0
+65,Mens Pants,Bestseller,20,mens-pants,True,2015-04-28T00:00:00Z,"Jeans, chinos, and dress pants in various fits and styles.",2,51,Clothing > Mens Clothing > Mens Pants,17.0
+66,Mens Outerwear,,30,mens-outerwear,True,2015-05-09T00:00:00Z,"Jackets, coats, and hoodies to keep you warm and stylish.",2,120,Clothing > Mens Clothing > Mens Outerwear,17.0
+67,Dresses,,10,dresses,True,2015-02-26T00:00:00Z,"Beautiful dresses for casual outings, work, and special occasions.",2,182,Clothing > Womens Clothing > Dresses,18.0
+68,Tops,,20,tops,True,2015-02-18T00:00:00Z,"Blouses, t-shirts, and sweaters in trending styles and colors.",2,125,Clothing > Womens Clothing > Tops,18.0
+69,Womens Pants,New Arrivals,30,womens-pants,True,2015-03-14T00:00:00Z,"Jeans, leggings, and trousers designed for comfort and style.",2,65,Clothing > Womens Clothing > Womens Pants,18.0
+70,Living Room Furniture,Bestseller,10,living-room-furniture,True,2015-02-18T00:00:00Z,"Sofas, coffee tables, and entertainment centers for your living space.",2,37,Home & Garden > Furniture > Living Room Furniture,22.0
+71,Bedroom Furniture,Seasonal,20,bedroom-furniture,False,2015-03-30T00:00:00Z,"Beds, dressers, and nightstands for a restful bedroom retreat.",2,2,Home & Garden > Furniture > Bedroom Furniture,22.0
+72,Office Furniture,,30,office-furniture,True,2015-03-21T00:00:00Z,"Desks, chairs, and storage solutions for productive workspaces.",2,92,Home & Garden > Furniture > Office Furniture,22.0
+73,Cardio Machines,Featured,10,cardio-machines,True,2015-03-24T00:00:00Z,"Treadmills, ellipticals, and stationary bikes for cardiovascular fitness.",2,69,Sports & Outdoors > Exercise Equipment > Cardio Machines,27.0
+74,Strength Training,Bestseller,20,strength-training,False,2015-03-24T00:00:00Z,"Dumbbells, barbells, and weight machines for building muscle.",2,0,Sports & Outdoors > Exercise Equipment > Strength Training,27.0
+75,Yoga & Pilates,,30,yoga-and-pilates,True,2015-03-27T00:00:00Z,"Mats, blocks, and equipment for mind-body fitness practices.",2,166,Sports & Outdoors > Exercise Equipment > Yoga & Pilates,27.0

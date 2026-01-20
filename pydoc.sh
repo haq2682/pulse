@@ -83,16 +83,3 @@ else
     docker exec python python3.10 "/app/$PYTHON_FILE" "$@"
     EXIT_CODE=$?
 fi
-
-# Cleanup: remove the copied file from container
-docker exec python rm "/app/$PYTHON_FILE" 2>/dev/null || true
-
-echo ""
-if [ $EXIT_CODE -eq 0 ]; then
-    echo "✓ Execution completed successfully"
-else
-    echo "✗ Execution failed with exit code: $EXIT_CODE"
-fi
-echo "================================================"
-
-exit $EXIT_CODE

@@ -1,8 +1,8 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import lit
+from pyspark.sql.functions import lit, col
 import List as mapping_list
-import psycopg2
-from io import BytesIO
+import pandas as pd
+from io import BytesIO, StringIO
 from minio import Minio
 from dotenv import load_dotenv, find_dotenv
 from algorithms.rapidfuzz_mapping import rapidfuzz_column_mapping
@@ -25,6 +25,160 @@ import findspark
 findspark.init()
 
 load_dotenv(find_dotenv())
+
+# Hardcoded columns_info from canonical_schema.sql
+# Format: List of (table_name, column_name, data_type) tuples
+COLUMNS_INFO = [
+    # addresses table
+    ("addresses", "address_id", "character varying"),
+    ("addresses", "city", "character varying"),
+    ("addresses", "state_province", "character varying"),
+    ("addresses", "postal_code", "character varying"),
+    ("addresses", "country", "character varying"),
+    # customers table
+    ("customers", "customer_id", "character varying"),
+    ("customers", "gender", "character varying"),
+    ("customers", "date_of_birth", "date"),
+    ("customers", "account_status", "character varying"),
+    ("customers", "address_id", "character varying"),
+    ("customers", "city", "character varying"),
+    ("customers", "state_province", "character varying"),
+    ("customers", "postal_code", "character varying"),
+    ("customers", "country", "character varying"),
+    ("customers", "account_created_at", "timestamp without time zone"),
+    ("customers", "last_login_date", "timestamp without time zone"),
+    ("customers", "is_active", "boolean"),
+    # suppliers table
+    ("suppliers", "supplier_id", "character varying"),
+    ("suppliers", "supplier_rating", "numeric"),
+    ("suppliers", "supplier_status", "character varying"),
+    ("suppliers", "is_preferred", "boolean"),
+    ("suppliers", "is_verified", "boolean"),
+    ("suppliers", "contract_start_date", "date"),
+    ("suppliers", "contract_end_date", "date"),
+    ("suppliers", "city", "character varying"),
+    ("suppliers", "state", "character varying"),
+    ("suppliers", "zip_code", "character varying"),
+    ("suppliers", "country", "character varying"),
+    # categories table
+    ("categories", "category_id", "character varying"),
+    ("categories", "category_name", "character varying"),
+    ("categories", "sub_category", "character varying"),
+    # products table
+    ("products", "product_id", "character varying"),
+    ("products", "product_name", "character varying"),
+    ("products", "sku", "character varying"),
+    ("products", "category_id", "character varying"),
+    ("products", "category", "character varying"),
+    ("products", "sub_category", "character varying"),
+    ("products", "brand", "character varying"),
+    ("products", "supplier_id", "character varying"),
+    ("products", "cost_price", "numeric"),
+    ("products", "sell_price", "numeric"),
+    ("products", "launch_date", "date"),
+    ("products", "weight", "numeric"),
+    ("products", "dimensions", "character varying"),
+    ("products", "color", "character varying"),
+    ("products", "size", "character varying"),
+    ("products", "material", "character varying"),
+    # inventory table
+    ("inventory", "inventory_id", "character varying"),
+    ("inventory", "product_id", "character varying"),
+    ("inventory", "supplier_id", "character varying"),
+    ("inventory", "stock_quantity", "integer"),
+    ("inventory", "reserved_quantity", "integer"),
+    ("inventory", "minimum_stock_level", "integer"),
+    ("inventory", "last_restocked_date", "timestamp without time zone"),
+    ("inventory", "storage_cost", "numeric"),
+    ("inventory", "stock_status", "character varying"),
+    # wishlist table
+    ("wishlist", "wishlist_id", "character varying"),
+    ("wishlist", "customer_id", "character varying"),
+    ("wishlist", "product_id", "character varying"),
+    ("wishlist", "added_date", "timestamp without time zone"),
+    ("wishlist", "purchased_date", "timestamp without time zone"),
+    ("wishlist", "removed_date", "timestamp without time zone"),
+    # shopping_cart table
+    ("shopping_cart", "cart_id", "character varying"),
+    ("shopping_cart", "customer_id", "character varying"),
+    ("shopping_cart", "session_id", "character varying"),
+    ("shopping_cart", "cart_status", "character varying"),
+    ("shopping_cart", "created_at", "timestamp without time zone"),
+    ("shopping_cart", "updated_at", "timestamp without time zone"),
+    # cart_items table
+    ("cart_items", "cart_item_id", "bigint"),
+    ("cart_items", "cart_id", "character varying"),
+    ("cart_items", "product_id", "character varying"),
+    ("cart_items", "quantity", "integer"),
+    ("cart_items", "unit_price", "numeric"),
+    ("cart_items", "total_price", "numeric"),
+    ("cart_items", "added_at", "timestamp without time zone"),
+    ("cart_items", "updated_at", "timestamp without time zone"),
+    ("cart_items", "item_status", "character varying"),
+    # orders table
+    ("orders", "order_id", "character varying"),
+    ("orders", "customer_id", "character varying"),
+    ("orders", "order_status", "character varying"),
+    ("orders", "subtotal", "numeric"),
+    ("orders", "tax_amount", "numeric"),
+    ("orders", "shipping_cost", "numeric"),
+    ("orders", "total_discount", "numeric"),
+    ("orders", "total_amount", "numeric"),
+    ("orders", "currency", "character varying"),
+    ("orders", "order_placed_at", "timestamp without time zone"),
+    ("orders", "order_shipped_at", "timestamp without time zone"),
+    ("orders", "order_delivered_at", "timestamp without time zone"),
+    # order_items table
+    ("order_items", "order_item_id", "character varying"),
+    ("order_items", "order_id", "character varying"),
+    ("order_items", "product_id", "character varying"),
+    ("order_items", "quantity", "integer"),
+    ("order_items", "discount_amount", "numeric"),
+    ("order_items", "product_price", "numeric"),
+    # payments table
+    ("payments", "payment_id", "character varying"),
+    ("payments", "order_id", "character varying"),
+    ("payments", "payment_method", "character varying"),
+    ("payments", "payment_provider", "character varying"),
+    ("payments", "payment_status", "character varying"),
+    ("payments", "transaction_id", "character varying"),
+    ("payments", "processing_fee", "numeric"),
+    ("payments", "refund_amount", "numeric"),
+    ("payments", "refund_date", "timestamp without time zone"),
+    ("payments", "payment_date", "timestamp without time zone"),
+    # reviews table
+    ("reviews", "review_id", "character varying"),
+    ("reviews", "product_id", "character varying"),
+    ("reviews", "customer_id", "character varying"),
+    ("reviews", "rating", "integer"),
+    ("reviews", "review_title", "character varying"),
+    ("reviews", "review_desc", "text"),
+    ("reviews", "review_date", "timestamp without time zone"),
+    # marketing_campaigns table
+    ("marketing_campaigns", "campaign_id", "character varying"),
+    ("marketing_campaigns", "campaign_name", "character varying"),
+    ("marketing_campaigns", "campaign_type", "character varying"),
+    ("marketing_campaigns", "start_date", "date"),
+    ("marketing_campaigns", "end_date", "date"),
+    ("marketing_campaigns", "budget", "numeric"),
+    ("marketing_campaigns", "spent_amount", "numeric"),
+    ("marketing_campaigns", "impressions", "integer"),
+    ("marketing_campaigns", "clicks", "integer"),
+    ("marketing_campaigns", "conversions", "integer"),
+    ("marketing_campaigns", "target_audience", "text"),
+    ("marketing_campaigns", "campaign_status", "character varying"),
+    # customer_sessions table
+    ("customer_sessions", "session_id", "character varying"),
+    ("customer_sessions", "customer_id", "character varying"),
+    ("customer_sessions", "session_start", "timestamp without time zone"),
+    ("customer_sessions", "session_end", "timestamp without time zone"),
+    ("customer_sessions", "device_type", "character varying"),
+    ("customer_sessions", "referrer_source", "character varying"),
+    ("customer_sessions", "pages_viewed", "integer"),
+    ("customer_sessions", "products_viewed", "integer"),
+    ("customer_sessions", "conversion_flag", "boolean"),
+    ("customer_sessions", "cart_abandonment_flag", "boolean"),
+]
 
 minio_client = Minio(
     os.getenv("MINIO_ENDPOINT"),
@@ -371,23 +525,42 @@ def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="bat
     return results
 
 
-def save_dataframes_to_minio(results, client, bucket_name):
+def save_dataframes_to_minio(results, client, bucket_name, operation=None, primary_key_col=None):
     """
-    Save processed DataFrames to MinIO bucket.
+    Save processed DataFrames to MinIO bucket with append logic.
 
     Args:
         results: Dictionary of processed results
         client: MinIO client instance
         bucket_name: Name of the bucket to save to
+        operation: Debezium CDC operation type ('c' for create, 'u' for update, 'd' for delete, 'r' for read/snapshot)
+        primary_key_col: Primary key column name for identifying rows to update/delete
     """
-
-    # bucket_name = "mapped"
 
     if not client.bucket_exists(bucket_name):
         client.make_bucket(bucket_name)
         print(f"Created bucket: {bucket_name}")
     else:
         print(f"Bucket already exists: {bucket_name}")
+
+    # Primary key mapping for each table
+    table_primary_keys = {
+        "addresses": "address_id",
+        "customers": "customer_id",
+        "suppliers": "supplier_id",
+        "categories": "category_id",
+        "products": "product_id",
+        "inventory": "inventory_id",
+        "wishlist": "wishlist_id",
+        "shopping_cart": "cart_id",
+        "cart_items": "cart_item_id",
+        "orders": "order_id",
+        "order_items": "order_item_id",
+        "payments": "payment_id",
+        "reviews": "review_id",
+        "marketing_campaigns": "campaign_id",
+        "customer_sessions": "session_id",
+    }
 
     for result_key, result_data in results.items():
         table_name = result_data["table_name"]
@@ -396,16 +569,114 @@ def save_dataframes_to_minio(results, client, bucket_name):
         print(f"Saving {table_name} to MinIO...")
 
         # Convert Spark DataFrame to Pandas
-        pdf = final_df.toPandas()
+        new_pdf = final_df.toPandas()
+
+        # File path in mapped folder
+        file_name = f"mapped/{table_name}.csv"
+
+        # Get the primary key for this table
+        pk_col = primary_key_col or table_primary_keys.get(table_name)
+
+        # Try to load existing data if file exists
+        existing_pdf = None
+        try:
+            response = client.get_object(bucket_name, file_name)
+            try:
+                existing_data = response.read().decode("utf-8")
+                existing_pdf = pd.read_csv(StringIO(existing_data))
+                print(f"  Loaded existing data: {len(existing_pdf)} rows")
+            finally:
+                response.close()
+                response.release_conn()
+        except Exception:
+            # File doesn't exist, will create new
+            existing_pdf = None
+            print(f"  No existing file found, creating new...")
+
+        # Handle Debezium CDC operations
+        if operation and pk_col and pk_col in new_pdf.columns:
+            if operation in ("d", "delete"):
+                # Delete operation: remove rows with matching primary keys using merge
+                if existing_pdf is not None and pk_col in existing_pdf.columns:
+                    # Use merge with indicator for efficient deletion
+                    merged = existing_pdf.merge(
+                        new_pdf[[pk_col]].drop_duplicates(), 
+                        on=pk_col, 
+                        how='left', 
+                        indicator=True
+                    )
+                    result_pdf = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
+                    deleted_count = len(existing_pdf) - len(result_pdf)
+                    print(f"  Deleted {deleted_count} rows")
+                else:
+                    result_pdf = pd.DataFrame(columns=new_pdf.columns)
+            elif operation in ("u", "update"):
+                # Update operation: replace rows with matching primary keys using merge
+                if existing_pdf is not None and pk_col in existing_pdf.columns:
+                    # Use merge with indicator for efficient update
+                    merged = existing_pdf.merge(
+                        new_pdf[[pk_col]].drop_duplicates(), 
+                        on=pk_col, 
+                        how='left', 
+                        indicator=True
+                    )
+                    existing_without_updates = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
+                    result_pdf = pd.concat([existing_without_updates, new_pdf], ignore_index=True)
+                    print(f"  Updated {len(new_pdf)} rows")
+                else:
+                    result_pdf = new_pdf
+            elif operation in ("c", "create", "r", "read"):
+                # Create/Read operation: append new rows
+                if existing_pdf is not None:
+                    # Avoid duplicates using merge with indicator
+                    if pk_col in existing_pdf.columns:
+                        merged = new_pdf.merge(
+                            existing_pdf[[pk_col]].drop_duplicates(), 
+                            on=pk_col, 
+                            how='left', 
+                            indicator=True
+                        )
+                        new_rows = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
+                        result_pdf = pd.concat([existing_pdf, new_rows], ignore_index=True)
+                        print(f"  Appended {len(new_rows)} new rows")
+                    else:
+                        result_pdf = pd.concat([existing_pdf, new_pdf], ignore_index=True)
+                else:
+                    result_pdf = new_pdf
+            else:
+                # Unknown operation, default to append
+                if existing_pdf is not None:
+                    result_pdf = pd.concat([existing_pdf, new_pdf], ignore_index=True)
+                else:
+                    result_pdf = new_pdf
+        else:
+            # No CDC operation specified - append mode with deduplication
+            if existing_pdf is not None:
+                if pk_col and pk_col in new_pdf.columns and pk_col in existing_pdf.columns:
+                    # Deduplicate using merge with indicator - more efficient for large datasets
+                    merged = new_pdf.merge(
+                        existing_pdf[[pk_col]].drop_duplicates(), 
+                        on=pk_col, 
+                        how='left', 
+                        indicator=True
+                    )
+                    new_rows = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
+                    result_pdf = pd.concat([existing_pdf, new_rows], ignore_index=True)
+                    print(f"  Appended {len(new_rows)} new rows (deduplicated)")
+                else:
+                    # No primary key, just append
+                    result_pdf = pd.concat([existing_pdf, new_pdf], ignore_index=True)
+                    print(f"  Appended {len(new_pdf)} rows")
+            else:
+                result_pdf = new_pdf
 
         # Save as CSV to MinIO
         csv_buffer = BytesIO()
-        pdf.to_csv(csv_buffer, index=False)
+        result_pdf.to_csv(csv_buffer, index=False)
         csv_buffer.seek(0)
 
         # Upload to MinIO
-        file_name = "mapped_" + table_name + ".csv"
-        minio_client.put_object(
+        client.put_object(
             bucket_name,
             file_name,
             csv_buffer,
@@ -413,32 +684,15 @@ def save_dataframes_to_minio(results, client, bucket_name):
             content_type="text/csv",
         )
 
-        print(f"✅ Saved {file_name} ({len(pdf)} rows)")
+        print(f"✅ Saved {file_name} ({len(result_pdf)} rows)")
         csv_buffer.close()
 
 
 if __name__ == "__main__":
     all_dataframes = load_all_files_from_minio(minio_client, bucket_name, spark)
 
-    conn = psycopg2.connect(
-        host=os.getenv("POSTGRES_SERVER"),
-        database=os.getenv("POSTGRES_DATABASE_NAME"),
-        user=os.getenv("POSTGRES_USER"),
-        password=os.getenv("POSTGRES_PASSWORD"),
-    )
-
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT table_name, column_name, data_type
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
-    """
-    )
-
-    columns_info = cur.fetchall()
-    cur.close()
-    conn.close()
+    # Use hardcoded columns_info from canonical schema
+    columns_info = COLUMNS_INFO
 
     results = process_all_dataframes(all_dataframes, columns_info, mapping_list)
     save_dataframes_to_minio(results, minio_client, bucket_name)

@@ -23,13 +23,12 @@ def session_aggregations(dataframes):
     )
 
     session_cart_agg = (
-        dataframes["shopping_cart"]
-        .filter(col("session_id").isNotNull())
+        cart_with_items.filter(col("session_id").isNotNull())
         .groupBy("session_id")
         .agg(
-            # Items added to cart
-            count("cart_id").alias("items_added_to_cart"),
-            # Cart value (unit_price * quantity)
+            # Items added to cart (count of cart_item_id)
+            count("cart_item_id").alias("items_added_to_cart"),
+            # Cart value (unit_price * quantity from cart_items)
             spark_sum(
                 when(
                     col("unit_price").isNotNull()

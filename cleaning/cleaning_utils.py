@@ -7,39 +7,41 @@ from io import BytesIO
 
 def load_data_from_minio(spark, minio_client, bucket_name, table_names):
     """
-    Load data from MinIO using pure MinIO client (bypasses Spark S3A issues).
-    Best for debugging or when Spark read hangs.
+    Load data from MinIO from the mapped/ directory.
 
     Args:
         spark (SparkSession): Active Spark session
         minio_client (Minio): MinIO client instance
         bucket_name (str): MinIO bucket name
-        table_names (list): Optional list of table names to filter
+        table_names (list): List of table names to load
 
     Returns:
         dict: Dictionary of table names to DataFrames
     """
-    import pandas as pd
-    from io import BytesIO
-    import time
-
-    objects = minio_client.list_objects(bucket_name, prefix="mapped_", recursive=True)
     dataframes = {}
-    for obj in objects:
-        df = (
-            spark.read.option("header", "true")
-            .option("inferSchema", "true")
-            .csv(f"s3a://{bucket_name}/{obj.object_name}")
-        )
-        object_name = obj.object_name.replace("mapped_", "").replace(".csv", "")
-        dataframes[object_name] = df
-        print(f"Loaded {object_name} with {df.count()} rows")
+    
+    for table_name in table_names:
+        file_path = f"mapped/{table_name}.csv"
+        try:
+            # Check if the file exists
+            minio_client.stat_object(bucket_name, file_path)
+            
+            df = (
+                spark.read.option("header", "true")
+                .option("inferSchema", "true")
+                .csv(f"s3a://{bucket_name}/{file_path}")
+            )
+            dataframes[table_name] = df
+            print(f"Loaded {table_name} with {df.count()} rows from {file_path}")
+        except Exception as e:
+            print(f"Could not load {table_name}: {e}")
+    
     return dataframes
 
 
 def save_data_to_minio(dataframes, minio_client, bucket_name):
     """
-    Save cleaned DataFrames back to MinIO as CSV files.
+    Save cleaned DataFrames to MinIO as CSV files in the cleaned/ directory.
 
     Args:
         dataframes (dict): Dictionary of table names to DataFrames
@@ -51,7 +53,7 @@ def save_data_to_minio(dataframes, minio_client, bucket_name):
         csv_buffer = BytesIO()
         pdf.to_csv(csv_buffer, index=False)
         csv_buffer.seek(0)
-        file_name = "cleaned_" + table + ".csv"
+        file_name = f"cleaned/{table}.csv"
 
         try:
             minio_client.put_object(
