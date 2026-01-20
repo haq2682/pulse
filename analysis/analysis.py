@@ -65,13 +65,13 @@ def main():
 
     # ---------------------------------------------------------
 
-    if not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at"):
+    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at"):
         dataframes["agg_orders"] = dataframes["agg_orders"].withColumn(
         "order_date",
         F.to_date("order_placed_at")
         )
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
         dataframes["agg_customers"] = dataframes["agg_customers"].withColumn(
         "account_created_date",
         F.to_date("account_created_at")
@@ -126,7 +126,7 @@ def main():
         )
 
         return kpi
-    if not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and not is_column_all_null_or_zero(dataframes["agg_orders"], "units_sold") and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit") and not is_column_all_null_or_zero(dataframes["agg_orders"], "net_profit"):
+    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and not is_column_all_null_or_zero(dataframes["agg_orders"], "units_sold") and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit") and not is_column_all_null_or_zero(dataframes["agg_orders"], "net_profit"):
         analysis["business_health_daily"]= core_kpis_over_time(dataframes["agg_orders"],"order_placed_at", grain="day")
         analysis["business_health_weekly"] = core_kpis_over_time(dataframes["agg_orders"],"order_placed_at", grain="week")
         analysis["business_health_monthly"] = core_kpis_over_time(dataframes["agg_orders"],"order_placed_at", grain="month")
@@ -154,7 +154,7 @@ def main():
         
         return category_df
 
-    if not is_column_all_null_or_zero(dataframes["agg_products"], "category"):
+    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "category"):
         analysis["low_margin_categories"] = analyze_category_margins(dataframes["agg_products"])
     else: 
         print("Category column is all NULL or zero; skipping category margin analysis.")
@@ -184,7 +184,7 @@ def main():
                 .fillna({"customer_count": 0})
                 .orderBy(*order_cols, "account_status")
         )
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
         analysis["customer_account_status_distribution_daily"]   = status_distribution_over_time(dataframes["agg_customers"],"account_created_at","day")
         analysis["customer_account_status_distribution_weekly"]  = status_distribution_over_time(dataframes["agg_customers"], "account_created_at", "week")
         analysis["customer_account_status_distribution_monthly"] = status_distribution_over_time(dataframes["agg_customers"], "account_created_at", "month")
@@ -1793,7 +1793,7 @@ def main():
     
     # Category-level viewing effectiveness
 
-    if not is_column_all_null_or_zero(dataframes["agg_products"], "category") and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders") and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue"):
+    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "category") and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders") and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue"):
         product_analysis["category_view_patterns"] = (
             dataframes["agg_products"]
             .groupBy("category")
@@ -1820,7 +1820,7 @@ def main():
 
     # Product-level Top-View-to-Purchase Rates
 
-    if not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders"):
+    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders"):
         product_analysis["top_view_to_purchase_products"] = (
             dataframes["agg_products"]
             .select(
