@@ -47,7 +47,10 @@ def remove_outliers(dataframes, table_name, columns):
             continue
 
         print(f"\nProcessing outliers for {column} in {table_name}...")
-        quantiles = result_df.approxQuantile(column, [0.01, 0.99], 0.0)
+        quantiles = df.approxQuantile(column, [0.05, 0.95], 0.0)
+        if len(quantiles) < 2:
+            print(f"Not enough data to compute outliers for column {column}")
+            continue
         low_cutoff, high_cutoff = quantiles[0], quantiles[1]
 
         print(f"  {column} - Low cutoff: {low_cutoff}, High cutoff: {high_cutoff}")
