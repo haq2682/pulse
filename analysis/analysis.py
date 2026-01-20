@@ -65,13 +65,13 @@ def main():
 
     # ---------------------------------------------------------
 
-    if not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at"):
+    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at"):
         dataframes["agg_orders"] = dataframes["agg_orders"].withColumn(
         "order_date",
         F.to_date("order_placed_at")
         )
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
         dataframes["agg_customers"] = dataframes["agg_customers"].withColumn(
         "account_created_date",
         F.to_date("account_created_at")
