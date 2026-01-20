@@ -1,6 +1,7 @@
 import os
 import datetime
 from difflib import get_close_matches
+import re
 
 
 def normalize_name(name):
