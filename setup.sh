@@ -9,8 +9,8 @@ echo ""
 
 # Phase 1: Start core services
 echo "=== Phase 1: Starting Core Services ==="
-echo "Starting PostgreSQL, MinIO, Zookeeper, and Kafka..."
-docker compose up -d postgresql minio zookeeper kafka
+echo "Starting PostgreSQL, MinIO, Redis, Zookeeper, and Kafka..."
+docker compose up -d postgresql minio redis zookeeper kafka
 
 echo ""
 echo "Waiting for services to be ready..."
@@ -67,4 +67,12 @@ echo "=========================================="
 echo ""
 echo "All services are running!"
 echo "Completed at: $(date '+%Y-%m-%d %H:%M:%S')"
+echo ""
+echo "Service URLs:"
+echo "  - Frontend:    http://localhost:5173"
+echo "  - API:         http://localhost:8000"
+echo "  - Spark UI:    http://localhost:8080"
+echo "  - MinIO:       http://localhost:9001"
+echo "  - PostgreSQL:  localhost:5432"
+echo "  - Redis:       localhost:6379"
 echo ""

@@ -1,4 +1,5 @@
 -- Address Table
+
 CREATE TABLE addresses (
     address_id VARCHAR(50) PRIMARY KEY, -- Unique ID for each address
     city VARCHAR(100) NOT NULL, -- City name, e.g., 'New York'
@@ -195,4 +196,32 @@ CREATE TABLE customer_sessions (
     conversion_flag BOOLEAN DEFAULT FALSE,
     cart_abandonment_flag BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+);
+
+-- User table
+CREATE TABLE users (
+    user_id VARCHAR(50) PRIMARY KEY,
+    username VARCHAR(100) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NULL,
+    reset_token TEXT NULL,
+    reset_token_expires TIMESTAMP NULL,
+);
+-- Business table
+CREATE TABLE businesses (
+    business_id VARCHAR(50) PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    business_name VARCHAR(255) NOT NULL,
+    business_region VARCHAR(100),
+    business_currency VARCHAR(50),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE admins (
+    admin_id VARCHAR(50) PRIMARY KEY,
+    username VARCHAR(100) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    reset_token VARCHAR(500),
+    reset_token_expires TIMESTAMP
 );

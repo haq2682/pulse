@@ -1,11 +1,18 @@
 import { useState } from 'react';
 import { InputText } from 'primereact/inputtext';
 import { Password } from 'primereact/password';
+import { useNavigate } from 'react-router'; // <--- 1. Import useNavigate
 import { PrimaryButton } from '@/components/global/Button';
 import { Heading, Text, CustomLink } from '@/components/global/Typography';
 import RegistrationBackground from '@/assets/registration-background.png';
+// Import Auth Hook
+import { useAuth } from '@/context/AuthContext';
 
 const Login = () => {
+    // Get login functions
+    const { login, loginWithGoogle, loading, error } = useAuth();
+    const navigate = useNavigate(); // <--- 2. Initialize Hook
+    
     const [formData, setFormData] = useState({
         email: '',
         password: '',
@@ -16,10 +23,10 @@ const Login = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log('Form submitted:', formData);
-        // Add your signup logic here
+        // Call Login API
+        await login(formData.email, formData.password);
     };
 
     return (
@@ -80,6 +87,13 @@ const Login = () => {
                             <Text className="text-base">Enter your credentials to continue</Text>
                         </div>
 
+                        {/* Error Message Display */}
+                        {error && (
+                            <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm text-center border border-red-100">
+                                {error}
+                            </div>
+                        )}
+
                         <form onSubmit={handleSubmit} className="space-y-5">
 
                             {/* Email */}
@@ -101,15 +115,29 @@ const Login = () => {
 
                             {/* Password */}
                             <div className="w-full">
-                                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                                    Password
-                                </label>
+                                {/* <--- 3. ADDED: Flex container for Label + Forgot Password Link ---> */}
+                                <div className="flex items-center justify-between mb-2">
+                                    <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                                        Password
+                                    </label>
+                                    <CustomLink 
+                                        href="/forgot-password"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            navigate('/forgot-password');
+                                        }}
+                                        className="text-sm font-semibold text-[var(--color-primary)] hover:opacity-80 cursor-pointer"
+                                    >
+                                        Forgot Password?
+                                    </CustomLink>
+                                </div>
+
                                 <Password
                                     id="password"
                                     name="password"
                                     value={formData.password}
                                     onChange={handleInputChange}
-                                    placeholder="Create a password"
+                                    placeholder="Enter your password"
                                     className="w-full"
                                     inputClassName="w-full"
                                     toggleMask
@@ -120,19 +148,19 @@ const Login = () => {
 
                             {/* Submit Button */}
                             <PrimaryButton
-                                label="Create Account"
+                                label="Log In" 
                                 type="submit"
                                 className="w-full text-base font-semibold"
-                                disabled={!formData.agreeToTerms}
+                                loading={loading} 
                             />
 
-                            {/* Sign In Link */}
+                            {/* Sign Up Link */}
                             <div className="text-center">
                                 <Text className="text-sm inline">
                                     New to Pulse Analytics?{' '}
                                 </Text>
-                                <CustomLink className="text-sm font-semibold cursor-pointer">
-                                    Log In
+                                <CustomLink href="/signup" className="text-sm font-semibold cursor-pointer">
+                                    Sign Up
                                 </CustomLink>
                             </div>
 
@@ -144,11 +172,11 @@ const Login = () => {
 
                             <PrimaryButton
                                 label="Log In with Google"
-                                type="submit"
+                                type="button" 
+                                onClick={loginWithGoogle}
                                 iconPos="right"
                                 icon="pi pi-google"
                                 className="w-full text-base font-semibold"
-                                disabled={!formData.agreeToTerms}
                             />
                         </form>
                     </div>

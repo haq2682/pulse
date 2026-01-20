@@ -5,8 +5,16 @@ import { Checkbox } from 'primereact/checkbox';
 import { PrimaryButton } from '@/components/global/Button';
 import { Heading, Text, CustomLink } from '@/components/global/Typography';
 import RegistrationBackground from '@/assets/registration-background.png';
+// 1. Import Auth Hook
+import { useAuth } from '@/context/AuthContext';
 
 const Signup = () => {
+    // 2. Destructure Auth functions
+    const { register, loginWithGoogle, loading, error } = useAuth();
+    
+    // Local state for validation errors
+    const [validationError, setValidationError] = useState('');
+
     const [formData, setFormData] = useState({
         fullName: '',
         email: '',
@@ -24,10 +32,45 @@ const Signup = () => {
         setFormData(prev => ({ ...prev, agreeToTerms: e.checked }));
     };
 
-    const handleSubmit = (e) => {
+    // --- HELPER: Email Validation (Format + Length) ---
+    const isValidEmail = (email) => {
+        // 1. Standard Regex for format (e.g., text@domain.com)
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        
+        // 2. Check: Matches Regex AND is at least 16 characters long
+        return email.length >= 16 && emailRegex.test(email);
+    };
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log('Form submitted:', formData);
-        // Add your signup logic here
+        setValidationError('');
+
+        // 1. Check Terms Agreement
+        if (!formData.agreeToTerms) {
+            setValidationError("You must agree to the Terms of Service.");
+            return;
+        }
+
+        // 2. Check Email Validity
+        if (!isValidEmail(formData.email)) {
+            setValidationError("Please enter a valid email address (minimum 6 characters).");
+            return;
+        }
+
+        // 3. Check Password Length
+        if (formData.password.length < 8) {
+            setValidationError("Password must be at least 8 characters long.");
+            return;
+        }
+
+        // 4. Check Passwords Match
+        if (formData.password !== formData.confirmPassword) {
+            setValidationError("Passwords do not match");
+            return;
+        }
+
+        // 5. Call Register API
+        await register(formData.fullName, formData.email, formData.password);
     };
 
     return (
@@ -89,6 +132,14 @@ const Signup = () => {
                             <Text className="text-base">Join us and start analyzing your data</Text>
                         </div>
 
+                        {/* Error Message Display */}
+                        {(error || validationError) && (
+                            <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm text-center border border-red-100 flex items-center justify-center gap-2">
+                                <i className="pi pi-exclamation-circle"></i>
+                                <span>{validationError || error}</span>
+                            </div>
+                        )}
+
                         <form onSubmit={handleSubmit} className="space-y-5">
                             {/* Full Name */}
                             <div>
@@ -118,7 +169,8 @@ const Signup = () => {
                                     value={formData.email}
                                     onChange={handleInputChange}
                                     placeholder="Enter your email"
-                                    className="w-full"
+                                    // Highlight red if invalid format & error is present
+                                    className={`w-full ${validationError && !isValidEmail(formData.email) ? 'p-invalid' : ''}`}
                                     required
                                 />
                             </div>
@@ -187,7 +239,8 @@ const Signup = () => {
                                 label="Create Account"
                                 type="submit"
                                 className="w-full text-base font-semibold"
-                                disabled={!formData.agreeToTerms}
+                                disabled={loading} 
+                                loading={loading} 
                             />
 
                             {/* Sign In Link */}
@@ -195,7 +248,7 @@ const Signup = () => {
                                 <Text className="text-sm inline">
                                     Already have an account?{' '}
                                 </Text>
-                                <CustomLink className="text-sm font-semibold cursor-pointer">
+                                <CustomLink href="/login" className="text-sm font-semibold cursor-pointer">
                                     Sign In
                                 </CustomLink>
                             </div>
@@ -208,7 +261,8 @@ const Signup = () => {
 
                             <PrimaryButton
                                 label="Sign Up with Google"
-                                type="submit"
+                                type="button"
+                                onClick={loginWithGoogle}
                                 iconPos="right"
                                 icon="pi pi-google"
                                 className="w-full text-base font-semibold"
