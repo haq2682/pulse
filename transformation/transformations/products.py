@@ -7,8 +7,7 @@ def transform_products(dataframes):
             "profit_margin": when(
                 col("cost_price").isNotNull()
                 & col("sell_price").isNotNull()
-                & (col("cost_price") != 0)
-                & (col("sell_price") != 0),
+                & (col("sell_price") > 0),
                 col("sell_price") - col("cost_price"),
             ),
         }

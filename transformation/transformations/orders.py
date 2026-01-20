@@ -1,5 +1,6 @@
 from pyspark.sql.functions import (
     col,
+    coalesce,
     year,
     month,
     quarter,
@@ -40,12 +41,15 @@ def transform_orders(dataframes):
     order_items = order_items.withColumn(
         "line_total",
         greatest(
-            (col("product_price") * col("quantity")) - col("discount_amount"),
+            (col("product_price") * col("quantity")) - when(col("discount_amount").isNotNull(), col("discount_amount")).otherwise(lit(0)),
             lit(0)
         )
     ).withColumn(
         "item_cogs",
-        col("cost_price") * col("quantity")
+        when(
+            col("cost_price").isNotNull() & col("quantity").isNotNull(),
+            col("cost_price") * col("quantity")
+        ).otherwise(lit(0))
     )
 
     # -------------------------
@@ -56,16 +60,16 @@ def transform_orders(dataframes):
         .groupBy("order_id")
         .agg(
             # Gross revenue (before discounts)
-            spark_sum(col("product_price") * col("quantity")).alias("gross_product_total"),
+            coalesce(spark_sum(col("product_price") * col("quantity")), lit(0)).alias("gross_product_total"),
             # Net revenue (after discounts)
-            spark_sum("line_total").alias("total_product_price"),
+            coalesce(spark_sum("line_total"), lit(0)).alias("total_product_price"),
             # Cost of goods sold
-            spark_sum("item_cogs").alias("total_cogs"),
-            spark_sum("quantity").alias("total_quantity"),
+            coalesce(spark_sum("item_cogs"), lit(0)).alias("total_cogs"),
+            coalesce(spark_sum("quantity"), lit(0)).alias("total_quantity"),
             spark_avg("product_price").alias("avg_product_price"),
-            spark_max("discount_amount").alias("max_item_discount"),
+            coalesce(spark_max("discount_amount"), lit(0)).alias("max_item_discount"),
             countDistinct("product_id").alias("unique_products_ordered"),
-            spark_sum("discount_amount").alias("total_discount_from_items")
+            coalesce(spark_sum("discount_amount"), lit(0)).alias("total_discount_from_items")
         )
     )
 

@@ -31,7 +31,7 @@ def transform_campaigns(dataframes):
                 col("start_date").alias("campaign_start"),
                 col("end_date").alias("campaign_end"),
             )
-            .filter(col("conversion_flag") == "true")
+            .filter((col("conversion_flag") == True) | (col("conversion_flag") == "true"))
             .join(
                 dataframes["orders"].filter(
                     (col("order_status") != "cancelled")
