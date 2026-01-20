@@ -1,6 +1,7 @@
 """Spark Structured Streaming - Kafka Consumer with Existing Map Integration"""
 
 import os
+import sys
 import findspark
 findspark.init()
 
@@ -10,6 +11,12 @@ from pyspark.sql.types import StructType, StructField, StringType, MapType
 from minio import Minio
 from dotenv import load_dotenv, find_dotenv
 
+# Add parent directory to path to import from mapping root
+# This allows importing map.py and List.py from the mapping directory
+mapping_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if mapping_dir not in sys.path:
+    sys.path.insert(0, mapping_dir)
+
 from map import process_all_dataframes, save_dataframes_to_minio, COLUMNS_INFO
 import List as mapping_list
 
@@ -17,7 +24,7 @@ load_dotenv(find_dotenv())
 
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "10.5.0.7:9092")
 CHECKPOINT_LOCATION = "s3a://pulse-checkpoints/normalize-stream"
-OUTPUT_BUCKET = "pulse-bucket-stream"
+OUTPUT_BUCKET = os.getenv("OUTPUT_BUCKET", "pulse-bucket-stream")
 
 
 def create_spark_session() -> SparkSession:

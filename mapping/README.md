@@ -1,4 +1,104 @@
-# Pulse Mapping Module - Database Streaming Documentation
+# Pulse Mapping Module - Unified Entry Point
+
+## Quick Start
+
+The mapping module provides a unified entry point (`run_mapping.py`) with 3 modes for data processing. Configuration is done by editing the `CONFIG` dictionary in the file.
+
+### 1. Batch Mode
+Load data from MinIO `bucket_name/ingested` folder, process through the mapping pipeline, and save results to `bucket_name/mapped` folder.
+
+**Configuration:**
+```python
+CONFIG = {
+    "mode": "batch",
+    "bucket_name": "pulse-bucket-1",
+}
+```
+
+**Run:**
+```bash
+python run_mapping.py
+```
+
+### 2. DB Mode
+Ingest data from a database URI, process through the mapping pipeline, and save results to `bucket_name/mapped` folder.
+
+**Configuration:**
+```python
+CONFIG = {
+    "mode": "db",
+    "bucket_name": "pulse-bucket-1",
+    "db_uri": "postgresql://user:pass@host:5432/database",
+    "db_poll_interval": 10,
+}
+```
+
+**Run:**
+```bash
+python run_mapping.py
+```
+
+**Note:** Before using DB mode, ensure the database administrator has completed the prerequisites outlined in the [Database Administrator Prerequisites](#database-administrator-prerequisites) section below.
+
+### 3. API Mode
+Ingest data from an API endpoint, process through the mapping pipeline, and save results to `bucket_name/mapped` folder.
+
+**Configuration:**
+```python
+CONFIG = {
+    "mode": "api",
+    "bucket_name": "pulse-bucket-1",
+    "api_url": "http://localhost:5000/api/data",
+    "api_poll_interval": 10,
+}
+```
+
+**Run:**
+```bash
+python run_mapping.py
+```
+
+### Configuration Reference
+
+Edit the `CONFIG` dictionary in `run_mapping.py`:
+
+```python
+CONFIG = {
+    # Mode: "batch", "db", or "api"
+    "mode": "batch",
+    
+    # Common settings
+    "bucket_name": "pulse-bucket-1",  # MinIO bucket name
+    
+    # DB mode settings (only used when mode="db")
+    "db_uri": "postgresql://user:pass@localhost:5432/ecommerce",
+    "db_poll_interval": 10,  # Polling interval in seconds
+    
+    # API mode settings (only used when mode="api")
+    "api_url": "http://localhost:5000/api/data",
+    "api_poll_interval": 10,  # Polling interval in seconds
+    
+    # Optional: Kafka bootstrap servers (defaults to env var if None)
+    "kafka_bootstrap": None,
+}
+```
+
+**Note:** In production, these configuration values will be provided by the React frontend.
+
+### Architecture
+
+- **Batch Mode**: Direct processing using PySpark
+  - MinIO ingested folder → PySpark mapping → MinIO mapped folder
+  
+- **DB Mode**: Streaming pipeline with Change Data Capture (CDC)
+  - Database → Kafka (via db_ingest_service.py) → PySpark Streaming (spark_streaming.py) → MinIO mapped folder
+  
+- **API Mode**: Streaming pipeline with API polling
+  - API Endpoint → Kafka (via api_ingest_service.py) → PySpark Streaming (spark_streaming.py) → MinIO mapped folder
+
+---
+
+# Database Streaming Documentation
 
 ## Overview
 

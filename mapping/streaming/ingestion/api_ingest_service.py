@@ -8,7 +8,7 @@ from kafka import KafkaProducer, KafkaAdminClient
 from kafka.admin import NewTopic
 from kafka.errors import TopicAlreadyExistsError
 from rapidfuzz import fuzz, process
-from canonical_message import create_message, VALID_TABLES
+from ..canonical_message import create_message, VALID_TABLES
 
 KAFKA_BOOTSTRAP = "10.5.0.7:9092"
 POLL_INTERVAL = 10
