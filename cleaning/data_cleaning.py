@@ -27,6 +27,11 @@ def check_duplicates(dataframes):
         dataframes (dict): Dictionary of table names to DataFrames
     """
     for table in dataframes.keys():
+        # Skip if dataframe is None
+        if dataframes[table] is None:
+            print(f"⚠️ Skipping duplicate check for '{table}': dataframe is None")
+            continue
+        
         # Group by all columns and count occurrences
         dup_rows = (
             dataframes[table]
@@ -49,6 +54,11 @@ def drop_duplicates(dataframes):
         dict: Updated dictionary with duplicates removed
     """
     for table in dataframes.keys():
+        # Skip if dataframe is None
+        if dataframes[table] is None:
+            print(f"⚠️ Skipping duplicate removal for '{table}': dataframe is None")
+            continue
+        
         dataframes[table] = dataframes[table].dropDuplicates()
     return dataframes
 
@@ -65,20 +75,25 @@ def drop_null_rows(dataframes, table, col_name):
     Returns:
         dict: Updated dictionary
     """
-    if table in dataframes:
-        df = dataframes[table]
-        if col_name in df.columns:
-            before = df.count()
-            cleaned = df.filter(F.col(col_name).isNotNull())
-            dataframes[table] = cleaned
-            after = cleaned.count()
-            print(
-                f"Removed {before - after} rows from '{table}' where '{col_name}' is NULL"
-            )
-        else:
-            print(f"Column '{col_name}' not found in '{table}'")
+    if table not in dataframes:
+        print(f"⚠️ Table '{table}' not found in dataframes")
+        return dataframes
+    
+    if dataframes[table] is None:
+        print(f"⚠️ Table '{table}' is None, skipping null row removal")
+        return dataframes
+    
+    df = dataframes[table]
+    if col_name in df.columns:
+        before = df.count()
+        cleaned = df.filter(F.col(col_name).isNotNull())
+        dataframes[table] = cleaned
+        after = cleaned.count()
+        print(
+            f"Removed {before - after} rows from '{table}' where '{col_name}' is NULL"
+        )
     else:
-        print(f"Table '{table}' not found in dataframes")
+        print(f"Column '{col_name}' not found in '{table}'")
 
     return dataframes
 
@@ -111,6 +126,11 @@ def drop_null_keys(dataframes):
     ]
 
     for table in dataframes.keys():
+        # Skip if dataframe is None
+        if dataframes[table] is None:
+            print(f"⚠️ Skipping null key removal for '{table}': dataframe is None")
+            continue
+        
         for col in dataframes[table].columns:
             if col in all_ids: 
                 dataframes = drop_null_rows(dataframes, table, col)
@@ -125,7 +145,12 @@ def check_nulls(dataframes):
     Args:
         dataframes (dict): Dictionary of table names to DataFrames
     """
-    for df in dataframes.values():
+    for table_name, df in dataframes.items():
+        # Skip if dataframe is None
+        if df is None:
+            print(f"⚠️ Skipping null check for '{table_name}': dataframe is None")
+            continue
+        
         null_counts = df.select(
             [F.sum(F.col(c).isNull().cast("int")).alias(c) for c in df.columns]
         )
@@ -142,7 +167,7 @@ def fill_null_values(dataframes):
     Returns:
         dict: Updated dictionary with filled values
     """
-    if "customers" in dataframes.keys():
+    if "customers" in dataframes.keys() and dataframes["customers"] is not None:
         dataframes["customers"] = dataframes["customers"].fillna(
             {
                 "gender": "",
@@ -158,9 +183,9 @@ def fill_null_values(dataframes):
             }
         )
     else:
-        print("Customers DataFrame is missing.")
+        print("⚠️ Customers DataFrame is missing or None.")
 
-    if "suppliers" in dataframes.keys():
+    if "suppliers" in dataframes.keys() and dataframes["suppliers"] is not None:
         dataframes["suppliers"] = dataframes["suppliers"].fillna(
             {
                 "supplier_rating": 0.0,
@@ -176,9 +201,9 @@ def fill_null_values(dataframes):
             }
         )
     else:
-        print("Suppliers DataFrame is missing.")
+        print("⚠️ Suppliers DataFrame is missing or None.")
 
-    if "products" in dataframes.keys():
+    if "products" in dataframes.keys() and dataframes["products"] is not None:
         dataframes["products"] = dataframes["products"].fillna(
             {
                 "product_name": "",
@@ -195,14 +220,16 @@ def fill_null_values(dataframes):
             }
         )
     else:
-        print("Products DataFrame is missing.")
+        print("⚠️ Products DataFrame is missing or None.")
 
-    if "inventory" in dataframes.keys():
+    if "inventory" in dataframes.keys() and dataframes["inventory"] is not None:
         dataframes["inventory"] = dataframes["inventory"].fillna(
             {"last_restocked_date": "1900-01-01"}
         )
+    else:
+        print("⚠️ Inventory DataFrame is missing or None.")
 
-    if "shopping_cart" in dataframes.keys():
+    if "shopping_cart" in dataframes.keys() and dataframes["shopping_cart"] is not None:
         dataframes["shopping_cart"] = dataframes["shopping_cart"].fillna(
             {
                 "cart_status": "",
@@ -210,8 +237,10 @@ def fill_null_values(dataframes):
                 "updated_at": "1900-01-01",
             }
         )
+    else:
+        print("⚠️ Shopping_cart DataFrame is missing or None.")
 
-    if "cart_items" in dataframes.keys():
+    if "cart_items" in dataframes.keys() and dataframes["cart_items"] is not None:
         dataframes["cart_items"] = dataframes["cart_items"].fillna(
             {
                 "item_status": "",
@@ -219,8 +248,10 @@ def fill_null_values(dataframes):
                 "updated_at": "1900-01-01",
             }
         )
+    else:
+        print("⚠️ Cart_items DataFrame is missing or None.")
 
-    if "orders" in dataframes.keys():
+    if "orders" in dataframes.keys() and dataframes["orders"] is not None:
         dataframes["orders"] = dataframes["orders"].fillna(
             {
                 "order_status": "",
@@ -228,8 +259,10 @@ def fill_null_values(dataframes):
                 "order_placed_at": "1900-01-01",
             }
         )
+    else:
+        print("⚠️ Orders DataFrame is missing or None.")
 
-    if "payments" in dataframes.keys():
+    if "payments" in dataframes.keys() and dataframes["payments"] is not None:
         dataframes["payments"] = dataframes["payments"].fillna(
             {
                 "payment_method": "",
@@ -239,8 +272,10 @@ def fill_null_values(dataframes):
                 "payment_date": "1900-01-01",
             }
         )
+    else:
+        print("⚠️ Payments DataFrame is missing or None.")
 
-    if "reviews" in dataframes.keys():
+    if "reviews" in dataframes.keys() and dataframes["reviews"] is not None:
         dataframes["reviews"] = dataframes["reviews"].fillna(
             {
                 "review_title": "",
@@ -248,8 +283,10 @@ def fill_null_values(dataframes):
                 "review_date": "1900-01-01",
             }
         )
+    else:
+        print("⚠️ Reviews DataFrame is missing or None.")
 
-    if "marketing_campaigns" in dataframes.keys():
+    if "marketing_campaigns" in dataframes.keys() and dataframes["marketing_campaigns"] is not None:
         dataframes["marketing_campaigns"] = dataframes["marketing_campaigns"].fillna(
             {
                 "campaign_name": "",
@@ -259,8 +296,10 @@ def fill_null_values(dataframes):
                 "campaign_status": "",
             }
         )
+    else:
+        print("⚠️ Marketing_campaigns DataFrame is missing or None.")
 
-    if "customer_sessions" in dataframes.keys():
+    if "customer_sessions" in dataframes.keys() and dataframes["customer_sessions"] is not None:
         dataframes["customer_sessions"] = dataframes["customer_sessions"].fillna(
             {
                 "session_start":  "1900-01-01",
@@ -271,6 +310,8 @@ def fill_null_values(dataframes):
                 "cart_abandonment_flag": "false",
             }
         )
+    else:
+        print("⚠️ Customer_sessions DataFrame is missing or None.")
 
     return dataframes
 
@@ -288,6 +329,11 @@ def impute_missing_values(dataframes, table, numeric_cols):
     Returns:
         dict: Updated dictionary
     """
+    # Skip if dataframe doesn't exist or is None
+    if table not in dataframes or dataframes[table] is None:
+        print(f"⚠️ Skipping imputation for '{table}': dataframe not found or is None")
+        return dataframes
+    
     df = dataframes[table]
     total_rows = df.count()
     print(f"Total rows: {total_rows}")
@@ -371,6 +417,11 @@ def impute_all_numeric(dataframes):
     ]
 
     for table in dataframes.keys():
+        # Skip if dataframe is None
+        if dataframes[table] is None:
+            print(f"⚠️ Skipping imputation for '{table}': dataframe is None")
+            continue
+        
         numeric_cols = [
             field.name
             for field in dataframes[table].schema.fields

@@ -19,6 +19,13 @@ from pyspark.sql.functions import (
 )
 
 def aggregate_customers(dataframes):
+    # Skip aggregation if required dataframes don't exist
+    required_dataframes = ["orders", "order_items"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping aggregate_customers: '{df_name}' dataframe not found")
+            return
+    
     orders_with_items = (
         dataframes["orders"]
         .join(dataframes["order_items"], "order_id", "inner")

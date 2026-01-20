@@ -14,6 +14,13 @@ from pyspark.sql.functions import (
 )
 
 def inventory_health_aggregations(dataframes):
+    # Skip aggregation if required dataframes don't exist
+    required_dataframes = ["orders", "order_items", "inventory", "products"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping inventory_health_aggregations: '{df_name}' dataframe not found")
+            return
+    
     product_daily_sales = (
         dataframes["orders"]
         .filter(col("order_placed_at").isNotNull())

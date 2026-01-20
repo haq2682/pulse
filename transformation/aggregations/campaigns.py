@@ -11,6 +11,17 @@ from pyspark.sql.functions import (
 )
 
 def aggregate_campaigns(dataframes):
+    # Skip aggregation if marketing_campaigns doesn't exist
+    if "marketing_campaigns" not in dataframes or dataframes["marketing_campaigns"] is None:
+        print("⚠️ Skipping aggregate_campaigns: 'marketing_campaigns' dataframe not found")
+        return
+    
+    # Skip if required dependencies don't exist
+    required_dataframes = ["customer_sessions", "orders"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping aggregate_campaigns: '{df_name}' dataframe not found")
+            return
 
     campaign_revenue = (
         dataframes["customer_sessions"]
