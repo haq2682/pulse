@@ -1,3 +1,21 @@
+-- User table
+CREATE TABLE users (
+    user_id VARCHAR(50) PRIMARY KEY,
+    username VARCHAR(100) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL
+);
+
+-- Business table
+CREATE TABLE businesses (
+    business_id VARCHAR(50) PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    business_name VARCHAR(255) NOT NULL,
+    business_region VARCHAR(100),
+    business_currency VARCHAR(50),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
 -- Address Table
 
 CREATE TABLE addresses (
@@ -101,14 +119,45 @@ CREATE TABLE shopping_cart (
     cart_id VARCHAR(50) PRIMARY KEY,
     customer_id VARCHAR(50),
     session_id VARCHAR(50),
-    product_id VARCHAR(50) NOT NULL,
-    quantity INT NOT NULL,
-    unit_price DECIMAL(10, 2) NOT NULL,
-    added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    cart_status VARCHAR(20),
+    cart_status VARCHAR(20) DEFAULT 'ACTIVE',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP,
+
     FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
-    FOREIGN KEY (product_id) REFERENCES products(product_id)
+    FOREIGN KEY (session_id) REFERENCES customer_sessions(session_id)
 );
+
+
+CREATE TABLE cart_items (
+    cart_item_id BIGINT PRIMARY KEY,
+
+    cart_id VARCHAR(50) NOT NULL,
+    product_id VARCHAR(50) NOT NULL,
+
+    quantity INT NOT NULL CHECK (quantity > 0),
+
+    unit_price DECIMAL(10, 2) NOT NULL,
+    total_price DECIMAL(12, 2)
+        GENERATED ALWAYS AS (quantity * unit_price) STORED,
+
+    added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP,
+
+    item_status VARCHAR(20) DEFAULT 'ACTIVE',
+
+    CONSTRAINT uq_cart_product UNIQUE (cart_id, product_id),
+
+    CONSTRAINT fk_cart
+        FOREIGN KEY (cart_id)
+        REFERENCES shopping_cart(cart_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_product
+        FOREIGN KEY (product_id)
+        REFERENCES products(product_id)
+);
+
+
 
 -- 7. Orders Table
 CREATE TABLE orders (

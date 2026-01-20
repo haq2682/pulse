@@ -17,6 +17,13 @@ from pyspark.sql.functions import (
 )
 
 def aggregate_categories(dataframes):
+    # Skip aggregation if required dataframes don't exist
+    required_dataframes = ["order_items", "products", "orders"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping aggregate_categories: '{df_name}' dataframe not found")
+            return
+    
     order_items_with_category = (
         dataframes["order_items"]
         .join(

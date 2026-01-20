@@ -5,6 +5,7 @@ from pyspark.sql.functions import (
     sum as spark_sum,
     avg as spark_avg,
     count,
+    current_timestamp,
     datediff,
     lower,
     lit,
@@ -13,6 +14,13 @@ from pyspark.sql.functions import (
 
 
 def global_aggregations(spark, dataframes):
+    # Skip aggregation if required dataframes don't exist
+    required_dataframes = ["orders", "customers", "products"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping global_aggregations: '{df_name}' dataframe not found")
+            return
+    
     # Calculate global metrics across entire dataset
     global_metrics = {}
 
@@ -243,7 +251,7 @@ def global_aggregations(spark, dataframes):
     global_aggregations_data = [(k, float(v)) for k, v in global_metrics.items()]
     global_aggregations_df = spark.createDataFrame(
         global_aggregations_data, ["metric_name", "metric_value"]
-    ).withColumn("calculated_at", lit("2025-11-14 16:34:39"))
+    ).withColumn("calculated_at", current_timestamp().cast("string"))
 
     dataframes["global_aggregations"] = global_aggregations_df
 

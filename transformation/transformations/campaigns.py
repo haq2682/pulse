@@ -13,6 +13,18 @@ from pyspark.sql.functions import (
 
 
 def transform_campaigns(dataframes):
+    # Skip transformation if marketing_campaigns doesn't exist
+    if "marketing_campaigns" not in dataframes or dataframes["marketing_campaigns"] is None:
+        print("⚠️ Skipping transform_campaigns: 'marketing_campaigns' dataframe not found")
+        return
+    
+    # Skip if required dependencies don't exist
+    required_dataframes = ["customer_sessions", "orders"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping transform_campaigns: '{df_name}' dataframe not found")
+            return
+    
     dataframes["marketing_campaigns"] = (
         dataframes["marketing_campaigns"]
         .join(
@@ -31,7 +43,7 @@ def transform_campaigns(dataframes):
                 col("start_date").alias("campaign_start"),
                 col("end_date").alias("campaign_end"),
             )
-            .filter(col("conversion_flag") == "true")
+            .filter((col("conversion_flag") == lit(True)) | (col("conversion_flag") == "true"))
             .join(
                 dataframes["orders"].filter(
                     (col("order_status") != "cancelled")

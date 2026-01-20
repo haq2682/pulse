@@ -1,6 +1,7 @@
 from pyspark.sql.functions import (
     col,
     countDistinct,
+    current_date,
     datediff,
     lit,
     when,
@@ -14,13 +15,18 @@ from pyspark.sql.functions import (
 
 
 def rfm_segmentation(dataframes):
+    # Skip aggregation if orders dataframe doesn't exist
+    if "orders" not in dataframes or dataframes["orders"] is None:
+        print("⚠️ Skipping rfm_segmentation: 'orders' dataframe not found")
+        return
+    
     rfm_metrics = (
         dataframes["orders"]
         .filter(col("customer_id").isNotNull() & col("order_placed_at").isNotNull())
         .groupBy("customer_id")
         .agg(
             # Recency: Days since last order
-            datediff(lit("2025-11-14"), spark_max("order_placed_at")).alias(
+            datediff(current_date(), spark_max("order_placed_at")).alias(
                 "days_since_last_order"
             ),
             # Frequency: Total number of orders

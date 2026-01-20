@@ -124,13 +124,26 @@ def cast_dataframes(dataframes):
             col("cart_id").cast(StringType()),
             col("customer_id").cast(StringType()),
             col("session_id").cast(StringType()),
+            col("cart_status").cast(StringType()),
+            col("created_at").cast(TimestampType()),
+            col("updated_at").cast(TimestampType())
+        )
+        print("Cast shopping_cart DataFrame")
+
+    # 8a. Cart Items
+    if "cart_items" in dataframes:
+        dataframes["cart_items"] = dataframes["cart_items"].select(
+            col("cart_item_id").cast(LongType()),
+            col("cart_id").cast(StringType()),
             col("product_id").cast(StringType()),
             col("quantity").cast(IntegerType()),
             col("unit_price").cast(FloatType()),
-            col("added_date").cast(DateType()),
-            col("cart_status").cast(StringType())
+            col("total_price").cast(FloatType()),
+            col("added_at").cast(TimestampType()),
+            col("updated_at").cast(TimestampType()),
+            col("item_status").cast(StringType())
         )
-        print("Cast shopping_cart DataFrame")
+        print("Cast cart_items DataFrame")
 
     # 9. Orders
     if "orders" in dataframes:
@@ -198,7 +211,7 @@ def cast_dataframes(dataframes):
             col("campaign_name").cast(StringType()),
             col("campaign_type").cast(StringType()),
             col("start_date").cast(DateType()),
-            when(col("end_date").isNotNull(), from_unixtime(col("end_date")).cast(DateType())).otherwise(None).alias("end_date"),
+            col("end_date").cast(DateType()),
             col("budget").cast(FloatType()),
             col("spent_amount").cast(FloatType()),
             col("impressions").cast(IntegerType()),

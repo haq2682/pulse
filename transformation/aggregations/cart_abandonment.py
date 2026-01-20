@@ -16,9 +16,20 @@ from pyspark.sql.functions import (
 
 
 def cart_abandonment_aggregations(dataframes):
+    # Skip aggregation if required dataframes don't exist
+    required_dataframes = ["shopping_cart", "cart_items", "products", "customer_sessions"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping cart_abandonment_aggregations: '{df_name}' dataframe not found")
+            return
+    
+    # Join shopping_cart with cart_items to get product-level details
+    cart_with_items = dataframes["shopping_cart"].join(
+        dataframes["cart_items"], "cart_id", "left"
+    )
+
     cart_with_products = (
-        dataframes["shopping_cart"]
-        .join(
+        cart_with_items.join(
             dataframes["products"].select("product_id", "category"),
             "product_id",
             "left",
@@ -60,10 +71,10 @@ def cart_abandonment_aggregations(dataframes):
             expr("first(category)").alias("abandoned_cart_category"),
             # Session conversion flag
             expr("first(conversion_flag)").alias("session_converted"),
-            # Earliest added date
-            spark_min("added_date").alias("first_added_date"),
-            # Latest added date
-            spark_max("added_date").alias("last_added_date"),
+            # Earliest added date (from cart_items.added_at)
+            spark_min("added_at").alias("first_added_date"),
+            # Latest added date (from cart_items.added_at)
+            spark_max("added_at").alias("last_added_date"),
             # Customer ID
             expr("first(customer_id)").alias("customer_id"),
             # Session ID
@@ -72,11 +83,11 @@ def cart_abandonment_aggregations(dataframes):
     )
     cart_full = (
         dataframes["shopping_cart"]
-        .select("cart_id", "cart_status", "added_date")
+        .select("cart_id", "cart_status", "created_at")
         .groupBy("cart_id")
         .agg(
             expr("first(cart_status)").alias("cart_status"),
-            spark_min("added_date").alias("cart_added_date"),
+            spark_min("created_at").alias("cart_added_date"),
         )
         .join(cart_agg, "cart_id", "left")
     )

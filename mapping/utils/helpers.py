@@ -1,27 +1,41 @@
 import os
 import datetime
 from difflib import get_close_matches
+import re
 
 
 def normalize_name(name):
     """
-    Normalize dataframe name to match df_to_table keys.
-
-    Args:
-        name: Name to normalize
-
-    Returns:
-        Normalized name or None if no match
+    Normalize incoming file name to a canonical dataframe key
+    defined in df_to_table.
     """
     from map import df_to_table
 
-    name = name.lower().replace("_df", "")
+    # Basic cleanup
+    name = name.lower()
     name = os.path.splitext(name)[0]
+    name = re.sub(r"(dataset|data|table|export)$", "", name)
+    name = re.sub(r"[^0-9a-zA-Z_]+", "_", name)
+    name = name.strip("_")
 
-    possible_keys = list(df_to_table.keys())
-    close = get_close_matches(name, possible_keys, n=1, cutoff=0.6)
+    # Direct & alias matching
+    for df_key, meta in df_to_table.items():
+        aliases = meta["aliases"]
+        if name == df_key.replace("_df", ""):
+            return df_key
+        if name in aliases:
+            return df_key
+
+    # Fuzzy fallback across all aliases
+    alias_map = {
+        alias: df_key
+        for df_key, meta in df_to_table.items()
+        for alias in meta["aliases"]
+    }
+
+    close = get_close_matches(name, alias_map.keys(), n=1, cutoff=0.7)
     if close:
-        return close[0]
+        return alias_map[close[0]]
 
     return None
 

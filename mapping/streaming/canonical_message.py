@@ -1,9 +1,10 @@
 """
 Canonical Kafka message format for Pulse e-commerce streaming.
 Functional approach - simple functions, no classes.
+Supports CDC operations for database ingestion.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 import json
 
@@ -11,6 +12,7 @@ import json
 VALID_SOURCES = ["db", "api"]
 VALID_TABLES = [
     "addresses",
+    "cart_items",
     "categories",
     "customer_sessions",
     "customers",
@@ -25,6 +27,10 @@ VALID_TABLES = [
     "suppliers",
     "wishlist",
 ]
+
+# CDC operations for database ingestion: c=create, u=update, d=delete, r=read/snapshot
+VALID_CDC_OPERATIONS = ["c", "u", "d", "r", "create", "update", "delete", "read"]
+
 TOPIC_MAP = {table: f"ecom.{table}" for table in VALID_TABLES}
 
 
@@ -34,14 +40,30 @@ def create_message(
     source_type: str = "api",
     vendor: str = "custom",
     schema_version: str = "v1",
+    operation: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Create canonical message."""
+    """
+    Create canonical message with optional CDC operation for database ingestion.
+    
+    Args:
+        table: Target table name
+        payload: Data payload
+        source_type: Source type (db, api)
+        vendor: Vendor identifier
+        schema_version: Schema version
+        operation: CDC operation for db source (c=create, u=update, d=delete, r=read)
+        
+    Returns:
+        Canonical message dictionary
+    """
     if table not in VALID_TABLES:
         raise ValueError(f"Invalid table: {table}")
     if source_type not in VALID_SOURCES:
         raise ValueError(f"Invalid source_type: {source_type}")
+    if operation and operation not in VALID_CDC_OPERATIONS:
+        raise ValueError(f"Invalid CDC operation: {operation}")
 
-    return {
+    message = {
         "source_type": source_type,
         "vendor": vendor,
         "table": table,
@@ -49,6 +71,12 @@ def create_message(
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "payload": payload,
     }
+    
+    # Add operation field for CDC messages (used with db source type)
+    if operation:
+        message["operation"] = operation
+    
+    return message
 
 
 def get_topic(table: str) -> str:
@@ -60,6 +88,16 @@ def validate_message(message: Dict[str, Any]) -> bool:
     """Validate message structure."""
     required = ["source_type", "vendor", "table", "schema_version", "payload"]
     return all(field in message for field in required)
+
+
+def validate_cdc_message(message: Dict[str, Any]) -> bool:
+    """Validate CDC message structure including operation field."""
+    if not validate_message(message):
+        return False
+    # Validate operation whenever it's present, regardless of source_type
+    if message.get("operation"):
+        return message["operation"] in VALID_CDC_OPERATIONS
+    return True
 
 
 def to_json(message: Dict[str, Any]) -> str:

@@ -27,6 +27,11 @@ def check_duplicates(dataframes):
         dataframes (dict): Dictionary of table names to DataFrames
     """
     for table in dataframes.keys():
+        # Skip if dataframe is None
+        if dataframes[table] is None:
+            print(f"⚠️ Skipping duplicate check for '{table}': dataframe is None")
+            continue
+        
         # Group by all columns and count occurrences
         dup_rows = (
             dataframes[table]
@@ -49,6 +54,11 @@ def drop_duplicates(dataframes):
         dict: Updated dictionary with duplicates removed
     """
     for table in dataframes.keys():
+        # Skip if dataframe is None
+        if dataframes[table] is None:
+            print(f"⚠️ Skipping duplicate removal for '{table}': dataframe is None")
+            continue
+        
         dataframes[table] = dataframes[table].dropDuplicates()
     return dataframes
 
@@ -65,20 +75,25 @@ def drop_null_rows(dataframes, table, col_name):
     Returns:
         dict: Updated dictionary
     """
-    if table in dataframes:
-        df = dataframes[table]
-        if col_name in df.columns:
-            before = df.count()
-            cleaned = df.filter(F.col(col_name).isNotNull())
-            dataframes[table] = cleaned
-            after = cleaned.count()
-            print(
-                f"Removed {before - after} rows from '{table}' where '{col_name}' is NULL"
-            )
-        else:
-            print(f"Column '{col_name}' not found in '{table}'")
+    if table not in dataframes:
+        print(f"⚠️ Table '{table}' not found in dataframes")
+        return dataframes
+    
+    if dataframes[table] is None:
+        print(f"⚠️ Table '{table}' is None, skipping null row removal")
+        return dataframes
+    
+    df = dataframes[table]
+    if col_name in df.columns:
+        before = df.count()
+        cleaned = df.filter(F.col(col_name).isNotNull())
+        dataframes[table] = cleaned
+        after = cleaned.count()
+        print(
+            f"Removed {before - after} rows from '{table}' where '{col_name}' is NULL"
+        )
     else:
-        print(f"Table '{table}' not found in dataframes")
+        print(f"Column '{col_name}' not found in '{table}'")
 
     return dataframes
 
@@ -104,13 +119,20 @@ def drop_null_keys(dataframes):
         "payment_id",
         "campaign_id",
         "cart_id",
+        "cart_item_id",
+        "inventory_id",
         "review_id",
         "wishlist_id",
     ]
 
     for table in dataframes.keys():
+        # Skip if dataframe is None
+        if dataframes[table] is None:
+            print(f"⚠️ Skipping null key removal for '{table}': dataframe is None")
+            continue
+        
         for col in dataframes[table].columns:
-            if col in all_ids:
+            if col in all_ids: 
                 dataframes = drop_null_rows(dataframes, table, col)
 
     return dataframes
@@ -123,7 +145,12 @@ def check_nulls(dataframes):
     Args:
         dataframes (dict): Dictionary of table names to DataFrames
     """
-    for df in dataframes.values():
+    for table_name, df in dataframes.items():
+        # Skip if dataframe is None
+        if df is None:
+            print(f"⚠️ Skipping null check for '{table_name}': dataframe is None")
+            continue
+        
         null_counts = df.select(
             [F.sum(F.col(c).isNull().cast("int")).alias(c) for c in df.columns]
         )
@@ -140,7 +167,7 @@ def fill_null_values(dataframes):
     Returns:
         dict: Updated dictionary with filled values
     """
-    if "customers" in dataframes.keys():
+    if "customers" in dataframes.keys() and dataframes["customers"] is not None:
         dataframes["customers"] = dataframes["customers"].fillna(
             {
                 "gender": "",
@@ -156,27 +183,27 @@ def fill_null_values(dataframes):
             }
         )
     else:
-        print("Customers DataFrame is missing.")
+        print("⚠️ Customers DataFrame is missing or None.")
 
-    if "suppliers" in dataframes.keys():
+    if "suppliers" in dataframes.keys() and dataframes["suppliers"] is not None:
         dataframes["suppliers"] = dataframes["suppliers"].fillna(
             {
                 "supplier_rating": 0.0,
                 "supplier_status": "",
-                "is_preferred": "false",
+                "is_preferred":  "false",
                 "is_verified": "false",
                 "contract_start_date": "1900-01-01",
                 "contract_end_date": "1900-01-01",
                 "city": "",
-                "state": "",
+                "state":  "",
                 "zip_code": "00000",
                 "country": "",
             }
         )
     else:
-        print("Suppliers DataFrame is missing.")
+        print("⚠️ Suppliers DataFrame is missing or None.")
 
-    if "products" in dataframes.keys():
+    if "products" in dataframes.keys() and dataframes["products"] is not None:
         dataframes["products"] = dataframes["products"].fillna(
             {
                 "product_name": "",
@@ -193,19 +220,38 @@ def fill_null_values(dataframes):
             }
         )
     else:
-        print("Products DataFrame is missing.")
+        print("⚠️ Products DataFrame is missing or None.")
 
-    if "inventory" in dataframes.keys():
+    if "inventory" in dataframes.keys() and dataframes["inventory"] is not None:
         dataframes["inventory"] = dataframes["inventory"].fillna(
             {"last_restocked_date": "1900-01-01"}
         )
+    else:
+        print("⚠️ Inventory DataFrame is missing or None.")
 
-    if "shopping_cart" in dataframes.keys():
+    if "shopping_cart" in dataframes.keys() and dataframes["shopping_cart"] is not None:
         dataframes["shopping_cart"] = dataframes["shopping_cart"].fillna(
-            {"added_date": "1900-01-01", "cart_status": ""}
+            {
+                "cart_status": "",
+                "created_at": "1900-01-01",
+                "updated_at": "1900-01-01",
+            }
         )
+    else:
+        print("⚠️ Shopping_cart DataFrame is missing or None.")
 
-    if "orders" in dataframes.keys():
+    if "cart_items" in dataframes.keys() and dataframes["cart_items"] is not None:
+        dataframes["cart_items"] = dataframes["cart_items"].fillna(
+            {
+                "item_status": "",
+                "added_at": "1900-01-01",
+                "updated_at": "1900-01-01",
+            }
+        )
+    else:
+        print("⚠️ Cart_items DataFrame is missing or None.")
+
+    if "orders" in dataframes.keys() and dataframes["orders"] is not None:
         dataframes["orders"] = dataframes["orders"].fillna(
             {
                 "order_status": "",
@@ -213,8 +259,10 @@ def fill_null_values(dataframes):
                 "order_placed_at": "1900-01-01",
             }
         )
+    else:
+        print("⚠️ Orders DataFrame is missing or None.")
 
-    if "payments" in dataframes.keys():
+    if "payments" in dataframes.keys() and dataframes["payments"] is not None:
         dataframes["payments"] = dataframes["payments"].fillna(
             {
                 "payment_method": "",
@@ -224,8 +272,10 @@ def fill_null_values(dataframes):
                 "payment_date": "1900-01-01",
             }
         )
+    else:
+        print("⚠️ Payments DataFrame is missing or None.")
 
-    if "reviews" in dataframes.keys():
+    if "reviews" in dataframes.keys() and dataframes["reviews"] is not None:
         dataframes["reviews"] = dataframes["reviews"].fillna(
             {
                 "review_title": "",
@@ -233,8 +283,10 @@ def fill_null_values(dataframes):
                 "review_date": "1900-01-01",
             }
         )
+    else:
+        print("⚠️ Reviews DataFrame is missing or None.")
 
-    if "marketing_campaigns" in dataframes.keys():
+    if "marketing_campaigns" in dataframes.keys() and dataframes["marketing_campaigns"] is not None:
         dataframes["marketing_campaigns"] = dataframes["marketing_campaigns"].fillna(
             {
                 "campaign_name": "",
@@ -244,11 +296,13 @@ def fill_null_values(dataframes):
                 "campaign_status": "",
             }
         )
+    else:
+        print("⚠️ Marketing_campaigns DataFrame is missing or None.")
 
-    if "customer_sessions" in dataframes.keys():
+    if "customer_sessions" in dataframes.keys() and dataframes["customer_sessions"] is not None:
         dataframes["customer_sessions"] = dataframes["customer_sessions"].fillna(
             {
-                "session_start": "1900-01-01",
+                "session_start":  "1900-01-01",
                 "session_end": "1900-01-01",
                 "device_type": "",
                 "referrer_source": "",
@@ -256,6 +310,8 @@ def fill_null_values(dataframes):
                 "cart_abandonment_flag": "false",
             }
         )
+    else:
+        print("⚠️ Customer_sessions DataFrame is missing or None.")
 
     return dataframes
 
@@ -273,6 +329,11 @@ def impute_missing_values(dataframes, table, numeric_cols):
     Returns:
         dict: Updated dictionary
     """
+    # Skip if dataframe doesn't exist or is None
+    if table not in dataframes or dataframes[table] is None:
+        print(f"⚠️ Skipping imputation for '{table}': dataframe not found or is None")
+        return dataframes
+    
     df = dataframes[table]
     total_rows = df.count()
     print(f"Total rows: {total_rows}")
@@ -290,7 +351,7 @@ def impute_missing_values(dataframes, table, numeric_cols):
 
         if non_null_count == 0:
             all_null_cols.append(col_name)
-            print(f"🚫 {col_name}: ALL NULL - will fill with 0")
+            print(f"🚫 {col_name}:  ALL NULL - will fill with 0")
         else:
             valid_cols.append(col_name)
             null_count = total_rows - non_null_count
@@ -306,7 +367,7 @@ def impute_missing_values(dataframes, table, numeric_cols):
         fill_dict = {col: 0 for col in all_null_cols}
         df = df.fillna(fill_dict)
         dataframes[table] = df
-        print(f"✅ Filled all-NULL columns with 0: {all_null_cols}")
+        print(f"✅ Filled all-NULL columns with 0:  {all_null_cols}")
 
     # Impute valid columns with median
     if valid_cols:
@@ -336,7 +397,7 @@ def impute_all_numeric(dataframes):
         dataframes (dict): Dictionary of table names to DataFrames
 
     Returns:
-        dict: Updated dictionary
+        dict:  Updated dictionary
     """
     all_ids = [
         "session_id",
@@ -349,11 +410,18 @@ def impute_all_numeric(dataframes):
         "payment_id",
         "campaign_id",
         "cart_id",
+        "cart_item_id",
+        "inventory_id",
         "review_id",
         "wishlist_id",
     ]
 
     for table in dataframes.keys():
+        # Skip if dataframe is None
+        if dataframes[table] is None:
+            print(f"⚠️ Skipping imputation for '{table}': dataframe is None")
+            continue
+        
         numeric_cols = [
             field.name
             for field in dataframes[table].schema.fields
@@ -365,7 +433,7 @@ def impute_all_numeric(dataframes):
         numeric_cols = [col for col in numeric_cols if col not in all_ids]
 
         if numeric_cols:
-            print(f"\nImputing missing values for table: {table}")
+            print(f"\nImputing missing values for table:  {table}")
             dataframes = impute_missing_values(dataframes, table, numeric_cols)
         else:
             print(f"\nNo numeric columns found in table: {table}, skipping imputation.")
@@ -389,27 +457,46 @@ def clean_text_columns(dataframes):
         if not text or len(str(text)) < 3:
             return False
 
-        text = str(text).lower()
+        text = str(text).strip()
+        text_lower = text.lower()
 
-        # Skip if text contains only alphanumeric (likely an ID/code)
-        if text.replace("_", "").replace("-", "").isalnum() and any(
-            c.isdigit() for c in text
-        ):
+        # Skip numeric values
+        if re.match(r'^[\d\.\,\s]+$', text):
             return False
 
-        vowels = len(re.findall(r"[aeiou]", text))
+        # Skip single word abbreviations (S, M, L, XL, XXL, etc.)
+        if len(text) <= 4 and text.isupper():
+            return False
+
+        # Skip common multi-word phrases with spaces
+        if ' ' in text and len(text.split()) >= 2:
+            words = text.split()
+            valid_words = 0
+            for word in words: 
+                if len(word) >= 2:
+                    vowels = len(re.findall(r"[aeiou]", word.lower()))
+                    if vowels > 0:
+                        valid_words += 1
+            if valid_words >= len(words) * 0.7:
+                return False
+
+        # Skip short strings (likely valid abbreviations or codes)
+        if len(text) <= 6: 
+            return False
+
+        vowels = len(re.findall(r"[aeiou]", text_lower))
         vowel_ratio = vowels / len(text)
 
-        # English text typically has 30-40% vowels
-        if vowel_ratio < 0.15 or vowel_ratio > 0.7:
+        # More lenient vowel ratio check
+        if vowel_ratio < 0.10 or vowel_ratio > 0.75:
             return True
 
-        # Check for excessive consonant clusters (5+ in a row)
-        if re.search(r"[bcdfghjklmnpqrstvwxyz]{5,}", text):
+        # Check for excessive consonant clusters (6+ in a row)
+        if re.search(r"[bcdfghjklmnpqrstvwxyz]{6,}", text_lower):
             return True
 
-        # Check for repeating patterns (same char 4+ times)
-        if re.search(r"(.)\1{3,}", text):
+        # Check for repeating patterns (same char 5+ times)
+        if re.search(r"(.)\1{4,}", text_lower):
             return True
 
         return False
@@ -443,90 +530,7 @@ def clean_text_columns(dataframes):
             and not any(pattern in field.name.lower() for pattern in skip_patterns)
         ]
 
-        for col_name in string_cols:
-            gibberish_count = df.filter(is_gibberish_udf(col(col_name))).count()
-
-            if gibberish_count > 0:
-                df = df.withColumn(
-                    col_name,
-                    when(is_gibberish_udf(col(col_name)), F.lit(None)).otherwise(
-                        col(col_name)
-                    ),
-                )
-                print(f"  ✅ Fixed {gibberish_count} gibberish values in {col_name}")
-
-        dataframes[table_name] = df
-
-    print("\n" + "=" * 60)
-    print("✅ TEXT CLEANING COMPLETED")
-    print("=" * 60)
-
-    return dataframes
-    """
-    Clean gibberish from text columns across all tables using linguistic analysis.
-
-    Uses a UDF to detect gibberish based on:
-    - Vowel-to-consonant ratios
-    - Excessive consonant clusters
-    - Character repetition patterns
-
-    Args:
-        dataframes (dict): Dictionary of table names to DataFrames
-
-    Returns:
-        dict: Updated dictionary with cleaned text
-    """
-
-    def is_gibberish_text(text):
-        """
-        UDF to detect gibberish strings based on character ratios and patterns.
-        """
-        if not text or text in ["Unknown", "NULL", None]:
-            return False
-
-        text = str(text).lower()
-
-        # Skip very short text
-        if len(text) < 3:
-            return False
-
-        vowels = len(re.findall(r"[aeiou]", text))
-
-        if len(text) > 3:
-            vowel_ratio = vowels / len(text)
-            # English text typically has 30-40% vowels
-            if vowel_ratio < 0.15 or vowel_ratio > 0.7:
-                return True
-
-            # Check for excessive consonant clusters (4+ in a row)
-            if re.search(r"[bcdfghjklmnpqrstvwxyz]{4,}", text):
-                return True
-
-            # Check for repeating patterns (same char 4+ times)
-            if re.search(r"(.)\1{3,}", text):
-                return True
-
-        return False
-
-    # Register UDF locally within function
-    is_gibberish_udf = udf(is_gibberish_text, BooleanType())
-    print("\n" + "=" * 60)
-    print("📝 CLEANING TEXT COLUMNS FOR GIBBERISH")
-    print("=" * 60)
-
-    for table_name, df in dataframes.items():
-        print(f"\n🔍 Checking {table_name}...")
-
-        # Get all string columns except special ones
-        string_cols = [
-            field.name
-            for field in df.schema.fields
-            if isinstance(field.dataType, StringType)
-            and field.name
-            not in ["sku", "zip_code", "postal_code", "dimensions", "transaction_id"]
-        ]
-
-        for col_name in string_cols:
+        for col_name in string_cols: 
             gibberish_count = df.filter(is_gibberish_udf(col(col_name))).count()
 
             if gibberish_count > 0:
@@ -552,12 +556,12 @@ def clean_numeric_strings(dataframes):
     Clean string columns with numeric formatting issues.
 
     Operations performed:
-    1. Remove leading zeros from ID columns
-    2. Validate integer columns for non-numeric values
-    3. Validate decimal/float columns
-    4. Convert numeric status codes to text (1→"Active", 0→"Inactive", 2→"Pending")
-    5. Clean transaction IDs and SKUs (remove special characters)
-    6. Trim numeric string columns
+    1.Remove leading zeros from ID columns
+    2.Validate integer columns for non-numeric values
+    3.Validate decimal/float columns
+    4.Convert numeric status codes to text (1→"Active", 0→"Inactive", 2→"Pending")
+    5.Clean transaction IDs and SKUs (remove special characters)
+    6.Trim numeric string columns
 
     Args:
         dataframes (dict): Dictionary of table names to DataFrames
@@ -569,21 +573,21 @@ def clean_numeric_strings(dataframes):
     print("🔢 CLEANING NUMERIC STRING COLUMNS")
     print("=" * 60)
 
-    # 1. Clean all ID columns - remove leading zeros
+    # 1.Clean all ID columns - remove leading zeros
     for table_name, df in dataframes.items():
         id_columns = [col_name for col_name in df.columns if col_name.endswith("_id")]
 
         for col_name in id_columns:
             # Remove leading zeros
             df = df.withColumn(
-                col_name, regexp_replace(col(col_name), "^0+(?=\\d)", "")
+                col_name, regexp_replace(col(col_name), r"^0+(?=\\d)", "")
             )
 
         if id_columns:
             dataframes[table_name] = df
             print(f"✅ Cleaned {len(id_columns)} ID columns in {table_name}")
 
-    # 2. Clean all integer columns that might have text values
+    # 2.Clean all integer columns that might have text values
     for table_name, df in dataframes.items():
         integer_cols = [
             field.name
@@ -618,7 +622,7 @@ def clean_numeric_strings(dataframes):
 
         dataframes[table_name] = df
 
-    # 3. Clean all decimal/float columns
+    # 3.Clean all decimal/float columns
     for table_name, df in dataframes.items():
         decimal_cols = [
             field.name
@@ -646,13 +650,13 @@ def clean_numeric_strings(dataframes):
 
         dataframes[table_name] = df
 
-    # 4. Handle columns with numeric status codes (convert to text)
+    # 4.Handle columns with numeric status codes (convert to text)
     for table_name, df in dataframes.items():
         status_columns = [
             col_name for col_name in df.columns if col_name.endswith("_status")
         ]
 
-        for status_col in status_columns:
+        for status_col in status_columns: 
             # Check if status column has numeric values like "0", "1"
             numeric_status_count = df.filter(col(status_col).rlike("^[0-9]$")).count()
 
@@ -671,7 +675,7 @@ def clean_numeric_strings(dataframes):
 
         dataframes[table_name] = df
 
-    # 5. Clean transaction/reference IDs - remove special characters
+    # 5.Clean transaction/reference IDs - remove special characters
     for table_name, df in dataframes.items():
         transaction_cols = [
             col_name
@@ -679,7 +683,7 @@ def clean_numeric_strings(dataframes):
             if "transaction" in col_name.lower() or col_name == "sku"
         ]
 
-        for col_name in transaction_cols:
+        for col_name in transaction_cols: 
             df = df.withColumn(
                 col_name, regexp_replace(col(col_name), "[^a-zA-Z0-9-]", "")
             )
@@ -688,7 +692,7 @@ def clean_numeric_strings(dataframes):
             dataframes[table_name] = df
             print(f"✅ Cleaned transaction IDs in {table_name}")
 
-    # 6. Trim all numeric string columns
+    # 6.Trim all numeric string columns
     for table_name, df in dataframes.items():
         string_cols = [
             field.name
@@ -699,7 +703,7 @@ def clean_numeric_strings(dataframes):
         for col_name in string_cols:
             # Check if column looks numeric
             sample_value = df.select(col_name).filter(col(col_name).isNotNull()).first()
-            if sample_value and sample_value[0]:
+            if sample_value and sample_value[0]: 
                 if re.match(r"^[\d\s.,-]+$", str(sample_value[0])):
                     # Trim whitespace from numeric strings
                     df = df.withColumn(col_name, trim(col(col_name)))
@@ -718,17 +722,17 @@ def clean_whitespace_issues(dataframes):
     Remove excessive whitespace and formatting issues from all string columns.
 
     Operations performed:
-    1. Trim leading/trailing whitespace
-    2. Replace multiple spaces with single space
-    3. Remove trailing special characters (*)
-    4. Remove leading special characters (*)
-    5. Clean up excessive quotes
-    6. Remove trailing quotes
+    1.Trim leading/trailing whitespace
+    2.Replace multiple spaces with single space
+    3.Remove trailing special characters (*)
+    4.Remove leading special characters (*)
+    5.Clean up excessive quotes
+    6.Remove trailing quotes
 
     Args:
         dataframes (dict): Dictionary of table names to DataFrames
 
-    Returns:
+    Returns: 
         dict: Updated dictionary with cleaned whitespace
     """
     print("\n" + "=" * 60)
@@ -746,23 +750,23 @@ def clean_whitespace_issues(dataframes):
         if not string_cols:
             continue
 
-        for col_name in string_cols:
-            # 1. Trim leading/trailing whitespace
+        for col_name in string_cols: 
+            # 1.Trim leading/trailing whitespace
             df = df.withColumn(col_name, trim(col(col_name)))
 
-            # 2. Replace multiple spaces with single space
+            # 2.Replace multiple spaces with single space
             df = df.withColumn(col_name, regexp_replace(col(col_name), "\\s+", " "))
 
-            # 3. Remove trailing special characters
+            # 3.Remove trailing special characters
             df = df.withColumn(col_name, regexp_replace(col(col_name), "[*]+$", ""))
 
-            # 4. Remove leading special characters
+            # 4.Remove leading special characters
             df = df.withColumn(col_name, regexp_replace(col(col_name), "^[*]+", ""))
 
-            # 5. Clean up excessive quotes
+            # 5.Clean up excessive quotes
             df = df.withColumn(col_name, regexp_replace(col(col_name), '"{2,}', '"'))
 
-            # 6. Remove trailing quotes
+            # 6.Remove trailing quotes
             df = df.withColumn(col_name, regexp_replace(col(col_name), '"+$', ""))
 
         dataframes[table_name] = df
@@ -785,7 +789,7 @@ def clean_mixed_scripts(dataframes):
     Args:
         dataframes (dict): Dictionary of table names to DataFrames
 
-    Returns:
+    Returns: 
         dict: Updated dictionary with ASCII-only text
     """
     print("\n" + "=" * 60)
@@ -812,7 +816,7 @@ def clean_mixed_scripts(dataframes):
 
         print(f"\n  🔧 Processing {table_name}...")
 
-        for col_name in text_cols:
+        for col_name in text_cols: 
             # Count non-ASCII before cleaning
             non_ascii_count = df.filter(
                 col(col_name).rlike(".*[^\\x00-\\x7f].*")
@@ -884,7 +888,7 @@ def validate_all_cleaned_data(dataframes):
             if isinstance(field.dataType, StringType)
         ]
 
-        for col_name in string_cols:
+        for col_name in string_cols: 
             # Check for excessive special characters
             special_char_count = df.filter(
                 col(col_name).rlike(".*[*@#$%^&]{2,}.*")
@@ -892,7 +896,7 @@ def validate_all_cleaned_data(dataframes):
 
             if special_char_count > 0:
                 print(
-                    f"⚠️  {table_name}.{col_name}: {special_char_count} rows with multiple special characters"
+                    f"⚠️  {table_name}.{col_name}:  {special_char_count} rows with multiple special characters"
                 )
                 issues_found = True
 

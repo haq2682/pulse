@@ -18,6 +18,13 @@ from pyspark.sql.functions import (
 
 
 def aggregate_products(dataframes):
+    # Skip aggregation if required dataframes don't exist
+    required_dataframes = ["order_items", "products", "orders"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping aggregate_products: '{df_name}' dataframe not found")
+            return
+    
     order_items_enhanced = (
         dataframes["order_items"]
         .join(
@@ -147,12 +154,13 @@ def aggregate_products(dataframes):
         )
     )
     product_cart_agg = (
-        dataframes["shopping_cart"]
+        dataframes["cart_items"]
+        .join(dataframes["shopping_cart"].select("cart_id", "cart_status"), "cart_id", "left")
         .filter(col("product_id").isNotNull())
         .groupBy("product_id")
         .agg(
             # Total cart adds
-            count("cart_id").alias("total_cart_adds"),
+            count("cart_item_id").alias("total_cart_adds"),
             # Cart to purchase rate (cart_status = 'purchased' or similar indicator)
             (
                 spark_sum(
@@ -166,7 +174,7 @@ def aggregate_products(dataframes):
                         lit(1),
                     ).otherwise(lit(0))
                 )
-                / count("cart_id")
+                / count("cart_item_id")
             ).alias("cart_to_purchase_rate"),
         )
     )

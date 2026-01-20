@@ -3,12 +3,14 @@ Main execution script for E-commerce Data Analysis.
 """
 import pyspark.sql.functions as F
 from pyspark.sql import Window
-from analysis_config import create_spark_session, DB_CONFIG
+from analysis_config import create_spark_session
 from analysis_utils import (
     get_agg_tables,
     add_time_grain,
     check_null_dataframes
 )
+from analysis_export_utils import export_analytics_to_minio
+
 def is_column_all_null_or_zero(df, col_name):
     if df is None:
         return True                    
@@ -51,11 +53,11 @@ def main():
     spark = create_spark_session("Ecommerce_Analysis_Main")
 
     # ---------------------------------------------------------
-    # 2. Load Data (from Postgres)
+    # 2. Load Data (from MinIO transformed/ directory)
     # ---------------------------------------------------------
-    print("\n📥 Loading Aggregated Tables from Database...")
-    # This uses the credentials from config and logic from utils
-    dataframes = get_agg_tables(spark, DB_CONFIG)
+    print("\n📥 Loading Aggregated Tables from MinIO...")
+    # Load transformed data from MinIO bucket
+    dataframes = get_agg_tables(spark)
     
     if not dataframes:
         print("❌ No tables loaded. Exiting.")
@@ -63,13 +65,13 @@ def main():
 
     # ---------------------------------------------------------
 
-    if not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at"):
+    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at"):
         dataframes["agg_orders"] = dataframes["agg_orders"].withColumn(
         "order_date",
         F.to_date("order_placed_at")
         )
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
         dataframes["agg_customers"] = dataframes["agg_customers"].withColumn(
         "account_created_date",
         F.to_date("account_created_at")
@@ -124,7 +126,7 @@ def main():
         )
 
         return kpi
-    if not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and not is_column_all_null_or_zero(dataframes["agg_orders"], "units_sold") and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit") and not is_column_all_null_or_zero(dataframes["agg_orders"], "net_profit"):
+    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and not is_column_all_null_or_zero(dataframes["agg_orders"], "units_sold") and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit") and not is_column_all_null_or_zero(dataframes["agg_orders"], "net_profit"):
         analysis["business_health_daily"]= core_kpis_over_time(dataframes["agg_orders"],"order_placed_at", grain="day")
         analysis["business_health_weekly"] = core_kpis_over_time(dataframes["agg_orders"],"order_placed_at", grain="week")
         analysis["business_health_monthly"] = core_kpis_over_time(dataframes["agg_orders"],"order_placed_at", grain="month")
@@ -152,7 +154,7 @@ def main():
         
         return category_df
 
-    if not is_column_all_null_or_zero(dataframes["agg_products"], "category"):
+    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "category"):
         analysis["low_margin_categories"] = analyze_category_margins(dataframes["agg_products"])
     else: 
         print("Category column is all NULL or zero; skipping category margin analysis.")
@@ -182,7 +184,7 @@ def main():
                 .fillna({"customer_count": 0})
                 .orderBy(*order_cols, "account_status")
         )
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
         analysis["customer_account_status_distribution_daily"]   = status_distribution_over_time(dataframes["agg_customers"],"account_created_at","day")
         analysis["customer_account_status_distribution_weekly"]  = status_distribution_over_time(dataframes["agg_customers"], "account_created_at", "week")
         analysis["customer_account_status_distribution_monthly"] = status_distribution_over_time(dataframes["agg_customers"], "account_created_at", "month")
@@ -1791,7 +1793,7 @@ def main():
     
     # Category-level viewing effectiveness
 
-    if not is_column_all_null_or_zero(dataframes["agg_products"], "category") and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders") and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue"):
+    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "category") and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders") and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue"):
         product_analysis["category_view_patterns"] = (
             dataframes["agg_products"]
             .groupBy("category")
@@ -1818,7 +1820,7 @@ def main():
 
     # Product-level Top-View-to-Purchase Rates
 
-    if not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders"):
+    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders"):
         product_analysis["top_view_to_purchase_products"] = (
             dataframes["agg_products"]
             .select(
@@ -5833,31 +5835,69 @@ def main():
 
     # Basic cart creation & status distribution
 
-    if not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_id") and not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_status"):
-        analysis["cart_overall_stats"] = dataframes["agg_shopping_cart"].agg(
-            F.countDistinct("cart_id").alias("total_carts"),
-            F.count("*").alias("total_cart_lines")
-        ).fillna({
-            "total_carts": 0,
-            "total_cart_lines": 0
-        })
+    has_cart = "agg_shopping_cart" in dataframes and not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_id")
+    has_cart_items = "agg_cart_items" in dataframes and not is_column_all_null_or_zero(dataframes["agg_cart_items"], "cart_item_id")
+
+    if has_cart and not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_status"):
+        if has_cart_items:
+            # Compute cart lines per cart once (used for both overall stats and status distribution)
+            cart_items_per_cart = (
+                dataframes["agg_cart_items"]
+                .groupBy("cart_id")
+                .agg(F.count("*").alias("cart_lines_count"))
+            )
+            cart_with_lines = (
+                dataframes["agg_shopping_cart"]
+                .join(cart_items_per_cart, on="cart_id", how="left")
+                .fillna({"cart_lines_count": 0})
+            )
+
+            # Cart overall stats: total carts and total cart lines
+            analysis["cart_overall_stats"] = cart_with_lines.agg(
+                F.countDistinct("cart_id").alias("total_carts"),
+                F.sum("cart_lines_count").alias("total_cart_lines")
+            ).fillna({
+                "total_carts": 0,
+                "total_cart_lines": 0
+            })
+
+            # Cart status distribution with lines count per status
+            analysis["cart_status_distribution"] = (
+                cart_with_lines
+                .groupBy("cart_status")
+                .agg(
+                    F.countDistinct("cart_id").alias("carts_count"),
+                    F.sum("cart_lines_count").alias("cart_lines_count")
+                ).fillna({
+                    "carts_count": 0,
+                    "cart_lines_count": 0
+                })
+                .orderBy("cart_status")
+            )
+        else:
+            # Fallback when agg_cart_items is not available
+            analysis["cart_overall_stats"] = dataframes["agg_shopping_cart"].agg(
+                F.countDistinct("cart_id").alias("total_carts"),
+                F.lit(0).alias("total_cart_lines")
+            ).fillna({
+                "total_carts": 0,
+                "total_cart_lines": 0
+            })
+
+            analysis["cart_status_distribution"] = (
+                dataframes["agg_shopping_cart"]
+                .groupBy("cart_status")
+                .agg(
+                    F.countDistinct("cart_id").alias("carts_count"),
+                    F.lit(0).alias("cart_lines_count")
+                ).fillna({
+                    "carts_count": 0,
+                    "cart_lines_count": 0
+                })
+                .orderBy("cart_status")
+            )
     else:
-        print("cart_id or cart_status column is all NULL or zero; skipping overall cart statistics analysis.")
-    if not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_status"):
-        analysis["cart_status_distribution"] = (
-            dataframes["agg_shopping_cart"]
-            .groupBy("cart_status")
-            .agg(
-                F.countDistinct("cart_id").alias("carts_count"),
-            F.count("*").alias("cart_lines_count")
-        ).fillna({
-            "carts_count": 0,
-            "cart_lines_count": 0
-        })
-        .orderBy("cart_status")
-    )
-    else:
-        print("cart_status column is all NULL or zero; skipping cart status distribution analysis.")
+        print("cart_id or cart_status column is all NULL or zero; skipping overall cart statistics and cart status distribution analysis.")
 
 
     
@@ -7584,6 +7624,17 @@ def main():
             "skipping shipping cost outlier analysis."
         )
 
+    export_result = export_analytics_to_minio(
+        analysis=analysis,
+        product_analysis=product_analysis,
+        supplier_analysis=supplier_analysis,
+        business_id=None,
+        file_format="parquet",
+        parallel=True,
+    )
+    
+    print(f"\n📦 Analytics exported to bucket: {export_result['bucket']}")
+    print(f"📁 Export timestamp: {export_result['timestamp']}")
 
     print("\n✅ Analysis Complete.")
 

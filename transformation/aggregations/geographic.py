@@ -13,6 +13,13 @@ from pyspark.sql.functions import (
 )
 
 def geographic_aggregations(dataframes):
+    # Skip aggregation if required dataframes don't exist
+    required_dataframes = ["orders", "customers", "order_items", "products"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping geographic_aggregations: '{df_name}' dataframe not found")
+            return
+    
     orders_with_geography = dataframes["orders"].join(
         dataframes["customers"].select(
             "customer_id", "city", "state_province", "country"

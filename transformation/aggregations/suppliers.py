@@ -15,6 +15,13 @@ from pyspark.sql.functions import (
 )
 
 def aggregate_suppliers(dataframes):
+    # Skip aggregation if required dataframes don't exist
+    required_dataframes = ["products", "order_items", "orders"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping aggregate_suppliers: '{df_name}' dataframe not found")
+            return
+    
     products_with_supplier = dataframes["products"].select(
         "product_id", "supplier_id", "cost_price", "sell_price"
     )
@@ -222,12 +229,12 @@ def aggregate_suppliers(dataframes):
             # Supplier reliability score (based on ratings and status)
             "supplier_reliability_score": when(
                 col("supplier_rating").isNotNull()
-                & (col("is_verified") == True)
-                & (col("is_preferred") == True),
+                & (col("is_verified") == lit(True))
+                & (col("is_preferred") == lit(True)),
                 col("supplier_rating") * lit(1.2),
             )
             .when(
-                col("supplier_rating").isNotNull() & (col("is_verified") == True),
+                col("supplier_rating").isNotNull() & (col("is_verified") == lit(True)),
                 col("supplier_rating") * lit(1.1),
             )
             .otherwise(col("supplier_rating")),
