@@ -126,7 +126,7 @@ def main():
         )
 
         return kpi
-    if not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and not is_column_all_null_or_zero(dataframes["agg_orders"], "units_sold") and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit") and not is_column_all_null_or_zero(dataframes["agg_orders"], "net_profit"):
+    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and not is_column_all_null_or_zero(dataframes["agg_orders"], "units_sold") and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit") and not is_column_all_null_or_zero(dataframes["agg_orders"], "net_profit"):
         analysis["business_health_daily"]= core_kpis_over_time(dataframes["agg_orders"],"order_placed_at", grain="day")
         analysis["business_health_weekly"] = core_kpis_over_time(dataframes["agg_orders"],"order_placed_at", grain="week")
         analysis["business_health_monthly"] = core_kpis_over_time(dataframes["agg_orders"],"order_placed_at", grain="month")
@@ -184,7 +184,7 @@ def main():
                 .fillna({"customer_count": 0})
                 .orderBy(*order_cols, "account_status")
         )
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
         analysis["customer_account_status_distribution_daily"]   = status_distribution_over_time(dataframes["agg_customers"],"account_created_at","day")
         analysis["customer_account_status_distribution_weekly"]  = status_distribution_over_time(dataframes["agg_customers"], "account_created_at", "week")
         analysis["customer_account_status_distribution_monthly"] = status_distribution_over_time(dataframes["agg_customers"], "account_created_at", "month")
