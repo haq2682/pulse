@@ -4,7 +4,7 @@ from dotenv import load_dotenv, find_dotenv
 from config.spark_config import create_spark_session
 from config.minio_config import create_minio_client, BUCKET_NAME
 from loaders.data_loader import load_data_from_minio
-from exporters.postgres_exporter import export_to_postgres
+from exporters.minio_exporter import export_to_minio
 from transformations.campaigns import transform_campaigns
 from transformations.carts import transform_carts
 from transformations.customer_sessions import transform_customer_sessions
@@ -66,7 +66,7 @@ def main():
 
     if "payments" in dataframes and dataframes["payments"] is not None:
         dataframes["payments"] = dataframes["payments"].dropDuplicates(["payment_id"])
-    export_to_postgres(dataframes)
+    export_to_minio(dataframes)
     spark.stop()
 
 

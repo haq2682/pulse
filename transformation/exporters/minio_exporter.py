@@ -146,12 +146,3 @@ def export_to_minio(dataframes, bucket_name=None):
     print("=" * 60)
     
     return {"successful": successful, "failed": failed}
-
-
-# Keep backward compatibility with existing code
-def export_to_postgres(dataframes):
-    """
-    Export to MinIO instead of PostgreSQL.
-    This function is kept for backward compatibility.
-    """
-    return export_to_minio(dataframes)
