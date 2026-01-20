@@ -10,6 +10,46 @@ The mapping phase in Pulse provides three modes for processing data:
 
 All modes apply the same mapping pipeline to normalize data to the canonical schema and save results to the MinIO `mapped/` folder.
 
+## Configuration
+
+**Note:** In production, configuration values will be provided by the React frontend. For development, edit the `CONFIG` dictionary in `run_mapping.py`.
+
+### Setting the Mode
+
+Edit the `CONFIG` dictionary at the top of `mapping/run_mapping.py`:
+
+```python
+CONFIG = {
+    # Mode: "batch", "db", or "api"
+    "mode": "batch",  # Change this to switch modes
+    
+    # Common settings
+    "bucket_name": "pulse-bucket-1",  # MinIO bucket name
+    
+    # DB mode settings (only used when mode="db")
+    "db_uri": "postgresql://user:pass@localhost:5432/ecommerce",
+    "db_poll_interval": 10,
+    
+    # API mode settings (only used when mode="api")
+    "api_url": "http://localhost:5000/api/data",
+    "api_poll_interval": 10,
+    
+    # Optional: Kafka bootstrap servers
+    "kafka_bootstrap": None,  # None = use env var
+}
+```
+
+### Running the Script
+
+Simply run the script without arguments:
+
+```bash
+cd mapping/
+python run_mapping.py
+```
+
+The script will use the mode and parameters defined in the `CONFIG` dictionary.
+
 ## Installation
 
 Ensure you have the required dependencies:
@@ -18,8 +58,6 @@ Ensure you have the required dependencies:
 cd /path/to/pulse
 pip install -r requirements.txt
 ```
-
-## Configuration
 
 ### Environment Variables
 
@@ -39,15 +77,25 @@ SPARK_SERVER=local[*]
 # For cluster mode: SPARK_SERVER=spark://10.5.0.3:7077
 ```
 
-## Usage
+## Usage Examples
 
 ### Batch Mode
 
-Process files from the `ingested/` folder in MinIO bucket:
+To use batch mode, edit `CONFIG` in `run_mapping.py`:
+
+```python
+CONFIG = {
+    "mode": "batch",
+    "bucket_name": "pulse-bucket-1",
+    # ... other settings
+}
+```
+
+Then run:
 
 ```bash
 cd mapping/
-python run_mapping.py --mode batch --bucket-name pulse-bucket-1
+python run_mapping.py
 ```
 
 **What happens:**
@@ -56,84 +104,65 @@ python run_mapping.py --mode batch --bucket-name pulse-bucket-1
 3. Applies fuzzy matching and ML-based column mapping algorithms
 4. Saves normalized results to `pulse-bucket-1/mapped/` as CSV files
 
-**Example:**
-```bash
-# Process data from the default bucket
-python run_mapping.py --mode batch --bucket-name pulse-bucket-1
-
-# The script will:
-# - Find files in pulse-bucket-1/ingested/
-# - Map columns to canonical schema
-# - Save to pulse-bucket-1/mapped/customers.csv, products.csv, etc.
-```
-
 ### DB Mode
 
-Stream data from a database using Change Data Capture (CDC):
+To use DB mode, edit `CONFIG` in `run_mapping.py`:
+
+```python
+CONFIG = {
+    "mode": "db",
+    "bucket_name": "pulse-bucket-1",
+    "db_uri": "postgresql://user:pass@host:5432/ecommerce",
+    "db_poll_interval": 10,
+    # ... other settings
+}
+```
+
+Then run:
 
 ```bash
 cd mapping/
-python run_mapping.py --mode db \
-  --db-uri "postgresql://user:password@host:5432/database" \
-  --bucket-name pulse-bucket-1 \
-  --poll-interval 10
+python run_mapping.py
 ```
 
 **What happens:**
 1. Connects to the database and discovers tables
 2. Maps discovered tables to canonical schema tables
-3. Polls for new/changed records every `poll-interval` seconds
+3. Polls for new/changed records every configured interval
 4. Streams changes to Kafka topics
 5. Spark Streaming consumes from Kafka, applies mapping
 6. Saves normalized results to `pulse-bucket-1/mapped/` as CSV files
 
 **Supported Databases:**
-- PostgreSQL
-- MySQL
-- MongoDB
-- Microsoft SQL Server
-- Oracle
-- IBM Db2
-- Apache Cassandra
-- Vitess
-- Google Cloud Spanner
+- PostgreSQL, MySQL, MongoDB
+- Microsoft SQL Server, Oracle, IBM Db2
+- Apache Cassandra, Vitess, Google Cloud Spanner
 
-**Prerequisites:**
-Before using DB mode, the database administrator must complete setup steps. See `README.md` section "Database Administrator Prerequisites".
-
-**Example:**
-```bash
-# Stream from PostgreSQL
-python run_mapping.py --mode db \
-  --db-uri "postgresql://pulse_user:password@10.5.0.5:5432/ecommerce" \
-  --bucket-name pulse-bucket-1
-
-# Stream from MySQL with custom poll interval
-python run_mapping.py --mode db \
-  --db-uri "mysql://pulse_user:password@10.5.0.11:3306/ecommerce" \
-  --bucket-name pulse-bucket-1 \
-  --poll-interval 30
-
-# Stream from MongoDB
-python run_mapping.py --mode db \
-  --db-uri "mongodb://pulse_user:password@10.5.0.12:27017/ecommerce?replicaSet=rs0" \
-  --bucket-name pulse-bucket-1
-```
+**Prerequisites:** See `README.md` section "Database Administrator Prerequisites".
 
 ### API Mode
 
-Stream data from an API endpoint:
+To use API mode, edit `CONFIG` in `run_mapping.py`:
+
+```python
+CONFIG = {
+    "mode": "api",
+    "bucket_name": "pulse-bucket-1",
+    "api_url": "http://localhost:5000/api/data",
+    "api_poll_interval": 10,
+    # ... other settings
+}
+```
+
+Then run:
 
 ```bash
 cd mapping/
-python run_mapping.py --mode api \
-  --api-url "http://localhost:5000/api/data" \
-  --bucket-name pulse-bucket-1 \
-  --poll-interval 10
+python run_mapping.py
 ```
 
 **What happens:**
-1. Polls the API endpoint every `poll-interval` seconds
+1. Polls the API endpoint every configured interval
 2. Expects JSON response with structure: `{"tables": [{"name": "...", "data": [...]}]}`
 3. Maps table names to canonical schema
 4. Streams data to Kafka topics
@@ -160,43 +189,6 @@ python run_mapping.py --mode api \
     }
   ]
 }
-```
-
-**Example:**
-```bash
-# Stream from local API
-python run_mapping.py --mode api \
-  --api-url "http://localhost:5000/api/data" \
-  --bucket-name pulse-bucket-1
-
-# Stream from remote API with custom poll interval
-python run_mapping.py --mode api \
-  --api-url "https://api.example.com/v1/data" \
-  --bucket-name pulse-bucket-1 \
-  --poll-interval 60
-```
-
-## Command-Line Options
-
-```
---mode {batch,db,api}
-    Required. Mapping mode to use.
-    
---bucket-name BUCKET_NAME
-    Required. MinIO bucket name where results will be saved.
-    
---db-uri DB_URI
-    Required for db mode. Database connection URI.
-    Format: protocol://user:password@host:port/database
-    
---api-url API_URL
-    Required for api mode. API endpoint URL.
-    
---poll-interval POLL_INTERVAL
-    Optional for db/api modes. Polling interval in seconds (default: 10).
-    
---kafka-bootstrap KAFKA_BOOTSTRAP
-    Optional for db/api modes. Kafka bootstrap servers (default: from env).
 ```
 
 ## Architecture
@@ -323,17 +315,6 @@ bucket-name/
 
 **Problem:** Spark job fails  
 **Solution:** Check Spark configuration and available resources
-
-## Testing
-
-Run CLI validation tests:
-
-```bash
-cd mapping/
-python test_run_mapping.py
-```
-
-This validates the command-line interface without requiring full infrastructure.
 
 ## Support
 

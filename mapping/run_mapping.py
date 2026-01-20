@@ -5,18 +5,11 @@ Unified entry point for the mapping phase with 3 modes:
 2. db: Ingest from database URI -> map -> save to mapped folder  
 3. api: Ingest from API endpoint -> map -> save to mapped folder
 
-Usage:
-    # Batch mode (default)
-    python run_mapping.py --mode batch --bucket-name pulse-bucket-1
-    
-    # DB mode
-    python run_mapping.py --mode db --db-uri "postgresql://user:pass@host:5432/db" --bucket-name pulse-bucket-1
-    
-    # API mode
-    python run_mapping.py --mode api --api-url "http://localhost:5000/api/data" --bucket-name pulse-bucket-1
+Configuration:
+    Edit the CONFIG section below to set the mode and parameters.
+    In production, these values will come from the React frontend.
 """
 
-import argparse
 import sys
 import os
 import multiprocessing
@@ -24,6 +17,33 @@ from typing import Optional
 
 # Add current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# ============================================================================
+# CONFIGURATION - Edit these values to change mode and parameters
+# ============================================================================
+# In production, these will be provided by the React frontend
+# For now, edit these values directly in the code
+
+CONFIG = {
+    # Mode: "batch", "db", or "api"
+    "mode": "batch",
+    
+    # Common settings
+    "bucket_name": "pulse-bucket-1",  # MinIO bucket name
+    
+    # DB mode settings (only used when mode="db")
+    "db_uri": "postgresql://user:pass@localhost:5432/ecommerce",  # Database connection URI
+    "db_poll_interval": 10,  # Polling interval in seconds
+    
+    # API mode settings (only used when mode="api")
+    "api_url": "http://localhost:5000/api/data",  # API endpoint URL
+    "api_poll_interval": 10,  # Polling interval in seconds
+    
+    # Optional: Kafka bootstrap servers (defaults to env var if None)
+    "kafka_bootstrap": None,  # e.g., "10.5.0.7:9092" or None to use env var
+}
+
+# ============================================================================
 
 
 def run_batch_mode(bucket_name: str):
@@ -246,81 +266,54 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Unified entry point for Pulse mapping phase",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Batch mode (process files from ingested folder)
-  python run_mapping.py --mode batch --bucket-name pulse-bucket-1
-  
-  # DB mode (ingest from database)
-  python run_mapping.py --mode db --db-uri "postgresql://user:pass@host:5432/db" --bucket-name pulse-bucket-1
-  
-  # API mode (ingest from API)
-  python run_mapping.py --mode api --api-url "http://localhost:5000/api/data" --bucket-name pulse-bucket-1
-  
-  # With custom poll interval
-  python run_mapping.py --mode db --db-uri "mysql://user:pass@host:3306/db" --bucket-name my-bucket --poll-interval 30
-        """
-    )
+    """
+    Main entry point that reads configuration and executes the appropriate mode.
+    In production, CONFIG values will be provided by the React frontend.
+    """
+    mode = CONFIG["mode"]
+    bucket_name = CONFIG["bucket_name"]
     
-    parser.add_argument(
-        "--mode",
-        type=str,
-        choices=["batch", "db", "api"],
-        default="batch",
-        help="Mapping mode: batch (files from MinIO), db (database URI), or api (API endpoint)"
-    )
+    print(f"\n{'='*60}")
+    print(f"PULSE MAPPING - Starting in {mode.upper()} mode")
+    print(f"{'='*60}")
+    print(f"Configuration:")
+    print(f"  Mode: {mode}")
+    print(f"  Bucket: {bucket_name}")
     
-    parser.add_argument(
-        "--bucket-name",
-        type=str,
-        required=True,
-        help="MinIO bucket name (e.g., pulse-bucket-1)"
-    )
-    
-    parser.add_argument(
-        "--db-uri",
-        type=str,
-        help="Database URI (required for db mode, e.g., postgresql://user:pass@host:5432/database)"
-    )
-    
-    parser.add_argument(
-        "--api-url",
-        type=str,
-        help="API endpoint URL (required for api mode, e.g., http://localhost:5000/api/data)"
-    )
-    
-    parser.add_argument(
-        "--poll-interval",
-        type=int,
-        default=10,
-        help="Polling interval in seconds for db/api modes (default: 10)"
-    )
-    
-    parser.add_argument(
-        "--kafka-bootstrap",
-        type=str,
-        help="Kafka bootstrap servers (defaults to KAFKA_BOOTSTRAP env var)"
-    )
-    
-    args = parser.parse_args()
-    
-    # Validate mode-specific arguments
-    if args.mode == "db" and not args.db_uri:
-        parser.error("--db-uri is required for db mode")
-    
-    if args.mode == "api" and not args.api_url:
-        parser.error("--api-url is required for api mode")
-    
-    # Execute the appropriate mode
-    if args.mode == "batch":
-        run_batch_mode(args.bucket_name)
-    elif args.mode == "db":
-        run_db_mode(args.db_uri, args.bucket_name, args.poll_interval, args.kafka_bootstrap)
-    elif args.mode == "api":
-        run_api_mode(args.api_url, args.bucket_name, args.poll_interval, args.kafka_bootstrap)
+    # Validate and execute the appropriate mode
+    if mode == "batch":
+        print(f"{'='*60}\n")
+        run_batch_mode(bucket_name)
+        
+    elif mode == "db":
+        db_uri = CONFIG["db_uri"]
+        poll_interval = CONFIG["db_poll_interval"]
+        kafka_bootstrap = CONFIG["kafka_bootstrap"]
+        
+        # Mask password in URI for display
+        display_uri = db_uri.split("@")[-1] if "@" in db_uri else db_uri
+        print(f"  Database: {display_uri}")
+        print(f"  Poll interval: {poll_interval}s")
+        print(f"{'='*60}\n")
+        
+        run_db_mode(db_uri, bucket_name, poll_interval, kafka_bootstrap)
+        
+    elif mode == "api":
+        api_url = CONFIG["api_url"]
+        poll_interval = CONFIG["api_poll_interval"]
+        kafka_bootstrap = CONFIG["kafka_bootstrap"]
+        
+        print(f"  API URL: {api_url}")
+        print(f"  Poll interval: {poll_interval}s")
+        print(f"{'='*60}\n")
+        
+        run_api_mode(api_url, bucket_name, poll_interval, kafka_bootstrap)
+        
+    else:
+        print(f"\n❌ ERROR: Invalid mode '{mode}'")
+        print(f"   Valid modes: batch, db, api")
+        print(f"   Edit CONFIG in run_mapping.py to change mode\n")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
