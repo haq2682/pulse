@@ -32,6 +32,35 @@ def transform_orders(dataframes):
     order_items = dataframes["order_items"]
     products = dataframes["products"]
 
+    # -------------------------
+    # Join order_items with products to get cost_price
+    # -------------------------
+    order_items = order_items.join(
+        products.select("product_id", "cost_price"),
+        on="product_id",
+        how="left"
+    )
+
+    # -------------------------
+    # Calculate line_total and item_cogs
+    # -------------------------
+    order_items = order_items.withColumn(
+        "line_total",
+        greatest(
+            (col("product_price") * col("quantity")) - when(col("discount_amount").isNotNull(), col("discount_amount")).otherwise(lit(0)),
+            lit(0)
+        )
+    ).withColumn(
+        "item_cogs",
+        when(
+            col("cost_price").isNotNull() & col("quantity").isNotNull(),
+            col("cost_price") * col("quantity")
+        ).otherwise(lit(0))
+    )
+
+    # -------------------------
+    # Aggregate order items
+    # -------------------------
     order_metrics = (
         dataframes["order_items"]
         .groupBy("order_id")
