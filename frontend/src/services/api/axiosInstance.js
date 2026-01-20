@@ -21,7 +21,8 @@ axiosInstance.interceptors.response.use(
             error.response?.status === 401 && 
             !originalRequest.url.includes('/session/validate') &&
             !originalRequest.url.includes('/login') &&
-            window.location.pathname !== '/login'
+            window.location.pathname !== '/login' &&
+            !window.location.pathname.startsWith('/admin') // <--- ADD THIS LINE
         ) {
             window.location.href = '/login';
         }

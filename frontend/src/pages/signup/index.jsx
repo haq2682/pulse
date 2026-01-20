@@ -12,7 +12,7 @@ const Signup = () => {
     // 2. Destructure Auth functions
     const { register, loginWithGoogle, loading, error } = useAuth();
     
-    // Local state for validation errors (like password mismatch)
+    // Local state for validation errors
     const [validationError, setValidationError] = useState('');
 
     const [formData, setFormData] = useState({
@@ -32,17 +32,44 @@ const Signup = () => {
         setFormData(prev => ({ ...prev, agreeToTerms: e.checked }));
     };
 
+    // --- HELPER: Email Validation (Format + Length) ---
+    const isValidEmail = (email) => {
+        // 1. Standard Regex for format (e.g., text@domain.com)
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        
+        // 2. Check: Matches Regex AND is at least 16 characters long
+        return email.length >= 16 && emailRegex.test(email);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setValidationError('');
 
-        // 3. Basic Validation Logic
+        // 1. Check Terms Agreement
+        if (!formData.agreeToTerms) {
+            setValidationError("You must agree to the Terms of Service.");
+            return;
+        }
+
+        // 2. Check Email Validity
+        if (!isValidEmail(formData.email)) {
+            setValidationError("Please enter a valid email address (minimum 6 characters).");
+            return;
+        }
+
+        // 3. Check Password Length
+        if (formData.password.length < 8) {
+            setValidationError("Password must be at least 8 characters long.");
+            return;
+        }
+
+        // 4. Check Passwords Match
         if (formData.password !== formData.confirmPassword) {
             setValidationError("Passwords do not match");
             return;
         }
 
-        // 4. Call Register API
+        // 5. Call Register API
         await register(formData.fullName, formData.email, formData.password);
     };
 
@@ -105,10 +132,11 @@ const Signup = () => {
                             <Text className="text-base">Join us and start analyzing your data</Text>
                         </div>
 
-                        {/* 5. Error Message Display (Only visual addition needed for functionality) */}
+                        {/* Error Message Display */}
                         {(error || validationError) && (
-                            <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm text-center border border-red-100">
-                                {error || validationError}
+                            <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm text-center border border-red-100 flex items-center justify-center gap-2">
+                                <i className="pi pi-exclamation-circle"></i>
+                                <span>{validationError || error}</span>
                             </div>
                         )}
 
@@ -141,7 +169,8 @@ const Signup = () => {
                                     value={formData.email}
                                     onChange={handleInputChange}
                                     placeholder="Enter your email"
-                                    className="w-full"
+                                    // Highlight red if invalid format & error is present
+                                    className={`w-full ${validationError && !isValidEmail(formData.email) ? 'p-invalid' : ''}`}
                                     required
                                 />
                             </div>
@@ -210,8 +239,8 @@ const Signup = () => {
                                 label="Create Account"
                                 type="submit"
                                 className="w-full text-base font-semibold"
-                                disabled={!formData.agreeToTerms || loading} // Disable while loading
-                                loading={loading} // Show spinner
+                                disabled={loading} 
+                                loading={loading} 
                             />
 
                             {/* Sign In Link */}
@@ -232,8 +261,8 @@ const Signup = () => {
 
                             <PrimaryButton
                                 label="Sign Up with Google"
-                                type="button" // Changed from submit to button
-                                onClick={loginWithGoogle} // Added onClick handler
+                                type="button"
+                                onClick={loginWithGoogle}
                                 iconPos="right"
                                 icon="pi pi-google"
                                 className="w-full text-base font-semibold"
