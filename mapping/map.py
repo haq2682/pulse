@@ -210,21 +210,74 @@ spark = (
 )
 
 df_to_table = {
-    "customers_df": "customers",
-    "addresses_df": "addresses",
-    "products_df": "products",
-    "inventories_df": "inventory",
-    "orders_df": "orders",
-    "reviews_df": "reviews",
-    "categories_df": "categories",
-    "wishlists_df": "wishlist",
-    "payments_df": "payments",
-    "order_items_df": "order_items",
-    "shopping_carts_df": "shopping_cart",
-    "cart_items_df": "cart_items",
-    "customer_sessions_df": "customer_sessions",
-    "marketing_campaigns_df": "marketing_campaigns",
-    "suppliers_df": "suppliers",
+    "customers_df": {
+        "table": "customers",
+        "aliases": ["customer", "customers", "client", "clients", "customer_data"]
+    },
+    "addresses_df": {
+        "table": "addresses",
+        "aliases": ["address", "addresses", "location", "locations"]
+    },
+    "products_df": {
+        "table": "products",
+        "aliases": ["product", "products", "item", "items", "product_catalog"]
+    },
+    "inventories_df": {
+        "table": "inventory",
+        "aliases": ["inventory", "inventories", "stock", "stocks"]
+    },
+    "orders_df": {
+        "table": "orders",
+        "aliases": ["order", "orders", "purchase", "purchases"]
+    },
+    "order_items_df": {
+        "table": "order_items",
+        "aliases": ["order_items", "orderitems", "order_line", "order_lines"]
+    },
+    "shopping_carts_df": {
+        "table": "shopping_cart",
+        "aliases": [
+            "shopping_cart",
+            "shoppingcart",
+            "cart",
+            "carts",
+            "cart_data",
+            "cart_dataset",
+            "carts_dataset"
+        ]
+    },
+    "cart_items_df": {
+        "table": "cart_items",
+        "aliases": ["cart_items", "cartitems", "cart_line", "cart_lines"]
+    },
+    "payments_df": {
+        "table": "payments",
+        "aliases": ["payment", "payments", "transactions", "payment_data"]
+    },
+    "reviews_df": {
+        "table": "reviews",
+        "aliases": ["review", "reviews", "ratings", "feedback"]
+    },
+    "categories_df": {
+        "table": "categories",
+        "aliases": ["category", "categories", "product_categories"]
+    },
+    "wishlists_df": {
+        "table": "wishlist",
+        "aliases": ["wishlist", "wishlists", "favorites", "favourites"]
+    },
+    "customer_sessions_df": {
+        "table": "customer_sessions",
+        "aliases": ["session", "sessions", "customer_sessions", "user_sessions"]
+    },
+    "marketing_campaigns_df": {
+        "table": "marketing_campaigns",
+        "aliases": ["campaign", "campaigns", "marketing", "marketing_data"]
+    },
+    "suppliers_df": {
+        "table": "suppliers",
+        "aliases": ["supplier", "suppliers", "vendor", "vendors"]
+    },
 }
 
 
