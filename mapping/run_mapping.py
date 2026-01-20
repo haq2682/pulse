@@ -19,7 +19,6 @@ Usage:
 import argparse
 import sys
 import os
-import subprocess
 import multiprocessing
 from typing import Optional
 

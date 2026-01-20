@@ -1,6 +1,7 @@
 """Spark Structured Streaming - Kafka Consumer with Existing Map Integration"""
 
 import os
+import sys
 import findspark
 findspark.init()
 
@@ -10,10 +11,12 @@ from pyspark.sql.types import StructType, StructField, StringType, MapType
 from minio import Minio
 from dotenv import load_dotenv, find_dotenv
 
-import sys
-import os
 # Add parent directory to path to import from mapping root
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+# This allows importing map.py and List.py from the mapping directory
+mapping_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if mapping_dir not in sys.path:
+    sys.path.insert(0, mapping_dir)
+
 from map import process_all_dataframes, save_dataframes_to_minio, COLUMNS_INFO
 import List as mapping_list
 
