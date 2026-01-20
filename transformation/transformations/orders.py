@@ -21,9 +21,16 @@ from pyspark.sql.functions import (
 
 
 def transform_orders(dataframes):
-    placed_timestamp = to_timestamp(col("order_placed_at"))
-    shipped_timestamp = to_timestamp(col("order_shipped_at"))
-    delivered_timestamp = to_timestamp(col("order_delivered_at"))
+    # Skip transformation if required dataframes don't exist
+    required_dataframes = ["orders", "order_items", "products"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping transform_orders: '{df_name}' dataframe not found")
+            return
+    
+    orders = dataframes["orders"]
+    order_items = dataframes["order_items"]
+    products = dataframes["products"]
 
     order_metrics = (
         dataframes["order_items"]

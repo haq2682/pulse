@@ -10,6 +10,18 @@ from pyspark.sql.functions import (
 
 
 def session_aggregations(dataframes):
+    # Skip aggregation if required dataframes don't exist
+    required_dataframes = ["shopping_cart", "cart_items", "customer_sessions", "orders"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping session_aggregations: '{df_name}' dataframe not found")
+            return
+    
+    # Join shopping_cart with cart_items to get item-level details
+    cart_with_items = dataframes["shopping_cart"].join(
+        dataframes["cart_items"], "cart_id", "left"
+    )
+
     session_cart_agg = (
         dataframes["shopping_cart"]
         .filter(col("session_id").isNotNull())

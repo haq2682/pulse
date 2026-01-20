@@ -13,7 +13,15 @@ from pyspark.sql.functions import (
 
 
 def transform_carts(dataframes):
-    dataframes["shopping_cart"] = dataframes["shopping_cart"].withColumn(
+    # Skip transformation if required dataframes don't exist
+    required_dataframes = ["cart_items", "shopping_cart", "customer_sessions", "orders"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping transform_carts: '{df_name}' dataframe not found")
+            return
+    
+    # Transform cart_items: calculate cart_age_time based on added_at
+    dataframes["cart_items"] = dataframes["cart_items"].withColumn(
         "cart_age_time",
         when(
             col("added_date").isNotNull(),

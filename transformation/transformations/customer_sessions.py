@@ -10,6 +10,12 @@ from pyspark.sql.functions import (
 
 
 def transform_customer_sessions(dataframes):
+    # Skip transformation if customer_sessions doesn't exist
+    if "customer_sessions" not in dataframes or dataframes["customer_sessions"] is None:
+        print("⚠️ Skipping transform_customer_sessions: 'customer_sessions' dataframe not found")
+        return
+    
+    # First pass: Calculate duration columns and convert boolean flags
     dataframes["customer_sessions"] = dataframes["customer_sessions"].withColumns(
         {
             "session_duration_seconds": when(

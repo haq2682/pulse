@@ -15,6 +15,13 @@ from pyspark.sql.functions import (
 )
 
 def aggregate_suppliers(dataframes):
+    # Skip aggregation if required dataframes don't exist
+    required_dataframes = ["products", "order_items", "orders"]
+    for df_name in required_dataframes:
+        if df_name not in dataframes or dataframes[df_name] is None:
+            print(f"⚠️ Skipping aggregate_suppliers: '{df_name}' dataframe not found")
+            return
+    
     products_with_supplier = dataframes["products"].select(
         "product_id", "supplier_id", "cost_price", "sell_price"
     )

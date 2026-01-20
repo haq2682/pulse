@@ -2,6 +2,11 @@ from pyspark.sql.functions import col, when
 
 
 def transform_products(dataframes):
+    # Skip transformation if products doesn't exist
+    if "products" not in dataframes or dataframes["products"] is None:
+        print("⚠️ Skipping transform_products: 'products' dataframe not found")
+        return
+    
     dataframes["products"] = dataframes["products"].withColumns(
         {
             "profit_margin": when(
