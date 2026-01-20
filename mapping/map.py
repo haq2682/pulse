@@ -299,7 +299,8 @@ def resolve_table_splits(df_name, df, columns_info, mode):
     """
     # Fast path: Known DataFrame name
     if df_name in df_to_table:
-        return {df_to_table[df_name]: df}
+        table_name = df_to_table[df_name]["table"]  # Extract the table name from the dict
+        return {table_name: df}
 
     # Fallback: Unknown name - use detection/splitting
     if mode == "stream":

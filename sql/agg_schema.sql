@@ -179,7 +179,7 @@ CREATE TABLE agg_marketing_campaigns (
     days_active INTEGER DEFAULT 0,
     
     -- Tier 3: Nullable Derived Fields
-    end_date VARCHAR(255) NULL,
+    end_date DATE NULL,
     budget DOUBLE PRECISION NULL,
     spent_amount DOUBLE PRECISION NULL,
     target_audience VARCHAR(100) NULL,
