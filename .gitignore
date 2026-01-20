@@ -6,7 +6,6 @@
 *.md
 !requirements.txt
 !packages.txt
-.vscode
 
 # dependencies
 */**/node_modules

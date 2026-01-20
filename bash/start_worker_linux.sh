@@ -2,9 +2,7 @@
 set -e
 
 if [ -f ".env" ]; then
-  set -a
-  source .env
-  set +a
+  export $(grep -v '^#' .env | xargs)
 else
   echo ".env file not found!"
   exit 1

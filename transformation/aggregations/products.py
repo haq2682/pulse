@@ -38,7 +38,7 @@ def aggregate_products(dataframes):
             "product_id",
             "quantity",
             "discount_amount",
-            "product_price",
+            "product_cost",
             "sell_price",
             "cost_price",
         )
@@ -154,13 +154,12 @@ def aggregate_products(dataframes):
         )
     )
     product_cart_agg = (
-        dataframes["cart_items"]
-        .join(dataframes["shopping_cart"].select("cart_id", "cart_status"), "cart_id", "left")
+        dataframes["shopping_cart"]
         .filter(col("product_id").isNotNull())
         .groupBy("product_id")
         .agg(
             # Total cart adds
-            count("cart_item_id").alias("total_cart_adds"),
+            count("cart_id").alias("total_cart_adds"),
             # Cart to purchase rate (cart_status = 'purchased' or similar indicator)
             (
                 spark_sum(
@@ -174,7 +173,7 @@ def aggregate_products(dataframes):
                         lit(1),
                     ).otherwise(lit(0))
                 )
-                / count("cart_item_id")
+                / count("cart_id")
             ).alias("cart_to_purchase_rate"),
         )
     )

@@ -29,7 +29,8 @@ def cart_abandonment_aggregations(dataframes):
     )
 
     cart_with_products = (
-        cart_with_items.join(
+        dataframes["shopping_cart"]
+        .join(
             dataframes["products"].select("product_id", "category"),
             "product_id",
             "left",
@@ -71,10 +72,10 @@ def cart_abandonment_aggregations(dataframes):
             expr("first(category)").alias("abandoned_cart_category"),
             # Session conversion flag
             expr("first(conversion_flag)").alias("session_converted"),
-            # Earliest added date (from cart_items.added_at)
-            spark_min("added_at").alias("first_added_date"),
-            # Latest added date (from cart_items.added_at)
-            spark_max("added_at").alias("last_added_date"),
+            # Earliest added date
+            spark_min("added_date").alias("first_added_date"),
+            # Latest added date
+            spark_max("added_date").alias("last_added_date"),
             # Customer ID
             expr("first(customer_id)").alias("customer_id"),
             # Session ID
@@ -83,11 +84,11 @@ def cart_abandonment_aggregations(dataframes):
     )
     cart_full = (
         dataframes["shopping_cart"]
-        .select("cart_id", "cart_status", "created_at")
+        .select("cart_id", "cart_status", "added_date")
         .groupBy("cart_id")
         .agg(
             expr("first(cart_status)").alias("cart_status"),
-            spark_min("created_at").alias("cart_added_date"),
+            spark_min("added_date").alias("cart_added_date"),
         )
         .join(cart_agg, "cart_id", "left")
     )

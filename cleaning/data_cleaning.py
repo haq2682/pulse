@@ -119,8 +119,6 @@ def drop_null_keys(dataframes):
         "payment_id",
         "campaign_id",
         "cart_id",
-        "cart_item_id",
-        "inventory_id",
         "review_id",
         "wishlist_id",
     ]
@@ -132,7 +130,7 @@ def drop_null_keys(dataframes):
             continue
         
         for col in dataframes[table].columns:
-            if col in all_ids: 
+            if col in all_ids:
                 dataframes = drop_null_rows(dataframes, table, col)
 
     return dataframes
@@ -190,12 +188,12 @@ def fill_null_values(dataframes):
             {
                 "supplier_rating": 0.0,
                 "supplier_status": "",
-                "is_preferred":  "false",
+                "is_preferred": "false",
                 "is_verified": "false",
                 "contract_start_date": "1900-01-01",
                 "contract_end_date": "1900-01-01",
                 "city": "",
-                "state":  "",
+                "state": "",
                 "zip_code": "00000",
                 "country": "",
             }
@@ -302,7 +300,7 @@ def fill_null_values(dataframes):
     if "customer_sessions" in dataframes.keys() and dataframes["customer_sessions"] is not None:
         dataframes["customer_sessions"] = dataframes["customer_sessions"].fillna(
             {
-                "session_start":  "1900-01-01",
+                "session_start": "1900-01-01",
                 "session_end": "1900-01-01",
                 "device_type": "",
                 "referrer_source": "",
@@ -351,7 +349,7 @@ def impute_missing_values(dataframes, table, numeric_cols):
 
         if non_null_count == 0:
             all_null_cols.append(col_name)
-            print(f"🚫 {col_name}:  ALL NULL - will fill with 0")
+            print(f"🚫 {col_name}: ALL NULL - will fill with 0")
         else:
             valid_cols.append(col_name)
             null_count = total_rows - non_null_count
@@ -367,7 +365,7 @@ def impute_missing_values(dataframes, table, numeric_cols):
         fill_dict = {col: 0 for col in all_null_cols}
         df = df.fillna(fill_dict)
         dataframes[table] = df
-        print(f"✅ Filled all-NULL columns with 0:  {all_null_cols}")
+        print(f"✅ Filled all-NULL columns with 0: {all_null_cols}")
 
     # Impute valid columns with median
     if valid_cols:
@@ -397,7 +395,7 @@ def impute_all_numeric(dataframes):
         dataframes (dict): Dictionary of table names to DataFrames
 
     Returns:
-        dict:  Updated dictionary
+        dict: Updated dictionary
     """
     all_ids = [
         "session_id",
@@ -410,8 +408,6 @@ def impute_all_numeric(dataframes):
         "payment_id",
         "campaign_id",
         "cart_id",
-        "cart_item_id",
-        "inventory_id",
         "review_id",
         "wishlist_id",
     ]
@@ -433,7 +429,7 @@ def impute_all_numeric(dataframes):
         numeric_cols = [col for col in numeric_cols if col not in all_ids]
 
         if numeric_cols:
-            print(f"\nImputing missing values for table:  {table}")
+            print(f"\nImputing missing values for table: {table}")
             dataframes = impute_missing_values(dataframes, table, numeric_cols)
         else:
             print(f"\nNo numeric columns found in table: {table}, skipping imputation.")
@@ -457,46 +453,27 @@ def clean_text_columns(dataframes):
         if not text or len(str(text)) < 3:
             return False
 
-        text = str(text).strip()
-        text_lower = text.lower()
+        text = str(text).lower()
 
-        # Skip numeric values
-        if re.match(r'^[\d\.\,\s]+$', text):
+        # Skip if text contains only alphanumeric (likely an ID/code)
+        if text.replace("_", "").replace("-", "").isalnum() and any(
+            c.isdigit() for c in text
+        ):
             return False
 
-        # Skip single word abbreviations (S, M, L, XL, XXL, etc.)
-        if len(text) <= 4 and text.isupper():
-            return False
-
-        # Skip common multi-word phrases with spaces
-        if ' ' in text and len(text.split()) >= 2:
-            words = text.split()
-            valid_words = 0
-            for word in words: 
-                if len(word) >= 2:
-                    vowels = len(re.findall(r"[aeiou]", word.lower()))
-                    if vowels > 0:
-                        valid_words += 1
-            if valid_words >= len(words) * 0.7:
-                return False
-
-        # Skip short strings (likely valid abbreviations or codes)
-        if len(text) <= 6: 
-            return False
-
-        vowels = len(re.findall(r"[aeiou]", text_lower))
+        vowels = len(re.findall(r"[aeiou]", text))
         vowel_ratio = vowels / len(text)
 
-        # More lenient vowel ratio check
-        if vowel_ratio < 0.10 or vowel_ratio > 0.75:
+        # English text typically has 30-40% vowels
+        if vowel_ratio < 0.15 or vowel_ratio > 0.7:
             return True
 
-        # Check for excessive consonant clusters (6+ in a row)
-        if re.search(r"[bcdfghjklmnpqrstvwxyz]{6,}", text_lower):
+        # Check for excessive consonant clusters (5+ in a row)
+        if re.search(r"[bcdfghjklmnpqrstvwxyz]{5,}", text):
             return True
 
-        # Check for repeating patterns (same char 5+ times)
-        if re.search(r"(.)\1{4,}", text_lower):
+        # Check for repeating patterns (same char 4+ times)
+        if re.search(r"(.)\1{3,}", text):
             return True
 
         return False
@@ -530,7 +507,90 @@ def clean_text_columns(dataframes):
             and not any(pattern in field.name.lower() for pattern in skip_patterns)
         ]
 
-        for col_name in string_cols: 
+        for col_name in string_cols:
+            gibberish_count = df.filter(is_gibberish_udf(col(col_name))).count()
+
+            if gibberish_count > 0:
+                df = df.withColumn(
+                    col_name,
+                    when(is_gibberish_udf(col(col_name)), F.lit(None)).otherwise(
+                        col(col_name)
+                    ),
+                )
+                print(f"  ✅ Fixed {gibberish_count} gibberish values in {col_name}")
+
+        dataframes[table_name] = df
+
+    print("\n" + "=" * 60)
+    print("✅ TEXT CLEANING COMPLETED")
+    print("=" * 60)
+
+    return dataframes
+    """
+    Clean gibberish from text columns across all tables using linguistic analysis.
+
+    Uses a UDF to detect gibberish based on:
+    - Vowel-to-consonant ratios
+    - Excessive consonant clusters
+    - Character repetition patterns
+
+    Args:
+        dataframes (dict): Dictionary of table names to DataFrames
+
+    Returns:
+        dict: Updated dictionary with cleaned text
+    """
+
+    def is_gibberish_text(text):
+        """
+        UDF to detect gibberish strings based on character ratios and patterns.
+        """
+        if not text or text in ["Unknown", "NULL", None]:
+            return False
+
+        text = str(text).lower()
+
+        # Skip very short text
+        if len(text) < 3:
+            return False
+
+        vowels = len(re.findall(r"[aeiou]", text))
+
+        if len(text) > 3:
+            vowel_ratio = vowels / len(text)
+            # English text typically has 30-40% vowels
+            if vowel_ratio < 0.15 or vowel_ratio > 0.7:
+                return True
+
+            # Check for excessive consonant clusters (4+ in a row)
+            if re.search(r"[bcdfghjklmnpqrstvwxyz]{4,}", text):
+                return True
+
+            # Check for repeating patterns (same char 4+ times)
+            if re.search(r"(.)\1{3,}", text):
+                return True
+
+        return False
+
+    # Register UDF locally within function
+    is_gibberish_udf = udf(is_gibberish_text, BooleanType())
+    print("\n" + "=" * 60)
+    print("📝 CLEANING TEXT COLUMNS FOR GIBBERISH")
+    print("=" * 60)
+
+    for table_name, df in dataframes.items():
+        print(f"\n🔍 Checking {table_name}...")
+
+        # Get all string columns except special ones
+        string_cols = [
+            field.name
+            for field in df.schema.fields
+            if isinstance(field.dataType, StringType)
+            and field.name
+            not in ["sku", "zip_code", "postal_code", "dimensions", "transaction_id"]
+        ]
+
+        for col_name in string_cols:
             gibberish_count = df.filter(is_gibberish_udf(col(col_name))).count()
 
             if gibberish_count > 0:
@@ -556,12 +616,12 @@ def clean_numeric_strings(dataframes):
     Clean string columns with numeric formatting issues.
 
     Operations performed:
-    1.Remove leading zeros from ID columns
-    2.Validate integer columns for non-numeric values
-    3.Validate decimal/float columns
-    4.Convert numeric status codes to text (1→"Active", 0→"Inactive", 2→"Pending")
-    5.Clean transaction IDs and SKUs (remove special characters)
-    6.Trim numeric string columns
+    1. Remove leading zeros from ID columns
+    2. Validate integer columns for non-numeric values
+    3. Validate decimal/float columns
+    4. Convert numeric status codes to text (1→"Active", 0→"Inactive", 2→"Pending")
+    5. Clean transaction IDs and SKUs (remove special characters)
+    6. Trim numeric string columns
 
     Args:
         dataframes (dict): Dictionary of table names to DataFrames
@@ -573,21 +633,21 @@ def clean_numeric_strings(dataframes):
     print("🔢 CLEANING NUMERIC STRING COLUMNS")
     print("=" * 60)
 
-    # 1.Clean all ID columns - remove leading zeros
+    # 1. Clean all ID columns - remove leading zeros
     for table_name, df in dataframes.items():
         id_columns = [col_name for col_name in df.columns if col_name.endswith("_id")]
 
         for col_name in id_columns:
             # Remove leading zeros
             df = df.withColumn(
-                col_name, regexp_replace(col(col_name), r"^0+(?=\\d)", "")
+                col_name, regexp_replace(col(col_name), "^0+(?=\\d)", "")
             )
 
         if id_columns:
             dataframes[table_name] = df
             print(f"✅ Cleaned {len(id_columns)} ID columns in {table_name}")
 
-    # 2.Clean all integer columns that might have text values
+    # 2. Clean all integer columns that might have text values
     for table_name, df in dataframes.items():
         integer_cols = [
             field.name
@@ -622,7 +682,7 @@ def clean_numeric_strings(dataframes):
 
         dataframes[table_name] = df
 
-    # 3.Clean all decimal/float columns
+    # 3. Clean all decimal/float columns
     for table_name, df in dataframes.items():
         decimal_cols = [
             field.name
@@ -650,13 +710,13 @@ def clean_numeric_strings(dataframes):
 
         dataframes[table_name] = df
 
-    # 4.Handle columns with numeric status codes (convert to text)
+    # 4. Handle columns with numeric status codes (convert to text)
     for table_name, df in dataframes.items():
         status_columns = [
             col_name for col_name in df.columns if col_name.endswith("_status")
         ]
 
-        for status_col in status_columns: 
+        for status_col in status_columns:
             # Check if status column has numeric values like "0", "1"
             numeric_status_count = df.filter(col(status_col).rlike("^[0-9]$")).count()
 
@@ -675,7 +735,7 @@ def clean_numeric_strings(dataframes):
 
         dataframes[table_name] = df
 
-    # 5.Clean transaction/reference IDs - remove special characters
+    # 5. Clean transaction/reference IDs - remove special characters
     for table_name, df in dataframes.items():
         transaction_cols = [
             col_name
@@ -683,7 +743,7 @@ def clean_numeric_strings(dataframes):
             if "transaction" in col_name.lower() or col_name == "sku"
         ]
 
-        for col_name in transaction_cols: 
+        for col_name in transaction_cols:
             df = df.withColumn(
                 col_name, regexp_replace(col(col_name), "[^a-zA-Z0-9-]", "")
             )
@@ -692,7 +752,7 @@ def clean_numeric_strings(dataframes):
             dataframes[table_name] = df
             print(f"✅ Cleaned transaction IDs in {table_name}")
 
-    # 6.Trim all numeric string columns
+    # 6. Trim all numeric string columns
     for table_name, df in dataframes.items():
         string_cols = [
             field.name
@@ -703,7 +763,7 @@ def clean_numeric_strings(dataframes):
         for col_name in string_cols:
             # Check if column looks numeric
             sample_value = df.select(col_name).filter(col(col_name).isNotNull()).first()
-            if sample_value and sample_value[0]: 
+            if sample_value and sample_value[0]:
                 if re.match(r"^[\d\s.,-]+$", str(sample_value[0])):
                     # Trim whitespace from numeric strings
                     df = df.withColumn(col_name, trim(col(col_name)))
@@ -722,17 +782,17 @@ def clean_whitespace_issues(dataframes):
     Remove excessive whitespace and formatting issues from all string columns.
 
     Operations performed:
-    1.Trim leading/trailing whitespace
-    2.Replace multiple spaces with single space
-    3.Remove trailing special characters (*)
-    4.Remove leading special characters (*)
-    5.Clean up excessive quotes
-    6.Remove trailing quotes
+    1. Trim leading/trailing whitespace
+    2. Replace multiple spaces with single space
+    3. Remove trailing special characters (*)
+    4. Remove leading special characters (*)
+    5. Clean up excessive quotes
+    6. Remove trailing quotes
 
     Args:
         dataframes (dict): Dictionary of table names to DataFrames
 
-    Returns: 
+    Returns:
         dict: Updated dictionary with cleaned whitespace
     """
     print("\n" + "=" * 60)
@@ -750,23 +810,23 @@ def clean_whitespace_issues(dataframes):
         if not string_cols:
             continue
 
-        for col_name in string_cols: 
-            # 1.Trim leading/trailing whitespace
+        for col_name in string_cols:
+            # 1. Trim leading/trailing whitespace
             df = df.withColumn(col_name, trim(col(col_name)))
 
-            # 2.Replace multiple spaces with single space
+            # 2. Replace multiple spaces with single space
             df = df.withColumn(col_name, regexp_replace(col(col_name), "\\s+", " "))
 
-            # 3.Remove trailing special characters
+            # 3. Remove trailing special characters
             df = df.withColumn(col_name, regexp_replace(col(col_name), "[*]+$", ""))
 
-            # 4.Remove leading special characters
+            # 4. Remove leading special characters
             df = df.withColumn(col_name, regexp_replace(col(col_name), "^[*]+", ""))
 
-            # 5.Clean up excessive quotes
+            # 5. Clean up excessive quotes
             df = df.withColumn(col_name, regexp_replace(col(col_name), '"{2,}', '"'))
 
-            # 6.Remove trailing quotes
+            # 6. Remove trailing quotes
             df = df.withColumn(col_name, regexp_replace(col(col_name), '"+$', ""))
 
         dataframes[table_name] = df
@@ -789,7 +849,7 @@ def clean_mixed_scripts(dataframes):
     Args:
         dataframes (dict): Dictionary of table names to DataFrames
 
-    Returns: 
+    Returns:
         dict: Updated dictionary with ASCII-only text
     """
     print("\n" + "=" * 60)
@@ -816,7 +876,7 @@ def clean_mixed_scripts(dataframes):
 
         print(f"\n  🔧 Processing {table_name}...")
 
-        for col_name in text_cols: 
+        for col_name in text_cols:
             # Count non-ASCII before cleaning
             non_ascii_count = df.filter(
                 col(col_name).rlike(".*[^\\x00-\\x7f].*")
@@ -888,7 +948,7 @@ def validate_all_cleaned_data(dataframes):
             if isinstance(field.dataType, StringType)
         ]
 
-        for col_name in string_cols: 
+        for col_name in string_cols:
             # Check for excessive special characters
             special_char_count = df.filter(
                 col(col_name).rlike(".*[*@#$%^&]{2,}.*")
@@ -896,7 +956,7 @@ def validate_all_cleaned_data(dataframes):
 
             if special_char_count > 0:
                 print(
-                    f"⚠️  {table_name}.{col_name}:  {special_char_count} rows with multiple special characters"
+                    f"⚠️  {table_name}.{col_name}: {special_char_count} rows with multiple special characters"
                 )
                 issues_found = True
 

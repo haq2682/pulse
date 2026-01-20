@@ -49,21 +49,15 @@ def transform_inventory(dataframes):
                     col("stock_quantity").isNotNull(),
                     when(col("stock_quantity") == 0, "Out of Stock")
                     .when(
-                        col("minimum_stock_level").isNotNull()
-                        & (col("stock_quantity") < col("minimum_stock_level")),
-                        "Low Stock",
-                    )
-                    .when(
-                        col("reserved_quantity").isNotNull()
+                        (col("stock_quantity") > 0)
                         & (col("stock_quantity") <= col("reserved_quantity")),
                         "Low Stock",
                     )
                     .when(
-                        col("minimum_stock_level").isNotNull()
-                        & (col("stock_quantity") <= col("minimum_stock_level") * 3),
+                        (col("stock_quantity") > col("reserved_quantity"))
+                        & (col("stock_quantity") <= 50),
                         "In Stock",
                     )
-                    .when(col("stock_quantity") <= 50, "In Stock")
                     .otherwise("High Stock"),
                 ),
                 "available_stock": when(

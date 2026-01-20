@@ -42,7 +42,7 @@ def aggregate_categories(dataframes):
             "product_id",
             "category",
             "quantity",
-            "product_price",
+            "product_cost",
             "sell_price",
             "customer_id",
             "order_placed_at",
