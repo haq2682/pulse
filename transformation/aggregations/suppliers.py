@@ -222,12 +222,12 @@ def aggregate_suppliers(dataframes):
             # Supplier reliability score (based on ratings and status)
             "supplier_reliability_score": when(
                 col("supplier_rating").isNotNull()
-                & (col("is_verified") == True)
-                & (col("is_preferred") == True),
+                & (col("is_verified") == lit(True))
+                & (col("is_preferred") == lit(True)),
                 col("supplier_rating") * lit(1.2),
             )
             .when(
-                col("supplier_rating").isNotNull() & (col("is_verified") == True),
+                col("supplier_rating").isNotNull() & (col("is_verified") == lit(True)),
                 col("supplier_rating") * lit(1.1),
             )
             .otherwise(col("supplier_rating")),

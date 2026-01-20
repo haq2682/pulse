@@ -24,6 +24,7 @@ def transform_carts(dataframes):
     )
 
     # Determine cart abandonment flag by joining shopping_cart with sessions and orders
+    # A cart is considered "Abandoned" if there was activity but no order was placed
     cart_abandonment_df = (
         dataframes["shopping_cart"]
         .join(dataframes["customer_sessions"], "session_id", "left")
@@ -31,12 +32,14 @@ def transform_carts(dataframes):
         .select(
             col("cart_id"),
             when(
-                (col("products_viewed") > 0)
-                & (col("order_id").isNull())
-                & (col("cart_id").isNotNull()),
-                lit("Active"),
+                col("order_id").isNotNull(),
+                lit("Converted"),  # Cart led to a purchase
             )
-            .otherwise(lit("Inactive"))
+            .when(
+                (col("products_viewed") > 0) & (col("order_id").isNull()),
+                lit("Abandoned"),  # Products viewed but no order - abandoned
+            )
+            .otherwise(lit("Active"))  # Still active, not abandoned yet
             .alias("cart_abandonment_flag"),
         )
         .dropDuplicates(["cart_id"])
