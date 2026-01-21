@@ -24,7 +24,7 @@ customer_id,days_since_last_order,total_orders_rfm,total_revenue_rfm,recency_sco
 355,352,1,228.33,4,5,1,451,New Customers,3.3333333333333335,Medium Value,Highly Engaged,Frequent Buyer,Low Spender,Low Risk
 185,449,1,2605.78,3,5,4,354,Loyal Customers,4.0,High Value,Moderately Engaged,Frequent Buyer,High Spender,Low Risk
 291,1576,1,538.49,1,5,2,152,Hibernating,2.6666666666666665,Low Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
-206,473,2,4743.54,3,5,5,355,Loyal Customers,4.333333333333333,High Value,Moderately Engaged,Frequent Buyer,High Spender,Low Risk
+206,473,1,3390.17,3,5,5,355,Loyal Customers,4.333333333333333,High Value,Moderately Engaged,Frequent Buyer,High Spender,Low Risk
 16,2397,1,1371.15,1,5,3,153,At Risk,3.0,Medium Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
 169,1057,1,1285.72,2,5,3,253,At Risk,3.3333333333333335,Medium Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
 283,432,1,3736.11,4,5,5,455,Champions,4.666666666666667,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
