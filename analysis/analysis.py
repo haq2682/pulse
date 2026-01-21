@@ -1702,6 +1702,11 @@ def main():
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
         and ("current_stock_level" in dataframes["agg_products"].columns
             or "current_stock" in dataframes["agg_products"].columns)
     ):
@@ -1752,9 +1757,16 @@ def main():
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "cart_to_purchase_rate")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "wishlist_to_purchase_rate")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_wishlist_adds")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_cart_adds")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
     ):
         product_analysis["low_conversion_products"] = (
             dataframes["agg_products"]
@@ -1847,7 +1859,7 @@ def main():
 
     # Product-level Top-View-to-Purchase Rates
 
-    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders"):
+    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name") and not is_column_all_null_or_zero(dataframes["agg_products"], "category") and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders"):
         product_analysis["top_view_to_purchase_products"] = (
             dataframes["agg_products"]
             .select(
@@ -1878,8 +1890,13 @@ def main():
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_performance_score")
     ):
 
         # Base product metrics
