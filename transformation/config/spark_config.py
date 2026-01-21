@@ -30,4 +30,4 @@ def create_spark_session():
         .config("inferSchema", "true")
         .config("mergeSchema", "true")
         .getOrCreate()
-    ).sparkContext.setLogLevel("ERROR")
+    )
