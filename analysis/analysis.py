@@ -126,12 +126,12 @@ def main():
         )
 
         return kpi
-    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and not is_column_all_null_or_zero(dataframes["agg_orders"], "units_sold") and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit") and not is_column_all_null_or_zero(dataframes["agg_orders"], "net_profit"):
+    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "units_sold") and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit") and not is_column_all_null_or_zero(dataframes["agg_orders"], "net_profit"):
         analysis["business_health_daily"]= core_kpis_over_time(dataframes["agg_orders"],"order_placed_at", grain="day")
         analysis["business_health_weekly"] = core_kpis_over_time(dataframes["agg_orders"],"order_placed_at", grain="week")
         analysis["business_health_monthly"] = core_kpis_over_time(dataframes["agg_orders"],"order_placed_at", grain="month")
     else:
-        print("One or more required columns are all null or zero in agg_orders dataframe.")
+        print("One or more required columns (order_placed_at, order_id, units_sold, total_amount, order_profit, net_profit) are all null or zero in agg_orders dataframe.")
         
        
     # Product category margin analysis
@@ -154,7 +154,7 @@ def main():
         
         return category_df
 
-    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "category"):
+    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "category") and not is_column_all_null_or_zero(dataframes["agg_products"], "profit_margin") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_profit") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold"):
         analysis["low_margin_categories"] = analyze_category_margins(dataframes["agg_products"])
     else: 
         print("Category column is all NULL or zero; skipping category margin analysis.")
@@ -184,12 +184,12 @@ def main():
                 .fillna({"customer_count": 0})
                 .orderBy(*order_cols, "account_status")
         )
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at") and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_status") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
         analysis["customer_account_status_distribution_daily"]   = status_distribution_over_time(dataframes["agg_customers"],"account_created_at","day")
         analysis["customer_account_status_distribution_weekly"]  = status_distribution_over_time(dataframes["agg_customers"], "account_created_at", "week")
         analysis["customer_account_status_distribution_monthly"] = status_distribution_over_time(dataframes["agg_customers"], "account_created_at", "month")
     else:
-        print("Account created at column is all NULL or zero; skipping status distribution over time analysis.")
+        print("One of the required columns (account_created_at, account_status, customer_id) is all NULL or zero; skipping status distribution over time analysis.")
     
     
     # New customers per day/week/month
@@ -213,12 +213,12 @@ def main():
                 .orderBy(*order_cols)
         )
         return new_df
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
         analysis["new_customers_daily"] = new_customers(dataframes["agg_customers"],"account_created_date", "day")
         analysis["new_customers_weekly"]  = new_customers(dataframes["agg_customers"], "account_created_date", "week")
         analysis["new_customers_monthly"]= new_customers(dataframes["agg_customers"], "account_created_date", "month")
     else:
-        print("Account created at column is all NULL or zero; skipping new customers analysis.")
+        print("One of the required columns (account_created_date, customer_id) is all NULL or zero; skipping new customers analysis.")
 
     # Cumulative customer growth curve
     def cumulative_customers(df, date_col="account_created_at", grain="day"):
@@ -241,23 +241,23 @@ def main():
         ).fillna({"cumulative_customers": 0})   
         
         return cum_df
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
         analysis["cumulative_customers_daily"]   = cumulative_customers(dataframes["agg_customers"],"account_created_date", "day")
         analysis["cumulative_customers_weekly"]  = cumulative_customers(dataframes["agg_customers"], "account_created_date", "week")
         analysis["cumulative_customers_monthly"] = cumulative_customers(dataframes["agg_customers"], "account_created_date", "month")
     else:
-        print("Account created at column is all NULL or zero; skipping cumulative customers analysis.")
+        print("One of the required columns (account_created_date, customer_id) is all NULL or zero; skipping cumulative customers analysis.")
 
 
     # Total new customers by geography + time
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province") and not is_column_all_null_or_zero(dataframes["agg_customers"], "city") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
         geo_acquisition = (
             dataframes["agg_customers"]
             .groupBy("country", "state_province", "city")
             .agg(F.countDistinct("customer_id").alias("new_customers"))
         )
     else:
-        print("Account created at column is all NULL or zero; skipping geo acquisition analysis.")
+        print("One of the required columns (account_created_at, country, state_province, city, customer_id) is all NULL or zero; skipping geo acquisition analysis.")
 
     def geo_acquisition_over_time(df, date_col="account_created_at", grain="day"):
         df_g = add_time_grain(df, date_col=date_col, grain=grain)
@@ -279,13 +279,13 @@ def main():
                 .orderBy(*order_cols)
         )
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province") and not is_column_all_null_or_zero(dataframes["agg_customers"], "city") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
         analysis["new_customers_geo_acquisition_daily"]   = geo_acquisition_over_time(dataframes["agg_customers"], "account_created_date", "day")
         analysis["new_customers_geo_acquisition_monthly"] = geo_acquisition_over_time(dataframes["agg_customers"], "account_created_date", "month")
     else:
-        print("Account created at column is all NULL or zero; skipping geo acquisition over time analysis.")
+        print("One of the required columns (account_created_date, country, state_province, city, customer_id) is all NULL or zero; skipping geo acquisition over time analysis.")
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_age_group"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_age_group") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
         analysis["customer_age_group_distribution"] = (
             dataframes["agg_customers"]
             .groupBy("customer_age_group")
@@ -516,7 +516,7 @@ def main():
     else:
         print("session_conversion_rate column is all NULL or zero; skipping session conversion percentage calculation.")
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate"):
         abandon_percentage = dataframes["agg_customers"].withColumn(
             "cart_abandonment_percentage",
             F.when(F.col("cart_abandonment_rate") < 0.1, "<10%")
@@ -603,7 +603,7 @@ def main():
         )
         return result
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "city") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment_label") and not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_referrer_source") and not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_device_type"):
         analysis["rev_by_country_city"] = revenue_by_segment(dataframes["agg_customers"], ["country", "city"])
         analysis["rev_by_customer_segment"] = revenue_by_segment(dataframes["agg_customers"], ["customer_segment"])
         analysis["rev_by_rfm_segment"] = revenue_by_segment(dataframes["agg_customers"], ["rfm_segment"])
@@ -611,7 +611,7 @@ def main():
         analysis["rev_by_referrer"] = revenue_by_segment(dataframes["agg_customers"], ["preferred_referrer_source"])
         analysis["rev_by_device"] = revenue_by_segment(dataframes["agg_customers"], ["preferred_device_type"])
     else:
-        print("One of the required columns in agg_customers is all NULL or zero; skipping revenue by segment analysis.")
+        print("One of the required columns (customer_id, total_revenue, country, city, customer_segment, rfm_segment, customer_segment_label, preferred_referrer_source, preferred_device_type) in agg_customers is all NULL or zero; skipping revenue by segment analysis.")
 
 
     # Average order value trends  
@@ -621,6 +621,11 @@ def main():
     if (
         "agg_daily_aggregations" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_daily_aggregations"], "order_date")
+        and not is_column_all_null_or_zero(dataframes["agg_daily_aggregations"], "order_year")
+        and not is_column_all_null_or_zero(dataframes["agg_daily_aggregations"], "order_month")
+        and not is_column_all_null_or_zero(dataframes["agg_daily_aggregations"], "total_orders")
+        and not is_column_all_null_or_zero(dataframes["agg_daily_aggregations"], "total_revenue")
+        and not is_column_all_null_or_zero(dataframes["agg_daily_aggregations"], "avg_order_value")
         ):
         daily = dataframes["agg_daily_aggregations"].fillna(
             {
@@ -651,6 +656,11 @@ def main():
     if (
         "agg_weekly_aggregations" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_weekly_aggregations"], "year_week")
+        and not is_column_all_null_or_zero(dataframes["agg_weekly_aggregations"], "order_year")
+        and not is_column_all_null_or_zero(dataframes["agg_weekly_aggregations"], "order_week")
+        and not is_column_all_null_or_zero(dataframes["agg_weekly_aggregations"], "total_orders")
+        and not is_column_all_null_or_zero(dataframes["agg_weekly_aggregations"], "total_revenue")
+        and not is_column_all_null_or_zero(dataframes["agg_weekly_aggregations"], "avg_order_value")
          ):
         weekly = dataframes["agg_weekly_aggregations"].fillna(
             {
@@ -681,6 +691,11 @@ def main():
     if (
         "agg_monthly_aggregations" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_monthly_aggregations"], "year_month")
+        and not is_column_all_null_or_zero(dataframes["agg_monthly_aggregations"], "order_year")
+        and not is_column_all_null_or_zero(dataframes["agg_monthly_aggregations"], "order_month")
+        and not is_column_all_null_or_zero(dataframes["agg_monthly_aggregations"], "total_orders")
+        and not is_column_all_null_or_zero(dataframes["agg_monthly_aggregations"], "total_revenue")
+        and not is_column_all_null_or_zero(dataframes["agg_monthly_aggregations"], "avg_order_value")
          ):
         monthly = dataframes["agg_monthly_aggregations"].fillna(
             {
@@ -710,7 +725,7 @@ def main():
 
     # Discount based analysis, customers contribution based on level of discount 
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_discount_received") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_discount_per_order") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_orders"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_discount_received") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_discount_per_order") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_orders") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
         disc_df = (
             dataframes["agg_customers"]
             .fillna({
@@ -792,7 +807,7 @@ def main():
 
     #  Cart & Checkout Health (Abandonment & Lost Value)
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_carts_created") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_abandoned_carts") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_purchased_carts") and not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_abandoned_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_time_in_cart_days"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_carts_created") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_abandoned_carts") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_purchased_carts") and not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_abandoned_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_time_in_cart_days") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value"):
         analysis["cart_behavior_summary"] = (
             dataframes["agg_customers"]
             .agg(
@@ -891,7 +906,7 @@ def main():
 
     # High‑Intent Non‑Buyers (Fix Funnel / UX)
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_products_viewed") and not is_column_all_null_or_zero(dataframes["agg_customers"], "wishlist_items_count") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_carts_created") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_purchased_carts") and not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate") and not is_column_all_null_or_zero(dataframes["agg_customers"], "session_conversion_rate"):
         analysis["high_intent_non_buyers"] = (
             dataframes["agg_customers"]
             .select(
@@ -914,7 +929,7 @@ def main():
         .orderBy(F.col("total_products_viewed").desc())
         )
     else:
-        print("One of the required columns in agg_customers is all NULL or zero; skipping high intent non-buyers analysis.")
+        print("One of the required columns (total_revenue, customer_id, total_products_viewed, wishlist_items_count, total_carts_created, total_purchased_carts, cart_abandonment_rate, session_conversion_rate) in agg_customers is all NULL or zero; skipping high intent non-buyers analysis.")
 
 
     # # OVERALL CUSTOMER ANALYSIS SUMMARY
@@ -1323,8 +1338,11 @@ def main():
     if (
         "agg_rfm_segmentation" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_rfm_segmentation"], "customer_id")
+        and not is_column_all_null_or_zero(dataframes["agg_rfm_segmentation"], "rfm_segment")
         and "agg_orders" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount")
     ):
         rfm = dataframes["agg_rfm_segmentation"].select(
             "customer_id",
@@ -1372,6 +1390,8 @@ def main():
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
@@ -1557,9 +1577,12 @@ def main():
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "profit_margin")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
     ):
         product_analysis["highest_margin_products"] = (
             dataframes["agg_products"]
@@ -1604,12 +1627,16 @@ def main():
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "profit_margin")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_wishlist_adds")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_cart_adds")
     ):
         product_analysis["low_margin_high_traffic_products"] = (
             dataframes["agg_products"]
@@ -1675,6 +1702,11 @@ def main():
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
         and ("current_stock_level" in dataframes["agg_products"].columns
             or "current_stock" in dataframes["agg_products"].columns)
     ):
@@ -1725,9 +1757,16 @@ def main():
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "cart_to_purchase_rate")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "wishlist_to_purchase_rate")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_wishlist_adds")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_cart_adds")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
     ):
         product_analysis["low_conversion_products"] = (
             dataframes["agg_products"]
@@ -1820,7 +1859,7 @@ def main():
 
     # Product-level Top-View-to-Purchase Rates
 
-    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders"):
+    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name") and not is_column_all_null_or_zero(dataframes["agg_products"], "category") and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders"):
         product_analysis["top_view_to_purchase_products"] = (
             dataframes["agg_products"]
             .select(
@@ -1851,8 +1890,13 @@ def main():
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_performance_score")
     ):
 
         # Base product metrics
@@ -2436,7 +2480,16 @@ def main():
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "launch_date")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "days_since_launch")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "avg_rating")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "inventory_turnover_rate")
     ):
         lifecycle_df = (
             dataframes["agg_products"]
@@ -5447,11 +5500,23 @@ def main():
     has_suppliers = (
         "agg_suppliers" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "supplier_id")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "supplier_status")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "total_products_supplied")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "total_units_sold")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "total_orders_fulfilled")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "total_stockouts")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "total_revenue_generated")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "supplier_performance_score")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "supplier_reliability_score")
     )
 
     has_sup_inv = (
         "agg_supplier_inventory_health" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "supplier_id")
+        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "total_products")
+        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "total_current_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "total_available_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "total_stockouts")
     )
 
     if not has_suppliers and not has_sup_inv:
@@ -5669,7 +5734,7 @@ def main():
 
     # Overall wishlist usage and conversion
 
-    if not is_column_all_null_or_zero(dataframes["agg_wishlist"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "purchased_date") and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "customer_id"):
+    if "agg_wishlist" in dataframes and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "purchased_date") and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "customer_id"):
         analysis["wishlist_overall_summary"] = dataframes["agg_wishlist"].agg(
             F.count("*").alias("total_wishlist_items"),
             F.countDistinct("customer_id").alias("customers_using_wishlist"),
@@ -5691,7 +5756,7 @@ def main():
 
     # Wishlist usage & conversion by product
 
-    if not is_column_all_null_or_zero(dataframes["agg_wishlist"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "purchased_date"):
+    if "agg_wishlist" in dataframes and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "purchased_date"):
         analysis["wishlist_by_product"] = (
             dataframes["agg_wishlist"]  
             .groupBy("product_id")
@@ -5965,7 +6030,7 @@ def main():
     
     # Abandonment & recovery (using agg_cart_abandonment_analysis)
 
-    if not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_id") and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status"):
+    if "agg_cart_abandonment_analysis" in dataframes and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_id") and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status"):
         analysis["cart_abandon_summary"] = dataframes["agg_cart_abandonment_analysis"].agg(
             F.countDistinct("cart_id").alias("total_carts_tracked"),
             F.countDistinct(F.when(F.col("cart_status") == "Abandoned", F.col("cart_id"))).alias("abandoned_carts"),
@@ -5990,7 +6055,7 @@ def main():
     
     # Value and size characteristics of abandoned vs purchased carts
 
-    if not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status"):
+    if "agg_cart_abandonment_analysis" in dataframes and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status"):
         analysis["cart_value_stats"] = (
             dataframes["agg_cart_abandonment_analysis"]
             .groupBy("cart_status")
@@ -6015,7 +6080,7 @@ def main():
 
     # Recovery opportunity: high-value abandoned carts
 
-    if not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status") and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_total_value"):
+    if "agg_cart_abandonment_analysis" in dataframes and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status") and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_total_value"):
         analysis["high_value_abandoned_carts"] = (
             dataframes["agg_cart_abandonment_analysis"]
             .filter(
@@ -6322,12 +6387,24 @@ def main():
 
     has_payments = "agg_payments" in dataframes and not is_column_all_null_or_zero(
         dataframes["agg_payments"], "payment_id"
+    ) and not is_column_all_null_or_zero(
+        dataframes["agg_payments"], "order_id"
+    ) and not is_column_all_null_or_zero(
+        dataframes["agg_payments"], "payment_method"
+    ) and not is_column_all_null_or_zero(
+        dataframes["agg_payments"], "payment_status"
     )
     has_customers = "agg_customers" in dataframes and not is_column_all_null_or_zero(
         dataframes["agg_customers"], "customer_id"
+    ) and not is_column_all_null_or_zero(
+        dataframes["agg_customers"], "country"
+    ) and not is_column_all_null_or_zero(
+        dataframes["agg_customers"], "state_province"
     )
     has_orders = "agg_orders" in dataframes and not is_column_all_null_or_zero(
         dataframes["agg_orders"], "order_id"
+    ) and not is_column_all_null_or_zero(
+        dataframes["agg_orders"], "customer_id"
     )
 
     if not (has_payments and has_customers and has_orders):
@@ -7176,7 +7253,15 @@ def main():
         and "agg_order_items" in dataframes
         and "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_processing_days_diff")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "delivery_days_diff")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_order_fulfillment_time_days")
+        and not is_column_all_null_or_zero(dataframes["agg_order_items"], "order_id")
+        and not is_column_all_null_or_zero(dataframes["agg_order_items"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_order_items"], "quantity")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
     ):
         orders_with_cat = (
             dataframes["agg_order_items"]. select("order_id", "product_id", "quantity")
@@ -7223,7 +7308,7 @@ def main():
     # =============================================================================
     # 2) Peak Processing Times Analysis
     # =============================================================================
-    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id"):
+    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_processing_days_diff") and not is_column_all_null_or_zero(dataframes["agg_orders"], "delivery_days_diff") and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount"):
         
         orders_time = (
             dataframes["agg_orders"]
@@ -7443,8 +7528,14 @@ def main():
     if (
         "agg_orders" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "subtotal")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "shipping_cost")
         and "agg_customers" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
+        and not is_column_all_null_or_zero(dataframes["agg_customers"], "country")
+        and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province")
+        and not is_column_all_null_or_zero(dataframes["agg_customers"], "city")
     ):
         # 1) Base orders: keep only fields needed
         orders = dataframes["agg_orders"].select(
@@ -7539,7 +7630,7 @@ def main():
     # Processing Delays by Season: season impact on order_processing_days_diff
 
 
-    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id"):
+    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_status") and not is_column_all_null_or_zero(dataframes["agg_orders"], "season") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_processing_days_diff"):
         orders = dataframes["agg_orders"].select(
             "order_id",
             "order_status",
@@ -7583,7 +7674,7 @@ def main():
 
     # Shipping Cost Outliers: Orders with unusually high shipping costs for investigation
 
-    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id"):
+    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and not is_column_all_null_or_zero(dataframes["agg_orders"], "subtotal") and not is_column_all_null_or_zero(dataframes["agg_orders"], "shipping_cost") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_status"):
         # 1) Base orders
         orders = dataframes["agg_orders"].select(
             "order_id",
