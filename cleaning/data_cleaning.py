@@ -100,7 +100,8 @@ def drop_null_rows(dataframes, table, col_name):
 
 def drop_null_keys(dataframes):
     """
-    Drop rows where primary keys or foreign keys are NULL.
+    Drop rows ONLY where the PRIMARY KEY for that specific table is NULL.
+    Foreign keys (e.g., customer_id in the orders table) are ignored.
 
     Args:
         dataframes (dict): Dictionary of table names to DataFrames
@@ -108,22 +109,25 @@ def drop_null_keys(dataframes):
     Returns:
         dict: Updated dictionary
     """
-    all_ids = [
-        "session_id",
-        "customer_id",
-        "address_id",
-        "product_id",
-        "supplier_id",
-        "order_id",
-        "order_item_id",
-        "payment_id",
-        "campaign_id",
-        "cart_id",
-        "cart_item_id",
-        "inventory_id",
-        "review_id",
-        "wishlist_id",
-    ]
+    
+    # Map each table to its specific Primary Key
+    # This ensures we don't drop an Order just because it has no Customer ID yet
+    primary_key_map = {
+        "customers": "customer_id",
+        "orders": "order_id",
+        "order_items": "order_item_id",
+        "products": "product_id",
+        "suppliers": "supplier_id",
+        "payments": "payment_id",
+        "marketing_campaigns": "campaign_id",
+        "shopping_cart": "cart_id",
+        "cart_items": "cart_item_id",
+        "inventory": "inventory_id",
+        "reviews": "review_id",
+        "wishlists": "wishlist_id",
+        "addresses": "address_id",
+        "customer_sessions": "session_id",
+    }
 
     for table in dataframes.keys():
         # Skip if dataframe is None
@@ -131,12 +135,21 @@ def drop_null_keys(dataframes):
             print(f"⚠️ Skipping null key removal for '{table}': dataframe is None")
             continue
         
-        for col in dataframes[table].columns:
-            if col in all_ids: 
-                dataframes = drop_null_rows(dataframes, table, col)
+        # 1. Check if we have a defined Primary Key for this table
+        if table in primary_key_map:
+            pk_column = primary_key_map[table]
+            
+            # 2. Only drop rows if the PK column actually exists in the dataframe
+            if pk_column in dataframes[table].columns:
+                print(f"🔒 Checking Primary Key '{pk_column}' for table '{table}'...")
+                dataframes = drop_null_rows(dataframes, table, pk_column)
+            else:
+                print(f"⚠️ Primary Key '{pk_column}' defined for '{table}' but column not found.")
+        else:
+            # Optional: Print if a table has no PK defined in our map
+            pass
 
     return dataframes
-
 
 def check_nulls(dataframes):
     """
@@ -352,7 +365,7 @@ def impute_missing_values(dataframes, table, numeric_cols):
         if non_null_count == 0:
             all_null_cols.append(col_name)
             print(f"🚫 {col_name}:  ALL NULL - will fill with 0")
-        else:
+        elif non_null_count < total_rows:
             valid_cols.append(col_name)
             null_count = total_rows - non_null_count
             print(

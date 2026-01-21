@@ -34,15 +34,11 @@ import re
 
 def remove_outliers(dataframes, table_name, columns):
     """
-    Remove outliers from specified columns using IQR method (1% and 99% quantiles).
-
-    Args:
-        dataframes (dict): Dictionary of table names to DataFrames
-        table_name (str): Name of the table
-        columns (list): List of column names to process
-
-    Returns: 
-        dict: Updated dictionary
+    Remove outliers using a flexible Quantile method.
+    
+    Adjustments made:
+    1. Changed quantiles from 5%/95% to 0.1%/99.9% to keep more data.
+    2. Added a "Safety Floor" for quantity columns to prevent cutting valid small numbers (like 7).
     """
     if table_name not in dataframes: 
         print(f"Table {table_name} not found")
@@ -57,23 +53,42 @@ def remove_outliers(dataframes, table_name, columns):
             continue
 
         print(f"\nProcessing outliers for {column} in {table_name}...")
-        quantiles = df.approxQuantile(column, [0.05, 0.95], 0.0)
+        
+        # --- FIX 1: Relaxed Quantiles ---
+        # Changed from [0.05, 0.95] to [0.001, 0.999]
+        # This keeps the top 0.1% and bottom 0.1% only, preserving legitimate bulk orders.
+        quantiles = result_df.approxQuantile(column, [0.001, 0.999], 0.0)
+        
         if len(quantiles) < 2:
             print(f"Not enough data to compute outliers for column {column}")
             continue
+            
         low_cutoff, high_cutoff = quantiles[0], quantiles[1]
 
-        print(f"  {column} - Low cutoff: {low_cutoff}, High cutoff: {high_cutoff}")
+        # --- FIX 2: Safety Floor for Quantity ---
+        # If the column represents quantity, DO NOT allow the cutoff to be less than 20.
+        # This fixes your issue where "7" was being removed.
+        if "quantity" in column.lower() or "qty" in column.lower():
+            if high_cutoff < 20:
+                print(f"  ⚠️  Calculated high cutoff ({high_cutoff}) is too strict for {column}.")
+                high_cutoff = 20
+                print(f"  🔧 Adjusted high cutoff to {high_cutoff} to preserve valid orders (e.g. 7, 10, 15).")
+
+        # --- FIX 3: Negative Price Check ---
         if low_cutoff < 0:
             low_cutoff = 0
             print(f"  Adjusted Low cutoff for {column} to 0 since it was negative.")
 
+        print(f"  {column} - Keeping data between: {low_cutoff} and {high_cutoff}")
+
         before_count = result_df.count()
+        
+        # Apply the filter
         result_df = result_df.filter(
             (F.col(column) >= low_cutoff) & (F.col(column) <= high_cutoff)
         )
+        
         after_count = result_df.count()
-
         removed = before_count - after_count
         print(f"  Removed {removed} outlier rows based on {column}")
 
