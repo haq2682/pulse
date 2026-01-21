@@ -48,7 +48,7 @@ def create_spark_session() -> SparkSession:
         .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
         .getOrCreate()
-    )
+    ).sparkContext.setLogLevel("ERROR")
 
 
 def get_canonical_schema() -> StructType:
