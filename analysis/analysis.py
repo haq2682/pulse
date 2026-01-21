@@ -213,7 +213,7 @@ def main():
                 .orderBy(*order_cols)
         )
         return new_df
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date"):
         analysis["new_customers_daily"] = new_customers(dataframes["agg_customers"],"account_created_date", "day")
         analysis["new_customers_weekly"]  = new_customers(dataframes["agg_customers"], "account_created_date", "week")
         analysis["new_customers_monthly"]= new_customers(dataframes["agg_customers"], "account_created_date", "month")
@@ -241,7 +241,7 @@ def main():
         ).fillna({"cumulative_customers": 0})   
         
         return cum_df
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date"):
         analysis["cumulative_customers_daily"]   = cumulative_customers(dataframes["agg_customers"],"account_created_date", "day")
         analysis["cumulative_customers_weekly"]  = cumulative_customers(dataframes["agg_customers"], "account_created_date", "week")
         analysis["cumulative_customers_monthly"] = cumulative_customers(dataframes["agg_customers"], "account_created_date", "month")
@@ -250,7 +250,7 @@ def main():
 
 
     # Total new customers by geography + time
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
         geo_acquisition = (
             dataframes["agg_customers"]
             .groupBy("country", "state_province", "city")
@@ -279,13 +279,13 @@ def main():
                 .orderBy(*order_cols)
         )
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date"):
         analysis["new_customers_geo_acquisition_daily"]   = geo_acquisition_over_time(dataframes["agg_customers"], "account_created_date", "day")
         analysis["new_customers_geo_acquisition_monthly"] = geo_acquisition_over_time(dataframes["agg_customers"], "account_created_date", "month")
     else:
         print("Account created at column is all NULL or zero; skipping geo acquisition over time analysis.")
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_age_group"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_age_group"):
         analysis["customer_age_group_distribution"] = (
             dataframes["agg_customers"]
             .groupBy("customer_age_group")
@@ -296,7 +296,7 @@ def main():
     else: 
         print("Customer age group column is all NULL or zero; skipping age group distribution analysis.")
         
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province") and not is_column_all_null_or_zero(dataframes["agg_customers"], "city"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province") and not is_column_all_null_or_zero(dataframes["agg_customers"], "city"):
         analysis["customer_city_distribution"] = (
             dataframes["agg_customers"]
             .groupBy("country", "state_province", "city")
@@ -309,7 +309,7 @@ def main():
 
     # Customer distribution by age group, city, state, country
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province"):
         analysis["customer_state_distribution"] = (
             dataframes["agg_customers"]
             .groupBy("country", "state_province")
@@ -321,7 +321,7 @@ def main():
     else:
         print("Country or state_province column is all NULL or zero; skipping state distribution analysis.")
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "country"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "country"):
         analysis["customer_country_distribution"] = (
             dataframes["agg_customers"]
             .groupBy("country")
@@ -334,7 +334,7 @@ def main():
 
 
     # Customer age group spending analysis
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_age_group") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_total_spent") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_age_group") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_total_spent") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue"):
         analysis["customer_age_group_spending"] = (
             dataframes["agg_customers"]
             .groupBy("customer_age_group")
@@ -355,7 +355,7 @@ def main():
 
 
     # Gender-based product preferences
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_age_group") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_total_spent") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_age_group") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_total_spent") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue"):
         analysis["customer_age_group_spending"] = (
             dataframes["agg_customers"]
             .groupBy("customer_age_group")
@@ -374,8 +374,8 @@ def main():
     else: 
         print("Customer age group column is all NULL or zero; skipping age group spending analysis.")
 
-    # New vs returning customers    
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "is_repeat_customer"):
+    # New vs returning customers
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "is_repeat_customer"):
         dataframes["agg_customers"] = dataframes["agg_customers"].withColumn(
             "customer_type",
             F.when(F.col("is_repeat_customer") == 1, F.lit("returning"))
@@ -384,7 +384,7 @@ def main():
     else:
         print("is_repeat_customer column is all NULL or zero; skipping customer type classification.")
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_type") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_type") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country"):
         analysis["new_vs_returning_customer_country"] = (
             dataframes["agg_customers"]
             .groupBy("country", "customer_type")
@@ -394,7 +394,7 @@ def main():
         )
     else:
         print("Country or customer_type column is all NULL or zero; skipping new vs returning country analysis.")
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_type") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province") and not is_column_all_null_or_zero(dataframes["agg_customers"], "city"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_type") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province") and not is_column_all_null_or_zero(dataframes["agg_customers"], "city"):
         analysis["new_vs_returning_customer_city"] = (
             dataframes["agg_customers"]
             .groupBy("country", "state_province", "city", "customer_type")
@@ -404,7 +404,7 @@ def main():
     else:
         print("One of the required columns (customer_type, country, state_province, city) is all NULL or zero; skipping new vs returning city analysis.")
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_type") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_type") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province"):
         new_vs_returning_state = (
             dataframes["agg_customers"]
             .groupBy("country", "state_province", "customer_type")
@@ -416,7 +416,7 @@ def main():
         print("One of the required columns (customer_type, country, state_province) is all NULL or zero; skipping new vs returning state analysis.")
 
     # Total & average engagement per customer
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_sessions") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_pages_viewed") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_products_viewed"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_sessions") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_pages_viewed") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_products_viewed"):
         analysis["customer_engagement"] = dataframes["agg_customers"].select(
             "customer_id",
             "total_sessions",
@@ -442,7 +442,7 @@ def main():
         print("One of the required columns in agg_customers is all NULL or zero; skipping engagement analysis.")
 
     # session to order analysis
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "session_conversion_rate") and not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "session_conversion_rate") and not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate"):
         analysis["session_to_order_analysis"] = dataframes["agg_customers"].agg(
             F.avg("session_conversion_rate").alias("avg_session_conversion_rate"),
             F.avg("cart_abandonment_rate").alias("avg_cart_abandonment_rate")
@@ -454,7 +454,7 @@ def main():
         print("One of the required columns (session_conversion_rate, cart_abandonment_rate) is all NULL or zero; skipping session to order analysis.")
 
     # top customers based on Revenue
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment"):
         analysis["top_customers_by_revenue"] = (
             dataframes["agg_customers"]
             .fillna({"total_revenue": 0.0})
@@ -465,7 +465,7 @@ def main():
         print("One of the required columns in agg_customers is all NULL or zero; skipping top customers by revenue analysis.")
 
     # top customers based on Profit
-    if not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit") and not is_column_all_null_or_zero(dataframes["agg_orders"], "net_profit") and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value"):
+    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit") and not is_column_all_null_or_zero(dataframes["agg_orders"], "net_profit") and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value"):
         customer_profit = (
             dataframes["agg_orders"]
             .groupBy("customer_id")
@@ -497,7 +497,7 @@ def main():
 
     # distribution percentage for conversion & abandonment
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "session_conversion_rate"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "session_conversion_rate"):
         conv_percentage = dataframes["agg_customers"].withColumn(
             "session_conversion_percentage",
             F.when(F.col("session_conversion_rate") < 0.1, "<10%")
@@ -539,7 +539,7 @@ def main():
 
     # # Overall CLV summary
 
-    if (
+    if "agg_customers" in dataframes and (
     not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value")
     and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue")
     and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_order_value")
@@ -603,7 +603,7 @@ def main():
         )
         return result
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue"):
         analysis["rev_by_country_city"] = revenue_by_segment(dataframes["agg_customers"], ["country", "city"])
         analysis["rev_by_customer_segment"] = revenue_by_segment(dataframes["agg_customers"], ["customer_segment"])
         analysis["rev_by_rfm_segment"] = revenue_by_segment(dataframes["agg_customers"], ["rfm_segment"])
@@ -710,7 +710,7 @@ def main():
 
     # Discount based analysis, customers contribution based on level of discount 
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "total_discount_received") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_discount_per_order") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_orders"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_discount_received") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_discount_per_order") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_orders"):
         disc_df = (
             dataframes["agg_customers"]
             .fillna({
@@ -767,7 +767,7 @@ def main():
 
     # Discount Behavior & Margin Pressure
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "total_discount_received") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_discount_per_order") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_discount_received") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_discount_per_order") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
         discount_behavior = (
             dataframes["agg_customers"]
             .select(
@@ -792,7 +792,7 @@ def main():
 
     #  Cart & Checkout Health (Abandonment & Lost Value)
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "total_carts_created") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_abandoned_carts") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_purchased_carts") and not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_abandoned_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_time_in_cart_days"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_carts_created") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_abandoned_carts") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_purchased_carts") and not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_abandoned_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_time_in_cart_days"):
         analysis["cart_behavior_summary"] = (
             dataframes["agg_customers"]
             .agg(
@@ -824,7 +824,7 @@ def main():
 
     # Churn Risk Distribution (Portfolio Health)
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_recency_days"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_recency_days"):
         analysis["churn_risk_summary"] = (
             dataframes["agg_customers"]
             .groupBy("churn_risk")
@@ -842,7 +842,7 @@ def main():
 
     # High‑CLV Customers at Risk of Churn (Immediate Action List)
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_activity_score") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_recency_days") and not is_column_all_null_or_zero(dataframes["agg_customers"], "days_since_last_purchase") and not is_column_all_null_or_zero(dataframes["agg_customers"], "days_since_last_login") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment_label") and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_category"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_activity_score") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_recency_days") and not is_column_all_null_or_zero(dataframes["agg_customers"], "days_since_last_purchase") and not is_column_all_null_or_zero(dataframes["agg_customers"], "days_since_last_login") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment_label") and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_category"):
         analysis["high_clv_at_risk"] = (
             dataframes["agg_customers"]
             .select(
@@ -870,7 +870,7 @@ def main():
     # RFM Segment Summary (Champions, At Risk, etc.)
 
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_recency_days") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_orders") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_order_value"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_recency_days") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_orders") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_order_value"):
         analysis["rfm_segment_summary"] = (
             dataframes["agg_customers"]
             .groupBy("rfm_segment")
@@ -891,7 +891,7 @@ def main():
 
     # High‑Intent Non‑Buyers (Fix Funnel / UX)
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
         analysis["high_intent_non_buyers"] = (
             dataframes["agg_customers"]
             .select(
@@ -921,8 +921,8 @@ def main():
 
     # Signup cohort: retention by month (based on first order month)
 
-        
-    if (
+
+    if "agg_customers" in dataframes and (
         not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at")
         and not is_column_all_null_or_zero(dataframes["agg_customers"], "first_order_date")
         ):
@@ -1102,7 +1102,7 @@ def main():
 
     # Cross-tab: RFM segment x churn_risk
 
-    if (
+    if "agg_customers" in dataframes and (
         not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment")
         and not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk")
         and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
@@ -1125,7 +1125,7 @@ def main():
 
     # Cross-tab: customer_segment_label x preferred_referrer_source
 
-    if (
+    if "agg_customers" in dataframes and (
         not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment_label")
         and not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_referrer_source")
         and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
@@ -1147,7 +1147,7 @@ def main():
 
     # Cross-tab: customer_segment_label x preferred_device_type
 
-    if (
+    if "agg_customers" in dataframes and (
         not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment_label")
         and not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_device_type")
         and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
@@ -1173,7 +1173,7 @@ def main():
 
     # Payment method vs CLV and churn
 
-    if (
+    if "agg_customers" in dataframes and (
         not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_payment_method")
         and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value")
         and not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk")
@@ -1209,7 +1209,7 @@ def main():
 
     # Channel (referrer) vs CLV, churn, and discount reliance
 
-    if (
+    if "agg_customers" in dataframes and (
         not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_referrer_source")
         and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value")
         and not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk")
@@ -1409,8 +1409,8 @@ def main():
 
     # product level seasonal trends analysis
 
-        
-    if (
+
+    if "agg_orders" in dataframes and "agg_order_items" in dataframes and "agg_products" in dataframes and (
         not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
         and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at")
         and not is_column_all_null_or_zero(dataframes["agg_order_items"], "order_id")
@@ -1794,7 +1794,6 @@ def main():
     # Category-level viewing effectiveness
 
     if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "category") and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders") and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue"):
-    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "category") and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders") and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue"):
         product_analysis["category_view_patterns"] = (
             dataframes["agg_products"]
             .groupBy("category")
@@ -1821,7 +1820,6 @@ def main():
 
     # Product-level Top-View-to-Purchase Rates
 
-    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders"):
     if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders"):
         product_analysis["top_view_to_purchase_products"] = (
             dataframes["agg_products"]

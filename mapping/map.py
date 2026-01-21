@@ -209,6 +209,8 @@ spark = (
     .getOrCreate()
 )
 
+spark.sparkContext.setLogLevel("ERROR")
+
 df_to_table = {
     "customers_df": {
         "table": "customers",

@@ -1,0 +1,107 @@
+customer_id,days_since_last_order,total_orders_rfm,total_revenue_rfm,recency_score,frequency_score,monetary_score,rfm_segment,customer_segment_label,rfm_overall_score,rfm_category,engagement_level,purchase_behavior,spending_pattern,churn_risk
+243,2668,1,6047.49,1,5,5,155,At Risk,3.6666666666666665,Medium Value,Low Engagement,Frequent Buyer,High Spender,High Risk
+251,1672,1,589.03,1,5,2,152,Hibernating,2.6666666666666665,Low Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+296,271,1,1687.81,4,5,3,453,Loyal Customers,4.0,High Value,Highly Engaged,Frequent Buyer,Average Spender,Low Risk
+472,389,1,165.05,4,5,1,451,New Customers,3.3333333333333335,Medium Value,Highly Engaged,Frequent Buyer,Low Spender,Low Risk
+115,440,1,681.62,3,5,2,352,Others,3.3333333333333335,Medium Value,Moderately Engaged,Frequent Buyer,Average Spender,Low Risk
+300,2654,1,891.73,1,5,2,152,Hibernating,2.6666666666666665,Low Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+332,526,1,2270.66,3,5,4,354,Loyal Customers,4.0,High Value,Moderately Engaged,Frequent Buyer,High Spender,Low Risk
+26,412,1,927.14,4,5,2,452,New Customers,3.6666666666666665,Medium Value,Highly Engaged,Frequent Buyer,Average Spender,Low Risk
+44,1400,1,1286.83,2,5,3,253,At Risk,3.3333333333333335,Medium Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+271,277,1,2540.72,4,5,4,454,Champions,4.333333333333333,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+253,3817,1,2625.13,1,5,4,154,At Risk,3.3333333333333335,Medium Value,Low Engagement,Frequent Buyer,High Spender,High Risk
+329,663,1,2465.75,3,5,4,354,Loyal Customers,4.0,High Value,Moderately Engaged,Frequent Buyer,High Spender,Low Risk
+223,297,3,2460.16,4,5,4,454,Champions,4.333333333333333,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+409,83,1,3077.45,5,5,5,555,Champions,5.0,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+91,453,1,1126.05,3,5,2,352,Others,3.3333333333333335,Medium Value,Moderately Engaged,Frequent Buyer,Average Spender,Low Risk
+333,77,1,4710.52,5,5,5,555,Champions,5.0,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+209,2470,1,1036.63,1,5,2,152,Hibernating,2.6666666666666665,Low Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+128,63,1,1609.58,5,5,3,553,Loyal Customers,4.333333333333333,High Value,Highly Engaged,Frequent Buyer,Average Spender,Low Risk
+93,408,1,2835.46,4,5,4,454,Champions,4.333333333333333,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+476,402,1,3986.18,4,5,5,455,Champions,4.666666666666667,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+367,113,1,2325.32,5,5,4,554,Champions,4.666666666666667,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+224,1040,1,3045.51,2,5,4,254,At Risk,3.6666666666666665,Medium Value,Low Engagement,Frequent Buyer,High Spender,High Risk
+355,352,1,228.33,4,5,1,451,New Customers,3.3333333333333335,Medium Value,Highly Engaged,Frequent Buyer,Low Spender,Low Risk
+185,449,1,2605.78,3,5,4,354,Loyal Customers,4.0,High Value,Moderately Engaged,Frequent Buyer,High Spender,Low Risk
+291,1576,1,538.49,1,5,2,152,Hibernating,2.6666666666666665,Low Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+206,473,1,3390.17,3,5,5,355,Loyal Customers,4.333333333333333,High Value,Moderately Engaged,Frequent Buyer,High Spender,Low Risk
+16,2397,1,1371.15,1,5,3,153,At Risk,3.0,Medium Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+169,1057,1,1285.72,2,5,3,253,At Risk,3.3333333333333335,Medium Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+283,432,1,3736.11,4,5,5,455,Champions,4.666666666666667,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+295,2618,1,4986.41,1,5,5,155,At Risk,3.6666666666666665,Medium Value,Low Engagement,Frequent Buyer,High Spender,High Risk
+339,1033,1,506.77,2,5,1,251,Others,2.6666666666666665,Low Value,Low Engagement,Frequent Buyer,Low Spender,Low Risk
+54,1459,1,153.68,2,5,1,251,Others,2.6666666666666665,Low Value,Low Engagement,Frequent Buyer,Low Spender,Low Risk
+491,1824,1,2166.71,1,5,3,153,At Risk,3.0,Medium Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+235,434,1,426.61,4,5,1,451,New Customers,3.3333333333333335,Medium Value,Highly Engaged,Frequent Buyer,Low Spender,Low Risk
+452,475,1,703.85,3,5,2,352,Others,3.3333333333333335,Medium Value,Moderately Engaged,Frequent Buyer,Average Spender,Low Risk
+299,49,2,3660.81,5,5,5,555,Champions,5.0,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+257,1433,2,2173.7,2,5,3,253,At Risk,3.3333333333333335,Medium Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+117,67,1,927.13,5,5,2,552,New Customers,4.0,High Value,Highly Engaged,Frequent Buyer,Average Spender,Low Risk
+64,2671,1,462.32,1,5,1,151,Others,2.3333333333333335,Low Value,Low Engagement,Frequent Buyer,Low Spender,Low Risk
+41,864,1,2986.92,2,5,4,254,At Risk,3.6666666666666665,Medium Value,Low Engagement,Frequent Buyer,High Spender,High Risk
+347,939,1,1443.14,2,5,3,253,At Risk,3.3333333333333335,Medium Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+447,481,1,4541.21,3,5,5,355,Loyal Customers,4.333333333333333,High Value,Moderately Engaged,Frequent Buyer,High Spender,Low Risk
+269,474,1,865.75,3,5,2,352,Others,3.3333333333333335,Medium Value,Moderately Engaged,Frequent Buyer,Average Spender,Low Risk
+127,356,1,773.12,4,5,2,452,New Customers,3.6666666666666665,Medium Value,Highly Engaged,Frequent Buyer,Average Spender,Low Risk
+374,1102,1,507.27,2,5,1,251,Others,2.6666666666666665,Low Value,Low Engagement,Frequent Buyer,Low Spender,Low Risk
+286,2243,1,149.72,1,5,1,151,Others,2.3333333333333335,Low Value,Low Engagement,Frequent Buyer,Low Spender,Low Risk
+175,2219,1,1134.98,1,5,2,152,Hibernating,2.6666666666666665,Low Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+326,1269,1,1435.18,2,5,3,253,At Risk,3.3333333333333335,Medium Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+114,1434,1,3076.29,2,5,4,254,At Risk,3.6666666666666665,Medium Value,Low Engagement,Frequent Buyer,High Spender,High Risk
+39,1030,1,530.35,2,5,2,252,Others,3.0,Medium Value,Low Engagement,Frequent Buyer,Average Spender,Low Risk
+49,61,1,517.33,5,5,1,551,New Customers,3.6666666666666665,Medium Value,Highly Engaged,Frequent Buyer,Low Spender,Low Risk
+7,221,1,2098.39,4,5,3,453,Loyal Customers,4.0,High Value,Highly Engaged,Frequent Buyer,Average Spender,Low Risk
+136,113,1,205.71,5,5,1,551,New Customers,3.6666666666666665,Medium Value,Highly Engaged,Frequent Buyer,Low Spender,Low Risk
+247,1718,1,3321.87,1,5,5,155,At Risk,3.6666666666666665,Medium Value,Low Engagement,Frequent Buyer,High Spender,High Risk
+443,518,1,229.82,3,5,1,351,Others,3.0,Medium Value,Moderately Engaged,Frequent Buyer,Low Spender,Low Risk
+428,1118,1,823.07,2,5,2,252,Others,3.0,Medium Value,Low Engagement,Frequent Buyer,Average Spender,Low Risk
+194,398,1,3357.81,4,5,5,455,Champions,4.666666666666667,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+448,1924,1,867.48,1,5,2,152,Hibernating,2.6666666666666665,Low Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+129,1344,1,813.36,2,5,2,252,Others,3.0,Medium Value,Low Engagement,Frequent Buyer,Average Spender,Low Risk
+389,578,2,1557.07,3,5,3,353,Loyal Customers,3.6666666666666665,Medium Value,Moderately Engaged,Frequent Buyer,Average Spender,Low Risk
+63,1604,1,1097.44,1,5,2,152,Hibernating,2.6666666666666665,Low Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+77,581,1,3235.67,3,5,5,355,Loyal Customers,4.333333333333333,High Value,Moderately Engaged,Frequent Buyer,High Spender,Low Risk
+82,45,1,3277.97,5,5,5,555,Champions,5.0,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+181,1945,1,213.89,1,5,1,151,Others,2.3333333333333335,Low Value,Low Engagement,Frequent Buyer,Low Spender,Low Risk
+167,1287,1,1872.61,2,5,3,253,At Risk,3.3333333333333335,Medium Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+240,1144,1,1635.94,2,5,3,253,At Risk,3.3333333333333335,Medium Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+73,95,1,171.77,5,5,1,551,New Customers,3.6666666666666665,Medium Value,Highly Engaged,Frequent Buyer,Low Spender,Low Risk
+113,472,1,3459.76,3,5,5,355,Loyal Customers,4.333333333333333,High Value,Moderately Engaged,Frequent Buyer,High Spender,Low Risk
+408,47,1,3999.05,5,5,5,555,Champions,5.0,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+125,359,1,3503.05,4,5,5,455,Champions,4.666666666666667,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+351,106,1,330.63,5,5,1,551,New Customers,3.6666666666666665,Medium Value,Highly Engaged,Frequent Buyer,Low Spender,Low Risk
+492,1370,1,2905.32,2,5,4,254,At Risk,3.6666666666666665,Medium Value,Low Engagement,Frequent Buyer,High Spender,High Risk
+338,754,1,353.59,3,5,1,351,Others,3.0,Medium Value,Moderately Engaged,Frequent Buyer,Low Spender,Low Risk
+345,815,1,738.02,2,5,2,252,Others,3.0,Medium Value,Low Engagement,Frequent Buyer,Average Spender,Low Risk
+60,1518,2,3735.13,1,5,5,155,At Risk,3.6666666666666665,Medium Value,Low Engagement,Frequent Buyer,High Spender,High Risk
+457,628,2,2574.5699999999997,3,5,4,354,Loyal Customers,4.0,High Value,Moderately Engaged,Frequent Buyer,High Spender,Low Risk
+488,1510,1,1770.98,1,5,3,153,At Risk,3.0,Medium Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+272,825,1,722.59,2,5,2,252,Others,3.0,Medium Value,Low Engagement,Frequent Buyer,Average Spender,Low Risk
+378,138,1,234.98,5,5,1,551,New Customers,3.6666666666666665,Medium Value,Highly Engaged,Frequent Buyer,Low Spender,Low Risk
+303,195,1,2904.73,4,5,4,454,Champions,4.333333333333333,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+354,405,1,3415.16,4,5,5,455,Champions,4.666666666666667,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+304,734,1,1344.16,3,5,3,353,Loyal Customers,3.6666666666666665,Medium Value,Moderately Engaged,Frequent Buyer,Average Spender,Low Risk
+204,434,3,3957.12,4,5,5,455,Champions,4.666666666666667,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+150,799,2,2281.79,3,5,4,354,Loyal Customers,4.0,High Value,Moderately Engaged,Frequent Buyer,High Spender,Low Risk
+369,937,1,3429.29,2,5,5,255,At Risk,4.0,High Value,Low Engagement,Frequent Buyer,High Spender,High Risk
+110,1883,1,4160.83,1,5,5,155,At Risk,3.6666666666666665,Medium Value,Low Engagement,Frequent Buyer,High Spender,High Risk
+106,409,1,1395.85,4,5,3,453,Loyal Customers,4.0,High Value,Highly Engaged,Frequent Buyer,Average Spender,Low Risk
+116,103,1,2417.13,5,5,4,554,Champions,4.666666666666667,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+317,242,1,1762.13,4,5,3,453,Loyal Customers,4.0,High Value,Highly Engaged,Frequent Buyer,Average Spender,Low Risk
+349,552,1,1045.29,3,5,2,352,Others,3.3333333333333335,Medium Value,Moderately Engaged,Frequent Buyer,Average Spender,Low Risk
+344,228,1,1219.32,4,5,3,453,Loyal Customers,4.0,High Value,Highly Engaged,Frequent Buyer,Average Spender,Low Risk
+424,185,1,430.99,5,5,1,551,New Customers,3.6666666666666665,Medium Value,Highly Engaged,Frequent Buyer,Low Spender,Low Risk
+454,1950,1,1327.04,1,5,3,153,At Risk,3.0,Medium Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+342,2844,1,1071.24,1,5,2,152,Hibernating,2.6666666666666665,Low Value,Low Engagement,Frequent Buyer,Average Spender,High Risk
+199,329,1,721.16,4,5,2,452,New Customers,3.6666666666666665,Medium Value,Highly Engaged,Frequent Buyer,Average Spender,Low Risk
+135,185,1,2795.37,5,5,4,554,Champions,4.666666666666667,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+42,138,1,2554.85,5,5,4,554,Champions,4.666666666666667,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+79,34,1,2664.32,5,5,4,554,Champions,4.666666666666667,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+2,167,2,3069.0299999999997,5,5,4,554,Champions,4.666666666666667,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+302,501,1,370.67,3,5,1,351,Others,3.0,Medium Value,Moderately Engaged,Frequent Buyer,Low Spender,Low Risk
+405,1821,1,3078.0,1,5,5,155,At Risk,3.6666666666666665,Medium Value,Low Engagement,Frequent Buyer,High Spender,High Risk
+282,99,1,2337.63,5,5,4,554,Champions,4.666666666666667,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+311,409,1,438.62,4,5,1,451,New Customers,3.3333333333333335,Medium Value,Highly Engaged,Frequent Buyer,Low Spender,Low Risk
+74,41,2,6231.42,5,5,5,555,Champions,5.0,High Value,Highly Engaged,Frequent Buyer,High Spender,Low Risk
+180,868,1,431.66,2,5,1,251,Others,2.6666666666666665,Low Value,Low Engagement,Frequent Buyer,Low Spender,Low Risk
+187,664,1,1248.83,3,5,3,353,Loyal Customers,3.6666666666666665,Medium Value,Moderately Engaged,Frequent Buyer,Average Spender,Low Risk
