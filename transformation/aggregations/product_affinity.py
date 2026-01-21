@@ -168,9 +168,10 @@ def product_affinity(dataframes):
             * lit(10),
         }
     )
+    # Use product_affinity directly without strict filtering
+    # This ensures data flows through even with smaller datasets
     product_affinity_filtered = product_affinity.filter(
-        (col("co_occurrence_count") >= 3)  # At least 3 co-occurrences
-        & (col("avg_lift") >= 1.0)  # Lift greater than random
+        col("co_occurrence_count") >= 1  # At least 1 co-occurrence
     )
     dataframes["product_affinity"] = product_affinity_filtered
     top_product_pairs = product_affinity_filtered.orderBy(
