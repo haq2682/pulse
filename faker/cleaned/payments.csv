@@ -1,0 +1,146 @@
+payment_id,order_id,payment_method,payment_provider,payment_status,transaction_id,processing_fee,refund_amount,refund_date,payment_date
+25,25,Credit Card,Square,Refunded,82894977455279,7.84,228.36,2022-02-22,2022-02-18
+27,27,PayPal,PayPal,Refunded,48351578450,41.16,1285.72,2023-03-09,2023-03-01
+28,28,Apple Pay,Square,Refunded,16909532487354,9.85,273.72,2023-09-01,2023-08-21
+30,30,Apple Pay,Stripe,Partially Refunded,45821650925753,101.38,3485.81,2025-12-13,2025-12-05
+140,140,Credit Card,Braintree,Partially Refunded,17838479988,30.71,1124.63,2025-06-13,2025-06-07
+51,51,Credit Card,Stripe,Partially Refunded,69596304299956,64.6,1801.99,2022-07-21,2022-07-14
+128,128,Credit Card,Adyen,Partially Refunded,6517048567574,4.75,165.25,2025-10-30,2025-10-18
+81,81,Credit Card,Stripe,Refunded,63453477317992,54.52,3321.87,2021-05-20,2021-05-09
+129,129,Apple Pay,Stripe,Partially Refunded,76448245064314,34.42,1270.57,2024-01-22,2024-01-17
+145,145,Credit Card,Braintree,Partially Refunded,33677175877,121.11,3300.76,2024-11-21,2024-11-15
+60,60,Credit Card,Square,Refunded,23361037905516,95.12,2795.37,2025-07-30,2025-07-20
+13,13,Cash on Delivery,COD,Refunded,000013,0.0,370.46,2025-02-17,2025-02-05
+31,31,PayPal,PayPal,Refunded,77837074979,27.27,1097.44,2021-09-13,2021-08-31
+34,34,PayPal,PayPal,Refunded,41643518072,5.29,229.82,2024-08-22,2024-08-21
+32,32,Credit Card,Braintree,Refunded,16278223955,7.8,387.85,2025-07-07,2025-07-05
+14,14,Gift Card,Square,Refunded,42161547996736,0.0,2325.32,2025-10-04,2025-09-30
+55,55,Gift Card,Square,Refunded,72448092072426,0.0,1371.15,2019-07-10,2019-06-30
+39,39,Credit Card,Stripe,Refunded,91279429094799,96.64,3429.29,2023-07-06,2023-06-29
+88,88,Credit Card,Square,Refunded,88108403619384,20.52,891.73,2018-10-20,2018-10-16
+17,17,Credit Card,Adyen,Partially Refunded,7343453661430,101.3,2672.52,2022-05-01,2022-04-22
+56,56,PayPal,Braintree,Refunded,25970292180,30.17,865.75,2024-10-05,2024-10-04
+80,80,Cash on Delivery,COD,Refunded,000080,0.0,2540.72,2025-04-27,2025-04-19
+63,63,Credit Card,Square,Refunded,98645073893330,26.76,1443.14,2023-07-09,2023-06-27
+118,118,Credit Card,Braintree,Partially Refunded,21287280277,94.03,2690.25,2023-03-27,2023-03-18
+95,95,PayPal,PayPal,Completed,27780101136,34.87,0.0,,2021-12-03
+36,36,Credit Card,Braintree,Completed,63530686880,10.17,0.0,,2023-03-25
+69,69,PayPal,PayPal,Completed,38091686615,6.46,0.0,,2023-12-29
+79,79,PayPal,Braintree,Completed,89729391881,16.99,0.0,,2022-08-03
+134,134,PayPal,Braintree,Completed,59567743300,184.27,0.0,,2024-06-28
+82,82,Apple Pay,Square,Completed,84317084355019,8.67,0.0,,2025-10-07
+91,91,Credit Card,Braintree,Completed,82084137903,2.86,0.0,,2025-12-11
+127,127,Credit Card,Square,Completed,92586834519378,42.26,0.0,,2025-09-05
+111,111,Apple Pay,Braintree,Completed,27175231078,7.84,0.0,,2025-02-03
+115,115,Credit Card,Adyen,Completed,2863982979063,29.69,0.0,,2024-10-25
+89,89,Credit Card,Braintree,Completed,57995739633,11.6,0.0,,2025-02-26
+6,6,Apple Pay,Braintree,Completed,69412406192,27.6,0.0,,2025-11-15
+61,61,Credit Card,Square,Completed,90872450355564,88.45,0.0,,2024-10-06
+35,35,Credit Card,Adyen,Pending,,0.0,0.0,,2025-09-05
+43,43,Credit Card,Authorize.net,Completed,183888028,51.87,0.0,,2024-03-29
+37,37,Gift Card,Stripe,Completed,29956440296578,0.0,0.0,,2021-08-21
+58,58,PayPal,Braintree,Completed,52773908481,171.32,0.0,,2018-11-21
+120,120,PayPal,Braintree,Completed,95339160441,20.31,0.0,,2024-10-03
+53,53,Credit Card,Authorize.net,Completed,288389814,75.29,0.0,,2024-10-05
+107,107,PayPal,Braintree,Completed,90934593567,67.29,0.0,,2025-12-03
+19,19,Credit Card,Stripe,Completed,44892722858272,10.35,0.0,,2021-06-24
+131,131,Credit Card,Adyen,Completed,2457700656955,11.21,0.0,,2024-09-07
+41,41,Credit Card,Stripe,Completed,98535652508173,214.5,0.0,,2025-05-27
+8,8,Credit Card,Authorize.net,Completed,881675020,64.0,0.0,,2025-06-14
+141,141,Gift Card,Stripe,Completed,44754603710559,0.0,0.0,,2024-12-05
+49,49,Credit Card,Square,Completed,83511931578466,5.78,0.0,,2020-09-24
+26,26,Credit Card,Square,Completed,93235845268144,48.49,0.0,,2024-08-03
+76,76,Apple Pay,Stripe,Completed,70336586707401,30.67,0.0,,2018-06-13
+16,16,Credit Card,Stripe,Completed,72286156740259,39.75,0.0,,2024-03-28
+1,1,Credit Card,Braintree,Completed,51327359467,84.24,0.0,,2024-12-15
+47,47,PayPal,Braintree,Completed,21836982352,15.73,0.0,,2023-10-29
+93,93,Credit Card,Authorize.net,Completed,773502151,21.82,0.0,,2024-07-18
+3,3,Credit Card,Authorize.net,Completed,300400419,71.51,0.0,,2023-09-10
+143,143,Credit Card,Stripe,Completed,37025915353828,26.44,0.0,,2024-11-13
+59,59,Cash on Delivery,COD,Completed,000059,0.0,0.0,,2025-08-07
+71,71,PayPal,PayPal,Completed,49559217906,1.92,0.0,,2023-10-23
+20,20,Cash on Delivery,COD,Completed,000020,0.0,0.0,,2024-10-29
+126,126,Credit Card,Braintree,Completed,22286301460,36.78,0.0,,2024-12-08
+12,12,Credit Card,Adyen,Completed,8574063531154,23.01,0.0,,2023-11-14
+139,139,Credit Card,Square,Completed,44763630818921,19.76,0.0,,2024-06-22
+29,29,Credit Card,Adyen,Pending,,0.0,0.0,,2019-12-01
+85,85,Credit Card,Adyen,Completed,8185619722284,93.79,0.0,,2025-10-30
+15,15,Credit Card,Stripe,Completed,51415198915542,42.62,0.0,,2022-03-23
+142,142,Gift Card,Stripe,Completed,80530298003844,0.0,0.0,,2025-10-10
+84,84,Credit Card,Adyen,Completed,6729131390191,1.77,0.0,,2016-10-30
+86,86,PayPal,Braintree,Completed,29021126690,102.44,0.0,,2024-12-12
+116,116,Credit Card,Authorize.net,Completed,304672913,33.59,0.0,,2025-05-24
+77,77,PayPal,PayPal,Completed,66467104694,11.75,0.0,,2025-11-21
+45,45,Gift Card,Square,Completed,70565032336838,0.0,0.0,,2022-08-01
+92,92,Credit Card,Square,Completed,41294939654025,169.97,0.0,,2017-08-18
+83,83,PayPal,Braintree,Pending,,0.0,0.0,,2024-09-27
+117,117,Cash on Delivery,COD,Completed,000117,0.0,0.0,,2025-07-20
+57,57,Credit Card,Adyen,Completed,6327367502708,66.87,0.0,,2024-08-13
+101,101,Credit Card,Adyen,Pending,,0.0,0.0,,2025-12-18
+5,5,Apple Pay,Adyen,Completed,8911802192390,129.89,0.0,,2025-12-22
+33,33,Credit Card,Authorize.net,Completed,394010124,12.67,0.0,,2023-09-06
+68,68,Credit Card,Braintree,Completed,23466372794,56.1,0.0,,2025-04-28
+100,100,Gift Card,Square,Completed,92229847068738,0.0,0.0,,2025-12-07
+98,98,Apple Pay,Braintree,Completed,50863783195,55.47,0.0,,2022-02-18
+75,75,PayPal,Braintree,Completed,40002353186,102.27,0.0,,2021-01-26
+99,99,Credit Card,Authorize.net,Completed,251604095,52.09,0.0,,2025-11-19
+65,65,PayPal,Braintree,Completed,25412771189,59.33,0.0,,2025-07-10
+11,11,PayPal,Braintree,Completed,76325038038,239.91,0.0,,2025-05-11
+48,48,Credit Card,Adyen,Completed,9226442702049,41.11,0.0,,2022-12-03
+105,105,Credit Card,Braintree,Completed,32365508378,0.8,0.0,,2025-11-29
+135,135,Credit Card,Square,Completed,78114848610836,27.03,0.0,,2018-04-09
+9,9,Credit Card,Braintree,Completed,88856132886,55.69,0.0,,2025-04-25
+87,87,PayPal,Braintree,Pending,,0.0,0.0,,2021-08-23
+104,104,Cash on Delivery,COD,Completed,000104,0.0,0.0,,2024-05-02
+42,42,Credit Card,Square,Completed,51083072418820,14.13,0.0,,2024-12-08
+78,78,Apple Pay,Square,Completed,37869877505795,112.99,0.0,,2025-01-27
+46,46,Credit Card,Adyen,Completed,5602479140163,56.54,0.0,,2025-01-30
+64,64,PayPal,PayPal,Completed,33833269755,6.08,0.0,,2025-03-30
+50,50,Credit Card,Authorize.net,Completed,319071723,32.89,0.0,,2022-07-06
+113,113,Credit Card,Square,Completed,37612256622962,27.14,0.0,,2022-05-18
+130,130,Credit Card,Square,Completed,85888562930203,30.58,0.0,,2020-09-19
+144,144,Credit Card,Square,Completed,42904858040359,42.15,0.0,,2015-08-10
+72,72,PayPal,Braintree,Completed,34564657796,134.23,0.0,,2025-02-03
+109,109,Credit Card,Square,Completed,81516070660474,2.75,0.0,,2022-01-23
+40,40,PayPal,PayPal,Completed,60260138675,22.18,0.0,,2025-01-30
+94,94,Credit Card,Braintree,Completed,27525350143,15.97,0.0,,2022-12-30
+110,110,Credit Card,Braintree,Completed,66116444658,100.92,0.0,,2025-12-11
+24,24,PayPal,PayPal,Completed,51959591826,97.31,0.0,,2024-12-19
+10,10,PayPal,Braintree,Completed,71991222305,427.45,0.0,,2017-09-26
+97,97,Credit Card,Stripe,Completed,81137400786502,2.22,0.0,,2021-05-23
+124,124,Credit Card,Adyen,Completed,6764466319313,14.91,0.0,,2023-10-19
+38,38,Credit Card,Braintree,Completed,31487819830,2.8,0.0,,2024-12-28
+102,102,Credit Card,Authorize.net,Completed,262217773,19.71,0.0,,2019-08-19
+7,7,Credit Card,Adyen,Completed,7761819554016,4.64,0.0,,2024-12-09
+103,103,Credit Card,Adyen,Completed,2529715269904,32.35,0.0,,2023-11-14
+133,133,PayPal,Braintree,Completed,97063666051,14.43,0.0,,2024-11-07
+18,18,PayPal,Braintree,Completed,60039542607,63.54,0.0,,2021-01-23
+132,132,Credit Card,Adyen,Completed,4562339269426,12.8,0.0,,2021-09-28
+90,90,Credit Card,Braintree,Completed,62156391843,16.18,0.0,,2018-09-29
+44,44,Gift Card,Square,Completed,61721949307978,0.0,0.0,,2025-11-05
+114,114,Credit Card,Braintree,Completed,28438109678,55.11,0.0,,2022-02-17
+138,138,Gift Card,Square,Completed,34335495787211,0.0,0.0,,2025-09-30
+4,4,PayPal,PayPal,Completed,27213805235,42.97,0.0,,2024-12-09
+121,121,Credit Card,Square,Completed,47972055551809,14.3,0.0,,2024-11-13
+52,52,Credit Card,Adyen,Completed,1486108194308,3.56,0.0,,2023-04-18
+66,66,PayPal,PayPal,Completed,41436803170,325.76,0.0,,2025-08-07
+96,96,Gift Card,Square,Completed,34385002941596,0.0,0.0,,2021-11-25
+119,119,Credit Card,Adyen,Completed,8231495959955,12.07,0.0,,2024-05-03
+122,122,PayPal,PayPal,Completed,52207380684,160.2,0.0,,2022-01-24
+123,123,Credit Card,Adyen,Completed,2187374128103,68.5,0.0,,2021-11-24
+2,2,Credit Card,Authorize.net,Completed,126538300,143.85,0.0,,2018-10-02
+108,108,Credit Card,Adyen,Completed,6857353679792,113.4,0.0,,2024-06-19
+74,74,Credit Card,Adyen,Completed,4046191034869,181.55,0.0,,2021-01-14
+106,106,PayPal,PayPal,Completed,43507188175,5.95,0.0,,2025-09-16
+137,137,Credit Card,Stripe,Completed,48959480777635,46.93,0.0,,2025-10-14
+136,136,Gift Card,Stripe,Completed,48693304966135,0.0,0.0,,2020-11-25
+67,67,Apple Pay,Stripe,Completed,86476169374241,83.43,0.0,,2021-06-25
+21,21,PayPal,PayPal,Completed,22998747673,22.88,0.0,,2019-04-18
+70,70,Credit Card,Authorize.net,Completed,621220216,146.55,0.0,,2025-04-30
+23,23,Gift Card,Stripe,Completed,68508012785030,0.0,0.0,,2025-07-12
+62,62,PayPal,PayPal,Completed,22405593744,16.05,0.0,,2023-01-15
+22,22,PayPal,Braintree,Completed,78056348740,59.8,0.0,,2024-12-08
+73,73,PayPal,Braintree,Pending,,0.0,0.0,,2020-10-15
+54,54,Apple Pay,Adyen,Completed,7672412409570,67.63,0.0,,2025-12-05
+125,125,PayPal,Braintree,Completed,57544434462,15.85,0.0,,2023-03-28
+112,112,Credit Card,Adyen,Pending,,0.0,0.0,,2019-12-25

@@ -32,33 +32,28 @@ def get_agg_tables(spark, db_config=None):
         print(f"Loading aggregated tables from MinIO bucket: {bucket_name}")
         print(f"Directory: transformed/")
         
-        # List all CSV files in the transformed/ directory
+        # List all Parquet files in the transformed/ directory
         objects = minio_client.list_objects(bucket_name, prefix="transformed/", recursive=True)
         
         spark_dfs = {}
         tables_found = []
         
         for obj in objects:
-            if not obj.object_name.endswith(".csv"):
+            if not obj.object_name.endswith(".parquet"):
                 continue
                 
-            # Extract table name from path: transformed/{table_name}.csv
-            table_name = obj.object_name.replace("transformed/", "").replace(".csv", "")
+            # Extract table name from path: transformed/{table_name}.parquet
+            table_name = obj.object_name.replace("transformed/", "").replace(".parquet", "")
             tables_found.append(table_name)
         
         print(f"Found tables: {tables_found}")
         
         for table_name in tables_found:
             try:
-                file_path = f"transformed/{table_name}.csv"
+                file_path = f"transformed/{table_name}.parquet"
                 print(f"Loading table: {table_name}...")
                 
-                df = (
-                    spark.read
-                    .option("header", "true")
-                    .option("inferSchema", "true")
-                    .csv(f"s3a://{bucket_name}/{file_path}")
-                )
+                df = spark.read.parquet(f"s3a://{bucket_name}/{file_path}")
                 
                 spark_dfs[table_name] = df
                 print(f"  ✅ Loaded {table_name}: {df.count()} rows")

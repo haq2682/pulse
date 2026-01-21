@@ -60,7 +60,6 @@ def main():
     rfm_segmentation(dataframes)
     product_affinity(dataframes)
     global_aggregations(spark, dataframes)
-    
     if "order_items" in dataframes and dataframes["order_items"] is not None:
         dataframes["order_items"] = dataframes["order_items"].dropDuplicates(
             ["order_item_id"]
@@ -68,19 +67,7 @@ def main():
 
     if "payments" in dataframes and dataframes["payments"] is not None:
         dataframes["payments"] = dataframes["payments"].dropDuplicates(["payment_id"])
-    
-    # Path to SQL schema file - adjust based on your project structure
-    sql_schema_path = "/app/sql/agg_schema.sql"
-    
-    # Export as Parquet with schema enforcement and type preservation
-    export_to_minio(
-        dataframes, 
-        sql_schema_path=sql_schema_path,
-        enforce_schemas=True,          # Add missing columns as NULL
-        preserve_types=True,            # Cast to correct data types
-        compression='snappy'            # Options: snappy, gzip, lz4, zstd, none
-    )
-    
+    export_to_minio(dataframes)
     spark.stop()
 
 

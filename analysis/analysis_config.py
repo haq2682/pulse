@@ -28,12 +28,6 @@ MINIO_CONFIG = {
     "secret_key": os.getenv("MINIO_SECRET_KEY"),
 }
 
-MINIO_CONFIG = {
-    "endpoint": os.getenv("MINIO_ENDPOINT"),
-    "access_key": os.getenv("MINIO_ACCESS_KEY"),
-    "secret_key": os.getenv("MINIO_SECRET_KEY"),
-}
-
 def create_spark_session(app_name="Analysis"):
     spark = (
         SparkSession.builder.appName(app_name)

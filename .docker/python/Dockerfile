@@ -36,6 +36,7 @@ RUN python3 -m ensurepip && \
 RUN python3 -m spacy download en_core_web_md
 
 # Copy scripts
+COPY ./sql /app/sql
 COPY ./bash /app/bash
 COPY ./mapping /app/mapping
 COPY ./cleaning /app/cleaning

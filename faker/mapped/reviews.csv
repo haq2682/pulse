@@ -1,0 +1,1001 @@
+review_id,product_id,customer_id,rating,review_title,review_desc,review_date
+1,449,280,4,Nice product,Happy with this purchase. It works well and the quality is good for the price.,2017-10-18T10:27:55Z
+2,431,16,4,Nice product,Happy with this purchase. It works well and the quality is good for the price.,2024-08-17T00:00:00Z
+3,246,476,4,Good quality,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-02-19T15:11:51Z
+4,486,427,4,Nice product,Happy with this purchase. It works well and the quality is good for the price.,2025-05-16T00:00:00Z
+5,157,485,5,Outstanding!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-11-24T00:00:00Z
+6,484,344,5,Worth every penny,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-10-15T00:00:00Z
+7,189,200,5,Exceeded expectations,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-08-03T14:59:22Z
+8,293,187,5,Couldn't be happier,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-05-27T14:33:36Z
+9,48,282,4,Very satisfied,Good value for money. Does what I needed it to do. Would consider buying again.,2025-12-04T20:49:43Z
+10,289,430,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-08-29T00:00:00Z
+11,233,349,4,Great product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-08-19T18:30:28Z
+12,280,12,3,Average product,It works but I expected a bit more based on the description. Okay overall.,2018-01-26T14:08:46Z
+13,494,116,5,Worth every penny,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-10-27T15:55:17Z
+14,36,151,5,Outstanding!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-04-07T00:00:00Z
+15,278,436,4,Good quality,Good value for money. Does what I needed it to do. Would consider buying again.,2025-04-23T00:00:00Z
+16,110,345,2,Could be better,Disappointed with this purchase. The quality is not as good as advertised.,2024-01-31T00:00:00Z
+17,189,200,4,Very satisfied,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-08-30T14:59:22Z
+18,92,200,4,Would buy again,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-07-19T14:59:22Z
+19,349,280,4,Very satisfied,Happy with this purchase. It works well and the quality is good for the price.,2017-10-12T10:27:55Z
+20,497,452,4,Nice product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-02-20T17:44:16Z
+21,92,200,4,Nice product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-08-18T14:59:22Z
+22,188,211,5,Perfect!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-02-11T00:00:00Z
+23,45,291,3,It's okay,Decent product for the price point. Some features could be improved.,2021-12-16T11:36:02Z
+24,248,105,5,Highly recommend!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-02-13T08:50:29Z
+25,219,150,3,Does the job,Middle of the road product. Not bad but not great either. Fair value.,2023-12-04T07:29:49Z
+26,73,427,5,Highly recommend!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-11-28T00:00:00Z
+27,148,77,5,Worth every penny,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-10-12T02:32:24Z
+28,404,372,4,Solid choice,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-10-13T00:00:00Z
+29,387,52,5,Exceeded expectations,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-05-14T00:00:00Z
+30,410,2,5,Highly recommend!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-04-04T00:00:00Z
+31,395,206,5,Exceeded expectations,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-12-11T08:48:26Z
+32,422,272,3,Decent quality,Decent product for the price point. Some features could be improved.,2024-05-11T00:00:00Z
+33,53,206,3,Does the job,It works but I expected a bit more based on the description. Okay overall.,2025-02-25T08:48:26Z
+34,12,162,4,Nice product,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-02-27T01:46:13Z
+35,154,61,2,Not great,Had issues right out of the box. Quality control seems lacking.,2025-05-21T00:00:00Z
+36,13,251,4,Happy with purchase,Nice quality and works as expected. Customer service was helpful when I had questions.,2021-08-05T21:17:34Z
+37,118,65,5,Couldn't be happier,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-10-14T00:00:00Z
+38,48,282,4,Nice product,Good value for money. Does what I needed it to do. Would consider buying again.,2025-11-02T20:49:43Z
+39,341,94,5,Perfect!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-03-01T00:00:00Z
+40,9,89,4,Nice product,Happy with this purchase. It works well and the quality is good for the price.,2025-01-31T21:13:27Z
+41,361,321,5,Five stars deserved,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2023-12-31T00:00:00Z
+42,252,55,5,Love it!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-05-16T00:00:00Z
+43,100,157,5,Perfect!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-09-28T00:00:00Z
+44,423,105,3,Meets expectations,It works but I expected a bit more based on the description. Okay overall.,2025-01-27T08:50:29Z
+45,435,415,3,Nothing special,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-05-14T00:00:00Z
+46,463,452,4,Happy with purchase,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-12-25T17:44:16Z
+47,415,263,5,Best purchase ever,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-08-23T00:00:00Z
+48,12,162,5,Excellent product!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-05-06T01:46:13Z
+49,303,296,5,Best purchase ever,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-09-01T23:07:26Z
+50,107,90,4,Recommended,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-07-01T00:00:00Z
+51,160,457,5,Outstanding!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-09-21T00:00:00Z
+52,187,218,4,Good quality,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-05-30T00:00:00Z
+53,72,299,3,Fair value,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-12-24T07:09:37Z
+54,200,354,5,Love it!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-03-09T20:30:35Z
+55,70,53,2,Disappointed,Not worth the price. There are better options available for less money.,2024-01-20T00:00:00Z
+56,492,403,4,Happy with purchase,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-09-13T00:00:00Z
+57,297,68,4,Solid choice,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-04-11T00:00:00Z
+58,500,396,3,Fair value,Middle of the road product. Not bad but not great either. Fair value.,2024-05-25T00:00:00Z
+59,78,268,5,Five stars deserved,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-04-15T00:00:00Z
+60,471,91,4,Nice product,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-04-27T18:27:07Z
+61,241,243,5,Five stars deserved,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2019-01-01T12:59:40Z
+62,97,204,2,Not worth it,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2025-03-16T11:36:43Z
+63,104,116,5,Worth every penny,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-11-13T15:55:17Z
+64,340,162,4,Nice product,Happy with this purchase. It works well and the quality is good for the price.,2025-04-05T01:46:13Z
+65,473,282,4,Nice product,Happy with this purchase. It works well and the quality is good for the price.,2025-11-17T20:49:43Z
+66,229,204,4,Recommended,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2018-07-17T16:16:51Z
+67,248,200,2,Underwhelming,Product arrived damaged and customer service was slow to respond. Not happy.,2024-11-18T14:59:22Z
+68,9,89,2,Below expectations,Disappointed with this purchase. The quality is not as good as advertised.,2024-12-11T21:13:27Z
+69,189,351,5,Outstanding!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-11-14T13:56:14Z
+70,34,125,5,Perfect!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-02-17T08:00:23Z
+71,461,15,3,Fair value,Decent product for the price point. Some features could be improved.,2025-08-22T19:37:51Z
+72,495,344,3,Decent quality,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-01-02T00:00:00Z
+73,476,159,4,Would buy again,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-07-04T00:12:00Z
+74,127,338,5,Excellent product!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-02-29T10:26:14Z
+75,288,187,5,Highly recommend!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-06-08T14:33:36Z
+76,448,77,4,Solid choice,Happy with this purchase. It works well and the quality is good for the price.,2024-01-07T00:00:00Z
+77,452,452,5,Amazing quality,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-03-24T17:44:16Z
+78,500,209,5,Couldn't be happier,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2019-05-09T15:31:56Z
+79,352,459,4,Solid choice,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-11-02T00:00:00Z
+80,244,333,1,Worst purchase,Avoid this product at all costs. It's nothing like the description or photos.,2025-12-24T01:48:09Z
+81,45,291,5,Love it!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2022-01-03T11:36:02Z
+82,246,476,5,Highly recommend!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-01-03T15:11:51Z
+83,189,200,5,Love it!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-12-27T14:59:22Z
+84,148,77,2,Not worth it,Not worth the price. There are better options available for less money.,2024-10-10T02:32:24Z
+85,475,110,4,Solid choice,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2021-03-26T01:21:26Z
+86,321,299,5,Love it!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-11-20T02:47:05Z
+87,489,54,5,Couldn't be happier,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2022-05-25T06:37:21Z
+88,361,185,5,Excellent product!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-03-17T07:10:52Z
+89,225,13,4,Happy with purchase,Happy with this purchase. It works well and the quality is good for the price.,2025-12-21T00:40:11Z
+90,310,119,1,Very disappointed,Worst purchase I've ever made. Cheaply made and doesn't work as advertised.,2025-06-07T00:00:00Z
+91,107,311,5,Outstanding!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-03-28T10:58:29Z
+92,331,98,5,Couldn't be happier,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-12-08T00:00:00Z
+93,457,366,2,Not great,Product arrived damaged and customer service was slow to respond. Not happy.,2025-03-16T00:00:00Z
+94,97,204,3,Fair value,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-03-12T11:36:43Z
+95,306,96,5,Worth every penny,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-11-09T00:00:00Z
+96,268,211,4,Solid choice,Happy with this purchase. It works well and the quality is good for the price.,2024-12-11T00:00:00Z
+97,300,223,5,Excellent product!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2021-11-09T03:10:34Z
+98,306,257,4,Happy with purchase,Happy with this purchase. It works well and the quality is good for the price.,2022-08-04T23:48:17Z
+99,188,118,3,Does the job,It works but I expected a bit more based on the description. Okay overall.,2024-06-04T00:00:00Z
+100,33,150,3,Does the job,Decent product for the price point. Some features could be improved.,2024-04-12T07:29:49Z
+101,4,42,5,Highly recommend!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-10-14T04:06:52Z
+102,257,200,3,Acceptable,Meets basic expectations but doesn't stand out. You get what you pay for.,2024-12-13T14:59:22Z
+103,338,354,4,Recommended,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-02-01T20:30:35Z
+104,91,204,3,Meets expectations,Decent product for the price point. Some features could be improved.,2018-12-15T16:16:51Z
+105,207,60,5,Excellent product!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2021-12-12T03:22:42Z
+106,423,116,4,Good quality,Happy with this purchase. It works well and the quality is good for the price.,2025-12-14T15:55:17Z
+107,148,77,5,Exceeded expectations,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-07-17T02:32:24Z
+108,19,279,5,Worth every penny,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-09-18T00:00:00Z
+109,300,280,5,Love it!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2017-12-09T10:27:55Z
+110,489,129,4,Recommended,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2022-07-22T17:32:09Z
+111,362,248,5,Five stars deserved,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-06-21T00:00:00Z
+112,149,43,5,Exceeded expectations,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-08-05T00:00:00Z
+113,394,243,2,Underwhelming,Disappointed with this purchase. The quality is not as good as advertised.,2018-11-08T12:59:40Z
+114,38,40,3,Meets expectations,It's an average product. Nothing special but it gets the job done adequately.,2025-05-04T00:00:00Z
+115,480,307,4,Great product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-10-26T01:59:48Z
+116,229,204,5,Couldn't be happier,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2018-08-21T16:16:51Z
+117,295,342,4,Happy with purchase,Really good product overall. A few minor issues but nothing major. Would recommend.,2018-05-15T09:41:23Z
+118,398,87,5,Excellent product!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-03-28T00:00:00Z
+119,251,162,4,Recommended,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-04-13T01:46:13Z
+120,349,303,5,Excellent product!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-11-21T21:21:18Z
+121,189,41,4,Nice product,Good value for money. Does what I needed it to do. Would consider buying again.,2025-10-18T00:00:00Z
+122,436,200,1,Complete waste,Do not buy! This is a scam product. I want my money back immediately.,2024-08-25T14:59:22Z
+123,175,317,4,Happy with purchase,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-08-16T06:12:07Z
+124,473,282,5,Highly recommend!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-12-18T20:49:43Z
+125,209,150,5,Highly recommend!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-04-04T07:29:49Z
+126,424,45,4,Good quality,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-09-01T00:00:00Z
+127,39,349,2,Underwhelming,Had issues right out of the box. Quality control seems lacking.,2024-08-14T18:30:28Z
+128,55,282,4,Good quality,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-08-14T00:00:00Z
+129,251,162,5,Highly recommend!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-07-15T01:46:13Z
+130,72,299,2,Would not recommend,Disappointed with this purchase. The quality is not as good as advertised.,2025-12-19T07:09:37Z
+131,104,365,2,Underwhelming,Product arrived damaged and customer service was slow to respond. Not happy.,2025-09-13T00:00:00Z
+132,475,409,3,Decent quality,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-03-27T00:00:00Z
+133,411,469,3,Decent quality,It's an average product. Nothing special but it gets the job done adequately.,2023-07-19T07:00:23Z
+134,291,308,4,Would buy again,Good value for money. Does what I needed it to do. Would consider buying again.,2025-02-16T00:00:00Z
+135,97,204,2,Would not recommend,Had issues right out of the box. Quality control seems lacking.,2025-04-15T11:36:43Z
+136,4,42,2,Poor quality,Had issues right out of the box. Quality control seems lacking.,2025-10-28T04:06:52Z
+137,436,200,4,Would buy again,Happy with this purchase. It works well and the quality is good for the price.,2024-12-29T14:59:22Z
+138,129,12,4,Happy with purchase,Really good product overall. A few minor issues but nothing major. Would recommend.,2017-10-12T14:08:46Z
+139,170,173,4,Solid choice,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-10-21T00:00:00Z
+140,375,374,3,Decent quality,It works but I expected a bit more based on the description. Okay overall.,2024-12-07T00:00:00Z
+141,229,204,5,Five stars deserved,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2018-10-25T16:16:51Z
+142,93,110,4,Solid choice,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-10-22T00:00:00Z
+143,365,37,5,Couldn't be happier,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-04-30T00:00:00Z
+144,394,115,5,Outstanding!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-02-16T03:33:47Z
+145,398,405,5,Excellent product!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-06-25T00:00:00Z
+146,392,185,4,Nice product,Happy with this purchase. It works well and the quality is good for the price.,2025-03-15T07:10:52Z
+147,284,321,5,Exceeded expectations,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-12-03T00:00:00Z
+148,293,209,5,Five stars deserved,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2019-10-16T15:31:56Z
+149,449,352,4,Solid choice,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-03-28T00:00:00Z
+150,392,185,4,Would buy again,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-02-06T07:10:52Z
+151,417,34,1,Awful quality,Complete waste of money. This product stopped working after just two days.,2024-02-25T00:00:00Z
+152,344,62,5,Highly recommend!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-12-14T00:00:00Z
+153,416,328,4,Solid choice,Good value for money. Does what I needed it to do. Would consider buying again.,2024-12-15T00:00:00Z
+154,52,204,5,Exceeded expectations,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2018-07-03T16:16:51Z
+155,489,296,5,Best purchase ever,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-06-04T23:07:26Z
+156,489,296,5,Best purchase ever,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-07-31T23:07:26Z
+157,432,91,1,Stay away,Avoid this product at all costs. It's nothing like the description or photos.,2024-12-27T18:27:07Z
+158,297,89,5,Exceeded expectations,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-08-22T21:13:27Z
+159,52,150,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-03-02T21:29:49Z
+160,104,116,5,Love it!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-11-25T15:55:17Z
+161,13,251,4,Very satisfied,Really good product overall. A few minor issues but nothing major. Would recommend.,2021-10-09T21:17:34Z
+162,463,222,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-04-11T00:00:00Z
+163,299,251,5,Love it!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2021-11-20T21:17:34Z
+164,299,251,5,Five stars deserved,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2021-07-18T21:17:34Z
+165,91,298,5,Outstanding!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2023-12-27T00:00:00Z
+166,342,409,4,Solid choice,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-11-23T11:51:32Z
+167,483,280,4,Recommended,Nice quality and works as expected. Customer service was helpful when I had questions.,2017-09-25T10:27:55Z
+168,462,269,4,Solid choice,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-03-22T00:00:00Z
+169,483,280,4,Nice product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2017-10-27T10:27:55Z
+170,72,159,4,Great product,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-11-04T00:00:00Z
+171,276,110,5,Best purchase ever,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2021-04-18T01:21:26Z
+172,158,286,4,Nice product,Happy with this purchase. It works well and the quality is good for the price.,2024-09-11T00:00:00Z
+173,175,317,5,Best purchase ever,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-08-04T06:12:07Z
+174,209,150,2,Poor quality,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2024-04-10T07:29:49Z
+175,403,278,4,Happy with purchase,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-05-02T00:00:00Z
+176,378,150,2,Not worth it,Disappointed with this purchase. The quality is not as good as advertised.,2024-03-09T21:29:49Z
+177,293,209,5,Love it!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2019-05-13T15:31:56Z
+178,182,289,4,Solid choice,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-10-02T00:00:00Z
+179,136,225,5,Worth every penny,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-12-01T00:00:00Z
+180,258,110,3,Average product,Decent product for the price point. Some features could be improved.,2024-11-29T00:00:00Z
+181,146,303,4,Would buy again,Good value for money. Does what I needed it to do. Would consider buying again.,2025-09-04T00:00:00Z
+182,102,77,4,Great product,Happy with this purchase. It works well and the quality is good for the price.,2024-08-17T02:32:24Z
+183,69,255,5,Couldn't be happier,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-01-17T00:00:00Z
+184,295,342,4,Happy with purchase,Happy with this purchase. It works well and the quality is good for the price.,2018-09-18T09:41:23Z
+185,293,209,5,Amazing quality,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2019-08-26T15:31:56Z
+186,143,179,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-10-30T00:00:00Z
+187,10,333,5,Exceeded expectations,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-12-24T01:48:09Z
+188,379,137,4,Very satisfied,Happy with this purchase. It works well and the quality is good for the price.,2024-03-13T00:00:00Z
+189,355,302,5,Perfect!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-03-06T00:00:00Z
+190,392,296,3,Fair value,Middle of the road product. Not bad but not great either. Fair value.,2025-06-11T23:07:26Z
+191,413,326,1,Do not buy,Avoid this product at all costs. It's nothing like the description or photos.,2025-08-30T00:00:00Z
+192,76,26,3,Decent quality,Decent product for the price point. Some features could be improved.,2025-05-05T20:56:10Z
+193,272,206,4,Very satisfied,Good value for money. Does what I needed it to do. Would consider buying again.,2024-12-29T08:48:26Z
+194,244,333,3,It's okay,Middle of the road product. Not bad but not great either. Fair value.,2025-12-02T01:48:09Z
+195,385,452,5,Five stars deserved,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2022-09-22T13:11:16Z
+196,257,200,2,Below expectations,Disappointed with this purchase. The quality is not as good as advertised.,2024-10-07T14:59:22Z
+197,21,223,5,Excellent product!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-11-18T00:00:00Z
+198,267,475,2,Poor quality,Disappointed with this purchase. The quality is not as good as advertised.,2025-08-14T00:00:00Z
+199,121,432,5,Outstanding!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-12-02T00:00:00Z
+200,293,209,4,Happy with purchase,Really good product overall. A few minor issues but nothing major. Would recommend.,2019-06-05T15:31:56Z
+201,227,452,5,Highly recommend!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2023-01-20T13:11:16Z
+202,489,54,4,Good quality,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2022-05-13T06:37:21Z
+203,64,282,4,Would buy again,Good value for money. Does what I needed it to do. Would consider buying again.,2025-11-27T20:49:43Z
+204,182,49,5,Couldn't be happier,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-12-22T19:58:09Z
+205,429,332,5,Exceeded expectations,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-06-29T00:00:00Z
+206,473,282,5,Worth every penny,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-11-26T20:49:43Z
+207,311,115,5,Highly recommend!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-04-09T03:33:47Z
+208,220,223,4,Happy with purchase,Good value for money. Does what I needed it to do. Would consider buying again.,2022-01-30T03:10:34Z
+209,339,187,5,Couldn't be happier,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-07-28T00:00:00Z
+210,276,198,1,Stay away,Do not buy! This is a scam product. I want my money back immediately.,2024-08-11T00:00:00Z
+211,41,207,5,Love it!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-10-09T00:00:00Z
+212,356,347,2,Not worth it,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2025-12-07T00:00:00Z
+213,241,243,5,Excellent product!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2018-12-05T12:59:40Z
+214,276,348,3,It's okay,It works but I expected a bit more based on the description. Okay overall.,2025-02-14T00:00:00Z
+215,107,277,4,Happy with purchase,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-09-13T00:00:00Z
+216,366,243,5,Five stars deserved,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-03-03T00:00:00Z
+217,91,187,4,Solid choice,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-07-10T14:33:36Z
+218,188,162,4,Recommended,Happy with this purchase. It works well and the quality is good for the price.,2025-05-17T01:46:13Z
+219,306,273,3,Acceptable,Decent product for the price point. Some features could be improved.,2024-05-29T00:00:00Z
+220,496,299,2,Could be better,Product arrived damaged and customer service was slow to respond. Not happy.,2025-12-15T07:09:37Z
+221,277,180,4,Recommended,Good value for money. Does what I needed it to do. Would consider buying again.,2024-01-16T14:41:57Z
+222,259,296,4,Would buy again,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-10-05T23:07:26Z
+223,442,278,3,Fair value,It's an average product. Nothing special but it gets the job done adequately.,2025-10-20T00:00:00Z
+224,82,15,4,Solid choice,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-08-03T19:37:51Z
+225,196,26,3,Meets expectations,It's an average product. Nothing special but it gets the job done adequately.,2025-03-04T20:56:10Z
+226,41,428,5,Worth every penny,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2023-06-24T17:25:23Z
+227,451,270,1,Very disappointed,Avoid this product at all costs. It's nothing like the description or photos.,2024-05-19T00:00:00Z
+228,303,296,1,Very disappointed,Avoid this product at all costs. It's nothing like the description or photos.,2025-06-20T23:07:26Z
+229,30,75,3,It's okay,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-06-21T00:00:00Z
+230,118,253,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2015-10-05T22:03:48Z
+231,90,251,5,Highly recommend!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-04-28T00:00:00Z
+232,227,452,2,Not great,Had issues right out of the box. Quality control seems lacking.,2022-11-18T13:11:16Z
+233,327,125,3,Average product,It's an average product. Nothing special but it gets the job done adequately.,2025-04-12T08:00:23Z
+234,495,457,4,Would buy again,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-06-30T20:41:30Z
+235,397,122,3,Average product,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-10-04T00:00:00Z
+236,299,235,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-03-15T11:22:46Z
+237,91,204,4,Nice product,Really good product overall. A few minor issues but nothing major. Would recommend.,2018-07-09T16:16:51Z
+238,458,405,4,Nice product,Good value for money. Does what I needed it to do. Would consider buying again.,2024-08-13T00:00:00Z
+239,186,176,3,It's okay,Middle of the road product. Not bad but not great either. Fair value.,2024-04-18T00:00:00Z
+240,480,307,2,Disappointed,Not worth the price. There are better options available for less money.,2025-08-01T01:59:48Z
+241,104,166,4,Nice product,Nice quality and works as expected. Customer service was helpful when I had questions.,2017-01-11T00:44:18Z
+242,45,2,5,Worth every penny,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-11-11T00:49:29Z
+243,51,180,2,Below expectations,Disappointed with this purchase. The quality is not as good as advertised.,2023-10-24T14:41:57Z
+244,290,450,4,Solid choice,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-10-07T00:00:00Z
+245,64,82,3,Acceptable,It works but I expected a bit more based on the description. Okay overall.,2025-12-17T02:38:34Z
+246,102,77,5,Highly recommend!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-08-13T02:32:24Z
+247,238,282,4,Nice product,Happy with this purchase. It works well and the quality is good for the price.,2025-10-19T00:00:00Z
+248,142,323,4,Solid choice,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-11-10T00:00:00Z
+249,52,150,3,Does the job,It's an average product. Nothing special but it gets the job done adequately.,2023-12-09T21:29:49Z
+250,20,223,4,Great product,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-07-21T00:00:00Z
+251,259,91,4,Good quality,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-11-08T18:27:07Z
+252,260,240,3,Acceptable,Middle of the road product. Not bad but not great either. Fair value.,2025-10-23T00:00:00Z
+253,346,129,5,Exceeded expectations,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2022-07-17T17:32:09Z
+254,220,223,4,Recommended,Nice quality and works as expected. Customer service was helpful when I had questions.,2021-10-06T03:10:34Z
+255,251,167,5,Couldn't be happier,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-02-17T00:00:00Z
+256,227,452,3,Nothing special,Decent product for the price point. Some features could be improved.,2022-10-26T13:11:16Z
+257,104,116,3,Average product,It's an average product. Nothing special but it gets the job done adequately.,2025-11-03T15:55:17Z
+258,45,257,4,Very satisfied,Really good product overall. A few minor issues but nothing major. Would recommend.,2022-03-07T23:48:17Z
+259,237,303,4,Very satisfied,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-12-03T21:21:18Z
+260,432,92,5,Love it!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-09-24T00:00:00Z
+261,259,55,4,Would buy again,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-02-11T00:00:00Z
+262,210,79,4,Good quality,Happy with this purchase. It works well and the quality is good for the price.,2025-12-18T00:00:00Z
+263,252,115,5,Perfect!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-01-16T03:33:47Z
+264,1,371,4,Very satisfied,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-05-26T00:00:00Z
+265,436,200,4,Would buy again,Happy with this purchase. It works well and the quality is good for the price.,2024-10-01T14:59:22Z
+266,395,317,3,Decent quality,It works but I expected a bit more based on the description. Okay overall.,2025-08-08T00:00:00Z
+267,250,413,5,Excellent product!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-09-09T00:00:00Z
+268,198,345,3,Fair value,It's an average product. Nothing special but it gets the job done adequately.,2024-03-05T08:28:49Z
+269,471,171,4,Would buy again,Happy with this purchase. It works well and the quality is good for the price.,2025-10-26T00:00:00Z
+270,153,257,3,Acceptable,It's an average product. Nothing special but it gets the job done adequately.,2022-03-26T23:48:17Z
+271,29,345,5,Outstanding!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-02-18T08:28:49Z
+272,276,110,2,Would not recommend,Not worth the price. There are better options available for less money.,2021-03-13T01:21:26Z
+273,273,98,4,Very satisfied,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-05-21T00:00:00Z
+274,334,60,5,Perfect!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2022-01-24T08:25:00Z
+275,392,185,4,Great product,Good value for money. Does what I needed it to do. Would consider buying again.,2024-12-21T07:10:52Z
+276,423,105,4,Would buy again,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-04-05T08:50:29Z
+277,64,82,5,Couldn't be happier,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-12-20T02:38:34Z
+278,204,175,3,Nothing special,It's an average product. Nothing special but it gets the job done adequately.,2025-08-14T00:00:00Z
+279,249,150,5,Exceeded expectations,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-04-26T21:29:49Z
+280,351,167,5,Love it!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-02-13T00:00:00Z
+281,127,338,4,Recommended,Happy with this purchase. It works well and the quality is good for the price.,2024-02-11T10:26:14Z
+282,182,49,3,Average product,It's an average product. Nothing special but it gets the job done adequately.,2025-12-21T19:58:09Z
+283,395,206,2,Would not recommend,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2024-12-30T08:48:26Z
+284,148,77,3,Does the job,Decent product for the price point. Some features could be improved.,2024-11-26T02:32:24Z
+285,34,125,4,Good quality,Happy with this purchase. It works well and the quality is good for the price.,2025-02-06T08:00:23Z
+286,378,150,5,Amazing quality,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-12-05T00:00:00Z
+287,443,206,1,Complete waste,Avoid this product at all costs. It's nothing like the description or photos.,2022-12-19T09:10:46Z
+288,161,431,4,Would buy again,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-02-07T00:00:00Z
+289,104,166,4,Would buy again,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2017-01-14T00:44:18Z
+290,307,450,5,Exceeded expectations,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-07-08T00:00:00Z
+291,252,115,4,Solid choice,Happy with this purchase. It works well and the quality is good for the price.,2025-03-20T03:33:47Z
+292,311,237,5,Love it!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-08-16T00:00:00Z
+293,389,281,4,Solid choice,Happy with this purchase. It works well and the quality is good for the price.,2024-03-20T00:00:00Z
+294,464,162,4,Nice product,Good value for money. Does what I needed it to do. Would consider buying again.,2025-05-25T01:46:13Z
+295,295,342,4,Good quality,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2018-05-02T09:41:23Z
+296,40,2,4,Great product,Happy with this purchase. It works well and the quality is good for the price.,2025-11-26T00:49:29Z
+297,385,452,5,Five stars deserved,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2022-09-02T13:11:16Z
+298,117,396,5,Love it!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-09-06T00:00:00Z
+299,89,82,1,Worst purchase,Do not buy! This is a scam product. I want my money back immediately.,2025-12-21T02:38:34Z
+300,120,200,5,Worth every penny,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-08-07T14:59:22Z
+301,20,163,3,Acceptable,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-01-16T00:00:00Z
+302,413,419,5,Excellent product!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-07-24T00:00:00Z
+303,256,469,5,Perfect!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-02-03T00:00:00Z
+304,4,42,5,Excellent product!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-10-26T04:06:52Z
+305,190,111,4,Happy with purchase,Happy with this purchase. It works well and the quality is good for the price.,2024-11-24T00:00:00Z
+306,471,310,2,Underwhelming,Had issues right out of the box. Quality control seems lacking.,2025-04-30T00:00:00Z
+307,129,77,2,Underwhelming,Had issues right out of the box. Quality control seems lacking.,2024-11-29T02:32:24Z
+308,156,52,5,Five stars deserved,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-08-08T00:00:00Z
+309,91,204,2,Would not recommend,Had issues right out of the box. Quality control seems lacking.,2018-08-03T16:16:51Z
+310,130,457,2,Not great,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2024-10-26T20:41:30Z
+311,10,333,5,Outstanding!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-12-15T01:48:09Z
+312,386,154,2,Not worth it,Not worth the price. There are better options available for less money.,2024-06-20T00:00:00Z
+313,110,243,5,Exceeded expectations,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-10-27T00:00:00Z
+314,259,91,2,Could be better,Product arrived damaged and customer service was slow to respond. Not happy.,2024-11-27T18:27:07Z
+315,244,333,3,Meets expectations,Middle of the road product. Not bad but not great either. Fair value.,2025-11-16T01:48:09Z
+316,157,180,4,Solid choice,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-08-13T00:00:00Z
+317,209,150,5,Amazing quality,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2023-12-22T07:29:49Z
+318,51,180,5,Best purchase ever,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2023-10-19T14:41:57Z
+319,340,162,4,Good quality,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-02-23T01:46:13Z
+320,349,280,5,Exceeded expectations,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2018-01-13T10:27:55Z
+321,280,12,5,Highly recommend!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2018-03-31T14:08:46Z
+322,143,7,3,Meets expectations,It works but I expected a bit more based on the description. Okay overall.,2025-11-23T14:03:35Z
+323,87,372,4,Solid choice,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-09-22T00:00:00Z
+324,97,110,5,Exceeded expectations,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-07-01T00:00:00Z
+325,337,417,4,Great product,Good value for money. Does what I needed it to do. Would consider buying again.,2024-09-13T00:00:00Z
+326,84,105,3,Acceptable,It's an average product. Nothing special but it gets the job done adequately.,2024-12-29T08:50:29Z
+327,180,276,4,Recommended,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-05-17T00:00:00Z
+328,344,148,2,Not worth it,Not worth the price. There are better options available for less money.,2024-04-05T00:00:00Z
+329,327,38,4,Happy with purchase,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-10-17T00:00:00Z
+330,381,475,5,Five stars deserved,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-02-24T00:00:00Z
+331,189,351,4,Nice product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-12-09T13:56:14Z
+332,251,436,4,Would buy again,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-12-11T00:00:00Z
+333,51,235,5,Excellent product!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-09-12T00:00:00Z
+334,244,333,3,Meets expectations,It's an average product. Nothing special but it gets the job done adequately.,2025-11-12T01:48:09Z
+335,127,338,2,Underwhelming,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2024-06-03T10:26:14Z
+336,489,296,4,Nice product,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-09-16T23:07:26Z
+337,282,224,4,Good quality,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-06-29T00:00:00Z
+338,330,280,5,Outstanding!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2017-12-26T10:27:55Z
+339,135,128,2,Could be better,Product arrived damaged and customer service was slow to respond. Not happy.,2025-02-17T00:00:00Z
+340,96,185,4,Very satisfied,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-11-09T07:10:52Z
+341,259,296,5,Excellent product!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-08-12T23:07:26Z
+342,424,296,5,Amazing quality,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-06-22T23:07:26Z
+343,476,82,5,Worth every penny,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-12-18T02:38:34Z
+344,130,339,4,Very satisfied,Happy with this purchase. It works well and the quality is good for the price.,2025-03-05T00:00:00Z
+345,454,36,4,Recommended,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-04-27T00:00:00Z
+346,294,95,4,Recommended,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-05-26T00:00:00Z
+347,91,392,4,Solid choice,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-12-09T00:00:00Z
+348,362,309,3,Acceptable,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-11-27T00:00:00Z
+349,297,89,4,Would buy again,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-11-06T21:13:27Z
+350,38,468,1,Stay away,Worst purchase I've ever made. Cheaply made and doesn't work as advertised.,2024-02-15T00:00:00Z
+351,162,29,5,Outstanding!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-12-14T00:00:00Z
+352,126,204,4,Solid choice,Nice quality and works as expected. Customer service was helpful when I had questions.,2019-11-29T20:41:08Z
+353,118,56,2,Underwhelming,Had issues right out of the box. Quality control seems lacking.,2024-10-12T00:00:00Z
+354,399,130,3,It's okay,Decent product for the price point. Some features could be improved.,2024-01-12T00:00:00Z
+355,243,247,4,Good quality,Good value for money. Does what I needed it to do. Would consider buying again.,2024-05-05T00:00:00Z
+356,118,253,4,Good quality,Really good product overall. A few minor issues but nothing major. Would recommend.,2015-11-18T22:03:48Z
+357,148,77,5,Amazing quality,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-11-26T02:32:24Z
+358,48,187,2,Not worth it,Product arrived damaged and customer service was slow to respond. Not happy.,2024-09-14T14:33:36Z
+359,236,474,3,Acceptable,It's an average product. Nothing special but it gets the job done adequately.,2025-06-02T00:00:00Z
+360,12,162,3,Fair value,It works but I expected a bit more based on the description. Okay overall.,2025-03-04T01:46:13Z
+361,360,136,4,Very satisfied,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-10-25T00:00:00Z
+362,220,223,3,Fair value,Middle of the road product. Not bad but not great either. Fair value.,2021-10-01T03:10:34Z
+363,349,280,3,Nothing special,Decent product for the price point. Some features could be improved.,2017-09-14T10:27:55Z
+364,496,299,5,Highly recommend!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-12-24T07:09:37Z
+365,441,457,3,Decent quality,Meets basic expectations but doesn't stand out. You get what you pay for.,2024-07-11T20:41:30Z
+366,283,303,4,Nice product,Happy with this purchase. It works well and the quality is good for the price.,2025-10-25T21:21:18Z
+367,165,243,4,Happy with purchase,Good value for money. Does what I needed it to do. Would consider buying again.,2024-08-04T00:00:00Z
+368,346,136,4,Would buy again,Happy with this purchase. It works well and the quality is good for the price.,2025-10-11T04:13:23Z
+369,248,200,4,Great product,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-07-18T14:59:22Z
+370,142,455,1,Awful quality,Avoid this product at all costs. It's nothing like the description or photos.,2025-05-16T00:00:00Z
+371,251,333,5,Couldn't be happier,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-12-20T01:48:09Z
+372,21,282,5,Perfect!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-11-07T20:49:43Z
+373,129,12,1,Do not buy,Avoid this product at all costs. It's nothing like the description or photos.,2018-03-11T14:08:46Z
+374,200,354,4,Good quality,Good value for money. Does what I needed it to do. Would consider buying again.,2025-01-07T20:30:35Z
+375,407,333,5,Amazing quality,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-10-22T00:00:00Z
+376,45,291,4,Very satisfied,Nice quality and works as expected. Customer service was helpful when I had questions.,2022-02-11T11:36:02Z
+377,76,26,5,Five stars deserved,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-03-29T20:56:10Z
+378,241,243,5,Five stars deserved,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2019-04-03T12:59:40Z
+379,259,296,5,Amazing quality,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-10-10T23:07:26Z
+380,471,355,5,Couldn't be happier,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-10-15T00:00:00Z
+381,476,82,4,Good quality,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-12-23T02:38:34Z
+382,25,243,1,Total failure,Worst purchase I've ever made. Cheaply made and doesn't work as advertised.,2018-11-24T12:59:40Z
+383,489,54,4,Happy with purchase,Happy with this purchase. It works well and the quality is good for the price.,2022-06-27T06:37:21Z
+384,91,204,3,Average product,Meets basic expectations but doesn't stand out. You get what you pay for.,2018-10-29T16:16:51Z
+385,420,342,5,Amazing quality,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-05-26T00:00:00Z
+386,191,237,5,Best purchase ever,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-06-01T00:00:00Z
+387,497,452,3,Decent quality,It's an average product. Nothing special but it gets the job done adequately.,2025-03-09T17:44:16Z
+388,92,200,5,Five stars deserved,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-07-09T14:59:22Z
+389,429,15,5,Perfect!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-07-05T19:37:51Z
+390,332,251,4,Very satisfied,Nice quality and works as expected. Customer service was helpful when I had questions.,2021-08-04T21:17:34Z
+391,232,48,5,Highly recommend!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-07-04T00:00:00Z
+392,2,437,4,Very satisfied,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-04-19T00:00:00Z
+393,169,247,5,Perfect!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-09-27T00:00:00Z
+394,201,175,4,Great product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-04-24T00:00:00Z
+395,225,13,4,Good quality,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-12-21T00:40:11Z
+396,449,280,2,Disappointed,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2017-10-27T10:27:55Z
+397,436,200,4,Solid choice,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-08-07T14:59:22Z
+398,435,406,4,Recommended,Good value for money. Does what I needed it to do. Would consider buying again.,2024-04-28T00:00:00Z
+399,102,77,3,Nothing special,Decent product for the price point. Some features could be improved.,2024-11-01T02:32:24Z
+400,489,129,4,Would buy again,Really good product overall. A few minor issues but nothing major. Would recommend.,2022-07-08T17:32:09Z
+401,115,498,2,Disappointed,Product arrived damaged and customer service was slow to respond. Not happy.,2024-05-21T00:00:00Z
+402,189,200,3,Fair value,It works but I expected a bit more based on the description. Okay overall.,2024-09-08T14:59:22Z
+403,219,235,4,Great product,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-01-20T11:22:46Z
+404,21,201,3,Decent quality,It's an average product. Nothing special but it gets the job done adequately.,2025-07-27T00:00:00Z
+405,52,275,3,Does the job,Meets basic expectations but doesn't stand out. You get what you pay for.,2024-12-18T00:00:00Z
+406,466,60,5,Love it!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2022-02-06T08:25:00Z
+407,259,91,4,Would buy again,Happy with this purchase. It works well and the quality is good for the price.,2025-04-28T18:27:07Z
+408,227,452,5,Worth every penny,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2022-09-22T13:11:16Z
+409,327,125,4,Nice product,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-03-31T08:00:23Z
+410,500,209,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2019-10-19T15:31:56Z
+411,427,291,5,Love it!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2022-02-17T11:36:02Z
+412,233,349,5,Highly recommend!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-09-01T18:30:28Z
+413,196,212,4,Would buy again,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-05-11T00:00:00Z
+414,446,291,4,Nice product,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-12-20T00:00:00Z
+415,180,60,3,Decent quality,Meets basic expectations but doesn't stand out. You get what you pay for.,2022-05-01T03:22:42Z
+416,416,457,5,Amazing quality,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-06-17T20:41:30Z
+417,106,178,5,Perfect!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-09-07T00:00:00Z
+418,188,162,5,Exceeded expectations,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-07-02T01:46:13Z
+419,307,304,4,Very satisfied,Happy with this purchase. It works well and the quality is good for the price.,2025-06-22T00:00:00Z
+420,293,209,5,Five stars deserved,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2019-05-30T15:31:56Z
+421,150,359,4,Very satisfied,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-06-22T00:00:00Z
+422,45,257,4,Would buy again,Nice quality and works as expected. Customer service was helpful when I had questions.,2022-06-17T23:48:17Z
+423,40,346,5,Perfect!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-12-01T00:00:00Z
+424,295,303,3,Meets expectations,Middle of the road product. Not bad but not great either. Fair value.,2025-12-15T21:21:18Z
+425,433,311,5,Worth every penny,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-03-17T10:58:29Z
+426,394,243,2,Not worth it,Product arrived damaged and customer service was slow to respond. Not happy.,2019-01-19T12:59:40Z
+427,300,223,5,Best purchase ever,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2021-11-12T03:10:34Z
+428,188,162,3,Does the job,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-04-09T01:46:13Z
+429,306,257,5,Worth every penny,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2022-06-05T23:48:17Z
+430,318,260,3,Average product,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-09-10T19:52:47Z
+431,227,452,3,Average product,Middle of the road product. Not bad but not great either. Fair value.,2022-08-12T13:11:16Z
+432,338,204,4,Recommended,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-05-22T11:36:43Z
+433,148,77,5,Love it!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-11-12T02:32:24Z
+434,297,89,4,Happy with purchase,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-11-22T21:13:27Z
+435,180,60,4,Very satisfied,Good value for money. Does what I needed it to do. Would consider buying again.,2022-02-25T03:22:42Z
+436,392,185,1,Do not buy,Avoid this product at all costs. It's nothing like the description or photos.,2025-01-23T07:10:52Z
+437,300,280,2,Could be better,Not worth the price. There are better options available for less money.,2018-01-22T10:27:55Z
+438,460,74,4,Would buy again,Happy with this purchase. It works well and the quality is good for the price.,2025-12-14T23:57:59Z
+439,237,372,1,Very disappointed,Avoid this product at all costs. It's nothing like the description or photos.,2024-11-07T00:00:00Z
+440,251,333,5,Exceeded expectations,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-11-18T01:48:09Z
+441,475,475,4,Great product,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-12-01T00:00:00Z
+442,436,200,4,Solid choice,Happy with this purchase. It works well and the quality is good for the price.,2024-08-09T14:59:22Z
+443,311,115,5,Best purchase ever,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-02-11T03:33:47Z
+444,135,196,3,Does the job,It works but I expected a bit more based on the description. Okay overall.,2024-11-02T00:00:00Z
+445,489,296,5,Exceeded expectations,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-06-12T23:07:26Z
+446,70,117,5,Highly recommend!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-12-17T00:00:00Z
+447,380,172,4,Very satisfied,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-07-07T00:00:00Z
+448,385,452,4,Very satisfied,Good value for money. Does what I needed it to do. Would consider buying again.,2022-09-29T13:11:16Z
+449,469,36,4,Very satisfied,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-09-11T00:00:00Z
+450,107,311,5,Perfect!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-02-04T10:58:29Z
+451,126,204,5,Highly recommend!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2019-12-09T20:41:08Z
+452,500,209,4,Would buy again,Happy with this purchase. It works well and the quality is good for the price.,2019-07-30T15:31:56Z
+453,156,172,4,Great product,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-09-24T00:00:00Z
+454,130,64,2,Not great,Product arrived damaged and customer service was slow to respond. Not happy.,2024-03-28T00:00:00Z
+455,495,249,4,Nice product,Good value for money. Does what I needed it to do. Would consider buying again.,2025-10-08T00:00:00Z
+456,13,91,5,Amazing quality,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-03-12T18:27:07Z
+457,338,12,5,Perfect!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2017-10-16T14:08:46Z
+458,45,257,2,Not worth it,Product arrived damaged and customer service was slow to respond. Not happy.,2022-04-15T23:48:17Z
+459,248,200,5,Perfect!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-11-04T14:59:22Z
+460,100,322,4,Solid choice,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-11-04T00:00:00Z
+461,109,469,5,Best purchase ever,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-07-20T00:00:00Z
+462,351,243,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-04-19T00:00:00Z
+463,105,77,4,Good quality,Good value for money. Does what I needed it to do. Would consider buying again.,2024-10-15T02:32:24Z
+464,153,257,5,Highly recommend!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2022-03-19T23:48:17Z
+465,476,159,4,Very satisfied,Happy with this purchase. It works well and the quality is good for the price.,2025-08-30T00:12:00Z
+466,489,54,2,Below expectations,Had issues right out of the box. Quality control seems lacking.,2022-04-26T06:37:21Z
+467,361,185,4,Very satisfied,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-11-27T07:10:52Z
+468,295,303,5,Five stars deserved,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-09-15T21:21:18Z
+469,483,280,1,Complete waste,Avoid this product at all costs. It's nothing like the description or photos.,2017-11-08T10:27:55Z
+470,338,12,1,Awful quality,Avoid this product at all costs. It's nothing like the description or photos.,2018-03-04T14:08:46Z
+471,378,357,3,Acceptable,It works but I expected a bit more based on the description. Okay overall.,2024-11-18T00:00:00Z
+472,422,204,2,Would not recommend,Product arrived damaged and customer service was slow to respond. Not happy.,2020-02-14T20:41:08Z
+473,118,253,5,Exceeded expectations,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2015-11-23T22:03:48Z
+474,320,195,4,Would buy again,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-01-11T00:00:00Z
+475,76,26,3,Does the job,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-04-23T20:56:10Z
+476,378,150,5,Five stars deserved,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2023-12-25T21:29:49Z
+477,45,291,3,Acceptable,Decent product for the price point. Some features could be improved.,2021-12-01T11:36:02Z
+478,361,185,3,Decent quality,It works but I expected a bit more based on the description. Okay overall.,2025-01-02T07:10:52Z
+479,332,251,5,Best purchase ever,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2021-09-28T21:17:34Z
+480,167,156,5,Exceeded expectations,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-07-29T00:00:00Z
+481,264,158,3,Nothing special,Decent product for the price point. Some features could be improved.,2025-06-13T00:00:00Z
+482,394,243,5,Five stars deserved,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2019-01-06T12:59:40Z
+483,495,457,5,Highly recommend!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-10-11T20:41:30Z
+484,300,223,5,Worth every penny,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2021-10-06T03:10:34Z
+485,277,180,4,Good quality,Really good product overall. A few minor issues but nothing major. Would recommend.,2023-11-04T14:41:57Z
+486,340,162,5,Couldn't be happier,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-04-05T01:46:13Z
+487,89,82,5,Best purchase ever,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-12-22T02:38:34Z
+488,494,116,3,Does the job,It works but I expected a bit more based on the description. Okay overall.,2025-11-29T15:55:17Z
+489,396,139,4,Happy with purchase,Good value for money. Does what I needed it to do. Would consider buying again.,2024-01-15T00:00:00Z
+490,145,431,2,Not great,Not worth the price. There are better options available for less money.,2024-02-19T00:00:00Z
+491,103,74,3,Does the job,Decent product for the price point. Some features could be improved.,2025-12-11T23:57:59Z
+492,300,223,3,Does the job,Decent product for the price point. Some features could be improved.,2021-09-07T03:10:34Z
+493,397,244,5,Outstanding!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-08-08T00:00:00Z
+494,473,282,5,Excellent product!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-12-17T20:49:43Z
+495,478,260,5,Amazing quality,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-04-08T00:00:00Z
+496,303,37,5,Five stars deserved,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-08-06T00:00:00Z
+497,234,485,4,Nice product,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-10-15T00:00:00Z
+498,10,43,4,Recommended,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-11-18T00:00:00Z
+499,41,428,4,Very satisfied,Good value for money. Does what I needed it to do. Would consider buying again.,2023-04-26T17:25:23Z
+500,489,54,5,Worth every penny,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2022-04-03T06:37:21Z
+501,227,452,3,It's okay,Decent product for the price point. Some features could be improved.,2022-10-09T13:11:16Z
+502,303,243,3,Does the job,It's an average product. Nothing special but it gets the job done adequately.,2025-09-23T00:00:00Z
+503,489,54,5,Highly recommend!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2022-02-07T06:37:21Z
+504,92,200,3,Nothing special,Decent product for the price point. Some features could be improved.,2024-09-26T14:59:22Z
+505,136,168,3,Meets expectations,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-08-04T00:00:00Z
+506,162,267,5,Best purchase ever,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-01-13T00:00:00Z
+507,251,162,4,Happy with purchase,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-07-16T01:46:13Z
+508,227,452,4,Would buy again,Nice quality and works as expected. Customer service was helpful when I had questions.,2022-09-26T13:11:16Z
+509,300,223,4,Happy with purchase,Nice quality and works as expected. Customer service was helpful when I had questions.,2021-11-06T03:10:34Z
+510,190,296,3,Acceptable,It's an average product. Nothing special but it gets the job done adequately.,2025-10-24T00:00:00Z
+511,210,300,4,Solid choice,Happy with this purchase. It works well and the quality is good for the price.,2025-02-14T00:00:00Z
+512,136,206,3,Acceptable,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-07-20T00:00:00Z
+513,474,140,5,Perfect!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-08-28T00:00:00Z
+514,170,193,5,Couldn't be happier,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-08-18T00:00:00Z
+515,136,253,4,Happy with purchase,Happy with this purchase. It works well and the quality is good for the price.,2025-09-03T00:00:00Z
+516,395,206,5,Five stars deserved,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-12-20T08:48:26Z
+517,91,187,5,Highly recommend!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-04-11T14:33:36Z
+518,32,251,5,Highly recommend!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-03-07T00:00:00Z
+519,297,21,3,Nothing special,Middle of the road product. Not bad but not great either. Fair value.,2024-05-12T00:00:00Z
+520,91,356,3,Average product,Middle of the road product. Not bad but not great either. Fair value.,2025-10-03T00:00:00Z
+521,118,253,3,Acceptable,It's an average product. Nothing special but it gets the job done adequately.,2015-10-10T22:03:48Z
+522,354,142,3,Meets expectations,It's an average product. Nothing special but it gets the job done adequately.,2024-11-06T00:00:00Z
+523,153,257,5,Excellent product!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2022-03-19T23:48:17Z
+524,272,285,4,Solid choice,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-05-07T00:00:00Z
+525,424,296,5,Exceeded expectations,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-09-01T23:07:26Z
+526,9,89,1,Total failure,Do not buy! This is a scam product. I want my money back immediately.,2024-09-27T21:13:27Z
+527,28,357,5,Outstanding!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-10-27T00:00:00Z
+528,160,428,5,Perfect!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-07-01T00:00:00Z
+529,139,137,3,Average product,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-08-19T00:00:00Z
+530,25,159,5,Couldn't be happier,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-10-23T00:00:00Z
+531,249,150,5,Exceeded expectations,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2023-12-20T21:29:49Z
+532,347,369,5,Best purchase ever,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-06-08T00:00:00Z
+533,372,169,1,Total failure,Avoid this product at all costs. It's nothing like the description or photos.,2024-12-19T00:00:00Z
+534,200,354,4,Great product,Happy with this purchase. It works well and the quality is good for the price.,2025-04-21T20:30:35Z
+535,233,349,5,Five stars deserved,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-09-13T18:30:28Z
+536,390,74,1,Do not buy,Complete waste of money. This product stopped working after just two days.,2025-12-13T23:57:59Z
+537,189,200,4,Good quality,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-09-04T14:59:22Z
+538,33,150,5,Five stars deserved,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2023-12-30T07:29:49Z
+539,175,309,5,Excellent product!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-11-06T00:00:00Z
+540,189,198,3,It's okay,It's an average product. Nothing special but it gets the job done adequately.,2024-12-05T00:00:00Z
+541,144,253,5,Best purchase ever,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2015-10-23T22:03:48Z
+542,207,60,2,Underwhelming,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2021-12-21T03:22:42Z
+543,48,439,1,Do not buy,Worst purchase I've ever made. Cheaply made and doesn't work as advertised.,2025-05-19T00:00:00Z
+544,45,257,2,Could be better,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2022-06-01T23:48:17Z
+545,403,7,5,Couldn't be happier,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-06-28T00:00:00Z
+546,445,354,5,Couldn't be happier,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-05-27T20:30:35Z
+547,476,216,4,Nice product,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-02-22T00:00:00Z
+548,93,349,5,Excellent product!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-07-23T18:30:28Z
+549,228,327,2,Below expectations,Product arrived damaged and customer service was slow to respond. Not happy.,2025-10-17T00:00:00Z
+550,39,349,3,Nothing special,Decent product for the price point. Some features could be improved.,2024-08-24T18:30:28Z
+551,390,74,1,Very disappointed,Complete waste of money. This product stopped working after just two days.,2025-12-20T23:57:59Z
+552,259,91,5,Love it!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-11-11T18:27:07Z
+553,480,493,3,Meets expectations,It's an average product. Nothing special but it gets the job done adequately.,2024-08-03T00:00:00Z
+554,395,136,4,Happy with purchase,Good value for money. Does what I needed it to do. Would consider buying again.,2025-10-22T00:00:00Z
+555,97,204,5,Outstanding!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-02-26T11:36:43Z
+556,361,185,4,Would buy again,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-11-13T07:10:52Z
+557,143,7,4,Nice product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-10-03T14:03:35Z
+558,327,469,1,Total failure,Do not buy! This is a scam product. I want my money back immediately.,2024-01-22T00:00:00Z
+559,123,88,4,Happy with purchase,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-01-30T00:00:00Z
+560,144,253,4,Would buy again,Nice quality and works as expected. Customer service was helpful when I had questions.,2015-11-09T22:03:48Z
+561,398,482,5,Exceeded expectations,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-10-05T00:00:00Z
+562,295,303,4,Would buy again,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-11-19T21:21:18Z
+563,280,12,3,Nothing special,Meets basic expectations but doesn't stand out. You get what you pay for.,2017-11-12T14:08:46Z
+564,188,162,4,Good quality,Good value for money. Does what I needed it to do. Would consider buying again.,2025-02-15T01:46:13Z
+565,156,2,4,Would buy again,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-08-23T00:49:29Z
+566,9,89,5,Excellent product!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-11-19T21:13:27Z
+567,284,209,3,Meets expectations,Middle of the road product. Not bad but not great either. Fair value.,2019-07-31T15:31:56Z
+568,361,185,3,Average product,It's an average product. Nothing special but it gets the job done adequately.,2024-11-21T07:10:52Z
+569,200,354,4,Would buy again,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-05-22T20:30:35Z
+570,118,98,3,Acceptable,It's an average product. Nothing special but it gets the job done adequately.,2025-12-01T00:00:00Z
+571,220,223,5,Couldn't be happier,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2021-11-25T03:10:34Z
+572,278,65,5,Perfect!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-07-24T00:00:00Z
+573,411,469,3,Nothing special,Decent product for the price point. Some features could be improved.,2023-09-18T07:00:23Z
+574,389,70,2,Would not recommend,Disappointed with this purchase. The quality is not as good as advertised.,2024-11-02T00:00:00Z
+575,182,49,4,Great product,Good value for money. Does what I needed it to do. Would consider buying again.,2025-12-20T19:58:09Z
+576,103,74,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-12-15T23:57:59Z
+577,64,282,4,Recommended,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-12-09T20:49:43Z
+578,318,260,3,Meets expectations,Middle of the road product. Not bad but not great either. Fair value.,2025-10-12T19:52:47Z
+579,47,243,4,Great product,Good value for money. Does what I needed it to do. Would consider buying again.,2018-12-05T12:59:40Z
+580,2,428,2,Not worth it,Product arrived damaged and customer service was slow to respond. Not happy.,2023-04-23T17:25:23Z
+581,25,243,5,Perfect!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2019-03-08T12:59:40Z
+582,483,280,3,Decent quality,Middle of the road product. Not bad but not great either. Fair value.,2018-02-08T10:27:55Z
+583,338,12,5,Excellent product!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2017-10-09T14:08:46Z
+584,461,178,4,Nice product,Happy with this purchase. It works well and the quality is good for the price.,2024-12-08T00:00:00Z
+585,495,457,5,Best purchase ever,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-06-04T20:41:30Z
+586,45,257,5,Five stars deserved,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2022-06-07T23:48:17Z
+587,338,12,5,Best purchase ever,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2018-03-13T14:08:46Z
+588,212,428,5,Highly recommend!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-03-22T00:00:00Z
+589,496,317,2,Not great,Disappointed with this purchase. The quality is not as good as advertised.,2025-07-14T06:12:07Z
+590,180,60,4,Great product,Happy with this purchase. It works well and the quality is good for the price.,2022-02-05T03:22:42Z
+591,295,378,5,Worth every penny,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-11-12T00:00:00Z
+592,34,125,4,Very satisfied,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-04-28T08:00:23Z
+593,189,200,3,It's okay,Decent product for the price point. Some features could be improved.,2024-10-07T14:59:22Z
+594,480,307,5,Best purchase ever,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-07-23T01:59:48Z
+595,21,304,4,Great product,Happy with this purchase. It works well and the quality is good for the price.,2025-11-24T00:00:00Z
+596,5,409,2,Not great,Had issues right out of the box. Quality control seems lacking.,2025-11-10T11:51:32Z
+597,89,82,5,Five stars deserved,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-12-17T02:38:34Z
+598,300,223,5,Excellent product!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2022-02-16T03:10:34Z
+599,411,64,5,Highly recommend!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2019-03-10T02:25:12Z
+600,306,257,2,Underwhelming,Not worth the price. There are better options available for less money.,2022-03-06T23:48:17Z
+601,416,39,1,Stay away,Avoid this product at all costs. It's nothing like the description or photos.,2024-12-02T00:00:00Z
+602,13,91,5,Exceeded expectations,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-02-08T18:27:07Z
+603,332,251,2,Disappointed,Had issues right out of the box. Quality control seems lacking.,2021-09-05T21:17:34Z
+604,257,200,2,Would not recommend,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2024-11-23T14:59:22Z
+605,234,284,3,Does the job,Meets basic expectations but doesn't stand out. You get what you pay for.,2024-12-04T00:00:00Z
+606,476,82,4,Great product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-12-23T02:38:34Z
+607,64,82,4,Would buy again,Good value for money. Does what I needed it to do. Would consider buying again.,2025-12-19T02:38:34Z
+608,115,191,5,Perfect!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-02-23T00:00:00Z
+609,79,446,2,Could be better,Had issues right out of the box. Quality control seems lacking.,2024-06-24T00:00:00Z
+610,230,57,5,Couldn't be happier,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-03-22T00:00:00Z
+611,33,150,4,Nice product,Good value for money. Does what I needed it to do. Would consider buying again.,2024-05-03T07:29:49Z
+612,499,353,4,Happy with purchase,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-12-27T00:00:00Z
+613,129,77,4,Great product,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-09-03T02:32:24Z
+614,240,295,4,Recommended,Happy with this purchase. It works well and the quality is good for the price.,2025-07-04T00:00:00Z
+615,219,150,4,Nice product,Happy with this purchase. It works well and the quality is good for the price.,2024-04-23T07:29:49Z
+616,2,428,1,Terrible product,Avoid this product at all costs. It's nothing like the description or photos.,2023-05-20T17:25:23Z
+617,334,60,4,Recommended,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2022-02-10T08:25:00Z
+618,34,125,5,Worth every penny,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-06-22T08:00:23Z
+619,181,286,5,Love it!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-03-27T00:00:00Z
+620,201,127,5,Worth every penny,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-10-28T00:00:00Z
+621,327,462,3,Fair value,Decent product for the price point. Some features could be improved.,2025-09-25T00:00:00Z
+622,86,221,2,Would not recommend,Disappointed with this purchase. The quality is not as good as advertised.,2025-08-08T00:00:00Z
+623,416,297,5,Amazing quality,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-11-11T00:00:00Z
+624,436,200,4,Great product,Good value for money. Does what I needed it to do. Would consider buying again.,2024-11-09T14:59:22Z
+625,207,60,5,Perfect!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2022-05-25T03:22:42Z
+626,48,187,5,Couldn't be happier,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-06-13T14:33:36Z
+627,327,125,2,Underwhelming,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2025-03-27T08:00:23Z
+628,155,260,4,Great product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-05-24T19:52:47Z
+629,300,223,4,Great product,Good value for money. Does what I needed it to do. Would consider buying again.,2022-02-15T03:10:34Z
+630,487,358,5,Five stars deserved,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-11-08T00:00:00Z
+631,103,74,3,Nothing special,It's an average product. Nothing special but it gets the job done adequately.,2025-12-13T23:57:59Z
+632,5,409,4,Very satisfied,Good value for money. Does what I needed it to do. Would consider buying again.,2025-12-02T11:51:32Z
+633,387,455,4,Nice product,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-08-13T00:00:00Z
+634,370,109,5,Couldn't be happier,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-11-06T00:00:00Z
+635,97,204,4,Recommended,Happy with this purchase. It works well and the quality is good for the price.,2025-04-29T11:36:43Z
+636,46,41,5,Perfect!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-05-09T00:00:00Z
+637,321,206,4,Very satisfied,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-03-15T08:48:26Z
+638,392,185,4,Very satisfied,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-04-14T07:10:52Z
+639,175,317,2,Underwhelming,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2025-08-01T06:12:07Z
+640,259,91,5,Love it!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-11-26T18:27:07Z
+641,48,14,5,Couldn't be happier,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-05-19T00:00:00Z
+642,18,219,5,Love it!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-09-14T00:00:00Z
+643,300,223,5,Highly recommend!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2021-11-24T03:10:34Z
+644,403,154,5,Exceeded expectations,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-03-25T00:00:00Z
+645,161,85,5,Exceeded expectations,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-11-19T00:00:00Z
+646,162,191,5,Couldn't be happier,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-05-08T00:00:00Z
+647,348,342,4,Happy with purchase,Nice quality and works as expected. Customer service was helpful when I had questions.,2018-07-28T09:41:23Z
+648,76,26,3,Does the job,It's an average product. Nothing special but it gets the job done adequately.,2025-06-06T20:56:10Z
+649,130,12,4,Very satisfied,Really good product overall. A few minor issues but nothing major. Would recommend.,2018-03-22T14:08:46Z
+650,239,16,5,Exceeded expectations,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-10-27T00:00:00Z
+651,280,12,1,Do not buy,Terrible quality. Broke immediately and the company won't refund my purchase.,2017-10-10T14:08:46Z
+652,182,218,5,Love it!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-09-05T00:00:00Z
+653,373,143,5,Five stars deserved,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-10-26T00:00:00Z
+654,297,258,2,Would not recommend,Had issues right out of the box. Quality control seems lacking.,2025-02-15T00:00:00Z
+655,249,150,5,Outstanding!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-01-03T21:29:49Z
+656,357,82,4,Good quality,Happy with this purchase. It works well and the quality is good for the price.,2025-03-04T00:00:00Z
+657,206,176,5,Couldn't be happier,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-02-12T00:00:00Z
+658,460,74,2,Disappointed,Disappointed with this purchase. The quality is not as good as advertised.,2025-12-16T23:57:59Z
+659,241,322,2,Disappointed,Not worth the price. There are better options available for less money.,2025-12-16T00:00:00Z
+660,485,492,4,Good quality,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-10-22T00:00:00Z
+661,392,185,5,Amazing quality,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-04-13T07:10:52Z
+662,414,286,5,Excellent product!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-02-07T00:00:00Z
+663,472,277,3,Decent quality,Meets basic expectations but doesn't stand out. You get what you pay for.,2024-01-03T00:00:00Z
+664,306,257,3,Fair value,It works but I expected a bit more based on the description. Okay overall.,2022-04-11T23:48:17Z
+665,155,345,3,Meets expectations,Decent product for the price point. Some features could be improved.,2024-12-09T00:00:00Z
+666,476,299,5,Outstanding!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-12-15T07:09:37Z
+667,340,162,3,Meets expectations,It works but I expected a bit more based on the description. Okay overall.,2025-08-04T01:46:13Z
+668,330,143,5,Best purchase ever,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-04-26T00:00:00Z
+669,422,204,5,Outstanding!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2019-11-11T20:41:08Z
+670,155,260,3,Acceptable,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-05-05T19:52:47Z
+671,385,452,5,Five stars deserved,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2022-08-10T13:11:16Z
+672,105,178,4,Nice product,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-02-22T00:00:00Z
+673,155,58,4,Solid choice,Happy with this purchase. It works well and the quality is good for the price.,2024-08-29T00:00:00Z
+674,433,311,3,It's okay,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-05-10T10:58:29Z
+675,297,89,5,Amazing quality,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-10-22T21:13:27Z
+676,6,264,4,Great product,Good value for money. Does what I needed it to do. Would consider buying again.,2024-02-06T00:00:00Z
+677,94,392,3,It's okay,Middle of the road product. Not bad but not great either. Fair value.,2024-03-16T00:00:00Z
+678,180,230,5,Best purchase ever,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-11-13T00:00:00Z
+679,318,260,4,Solid choice,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-08-30T19:52:47Z
+680,489,129,2,Could be better,Not worth the price. There are better options available for less money.,2022-10-19T17:32:09Z
+681,144,253,3,Acceptable,Middle of the road product. Not bad but not great either. Fair value.,2015-10-03T22:03:48Z
+682,45,2,4,Nice product,Happy with this purchase. It works well and the quality is good for the price.,2025-12-09T00:49:29Z
+683,121,172,5,Exceeded expectations,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-12-20T00:00:00Z
+684,231,281,4,Would buy again,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-08-13T00:00:00Z
+685,220,223,5,Highly recommend!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2022-01-31T03:10:34Z
+686,495,457,5,Worth every penny,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-08-17T20:41:30Z
+687,392,185,4,Would buy again,Happy with this purchase. It works well and the quality is good for the price.,2025-01-04T07:10:52Z
+688,46,15,3,Decent quality,It works but I expected a bit more based on the description. Okay overall.,2024-08-26T00:00:00Z
+689,57,420,4,Happy with purchase,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-04-20T00:00:00Z
+690,297,223,5,Five stars deserved,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-11-13T00:00:00Z
+691,189,351,5,Couldn't be happier,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-11-06T13:56:14Z
+692,295,342,2,Would not recommend,Disappointed with this purchase. The quality is not as good as advertised.,2018-09-03T09:41:23Z
+693,354,353,4,Nice product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-09-14T00:00:00Z
+694,268,4,5,Excellent product!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-07-05T00:00:00Z
+695,476,299,1,Terrible product,Terrible quality. Broke immediately and the company won't refund my purchase.,2025-12-13T07:09:37Z
+696,144,108,5,Perfect!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-08-29T00:00:00Z
+697,182,49,5,Love it!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-12-12T19:58:09Z
+698,338,204,4,Nice product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-04-30T11:36:43Z
+699,276,110,2,Disappointed,Disappointed with this purchase. The quality is not as good as advertised.,2021-04-23T01:21:26Z
+700,412,85,5,Amazing quality,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-12-04T00:00:00Z
+701,120,200,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-12-20T14:59:22Z
+702,46,334,4,Great product,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-09-05T00:00:00Z
+703,272,206,4,Very satisfied,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-10-22T08:48:26Z
+704,207,60,5,Highly recommend!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2022-04-09T03:22:42Z
+705,172,13,5,Amazing quality,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-12-05T00:00:00Z
+706,313,459,4,Would buy again,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-10-24T00:00:00Z
+707,64,82,4,Good quality,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-12-24T02:38:34Z
+708,342,409,3,Nothing special,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-12-07T11:51:32Z
+709,471,91,3,Does the job,Decent product for the price point. Some features could be improved.,2025-02-21T18:27:07Z
+710,293,457,5,Amazing quality,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-09-15T20:41:30Z
+711,471,91,4,Would buy again,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-11-25T18:27:07Z
+712,466,60,5,Excellent product!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2022-01-10T08:25:00Z
+713,144,253,4,Solid choice,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2015-11-07T22:03:48Z
+714,143,7,1,Do not buy,Worst purchase I've ever made. Cheaply made and doesn't work as advertised.,2025-07-28T14:03:35Z
+715,72,490,3,Acceptable,Middle of the road product. Not bad but not great either. Fair value.,2025-11-30T00:00:00Z
+716,441,111,5,Highly recommend!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-04-12T00:00:00Z
+717,334,60,5,Five stars deserved,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2022-03-24T08:25:00Z
+718,407,113,1,Do not buy,Complete waste of money. This product stopped working after just two days.,2025-03-19T23:00:36Z
+719,338,354,5,Amazing quality,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-01-26T20:30:35Z
+720,300,280,5,Worth every penny,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2017-12-21T10:27:55Z
+721,17,62,4,Very satisfied,Good value for money. Does what I needed it to do. Would consider buying again.,2025-04-29T00:00:00Z
+722,424,296,3,Nothing special,Middle of the road product. Not bad but not great either. Fair value.,2025-08-18T23:07:26Z
+723,500,209,5,Highly recommend!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2019-09-25T15:31:56Z
+724,194,60,4,Would buy again,Happy with this purchase. It works well and the quality is good for the price.,2022-03-21T08:25:00Z
+725,416,457,5,Love it!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-07-27T20:41:30Z
+726,315,446,1,Do not buy,Worst purchase I've ever made. Cheaply made and doesn't work as advertised.,2025-07-02T00:00:00Z
+727,466,60,4,Very satisfied,Really good product overall. A few minor issues but nothing major. Would recommend.,2022-02-12T08:25:00Z
+728,36,125,2,Could be better,Not worth the price. There are better options available for less money.,2025-05-05T00:00:00Z
+729,375,200,3,Does the job,It works but I expected a bit more based on the description. Okay overall.,2024-04-06T00:00:00Z
+730,252,457,4,Great product,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-10-28T00:00:00Z
+731,500,7,4,Very satisfied,Happy with this purchase. It works well and the quality is good for the price.,2024-03-31T00:00:00Z
+732,385,113,5,Perfect!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-11-24T23:00:36Z
+733,227,400,5,Couldn't be happier,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-10-16T00:00:00Z
+734,51,180,3,Nothing special,Middle of the road product. Not bad but not great either. Fair value.,2023-09-12T14:41:57Z
+735,184,225,5,Perfect!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-04-27T00:00:00Z
+736,361,185,5,Highly recommend!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-02-25T07:10:52Z
+737,198,345,5,Outstanding!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-04-04T08:28:49Z
+738,44,7,5,Exceeded expectations,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-11-16T14:03:35Z
+739,246,476,5,Outstanding!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-04-23T15:11:51Z
+740,113,355,5,Highly recommend!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-02-17T20:49:39Z
+741,64,82,4,Happy with purchase,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-12-22T02:38:34Z
+742,443,206,4,Nice product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2022-10-19T09:10:46Z
+743,30,35,2,Not great,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2025-11-11T00:00:00Z
+744,338,204,5,Best purchase ever,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-03-31T11:36:43Z
+745,219,91,3,Nothing special,Decent product for the price point. Some features could be improved.,2024-11-06T18:27:07Z
+746,394,115,5,Love it!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-04-17T03:33:47Z
+747,45,61,2,Could be better,Had issues right out of the box. Quality control seems lacking.,2024-08-09T00:00:00Z
+748,219,91,2,Would not recommend,Product arrived damaged and customer service was slow to respond. Not happy.,2025-04-30T18:27:07Z
+749,38,435,4,Very satisfied,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-04-15T00:00:00Z
+750,309,279,5,Amazing quality,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-01-12T00:00:00Z
+751,190,124,4,Happy with purchase,Happy with this purchase. It works well and the quality is good for the price.,2024-02-28T00:00:00Z
+752,470,148,1,Terrible product,Worst purchase I've ever made. Cheaply made and doesn't work as advertised.,2025-08-15T00:00:00Z
+753,8,407,4,Solid choice,Happy with this purchase. It works well and the quality is good for the price.,2025-09-07T00:00:00Z
+754,48,187,4,Good quality,Good value for money. Does what I needed it to do. Would consider buying again.,2024-08-24T14:33:36Z
+755,373,309,3,Nothing special,It works but I expected a bit more based on the description. Okay overall.,2024-06-26T00:00:00Z
+756,289,484,4,Would buy again,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-01-24T00:00:00Z
+757,204,406,5,Amazing quality,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-05-07T00:00:00Z
+758,303,296,4,Nice product,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-08-25T23:07:26Z
+759,92,200,3,Average product,It's an average product. Nothing special but it gets the job done adequately.,2024-08-13T14:59:22Z
+760,306,125,4,Recommended,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-07-14T08:00:23Z
+761,436,294,5,Exceeded expectations,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-10-25T00:00:00Z
+762,51,474,3,Fair value,Middle of the road product. Not bad but not great either. Fair value.,2025-04-24T00:00:00Z
+763,308,196,5,Couldn't be happier,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-07-30T00:00:00Z
+764,64,282,3,Decent quality,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-11-20T20:49:43Z
+765,202,297,4,Good quality,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-05-26T00:00:00Z
+766,53,206,3,It's okay,Meets basic expectations but doesn't stand out. You get what you pay for.,2024-12-06T08:48:26Z
+767,212,385,3,Acceptable,Middle of the road product. Not bad but not great either. Fair value.,2024-11-19T00:00:00Z
+768,225,13,5,Excellent product!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-12-21T00:40:11Z
+769,349,303,5,Highly recommend!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-09-16T21:21:18Z
+770,33,150,5,Love it!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-04-19T07:29:49Z
+771,346,136,5,Five stars deserved,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-11-09T04:13:23Z
+772,9,89,4,Good quality,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-08-19T21:13:27Z
+773,324,250,4,Great product,Good value for money. Does what I needed it to do. Would consider buying again.,2024-09-05T00:00:00Z
+774,117,230,4,Happy with purchase,Happy with this purchase. It works well and the quality is good for the price.,2024-06-24T00:00:00Z
+775,2,428,5,Excellent product!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2023-07-03T17:25:23Z
+776,275,58,2,Below expectations,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2024-10-27T00:00:00Z
+777,218,69,4,Good quality,Happy with this purchase. It works well and the quality is good for the price.,2025-05-31T00:00:00Z
+778,315,163,1,Complete waste,Avoid this product at all costs. It's nothing like the description or photos.,2024-11-07T00:00:00Z
+779,76,26,5,Best purchase ever,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-01-03T20:56:10Z
+780,378,150,5,Amazing quality,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-04-05T21:29:49Z
+781,110,215,3,Meets expectations,Decent product for the price point. Some features could be improved.,2025-02-10T00:00:00Z
+782,297,89,4,Solid choice,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-10-20T21:13:27Z
+783,321,206,3,Meets expectations,It works but I expected a bit more based on the description. Okay overall.,2024-11-12T08:48:26Z
+784,288,187,3,Acceptable,Meets basic expectations but doesn't stand out. You get what you pay for.,2024-05-26T14:33:36Z
+785,313,205,2,Disappointed,Product arrived damaged and customer service was slow to respond. Not happy.,2025-04-20T00:00:00Z
+786,280,74,3,Meets expectations,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-12-22T00:00:00Z
+787,290,55,3,Does the job,Meets basic expectations but doesn't stand out. You get what you pay for.,2024-07-11T00:00:00Z
+788,390,74,5,Worth every penny,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-12-17T23:57:59Z
+789,141,181,5,Love it!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-08-31T00:00:00Z
+790,284,88,3,Does the job,Meets basic expectations but doesn't stand out. You get what you pay for.,2024-09-03T00:00:00Z
+791,102,77,4,Good quality,Happy with this purchase. It works well and the quality is good for the price.,2024-11-12T02:32:24Z
+792,15,472,5,Worth every penny,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-03-04T00:00:00Z
+793,293,187,4,Happy with purchase,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-05-08T14:33:36Z
+794,328,320,5,Worth every penny,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-10-30T00:00:00Z
+795,47,243,5,Highly recommend!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2018-12-02T12:59:40Z
+796,483,280,4,Would buy again,Nice quality and works as expected. Customer service was helpful when I had questions.,2018-02-15T10:27:55Z
+797,283,303,2,Underwhelming,Disappointed with this purchase. The quality is not as good as advertised.,2025-11-22T21:21:18Z
+798,104,116,4,Nice product,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-10-26T15:55:17Z
+799,411,200,2,Would not recommend,Product arrived damaged and customer service was slow to respond. Not happy.,2025-02-17T00:00:00Z
+800,465,353,4,Good quality,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-05-13T00:00:00Z
+801,12,117,5,Love it!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-08-31T00:00:00Z
+802,247,29,1,Complete waste,Worst purchase I've ever made. Cheaply made and doesn't work as advertised.,2025-05-28T00:00:00Z
+803,127,338,3,Meets expectations,It works but I expected a bit more based on the description. Okay overall.,2024-05-28T10:26:14Z
+804,189,135,5,Love it!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-06-08T00:00:00Z
+805,259,91,2,Not worth it,Disappointed with this purchase. The quality is not as good as advertised.,2024-12-04T18:27:07Z
+806,153,257,3,It's okay,Decent product for the price point. Some features could be improved.,2022-05-18T23:48:17Z
+807,44,7,3,It's okay,It's an average product. Nothing special but it gets the job done adequately.,2025-10-18T14:03:35Z
+808,80,347,4,Good quality,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-09-15T00:00:00Z
+809,5,409,3,It's okay,Decent product for the price point. Some features could be improved.,2025-11-27T11:51:32Z
+810,293,389,4,Solid choice,Happy with this purchase. It works well and the quality is good for the price.,2024-07-01T00:00:00Z
+811,421,122,4,Recommended,Good value for money. Does what I needed it to do. Would consider buying again.,2025-04-28T00:00:00Z
+812,484,105,5,Couldn't be happier,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-09-25T00:00:00Z
+813,85,141,5,Worth every penny,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-10-30T00:00:00Z
+814,394,243,5,Love it!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2018-11-09T12:59:40Z
+815,175,261,4,Solid choice,Nice quality and works as expected. Customer service was helpful when I had questions.,2023-12-26T00:00:00Z
+816,230,216,5,Highly recommend!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-11-15T00:00:00Z
+817,443,206,5,Love it!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2022-11-20T09:10:46Z
+818,259,296,3,It's okay,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-07-30T23:07:26Z
+819,481,231,4,Recommended,Happy with this purchase. It works well and the quality is good for the price.,2025-08-24T00:00:00Z
+820,107,359,5,Amazing quality,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-03-31T00:00:00Z
+821,67,462,5,Excellent product!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-05-02T00:00:00Z
+822,79,326,4,Recommended,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-04-09T00:00:00Z
+823,257,200,3,Fair value,Meets basic expectations but doesn't stand out. You get what you pay for.,2024-11-19T14:59:22Z
+824,75,361,4,Would buy again,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-11-12T00:00:00Z
+825,116,334,5,Worth every penny,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-11-07T00:00:00Z
+826,107,311,4,Very satisfied,Good value for money. Does what I needed it to do. Would consider buying again.,2025-05-17T10:58:29Z
+827,137,291,1,Terrible product,Avoid this product at all costs. It's nothing like the description or photos.,2025-05-07T00:00:00Z
+828,496,299,4,Happy with purchase,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-12-16T07:09:37Z
+829,332,251,5,Perfect!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2021-08-24T21:17:34Z
+830,349,280,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2017-09-22T10:27:55Z
+831,211,56,4,Very satisfied,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-05-25T00:00:00Z
+832,76,26,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-05-07T20:56:10Z
+833,242,464,4,Nice product,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-04-20T00:00:00Z
+834,46,325,4,Very satisfied,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-01-27T00:00:00Z
+835,253,98,3,It's okay,It works but I expected a bit more based on the description. Okay overall.,2024-01-27T00:00:00Z
+836,107,311,3,Meets expectations,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-01-07T10:58:29Z
+837,449,280,5,Best purchase ever,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2017-11-27T10:27:55Z
+838,243,294,2,Not great,Not worth the price. There are better options available for less money.,2024-10-19T00:00:00Z
+839,129,12,4,Happy with purchase,Good value for money. Does what I needed it to do. Would consider buying again.,2017-10-13T14:08:46Z
+840,436,200,4,Solid choice,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-12-21T14:59:22Z
+841,222,201,4,Great product,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-06-26T00:00:00Z
+842,444,462,4,Recommended,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-09-05T00:00:00Z
+843,467,267,5,Amazing quality,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-11-04T00:00:00Z
+844,82,15,4,Nice product,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-12-01T19:37:51Z
+845,394,115,4,Happy with purchase,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-01-06T03:33:47Z
+846,207,60,3,Does the job,Meets basic expectations but doesn't stand out. You get what you pay for.,2022-01-28T03:22:42Z
+847,407,113,1,Very disappointed,Terrible quality. Broke immediately and the company won't refund my purchase.,2025-02-03T23:00:36Z
+848,227,162,5,Exceeded expectations,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-02-20T01:46:13Z
+849,489,296,1,Stay away,Terrible quality. Broke immediately and the company won't refund my purchase.,2025-08-30T23:07:26Z
+850,15,415,4,Recommended,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-02-16T00:00:00Z
+851,200,167,5,Outstanding!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-01-25T00:00:00Z
+852,326,87,5,Couldn't be happier,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-05-18T00:00:00Z
+853,219,91,3,Fair value,Decent product for the price point. Some features could be improved.,2024-11-21T18:27:07Z
+854,330,280,4,Nice product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2017-12-29T10:27:55Z
+855,225,13,2,Could be better,Had issues right out of the box. Quality control seems lacking.,2025-12-23T00:40:11Z
+856,39,349,4,Recommended,Happy with this purchase. It works well and the quality is good for the price.,2024-11-14T18:30:28Z
+857,427,291,4,Great product,Good value for money. Does what I needed it to do. Would consider buying again.,2022-02-09T11:36:02Z
+858,150,275,5,Couldn't be happier,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-06-12T00:00:00Z
+859,196,374,5,Worth every penny,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2023-04-01T14:55:27Z
+860,62,374,5,Best purchase ever,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-02-28T00:00:00Z
+861,175,317,4,Very satisfied,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-07-27T06:12:07Z
+862,482,392,3,Nothing special,Decent product for the price point. Some features could be improved.,2024-09-18T00:00:00Z
+863,243,461,3,Does the job,It works but I expected a bit more based on the description. Okay overall.,2025-10-01T00:00:00Z
+864,485,324,3,Meets expectations,Middle of the road product. Not bad but not great either. Fair value.,2024-06-18T00:00:00Z
+865,343,408,4,Solid choice,Happy with this purchase. It works well and the quality is good for the price.,2025-12-05T00:00:00Z
+866,452,452,4,Would buy again,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-11-16T17:44:16Z
+867,180,60,5,Best purchase ever,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2022-04-28T03:22:42Z
+868,130,42,2,Disappointed,Had issues right out of the box. Quality control seems lacking.,2025-11-04T04:06:52Z
+869,441,457,5,Couldn't be happier,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-10-05T20:41:30Z
+870,64,82,5,Highly recommend!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-12-24T02:38:34Z
+871,410,89,3,It's okay,Meets basic expectations but doesn't stand out. You get what you pay for.,2024-08-26T21:13:27Z
+872,281,106,4,Great product,Good value for money. Does what I needed it to do. Would consider buying again.,2025-05-05T01:49:17Z
+873,93,349,4,Nice product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-08-11T18:30:28Z
+874,310,381,5,Couldn't be happier,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-11-23T00:00:00Z
+875,138,275,4,Would buy again,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-11-28T00:00:00Z
+876,236,287,5,Perfect!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-10-17T00:00:00Z
+877,277,180,4,Good quality,Nice quality and works as expected. Customer service was helpful when I had questions.,2023-12-12T14:41:57Z
+878,480,307,3,Nothing special,Meets basic expectations but doesn't stand out. You get what you pay for.,2025-10-20T01:59:48Z
+879,91,187,4,Would buy again,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-05-20T14:33:36Z
+880,43,115,5,Excellent product!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-08-22T00:00:00Z
+881,476,299,2,Below expectations,Not worth the price. There are better options available for less money.,2025-12-11T07:09:37Z
+882,449,280,2,Would not recommend,Disappointed with this purchase. The quality is not as good as advertised.,2017-09-03T10:27:55Z
+883,407,113,5,Best purchase ever,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-12-08T23:00:36Z
+884,432,91,5,Love it!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-01-04T18:27:07Z
+885,354,221,1,Very disappointed,Terrible quality. Broke immediately and the company won't refund my purchase.,2024-05-18T00:00:00Z
+886,49,379,4,Would buy again,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-08-18T00:00:00Z
+887,332,251,3,Average product,It's an average product. Nothing special but it gets the job done adequately.,2021-09-28T21:17:34Z
+888,337,340,1,Total failure,Complete waste of money. This product stopped working after just two days.,2025-08-12T00:00:00Z
+889,394,115,3,Fair value,It works but I expected a bit more based on the description. Okay overall.,2024-11-27T03:33:47Z
+890,39,349,5,Worth every penny,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-08-16T18:30:28Z
+891,279,227,5,Perfect!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-06-28T00:00:00Z
+892,373,180,2,Not great,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2024-09-16T00:00:00Z
+893,499,410,5,Perfect!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-05-24T00:00:00Z
+894,318,260,5,Amazing quality,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-05-21T19:52:47Z
+895,21,282,5,Excellent product!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-11-26T20:49:43Z
+896,257,200,4,Solid choice,Good value for money. Does what I needed it to do. Would consider buying again.,2024-08-23T14:59:22Z
+897,444,82,5,Outstanding!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-01-06T00:00:00Z
+898,192,191,5,Excellent product!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-07-07T00:00:00Z
+899,306,257,5,Excellent product!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2022-04-25T23:48:17Z
+900,118,253,5,Worth every penny,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2015-10-05T22:03:48Z
+901,246,198,4,Nice product,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-01-22T00:00:00Z
+902,422,204,3,Acceptable,Decent product for the price point. Some features could be improved.,2019-12-04T20:41:08Z
+903,252,115,5,Excellent product!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-11-21T03:33:47Z
+904,9,89,4,Happy with purchase,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-12-04T21:13:27Z
+905,445,354,5,Five stars deserved,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-05-17T20:30:35Z
+906,13,221,5,Outstanding!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-11-04T00:00:00Z
+907,43,390,3,Acceptable,It's an average product. Nothing special but it gets the job done adequately.,2025-12-24T00:00:00Z
+908,280,12,4,Very satisfied,Nice quality and works as expected. Customer service was helpful when I had questions.,2017-12-15T14:08:46Z
+909,155,260,4,Recommended,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-06-20T19:52:47Z
+910,411,64,2,Disappointed,Product arrived damaged and customer service was slow to respond. Not happy.,2018-10-20T02:25:12Z
+911,330,280,1,Complete waste,Do not buy! This is a scam product. I want my money back immediately.,2017-10-18T10:27:55Z
+912,104,229,4,Happy with purchase,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-01-05T00:00:00Z
+913,154,49,4,Solid choice,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-09-05T00:00:00Z
+914,52,204,4,Very satisfied,Really good product overall. A few minor issues but nothing major. Would recommend.,2018-10-27T16:16:51Z
+915,292,201,5,Excellent product!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-09-02T00:00:00Z
+916,159,366,4,Nice product,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2025-09-23T00:00:00Z
+917,327,135,4,Nice product,Happy with this purchase. It works well and the quality is good for the price.,2025-08-03T00:00:00Z
+918,496,317,2,Not great,Not worth the price. There are better options available for less money.,2025-11-23T06:12:07Z
+919,392,185,5,Outstanding!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-01-17T07:10:52Z
+920,194,60,4,Nice product,Happy with this purchase. It works well and the quality is good for the price.,2022-04-12T08:25:00Z
+921,91,204,5,Couldn't be happier,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2018-10-05T16:16:51Z
+922,144,302,1,Awful quality,Worst purchase I've ever made. Cheaply made and doesn't work as advertised.,2025-09-09T00:00:00Z
+923,321,206,5,Love it!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-01-17T08:48:26Z
+924,58,2,4,Very satisfied,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-12-16T00:49:29Z
+925,495,457,4,Solid choice,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-10-15T20:41:30Z
+926,153,257,5,Perfect!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2022-04-10T23:48:17Z
+927,337,122,5,Worth every penny,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-09-09T00:00:00Z
+928,55,282,3,Nothing special,Decent product for the price point. Some features could be improved.,2025-10-20T00:00:00Z
+929,338,354,1,Complete waste,Complete waste of money. This product stopped working after just two days.,2025-05-04T20:30:35Z
+930,340,162,4,Good quality,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-07-22T01:46:13Z
+931,496,317,2,Below expectations,Disappointed with this purchase. The quality is not as good as advertised.,2025-10-14T06:12:07Z
+932,476,54,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-05-26T00:00:00Z
+933,51,180,2,Underwhelming,Below my expectations. It works but feels cheaply made. Wouldn't buy again.,2023-12-11T14:41:57Z
+934,155,260,3,Acceptable,Middle of the road product. Not bad but not great either. Fair value.,2025-07-28T19:52:47Z
+935,300,223,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2021-09-15T03:10:34Z
+936,149,346,4,Good quality,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-08-19T00:00:00Z
+937,301,462,1,Awful quality,Do not buy! This is a scam product. I want my money back immediately.,2024-06-13T00:00:00Z
+938,244,333,4,Recommended,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-12-10T01:48:09Z
+939,182,49,5,Highly recommend!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-12-22T19:58:09Z
+940,162,412,1,Very disappointed,Avoid this product at all costs. It's nothing like the description or photos.,2025-07-10T00:00:00Z
+941,58,2,1,Worst purchase,Worst purchase I've ever made. Cheaply made and doesn't work as advertised.,2025-10-27T00:49:29Z
+942,398,91,3,Nothing special,Middle of the road product. Not bad but not great either. Fair value.,2025-04-22T00:00:00Z
+943,33,116,4,Recommended,Good value for money. Does what I needed it to do. Would consider buying again.,2025-12-14T15:55:17Z
+944,489,129,5,Best purchase ever,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2022-07-21T17:32:09Z
+945,348,342,5,Five stars deserved,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2018-07-11T09:41:23Z
+946,489,54,4,Would buy again,Good value for money. Does what I needed it to do. Would consider buying again.,2022-02-08T06:37:21Z
+947,125,226,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-10-21T00:00:00Z
+948,23,453,5,Amazing quality,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-11-19T00:00:00Z
+949,225,13,3,Nothing special,Middle of the road product. Not bad but not great either. Fair value.,2025-12-21T00:40:11Z
+950,252,115,4,Recommended,Solid product that delivers on its promises. Shipping was fast and packaging was good.,2024-12-05T03:33:47Z
+951,311,115,5,Highly recommend!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-01-17T03:33:47Z
+952,226,227,4,Nice product,Really good product overall. A few minor issues but nothing major. Would recommend.,2024-10-07T00:00:00Z
+953,45,2,3,Decent quality,Middle of the road product. Not bad but not great either. Fair value.,2025-11-27T00:49:29Z
+954,370,360,3,Average product,It works but I expected a bit more based on the description. Okay overall.,2024-06-13T00:00:00Z
+955,422,204,5,Couldn't be happier,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2020-02-13T20:41:08Z
+956,57,158,3,Nothing special,Middle of the road product. Not bad but not great either. Fair value.,2024-12-31T00:00:00Z
+957,409,40,5,Couldn't be happier,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-07-24T00:00:00Z
+958,123,48,2,Underwhelming,Disappointed with this purchase. The quality is not as good as advertised.,2025-04-29T00:00:00Z
+959,137,95,4,Great product,Happy with this purchase. It works well and the quality is good for the price.,2025-07-01T00:00:00Z
+960,227,80,3,Does the job,Decent product for the price point. Some features could be improved.,2024-04-18T00:00:00Z
+961,251,333,5,Five stars deserved,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-11-15T01:48:09Z
+962,119,120,5,Couldn't be happier,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-10-14T00:00:00Z
+963,344,325,5,Excellent product!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-03-27T00:00:00Z
+964,276,110,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2020-12-23T01:21:26Z
+965,463,130,3,Acceptable,It's an average product. Nothing special but it gets the job done adequately.,2025-08-07T00:00:00Z
+966,76,149,4,Good quality,Good value for money. Does what I needed it to do. Would consider buying again.,2024-04-12T00:00:00Z
+967,471,91,5,Five stars deserved,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-04-07T18:27:07Z
+968,445,133,1,Worst purchase,Avoid this product at all costs. It's nothing like the description or photos.,2025-09-09T00:00:00Z
+969,2,428,4,Solid choice,Really good product overall. A few minor issues but nothing major. Would recommend.,2023-03-02T17:25:23Z
+970,118,243,3,Decent quality,Meets basic expectations but doesn't stand out. You get what you pay for.,2019-01-18T12:59:40Z
+971,52,150,5,Highly recommend!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2024-01-18T21:29:49Z
+972,91,187,5,Best purchase ever,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2024-08-08T14:33:36Z
+973,249,150,5,Outstanding!,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2024-01-28T21:29:49Z
+974,327,125,5,Outstanding!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-06-11T08:00:23Z
+975,271,89,3,Fair value,It's an average product. Nothing special but it gets the job done adequately.,2025-12-01T00:00:00Z
+976,464,162,4,Recommended,Nice quality and works as expected. Customer service was helpful when I had questions.,2025-03-01T01:46:13Z
+977,10,494,5,Exceeded expectations,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2024-11-17T00:00:00Z
+978,280,12,3,Decent quality,Decent product for the price point. Some features could be improved.,2017-12-06T14:08:46Z
+979,321,206,5,Excellent product!,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2025-03-31T08:48:26Z
+980,2,428,5,Amazing quality,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2023-01-31T17:25:23Z
+981,186,224,2,Disappointed,Had issues right out of the box. Quality control seems lacking.,2025-06-07T00:00:00Z
+982,113,355,5,Excellent product!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-03-01T20:49:39Z
+983,410,321,4,Recommended,Nice quality and works as expected. Customer service was helpful when I had questions.,2024-11-26T00:00:00Z
+984,135,89,5,Amazing quality,I've been using this for weeks now and I'm absolutely thrilled with it. Highly recommended!,2024-03-26T00:00:00Z
+985,349,280,4,Would buy again,Good value for money. Does what I needed it to do. Would consider buying again.,2017-10-23T10:27:55Z
+986,334,60,5,Amazing quality,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2021-12-04T08:25:00Z
+987,398,313,2,Underwhelming,Had issues right out of the box. Quality control seems lacking.,2025-04-16T00:00:00Z
+988,423,116,5,Excellent product!,Fantastic product! It does exactly what it promises and more. Very happy customer here.,2025-11-06T15:55:17Z
+989,97,204,1,Very disappointed,Avoid this product at all costs. It's nothing like the description or photos.,2025-02-06T11:36:43Z
+990,116,24,5,Highly recommend!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2025-07-06T00:00:00Z
+991,416,457,4,Would buy again,Happy with this purchase. It works well and the quality is good for the price.,2024-06-24T20:41:30Z
+992,156,2,5,Couldn't be happier,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2025-12-03T00:49:29Z
+993,411,64,3,Acceptable,It works but I expected a bit more based on the description. Okay overall.,2018-11-09T02:25:12Z
+994,477,94,5,Amazing quality,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-03-20T00:00:00Z
+995,277,180,5,Highly recommend!,Best purchase I've made in a long time. The build quality is excellent and it arrived quickly.,2023-11-17T14:41:57Z
+996,216,276,5,Couldn't be happier,This product exceeded all my expectations. The quality is outstanding and it works perfectly.,2025-02-12T00:00:00Z
+997,276,110,5,Highly recommend!,Top-notch quality and great value for money. Would definitely purchase from this brand again.,2021-02-09T01:21:26Z
+998,51,45,4,Happy with purchase,Really good product overall. A few minor issues but nothing major. Would recommend.,2025-11-09T00:00:00Z
+999,28,257,3,Meets expectations,Meets basic expectations but doesn't stand out. You get what you pay for.,2022-03-30T23:48:17Z
+1000,284,209,3,Average product,Middle of the road product. Not bad but not great either. Fair value.,2019-09-07T15:31:56Z

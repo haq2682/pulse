@@ -1,0 +1,51 @@
+supplier_id,supplier_rating,supplier_status,is_preferred,is_verified,contract_start_date,contract_end_date,city,state,zip_code,country
+21,4.27,Under Review,False,False,2020-02-01,2024-06-27,Nice,Unknown,23996,FR
+40,3.33,Inactive,False,True,2020-10-01,2025-09-26,London,England,,GB
+33,4.79,Inactive,False,True,2023-09-13,2025-11-14,Lyon,Nouvelle-Aquitaine,52133,FR
+8,4.66,Inactive,False,True,2022-02-28,2025-08-08,Unknown,Hesse,64627,DE
+5,3.83,Inactive,False,False,2018-09-25,2020-05-23,San Jose,IL,70037,US
+46,4.24,Active,False,True,2022-06-24,2026-01-21,San Diego,NY,81232,US
+47,4.24,Inactive,False,True,2019-03-29,2023-11-26,Toronto,QC,,CA
+29,4.16,Under Review,False,True,2022-03-16,2025-05-21,Columbus,FL,46233,US
+9,3.92,Inactive,False,True,2021-07-06,2024-04-01,New York,PA,34836,US
+50,4.82,Inactive,False,True,2018-12-26,2020-08-12,Bordeaux,Nouvelle-Aquitaine,31563,FR
+34,3.59,Inactive,False,True,2023-05-06,2024-09-17,Edinburgh,England,,GB
+31,3.91,Inactive,False,True,2018-06-11,2019-09-14,Seattle,MI,31573,US
+37,1.9,Inactive,False,True,2021-08-28,2024-05-18,Unknown,Berlin,96482,DE
+48,4.38,Active,False,True,2024-02-23,2026-01-21,Fort Worth,AZ,14494,US
+23,2.8,Inactive,False,True,2020-01-26,2021-08-18,Stuttgart,Hesse,36970,DE
+39,4.39,Inactive,False,True,2022-04-13,2025-01-18,Austin,GA,75840,US
+10,2.76,Active,False,True,2024-10-25,2026-01-21,Phoenix,IL,33143,US
+25,3.75,Under Review,False,True,2018-09-23,2021-04-12,New York,NC,49010,US
+14,4.22,Inactive,False,True,2019-07-06,2022-05-10,Hamburg,Saxony,62165,DE
+16,2.49,Inactive,False,False,2019-06-08,2023-01-07,Columbus,OR,64960,US
+49,4.54,Inactive,False,False,2018-07-27,2023-05-03,Vancouver,NS,,CA
+27,3.71,Inactive,False,False,2023-04-30,2025-12-19,Nice,Unknown,51273,FR
+24,4.96,Inactive,False,False,2018-05-11,2020-06-13,Munich,Bavaria,59025,DE
+7,4.25,Inactive,False,True,2018-03-25,2021-08-02,Manchester,Wales,,GB
+11,4.63,Under Review,False,True,2023-05-20,2025-12-21,Detroit,TX,81283,US
+32,4.84,Inactive,False,True,2021-12-31,2023-11-25,Houston,OH,94677,US
+38,4.36,Inactive,False,True,2020-01-30,2023-06-16,Strasbourg,Unknown,17553,FR
+15,4.02,Under Review,False,True,2020-01-29,2023-11-24,Quebec City,SK,,CA
+44,3.65,Active,False,True,2021-07-17,2026-01-21,Frankfurt,Berlin,10853,DE
+13,4.31,Inactive,False,False,2021-12-19,2025-06-11,Ottawa,QC,,CA
+4,4.37,Active,True,True,2023-12-31,2026-01-21,Toronto,SK,,CA
+36,4.9,Inactive,False,True,2020-10-02,2025-01-15,Denver,TX,32919,US
+35,4.17,Active,False,True,2024-04-21,2026-01-21,Strasbourg,Nouvelle-Aquitaine,99581,FR
+45,4.41,Inactive,False,False,2019-07-19,2022-05-03,Detroit,PA,55876,US
+3,4.49,Under Review,False,True,2019-07-19,2022-03-10,Winnipeg,NS,,CA
+43,3.83,Inactive,False,False,2018-01-22,2020-06-17,Los Angeles,CA,92051,US
+20,1.12,Under Review,False,True,2019-05-13,2020-10-12,Vancouver,QC,,CA
+18,1.07,Inactive,False,False,2023-06-05,2025-05-13,Jacksonville,FL,81605,US
+12,4.79,Under Review,False,True,2020-12-21,2023-03-17,Boston,FL,15055,US
+30,3.05,Inactive,False,True,2018-07-22,2023-04-03,Houston,IL,70543,US
+19,4.63,Inactive,False,False,2022-10-02,2024-07-23,New York,MI,11995,US
+17,1.73,Active,False,True,2024-09-10,2026-01-21,Columbus,NY,80426,US
+26,3.92,Active,False,True,2024-04-22,2026-01-21,Marseille,Occitanie,54009,FR
+41,1.13,Inactive,False,True,2021-06-09,2022-11-09,Unknown,North Rhine-Westphalia,20327,DE
+1,4.12,Under Review,False,False,2024-02-24,2025-02-28,Manchester,Scotland,,GB
+2,3.05,Under Review,False,True,2023-05-23,2024-12-28,Edmonton,QC,,CA
+42,1.03,Active,False,False,2024-03-06,2026-01-21,Quebec City,MB,,CA
+6,4.25,Active,True,True,2023-05-17,2026-01-21,Boston,VA,47814,US
+22,2.77,Suspended,False,False,2024-08-06,2026-01-10,Memphis,WA,66744,US
+28,4.53,Under Review,False,False,2019-07-11,2022-03-10,Paris,Unknown,61602,FR
