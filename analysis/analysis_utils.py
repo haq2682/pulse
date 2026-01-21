@@ -1,4 +1,5 @@
 import os
+import os
 import pyspark.sql.functions as F
 from pyspark.sql import Window
 from minio import Minio
@@ -18,7 +19,27 @@ def get_agg_tables(spark, db_config=None):
     """
     Load aggregated tables from MinIO transformed/ directory.
     
+from minio import Minio
+
+
+def get_minio_client():
+    """Create and return a MinIO client instance."""
+    return Minio(
+        os.getenv("MINIO_ENDPOINT"),
+        access_key=os.getenv("MINIO_ACCESS_KEY"),
+        secret_key=os.getenv("MINIO_SECRET_KEY"),
+        secure=False,
+    )
+
+
+def get_agg_tables(spark, db_config=None):
+    """
+    Load aggregated tables from MinIO transformed/ directory.
+    
     Args:
+        spark: SparkSession
+        db_config: Deprecated parameter kept for backward compatibility
+        
         spark: SparkSession
         db_config: Deprecated parameter kept for backward compatibility
         
@@ -65,12 +86,15 @@ def get_agg_tables(spark, db_config=None):
 
     except Exception as e:
         print(f"Error loading tables from MinIO: {e}")
+        print(f"Error loading tables from MinIO: {e}")
         import traceback
         traceback.print_exc()
         return {}
 
 
+
 def is_column_all_null_or_zero(df, col_name):
+    if df is None: 
     if df is None: 
         return True                    
 
@@ -100,12 +124,15 @@ def is_column_all_null_or_zero(df, col_name):
     return False
 
 
+
 def add_time_grain(df, date_col, grain="day"):
+    if grain == "day": 
     if grain == "day": 
         return df.withColumn("grain_date", F.col(date_col))
     elif grain == "week":
         return df.withColumn("grain_year", F.year(date_col)) \
                  .withColumn("grain_week", F.weekofyear(date_col))
+    elif grain == "month": 
     elif grain == "month": 
         return df.withColumn("grain_year", F.year(date_col)) \
                  .withColumn("grain_month", F.month(date_col))
@@ -122,6 +149,7 @@ def check_null_dataframes(dataframe):
         if df is None:
             empty_dataframes.append(key)
             print(f"dataframe['{key}'] is None")
+        else: 
         else: 
             row_count = df.count()
             
@@ -149,7 +177,11 @@ def check_null_dataframes(dataframe):
         print(f"   - {key}")
     print(f"\n⚠️  All-NULL DataFrames ({len(all_null_dataframes)}):")
     for key in all_null_dataframes: 
+    for key in all_null_dataframes: 
         print(f"   - {key}")
     print(f"\n⚡ DataFrames with Some NULL values ({len(has_null_values)}):")
+    for key, cols in has_null_values: 
+        print(f"   - {key}:  {cols}")
+
     for key, cols in has_null_values: 
         print(f"   - {key}:  {cols}")

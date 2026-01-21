@@ -5,6 +5,7 @@ from config.spark_config import create_spark_session
 from config.minio_config import create_minio_client, BUCKET_NAME
 from loaders.data_loader import load_data_from_minio
 from exporters.minio_exporter import export_to_minio
+from exporters.minio_exporter import export_to_minio
 from transformations.campaigns import transform_campaigns
 from transformations.carts import transform_carts
 from transformations.customer_sessions import transform_customer_sessions
@@ -45,6 +46,7 @@ def main():
     transform_inventory(dataframes)
     transform_customer_sessions(dataframes)
     transform_reviews(dataframes)
+    transform_carts(dataframes)
     transform_carts(dataframes)
 
     aggregate_customers(dataframes)
