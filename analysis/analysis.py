@@ -154,7 +154,7 @@ def main():
         
         return category_df
 
-    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "category"):
+    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "category") and not is_column_all_null_or_zero(dataframes["agg_products"], "profit_margin") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_profit") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold"):
         analysis["low_margin_categories"] = analyze_category_margins(dataframes["agg_products"])
     else: 
         print("Category column is all NULL or zero; skipping category margin analysis.")
@@ -184,12 +184,12 @@ def main():
                 .fillna({"customer_count": 0})
                 .orderBy(*order_cols, "account_status")
         )
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at") and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_status") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
         analysis["customer_account_status_distribution_daily"]   = status_distribution_over_time(dataframes["agg_customers"],"account_created_at","day")
         analysis["customer_account_status_distribution_weekly"]  = status_distribution_over_time(dataframes["agg_customers"], "account_created_at", "week")
         analysis["customer_account_status_distribution_monthly"] = status_distribution_over_time(dataframes["agg_customers"], "account_created_at", "month")
     else:
-        print("Account created at column is all NULL or zero; skipping status distribution over time analysis.")
+        print("One of the required columns (account_created_at, account_status, customer_id) is all NULL or zero; skipping status distribution over time analysis.")
     
     
     # New customers per day/week/month
@@ -213,12 +213,12 @@ def main():
                 .orderBy(*order_cols)
         )
         return new_df
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
         analysis["new_customers_daily"] = new_customers(dataframes["agg_customers"],"account_created_date", "day")
         analysis["new_customers_weekly"]  = new_customers(dataframes["agg_customers"], "account_created_date", "week")
         analysis["new_customers_monthly"]= new_customers(dataframes["agg_customers"], "account_created_date", "month")
     else:
-        print("Account created at column is all NULL or zero; skipping new customers analysis.")
+        print("One of the required columns (account_created_date, customer_id) is all NULL or zero; skipping new customers analysis.")
 
     # Cumulative customer growth curve
     def cumulative_customers(df, date_col="account_created_at", grain="day"):
@@ -241,23 +241,23 @@ def main():
         ).fillna({"cumulative_customers": 0})   
         
         return cum_df
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
         analysis["cumulative_customers_daily"]   = cumulative_customers(dataframes["agg_customers"],"account_created_date", "day")
         analysis["cumulative_customers_weekly"]  = cumulative_customers(dataframes["agg_customers"], "account_created_date", "week")
         analysis["cumulative_customers_monthly"] = cumulative_customers(dataframes["agg_customers"], "account_created_date", "month")
     else:
-        print("Account created at column is all NULL or zero; skipping cumulative customers analysis.")
+        print("One of the required columns (account_created_date, customer_id) is all NULL or zero; skipping cumulative customers analysis.")
 
 
     # Total new customers by geography + time
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province") and not is_column_all_null_or_zero(dataframes["agg_customers"], "city") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
         geo_acquisition = (
             dataframes["agg_customers"]
             .groupBy("country", "state_province", "city")
             .agg(F.countDistinct("customer_id").alias("new_customers"))
         )
     else:
-        print("Account created at column is all NULL or zero; skipping geo acquisition analysis.")
+        print("One of the required columns (account_created_at, country, state_province, city, customer_id) is all NULL or zero; skipping geo acquisition analysis.")
 
     def geo_acquisition_over_time(df, date_col="account_created_at", grain="day"):
         df_g = add_time_grain(df, date_col=date_col, grain=grain)
@@ -279,13 +279,13 @@ def main():
                 .orderBy(*order_cols)
         )
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province") and not is_column_all_null_or_zero(dataframes["agg_customers"], "city") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
         analysis["new_customers_geo_acquisition_daily"]   = geo_acquisition_over_time(dataframes["agg_customers"], "account_created_date", "day")
         analysis["new_customers_geo_acquisition_monthly"] = geo_acquisition_over_time(dataframes["agg_customers"], "account_created_date", "month")
     else:
-        print("Account created at column is all NULL or zero; skipping geo acquisition over time analysis.")
+        print("One of the required columns (account_created_date, country, state_province, city, customer_id) is all NULL or zero; skipping geo acquisition over time analysis.")
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_age_group"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_age_group") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
         analysis["customer_age_group_distribution"] = (
             dataframes["agg_customers"]
             .groupBy("customer_age_group")
@@ -516,7 +516,7 @@ def main():
     else:
         print("session_conversion_rate column is all NULL or zero; skipping session conversion percentage calculation.")
 
-    if not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate"):
+    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate"):
         abandon_percentage = dataframes["agg_customers"].withColumn(
             "cart_abandonment_percentage",
             F.when(F.col("cart_abandonment_rate") < 0.1, "<10%")
@@ -5669,7 +5669,7 @@ def main():
 
     # Overall wishlist usage and conversion
 
-    if not is_column_all_null_or_zero(dataframes["agg_wishlist"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "purchased_date") and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "customer_id"):
+    if "agg_wishlist" in dataframes and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "purchased_date") and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "customer_id"):
         analysis["wishlist_overall_summary"] = dataframes["agg_wishlist"].agg(
             F.count("*").alias("total_wishlist_items"),
             F.countDistinct("customer_id").alias("customers_using_wishlist"),
@@ -5691,7 +5691,7 @@ def main():
 
     # Wishlist usage & conversion by product
 
-    if not is_column_all_null_or_zero(dataframes["agg_wishlist"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "purchased_date"):
+    if "agg_wishlist" in dataframes and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "purchased_date"):
         analysis["wishlist_by_product"] = (
             dataframes["agg_wishlist"]  
             .groupBy("product_id")
@@ -5965,7 +5965,7 @@ def main():
     
     # Abandonment & recovery (using agg_cart_abandonment_analysis)
 
-    if not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_id") and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status"):
+    if "agg_cart_abandonment_analysis" in dataframes and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_id") and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status"):
         analysis["cart_abandon_summary"] = dataframes["agg_cart_abandonment_analysis"].agg(
             F.countDistinct("cart_id").alias("total_carts_tracked"),
             F.countDistinct(F.when(F.col("cart_status") == "Abandoned", F.col("cart_id"))).alias("abandoned_carts"),
@@ -5990,7 +5990,7 @@ def main():
     
     # Value and size characteristics of abandoned vs purchased carts
 
-    if not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status"):
+    if "agg_cart_abandonment_analysis" in dataframes and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status"):
         analysis["cart_value_stats"] = (
             dataframes["agg_cart_abandonment_analysis"]
             .groupBy("cart_status")
@@ -6015,7 +6015,7 @@ def main():
 
     # Recovery opportunity: high-value abandoned carts
 
-    if not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status") and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_total_value"):
+    if "agg_cart_abandonment_analysis" in dataframes and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status") and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_total_value"):
         analysis["high_value_abandoned_carts"] = (
             dataframes["agg_cart_abandonment_analysis"]
             .filter(
