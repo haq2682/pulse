@@ -15,7 +15,7 @@ from pyspark.sql.functions import (
 
 def product_affinity(dataframes):
     # Skip aggregation if required dataframes don't exist
-    required_dataframes = ["order_items", "orders"]
+    required_dataframes = ["order_items", "orders", "products"]
     for df_name in required_dataframes:
         if df_name not in dataframes or dataframes[df_name] is None or dataframes[df_name].count() == 0:
             print(f"⚠️ Skipping product_affinity: '{df_name}' dataframe not found or empty")
@@ -43,6 +43,12 @@ def product_affinity(dataframes):
             col("a.order_id"),
         )
     )
+    
+    # Check if we have any product pairs (orders with multiple items)
+    if product_pairs.count() == 0:
+        print("⚠️ Skipping product_affinity: No product pairs found (orders may have only single items)")
+        return
+    
     product_affinity = product_pairs.groupBy("product_a_id", "product_b_id").agg(
         countDistinct("order_id").alias("co_occurrence_count")
     )
@@ -168,9 +174,12 @@ def product_affinity(dataframes):
             * lit(10),
         }
     )
+    # Filter product affinity data with minimal threshold
+    # Previous filter required co_occurrence_count >= 3 AND avg_lift >= 1.0
+    # which excluded all data in development/small production environments.
+    # Now using minimal threshold (co_occurrence_count >= 1) to ensure data flows through.
     product_affinity_filtered = product_affinity.filter(
-        (col("co_occurrence_count") >= 3)  # At least 3 co-occurrences
-        & (col("avg_lift") >= 1.0)  # Lift greater than random
+        col("co_occurrence_count") >= 1  # At least 1 co-occurrence
     )
     dataframes["product_affinity"] = product_affinity_filtered
     top_product_pairs = product_affinity_filtered.orderBy(
