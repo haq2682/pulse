@@ -13,8 +13,8 @@ def transform_carts(dataframes):
     # Skip transformation if required dataframes don't exist
     required_dataframes = ["cart_items", "shopping_cart", "customer_sessions", "orders"]
     for df_name in required_dataframes:
-        if df_name not in dataframes or dataframes[df_name] is None:
-            print(f"⚠️ Skipping transform_carts: '{df_name}' dataframe not found")
+        if df_name not in dataframes or dataframes[df_name] is None or dataframes[df_name].count() == 0:
+            print(f"⚠️ Skipping transform_carts: '{df_name}' dataframe not found or empty")
             return
     
     # Transform cart_items: calculate cart_age_time based on added_at

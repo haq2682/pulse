@@ -17,8 +17,8 @@ def product_affinity(dataframes):
     # Skip aggregation if required dataframes don't exist
     required_dataframes = ["order_items", "orders"]
     for df_name in required_dataframes:
-        if df_name not in dataframes or dataframes[df_name] is None:
-            print(f"⚠️ Skipping product_affinity: '{df_name}' dataframe not found")
+        if df_name not in dataframes or dataframes[df_name] is None or dataframes[df_name].count() == 0:
+            print(f"⚠️ Skipping product_affinity: '{df_name}' dataframe not found or empty")
             return
     
     order_products = (

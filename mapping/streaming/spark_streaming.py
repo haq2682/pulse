@@ -48,7 +48,7 @@ def create_spark_session() -> SparkSession:
         .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
         .getOrCreate()
-    ).sparkContext.setLogLevel("ERROR")
+    )
 
 
 def get_canonical_schema() -> StructType:
@@ -176,7 +176,7 @@ def run_streaming():
     
     # Initialize
     spark = create_spark_session()
-    spark.sparkContext.setLogLevel("WARN")
+    spark.sparkContext.setLogLevel("ERROR")
     
     # Use hardcoded columns_info from canonical schema
     columns_info = COLUMNS_INFO

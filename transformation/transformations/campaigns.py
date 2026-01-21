@@ -14,8 +14,8 @@ from pyspark.sql.functions import (
 
 def transform_campaigns(dataframes):
     # Skip transformation if marketing_campaigns doesn't exist
-    if "marketing_campaigns" not in dataframes or dataframes["marketing_campaigns"] is None:
-        print("⚠️ Skipping transform_campaigns: 'marketing_campaigns' dataframe not found")
+    if "marketing_campaigns" not in dataframes or dataframes["marketing_campaigns"] is None or dataframes["marketing_campaigns"].count() == 0:
+        print("⚠️ Skipping transform_campaigns: 'marketing_campaigns' dataframe not found or empty")
         return
     
     # Skip if required dependencies don't exist

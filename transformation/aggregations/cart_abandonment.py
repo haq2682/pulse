@@ -19,8 +19,8 @@ def cart_abandonment_aggregations(dataframes):
     # Skip aggregation if required dataframes don't exist
     required_dataframes = ["shopping_cart", "cart_items", "products", "customer_sessions"]
     for df_name in required_dataframes:
-        if df_name not in dataframes or dataframes[df_name] is None:
-            print(f"⚠️ Skipping cart_abandonment_aggregations: '{df_name}' dataframe not found")
+        if df_name not in dataframes or dataframes[df_name] is None or dataframes[df_name].count() == 0:
+            print(f"⚠️ Skipping cart_abandonment_aggregations: '{df_name}' dataframe not found or empty")
             return
     
     # Join shopping_cart with cart_items to get product-level details
