@@ -43,6 +43,12 @@ def product_affinity(dataframes):
             col("a.order_id"),
         )
     )
+    
+    # Check if we have any product pairs (orders with multiple items)
+    if product_pairs.count() == 0:
+        print("⚠️ Skipping product_affinity: No product pairs found (orders may have only single items)")
+        return
+    
     product_affinity = product_pairs.groupBy("product_a_id", "product_b_id").agg(
         countDistinct("order_id").alias("co_occurrence_count")
     )
