@@ -7253,7 +7253,15 @@ def main():
         and "agg_order_items" in dataframes
         and "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_processing_days_diff")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "delivery_days_diff")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_order_fulfillment_time_days")
+        and not is_column_all_null_or_zero(dataframes["agg_order_items"], "order_id")
+        and not is_column_all_null_or_zero(dataframes["agg_order_items"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_order_items"], "quantity")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
     ):
         orders_with_cat = (
             dataframes["agg_order_items"]. select("order_id", "product_id", "quantity")
@@ -7300,7 +7308,7 @@ def main():
     # =============================================================================
     # 2) Peak Processing Times Analysis
     # =============================================================================
-    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id"):
+    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_processing_days_diff") and not is_column_all_null_or_zero(dataframes["agg_orders"], "delivery_days_diff") and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount"):
         
         orders_time = (
             dataframes["agg_orders"]
@@ -7520,8 +7528,14 @@ def main():
     if (
         "agg_orders" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "subtotal")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "shipping_cost")
         and "agg_customers" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
+        and not is_column_all_null_or_zero(dataframes["agg_customers"], "country")
+        and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province")
+        and not is_column_all_null_or_zero(dataframes["agg_customers"], "city")
     ):
         # 1) Base orders: keep only fields needed
         orders = dataframes["agg_orders"].select(
@@ -7616,7 +7630,7 @@ def main():
     # Processing Delays by Season: season impact on order_processing_days_diff
 
 
-    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id"):
+    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_status") and not is_column_all_null_or_zero(dataframes["agg_orders"], "season") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_processing_days_diff"):
         orders = dataframes["agg_orders"].select(
             "order_id",
             "order_status",
@@ -7660,7 +7674,7 @@ def main():
 
     # Shipping Cost Outliers: Orders with unusually high shipping costs for investigation
 
-    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id"):
+    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and not is_column_all_null_or_zero(dataframes["agg_orders"], "subtotal") and not is_column_all_null_or_zero(dataframes["agg_orders"], "shipping_cost") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_status"):
         # 1) Base orders
         orders = dataframes["agg_orders"].select(
             "order_id",
