@@ -5500,11 +5500,23 @@ def main():
     has_suppliers = (
         "agg_suppliers" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "supplier_id")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "supplier_status")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "total_products_supplied")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "total_units_sold")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "total_orders_fulfilled")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "total_stockouts")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "total_revenue_generated")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "supplier_performance_score")
+        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "supplier_reliability_score")
     )
 
     has_sup_inv = (
         "agg_supplier_inventory_health" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "supplier_id")
+        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "total_products")
+        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "total_current_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "total_available_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "total_stockouts")
     )
 
     if not has_suppliers and not has_sup_inv:
@@ -6375,12 +6387,24 @@ def main():
 
     has_payments = "agg_payments" in dataframes and not is_column_all_null_or_zero(
         dataframes["agg_payments"], "payment_id"
+    ) and not is_column_all_null_or_zero(
+        dataframes["agg_payments"], "order_id"
+    ) and not is_column_all_null_or_zero(
+        dataframes["agg_payments"], "payment_method"
+    ) and not is_column_all_null_or_zero(
+        dataframes["agg_payments"], "payment_status"
     )
     has_customers = "agg_customers" in dataframes and not is_column_all_null_or_zero(
         dataframes["agg_customers"], "customer_id"
+    ) and not is_column_all_null_or_zero(
+        dataframes["agg_customers"], "country"
+    ) and not is_column_all_null_or_zero(
+        dataframes["agg_customers"], "state_province"
     )
     has_orders = "agg_orders" in dataframes and not is_column_all_null_or_zero(
         dataframes["agg_orders"], "order_id"
+    ) and not is_column_all_null_or_zero(
+        dataframes["agg_orders"], "customer_id"
     )
 
     if not (has_payments and has_customers and has_orders):
