@@ -28,9 +28,9 @@ MINIO_CONFIG = {
     "secret_key": os.getenv("MINIO_SECRET_KEY"),
 }
 
-def create_spark_session(app_name="analysis"):
+def create_spark_session(app_name="Analysis"):
     spark = (
-        SparkSession.builder.appName("Cleaning")
+        SparkSession.builder.appName(app_name)
         .master(os.getenv("SPARK_SERVER", "local[*]"))
         .config("spark.dynamicAllocation.enabled", "true")
         .config("spark.dynamicAllocation.minExecutors", "0")

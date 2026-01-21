@@ -2852,7 +2852,13 @@ def main():
 
     # 2) Critical products: high revenue + low days_of_supply (urgent replenishment)
 
-    if "product_inventory_health" in product_analysis:
+    if "product_inventory_health" in product_analysis and (
+        not is_column_all_null_or_zero(product_analysis["product_inventory_health"], "product_id")
+        and not is_column_all_null_or_zero(product_analysis["product_inventory_health"], "days_of_supply")
+        and not is_column_all_null_or_zero(product_analysis["product_inventory_health"], "total_revenue")
+        and not is_column_all_null_or_zero(product_analysis["product_inventory_health"], "reorder_urgency")
+        and not is_column_all_null_or_zero(product_analysis["product_inventory_health"], "stock_health_score")
+    ):
         base = (
             product_analysis["product_inventory_health"]
             .fillna(
@@ -3135,49 +3141,68 @@ def main():
     if has_suppliers or has_sup_inv:
         # Supplier base (from agg_suppliers if available)
         if has_suppliers:
-            s = dataframes["agg_suppliers"].select(
-                "supplier_id",
-                "supplier_status",
-                "total_products_supplied",
-                "total_units_sold",
-                "total_orders_fulfilled",
-                "total_stockouts",
-                "stockout_rate",                 # supplier-level stockout rate
-                "supplier_reliability_score",
-                "supplier_inventory_health_score",
-            )
+            supplier_cols = ["supplier_id"]
+            
+            # Check and add each column if it exists
+            if "supplier_status" in dataframes["agg_suppliers"].columns:
+                supplier_cols.append("supplier_status")
+            if "total_products_supplied" in dataframes["agg_suppliers"].columns:
+                supplier_cols.append("total_products_supplied")
+            if "total_units_sold" in dataframes["agg_suppliers"].columns:
+                supplier_cols.append("total_units_sold")
+            if "total_orders_fulfilled" in dataframes["agg_suppliers"].columns:
+                supplier_cols.append("total_orders_fulfilled")
+            if "total_stockouts" in dataframes["agg_suppliers"].columns:
+                supplier_cols.append("total_stockouts")
+            if "stockout_rate" in dataframes["agg_suppliers"].columns:
+                supplier_cols.append("stockout_rate")
+            if "supplier_reliability_score" in dataframes["agg_suppliers"].columns:
+                supplier_cols.append("supplier_reliability_score")
+            if "supplier_inventory_health_score" in dataframes["agg_suppliers"].columns:
+                supplier_cols.append("supplier_inventory_health_score")
+            
+            s = dataframes["agg_suppliers"].select(*supplier_cols)
         else:
             # Fallback: only supplier_id from inventory health
             s = dataframes["agg_supplier_inventory_health"].select("supplier_id").distinct()
 
         # Inventory health aggregates (renamed to avoid clashes)
         if has_sup_inv:
-            i = dataframes["agg_supplier_inventory_health"].select(
-                "supplier_id",
-                F.col("total_stockouts").alias("inv_total_stockouts"),
-                F.col("stockout_rate").alias("inv_stockout_rate"),
-                F.col("total_products").alias("inv_total_products"),
-                F.col("total_current_stock").alias("inv_total_current_stock"),
-                F.col("total_available_stock").alias("inv_total_available_stock"),
-            )
+            inv_cols = ["supplier_id"]
+            
+            if "total_stockouts" in dataframes["agg_supplier_inventory_health"].columns:
+                inv_cols.append(F.col("total_stockouts").alias("inv_total_stockouts"))
+            if "stockout_rate" in dataframes["agg_supplier_inventory_health"].columns:
+                inv_cols.append(F.col("stockout_rate").alias("inv_stockout_rate"))
+            if "total_products" in dataframes["agg_supplier_inventory_health"].columns:
+                inv_cols.append(F.col("total_products").alias("inv_total_products"))
+            if "total_current_stock" in dataframes["agg_supplier_inventory_health"].columns:
+                inv_cols.append(F.col("total_current_stock").alias("inv_total_current_stock"))
+            if "total_available_stock" in dataframes["agg_supplier_inventory_health"].columns:
+                inv_cols.append(F.col("total_available_stock").alias("inv_total_available_stock"))
+            
+            i = dataframes["agg_supplier_inventory_health"].select(*inv_cols)
             joined = s.alias("s").join(i.alias("i"), on="supplier_id", how="left")
         else:
             joined = s
 
+        # Build select list dynamically based on available columns
+        select_cols = [
+            "supplier_id",
+            F.coalesce(F.col("supplier_status"), F.lit("unknown")).alias("supplier_status") if "supplier_status" in joined.columns else F.lit("unknown").alias("supplier_status"),
+            F.coalesce(F.col("total_stockouts"), F.lit(0)).alias("total_stockouts") if "total_stockouts" in joined.columns else F.lit(0).alias("total_stockouts"),
+            F.coalesce(F.col("stockout_rate"), F.lit(0.0)).alias("supplier_stockout_rate") if "stockout_rate" in joined.columns else F.lit(0.0).alias("supplier_stockout_rate"),
+            F.coalesce(F.col("inv_total_stockouts"), F.lit(0)).alias("inv_total_stockouts") if "inv_total_stockouts" in joined.columns else F.lit(0).alias("inv_total_stockouts"),
+            F.coalesce(F.col("inv_stockout_rate"), F.lit(0.0)).alias("inv_stockout_rate") if "inv_stockout_rate" in joined.columns else F.lit(0.0).alias("inv_stockout_rate"),
+            F.coalesce(F.col("inv_total_products"), F.lit(0)).alias("inv_total_products") if "inv_total_products" in joined.columns else F.lit(0).alias("inv_total_products"),
+            F.coalesce(F.col("inv_total_current_stock"), F.lit(0)).alias("inv_total_current_stock") if "inv_total_current_stock" in joined.columns else F.lit(0).alias("inv_total_current_stock"),
+            F.coalesce(F.col("inv_total_available_stock"), F.lit(0)).alias("inv_total_available_stock") if "inv_total_available_stock" in joined.columns else F.lit(0).alias("inv_total_available_stock"),
+            F.coalesce(F.col("supplier_reliability_score"), F.lit(0.0)).alias("supplier_reliability_score") if "supplier_reliability_score" in joined.columns else F.lit(0.0).alias("supplier_reliability_score"),
+            F.coalesce(F.col("supplier_inventory_health_score"), F.lit(0.0)).alias("supplier_inventory_health_score") if "supplier_inventory_health_score" in joined.columns else F.lit(0.0).alias("supplier_inventory_health_score"),
+        ]
+
         supplier_analysis["stockout_rate_by_supplier"] = (
-            joined.select(
-                "supplier_id",
-                F.coalesce(F.col("supplier_status"), F.lit("unknown")).alias("supplier_status"),
-                F.coalesce(F.col("total_stockouts"), F.lit(0)).alias("total_stockouts"),
-                F.coalesce(F.col("stockout_rate"), F.lit(0.0)).alias("supplier_stockout_rate"),
-                F.coalesce(F.col("inv_total_stockouts"), F.lit(0)).alias("inv_total_stockouts"),
-                F.coalesce(F.col("inv_stockout_rate"), F.lit(0.0)).alias("inv_stockout_rate"),
-                F.coalesce(F.col("inv_total_products"), F.lit(0)).alias("inv_total_products"),
-                F.coalesce(F.col("inv_total_current_stock"), F.lit(0)).alias("inv_total_current_stock"),
-                F.coalesce(F.col("inv_total_available_stock"), F.lit(0)).alias("inv_total_available_stock"),
-                F.coalesce(F.col("supplier_reliability_score"), F.lit(0.0)).alias("supplier_reliability_score"),
-                F.coalesce(F.col("supplier_inventory_health_score"), F.lit(0.0)).alias("supplier_inventory_health_score"),
-            )
+            joined.select(*select_cols)
             .orderBy(
                 F.col("supplier_stockout_rate").desc_nulls_last(),
                 F.col("total_stockouts").desc_nulls_last(),
@@ -4286,7 +4311,7 @@ def main():
             )
         )
 
-        # Optional enrich with product metadata (again, skip stock_status to keep it simple)
+         # Optional enrich with product metadata (again, skip stock_status to keep it simple)
         if (
             "agg_products" in dataframes
             and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
@@ -4302,19 +4327,26 @@ def main():
 
         BREACH_THRESHOLD = 3
 
+        # Build select list dynamically based on available columns
+        select_cols = [
+            "product_id",
+            "supplier_id",
+            "reorder_point_breach_count",
+            "latest_stock_quantity",
+            "latest_available_stock",
+        ]
+        if "product_name" in breaches_agg.columns:
+            select_cols.append("product_name")
+        if "category" in breaches_agg.columns:
+            select_cols.append("category")
+        if "total_units_sold" in breaches_agg.columns:
+            select_cols.append("total_units_sold")
+        if "total_revenue" in breaches_agg.columns:
+            select_cols.append("total_revenue")
+
         product_analysis["reorder_point_breach_frequency"] = (
             breaches_agg.filter(F.col("reorder_point_breach_count") >= BREACH_THRESHOLD)
-            .select(
-                "product_id",
-                "supplier_id",
-                "reorder_point_breach_count",
-                "latest_stock_quantity",
-                "latest_available_stock",
-                "product_name",
-                "category",
-                "total_units_sold",
-                "total_revenue",
-            )
+            .select(*select_cols)
             .orderBy(F.col("reorder_point_breach_count").desc_nulls_last())
         )
 
@@ -4881,10 +4913,19 @@ def main():
             base = base.alias("i").join(prod.alias("p"), on="product_id", how="left")
 
         # Approx avg_daily_sales from total_sold or total_units_sold over 180 days
+        # Check if total_units_sold exists in base before using it
+        if "total_units_sold" in base.columns:
+            base = base.withColumn(
+                "total_units_sold_effective",
+                F.coalesce(F.col("total_sold"), F.col("total_units_sold")),
+            )
+        else:
+            base = base.withColumn(
+                "total_units_sold_effective",
+                F.coalesce(F.col("total_sold"), F.lit(0)),
+            )
+        
         base = base.withColumn(
-            "total_units_sold_effective",
-            F.coalesce(F.col("total_sold"), F.col("total_units_sold")),
-        ).withColumn(
             "avg_daily_sales_effective",
             F.when(
                 F.col("total_units_sold_effective") > 0,
@@ -5072,73 +5113,113 @@ def main():
             )
             base = base.alias("i").join(prod.alias("p"), on="product_id", how="left")
 
-        # days_since_restock from last_restocked_date
-        base = base.withColumn(
-            "days_since_restock_effective",
-            F.when(
-                F.col("last_restocked_date").isNotNull(),
-                F.datediff(F.current_date(), F.col("last_restocked_date")),
-            ).otherwise(F.col("days_since_launch")),
-        )
+        # Check if required columns exist before proceeding
+        has_last_restocked = "last_restocked_date" in base.columns and not is_column_all_null_or_zero(base, "last_restocked_date")
+        has_days_since_launch = "days_since_launch" in base.columns and not is_column_all_null_or_zero(base, "days_since_launch")
+        has_total_sold = "total_sold" in base.columns and not is_column_all_null_or_zero(base, "total_sold")
+        has_total_units_sold = "total_units_sold" in base.columns and not is_column_all_null_or_zero(base, "total_units_sold")
+        has_total_revenue = "total_revenue" in base.columns and not is_column_all_null_or_zero(base, "total_revenue")
 
-        # Sales velocity proxy
-        base = base.withColumn(
-            "total_units_sold_effective",
-            F.coalesce(F.col("total_sold"), F.col("total_units_sold")),
-        ).withColumn(
-            "avg_daily_sales_effective",
-            F.when(
-                F.col("total_units_sold_effective") > 0,
-                F.col("total_units_sold_effective") / F.lit(180.0),
-            ).otherwise(F.lit(0.0)),
-        )
+        # Only proceed if we have the minimum required columns
+        if has_last_restocked or has_days_since_launch:
+            # days_since_restock from last_restocked_date
+            if has_last_restocked:
+                base = base.withColumn(
+                    "days_since_restock_effective",
+                    F.when(
+                        F.col("last_restocked_date").isNotNull(),
+                        F.datediff(F.current_date(), F.col("last_restocked_date")),
+                    ).otherwise(F.col("days_since_launch") if has_days_since_launch else F.lit(None)),
+                )
+            elif has_days_since_launch:
+                base = base.withColumn(
+                    "days_since_restock_effective",
+                    F.col("days_since_launch"),
+                )
 
-        base = base.withColumn(
-            "days_of_supply_effective",
-            F.when(
-                F.col("avg_daily_sales_effective") > 0,
-                F.col("available_stock") / F.col("avg_daily_sales_effective"),
-            ).otherwise(F.lit(None)),
-        )
-
-        SLOW_MIN_DAYS_IN_STOCK = 60
-        SLOW_MAX_SALES_RATE = 0.5
-        SLOW_MIN_DOS = 30.0
-
-        slow = (
-            base.withColumn(
-                "is_slow_mover",
-                F.when(
-                    (F.col("available_stock") > 0)
-                    & (F.col("avg_daily_sales_effective") <= F.lit(SLOW_MAX_SALES_RATE))
-                    & (F.col("days_since_restock_effective").isNotNull())
-                    & (F.col("days_since_restock_effective") >= F.lit(SLOW_MIN_DAYS_IN_STOCK))
-                    & (
-                        F.col("days_of_supply_effective").isNull()
-                        | (F.col("days_of_supply_effective") >= F.lit(SLOW_MIN_DOS))
+            # Sales velocity proxy
+            if has_total_sold or has_total_units_sold:
+                base = base.withColumn(
+                    "total_units_sold_effective",
+                    F.coalesce(
+                        F.col("total_sold") if has_total_sold else F.lit(None),
+                        F.col("total_units_sold") if has_total_units_sold else F.lit(None)
                     ),
-                    1,
-                ).otherwise(0),
-            )
-            .filter(F.col("is_slow_mover") == 1)
-            .select(
-                "product_id",
-                *[c for c in ["product_name", "category"] if c in base.columns],
-                "supplier_id",
-                "available_stock",
-                "stock_quantity",
-                "avg_daily_sales_effective",
-                "days_of_supply_effective",
-                "days_since_restock_effective",
-                *[c for c in ["total_units_sold_effective", "total_revenue", "days_since_launch"] if c in base.columns],
-            )
-            .orderBy(
-                F.col("days_since_restock_effective").desc_nulls_last(),
-                F.col("avg_daily_sales_effective").asc_nulls_last(),
-            )
-        )
+                ).withColumn(
+                    "avg_daily_sales_effective",
+                    F.when(
+                        F.col("total_units_sold_effective") > 0,
+                        F.col("total_units_sold_effective") / F.lit(180.0),
+                    ).otherwise(F.lit(0.0)),
+                )
 
-        product_analysis["aging_inventory_slow_movers"] = slow
+                base = base.withColumn(
+                    "days_of_supply_effective",
+                    F.when(
+                        F.col("avg_daily_sales_effective") > 0,
+                        F.col("available_stock") / F.col("avg_daily_sales_effective"),
+                    ).otherwise(F.lit(None)),
+                )
+
+                SLOW_MIN_DAYS_IN_STOCK = 60
+                SLOW_MAX_SALES_RATE = 0.5
+                SLOW_MIN_DOS = 30.0
+
+                slow = (
+                    base.withColumn(
+                        "is_slow_mover",
+                        F.when(
+                            (F.col("available_stock") > 0)
+                            & (F.col("avg_daily_sales_effective") <= F.lit(SLOW_MAX_SALES_RATE))
+                            & (F.col("days_since_restock_effective").isNotNull())
+                            & (F.col("days_since_restock_effective") >= F.lit(SLOW_MIN_DAYS_IN_STOCK))
+                            & (
+                                F.col("days_of_supply_effective").isNull()
+                                | (F.col("days_of_supply_effective") >= F.lit(SLOW_MIN_DOS))
+                            ),
+                            1,
+                        ).otherwise(0),
+                    )
+                    .filter(F.col("is_slow_mover") == 1)
+                )
+
+                # Build select list dynamically based on available columns
+                select_cols = ["product_id"]
+                if "product_name" in slow.columns:
+                    select_cols.append("product_name")
+                if "category" in slow.columns:
+                    select_cols.append("category")
+                select_cols.extend([
+                    "supplier_id",
+                    "available_stock",
+                    "stock_quantity",
+                    "avg_daily_sales_effective",
+                    "days_of_supply_effective",
+                    "days_since_restock_effective"
+                ])
+                if "total_units_sold_effective" in slow.columns:
+                    select_cols.append("total_units_sold_effective")
+                if has_total_revenue and "total_revenue" in slow.columns:
+                    select_cols.append("total_revenue")
+                if has_days_since_launch and "days_since_launch" in slow.columns:
+                    select_cols.append("days_since_launch")
+
+                slow = slow.select(*select_cols).orderBy(
+                    F.col("days_since_restock_effective").desc_nulls_last(),
+                    F.col("avg_daily_sales_effective").asc_nulls_last(),
+                )
+
+                product_analysis["aging_inventory_slow_movers"] = slow
+            else:
+                print(
+                    "agg_inventory missing required sales columns (total_sold, total_units_sold); "
+                    "skipping aging inventory / slow movers analysis."
+                )
+        else:
+            print(
+                "agg_inventory missing required date columns (last_restocked_date, days_since_launch); "
+                "skipping aging inventory / slow movers analysis."
+            )
 
     else:
         print(
@@ -6778,6 +6859,16 @@ def main():
             "agg_payments or agg_orders missing/invalid; "
             "cannot compute refund rate by month."
         )
+    elif not (
+        "order_placed_year" in dataframes["agg_orders"].columns
+        and "order_placed_month" in dataframes["agg_orders"].columns
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_year")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_month")
+    ):
+        print(
+            "agg_orders missing order_placed_year or order_placed_month columns, or columns are all NULL/zero; "
+            "skipping refund rate by month analysis."
+        )
     else:
         payments = dataframes["agg_payments"].select(
             "payment_id",
@@ -7369,8 +7460,14 @@ def main():
     if (
         "agg_orders" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_delivered_at")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "delivery_days_diff")
         and "agg_customers" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
+        and not is_column_all_null_or_zero(dataframes["agg_customers"], "country")
+        and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province")
+        and not is_column_all_null_or_zero(dataframes["agg_customers"], "city")
     ):
         orders = dataframes["agg_orders"].select(
             "order_id",
@@ -7452,8 +7549,11 @@ def main():
     if (
         "agg_orders" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_delivered_at")
+        and not is_column_all_null_or_zero(dataframes["agg_orders"], "delivery_days_diff")
         and "agg_customers" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
+        and not is_column_all_null_or_zero(dataframes["agg_customers"], "country")
     ):
         orders = dataframes["agg_orders"].select(
             "order_id",
@@ -7798,7 +7898,6 @@ def main():
     )
     
     print(f"\n📦 Analytics exported to bucket: {export_result['bucket']}")
-    print(f"📁 Export timestamp: {export_result['timestamp']}")
 
     print("\n✅ Analysis Complete.")
 

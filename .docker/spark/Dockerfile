@@ -28,6 +28,8 @@ ENV PYSPARK_PYTHON=python3.10
 ENV PYSPARK_DRIVER_PYTHON=python3.10
 
 COPY requirements.txt /tmp/requirements.txt
+COPY packages.txt /tmp/packages.txt
 RUN pip3 install --no-cache-dir -r /tmp/requirements.txt
+RUN pip3 install --no-cache-dir -r /tmp/packages.txt
 
 USER spark
