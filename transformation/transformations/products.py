@@ -3,8 +3,8 @@ from pyspark.sql.functions import col, when
 
 def transform_products(dataframes):
     # Skip transformation if products doesn't exist
-    if "products" not in dataframes or dataframes["products"] is None:
-        print("⚠️ Skipping transform_products: 'products' dataframe not found")
+    if "products" not in dataframes or dataframes["products"] is None or dataframes["products"].count() == 0:
+        print("⚠️ Skipping transform_products: 'products' dataframe not found or empty")
         return
     
     dataframes["products"] = dataframes["products"].withColumns(

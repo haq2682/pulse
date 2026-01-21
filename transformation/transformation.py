@@ -33,6 +33,7 @@ load_dotenv(find_dotenv())
 
 def main():
     spark = create_spark_session()
+    spark.sparkContext.setLogLevel("ERROR")
     minio_client = create_minio_client()
 
     dataframes = load_data_from_minio(spark, minio_client, BUCKET_NAME)

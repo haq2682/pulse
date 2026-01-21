@@ -16,8 +16,8 @@ from pyspark.sql.functions import (
 
 def rfm_segmentation(dataframes):
     # Skip aggregation if orders dataframe doesn't exist
-    if "orders" not in dataframes or dataframes["orders"] is None:
-        print("⚠️ Skipping rfm_segmentation: 'orders' dataframe not found")
+    if "orders" not in dataframes or dataframes["orders"] is None or dataframes["orders"].count() == 0:
+        print("⚠️ Skipping rfm_segmentation: 'orders' dataframe not found or empty")
         return
     
     rfm_metrics = (
