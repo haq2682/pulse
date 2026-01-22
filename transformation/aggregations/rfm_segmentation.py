@@ -192,13 +192,30 @@ def rfm_segmentation(dataframes):
             .otherwise("Low Spender"),
             # Risk flag
             "churn_risk": when(
-                col("customer_segment_label").isin(
-                    "At Risk", "Cant Lose Them", "Hibernating", "Lost"
-                ),
-                "High Risk",
+                # High Risk: Long time since last order OR low engagement + declining activity
+                (col("days_since_last_order") > 90) |
+                (
+                    (col("recency_score") <= 2) & 
+                    (col("frequency_score") <= 2)
+                ) |
+                col("customer_segment_label").isin("At Risk", "Hibernating", "Lost"),
+                lit("High")
             )
-            .when(col("customer_segment_label") == "Need Attention", "Medium Risk")
-            .otherwise("Low Risk"),
+            .when(
+                # Medium Risk: Moderate inactivity OR segment-based risk
+                (col("days_since_last_order").between(60, 90)) |
+                (col("recency_score") == 2) |
+                col("customer_segment_label").isin("Need Attention", "Cant Lose Them"),
+                lit("Medium")
+            )
+            .when(
+                # Low Risk:  Recent activity AND decent engagement
+                (col("days_since_last_order") < 60) &
+                (col("recency_score") >= 3) &
+                col("customer_segment_label").isNotNull(),
+                lit("Low")
+            )
+            .otherwise(None),
             # Handle nulls
             "days_since_last_order": coalesce(col("days_since_last_order"), lit(999)),
             "total_orders_rfm": coalesce(col("total_orders_rfm"), lit(0)),
