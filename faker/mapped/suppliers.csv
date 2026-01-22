@@ -1,0 +1,51 @@
+supplier_id,supplier_rating,supplier_status,is_preferred,is_verified,contract_start_date,contract_end_date,city,state,zip_code,country
+SUPP_1,4.12,Under Review,False,False,2024-02-24,2025-02-28,Manchester,Scotland,VM5 8WV,GB
+SUPP_2,3.05,Under Review,False,True,2023-05-23,2024-12-28,Edmonton,QC,Y2X 5T8,CA
+SUPP_3,4.49,Under Review,False,True,2019-07-19,2022-03-10,Winnipeg,NS,G2A 2E4,CA
+SUPP_4,4.37,Active,True,True,2023-12-31,2027-01-05,Toronto,SK,V5L 4B4,CA
+SUPP_5,3.83,Inactive,False,False,2018-09-25,2020-05-23,San Jose,IL,70037,US
+SUPP_6,4.25,Active,True,True,2023-05-17,2026-06-08,Boston,VA,47814,US
+SUPP_7,4.25,Inactive,False,True,2018-03-25,2021-08-02,Manchester,Wales,ZZ5 3YA,GB
+SUPP_8,4.66,Inactive,False,True,2022-02-28,2025-08-08,Düsseldorf,Hesse,64627,DE
+SUPP_9,3.92,Inactive,False,True,2021-07-06,2024-04-01,New York,PA,34836,US
+SUPP_10,2.76,Active,False,True,2024-10-25,2027-07-24,Phoenix,IL,33143,US
+SUPP_11,4.63,Under Review,False,True,2023-05-20,2025-12-21,Detroit,TX,81283,US
+SUPP_12,4.79,Under Review,False,True,2020-12-21,2023-03-17,Boston,FL,15055,US
+SUPP_13,4.31,Inactive,False,False,2021-12-19,2025-06-11,Ottawa,QC,A1T 5T1,CA
+SUPP_14,4.22,Inactive,False,True,2019-07-06,2022-05-10,Hamburg,Saxony,62165,DE
+SUPP_15,4.02,Under Review,False,True,2020-01-29,2023-11-24,Quebec City,SK,J6V 1H2,CA
+SUPP_16,2.49,Inactive,False,False,2019-06-08,2023-01-07,Columbus,OR,64960,US
+SUPP_17,1.73,Active,False,True,2024-09-10,2029-07-24,Columbus,NY,80426,US
+SUPP_18,1.07,Inactive,False,False,2023-06-05,2025-05-13,Jacksonville,FL,81605,US
+SUPP_19,4.63,Inactive,False,False,2022-10-02,2024-07-23,New York,MI,11995,US
+SUPP_20,1.12,Under Review,False,True,2019-05-13,2020-10-12,Vancouver,QC,B7Y 5H6,CA
+SUPP_21,4.27,Under Review,False,False,2020-02-01,2024-06-27,Nice,Île-de-France,23996,FR
+SUPP_22,2.77,Suspended,False,False,2024-08-06,2026-01-10,Memphis,WA,66744,US
+SUPP_23,2.8,Inactive,False,True,2020-01-26,2021-08-18,Stuttgart,Hesse,36970,DE
+SUPP_24,4.96,Inactive,False,False,2018-05-11,2020-06-13,Munich,Bavaria,59025,DE
+SUPP_25,3.75,Under Review,False,True,2018-09-23,2021-04-12,New York,NC,49010,US
+SUPP_26,3.92,Active,False,True,2024-04-22,2026-05-14,Marseille,Occitanie,54009,FR
+SUPP_27,3.71,Inactive,False,False,2023-04-30,2025-12-19,Nice,Île-de-France,51273,FR
+SUPP_28,4.53,Under Review,False,False,2019-07-11,2022-03-10,Paris,Auvergne-Rhône-Alpes,61602,FR
+SUPP_29,4.16,Under Review,False,True,2022-03-16,2025-05-21,Columbus,FL,46233,US
+SUPP_30,3.05,Inactive,False,True,2018-07-22,2023-04-03,Houston,IL,70543,US
+SUPP_31,3.91,Inactive,False,True,2018-06-11,2019-09-14,Seattle,MI,31573,US
+SUPP_32,4.84,Inactive,False,True,2021-12-31,2023-11-25,Houston,OH,94677,US
+SUPP_33,4.79,Inactive,False,True,2023-09-13,2025-11-14,Lyon,Nouvelle-Aquitaine,52133,FR
+SUPP_34,3.59,Inactive,False,True,2023-05-06,2024-09-17,Edinburgh,England,PX7 1DI,GB
+SUPP_35,4.17,Active,False,True,2024-04-21,2027-06-07,Strasbourg,Nouvelle-Aquitaine,99581,FR
+SUPP_36,4.9,Inactive,False,True,2020-10-02,2025-01-15,Denver,TX,32919,US
+SUPP_37,1.9,Inactive,False,True,2021-08-28,2024-05-18,Düsseldorf,Berlin,96482,DE
+SUPP_38,4.36,Inactive,False,True,2020-01-30,2023-06-16,Strasbourg,Auvergne-Rhône-Alpes,17553,FR
+SUPP_39,4.39,Inactive,False,True,2022-04-13,2025-01-18,Austin,GA,75840,US
+SUPP_40,3.33,Inactive,False,True,2020-10-01,2025-09-26,London,England,CO2 3KA,GB
+SUPP_41,1.13,Inactive,False,True,2021-06-09,2022-11-09,Düsseldorf,North Rhine-Westphalia,20327,DE
+SUPP_42,1.03,Active,False,False,2024-03-06,2026-07-15,Quebec City,MB,L3Y 9H7,CA
+SUPP_43,3.83,Inactive,False,False,2018-01-22,2020-06-17,Los Angeles,CA,92051,US
+SUPP_44,3.65,Active,False,True,2021-07-17,2026-03-06,Frankfurt,Berlin,10853,DE
+SUPP_45,4.41,Inactive,False,False,2019-07-19,2022-05-03,Detroit,PA,55876,US
+SUPP_46,4.24,Active,False,True,2022-06-24,2026-12-01,San Diego,NY,81232,US
+SUPP_47,4.24,Inactive,False,True,2019-03-29,2023-11-26,Toronto,QC,L1T 4Y7,CA
+SUPP_48,4.38,Active,False,True,2024-02-23,2028-06-05,Fort Worth,AZ,14494,US
+SUPP_49,4.54,Inactive,False,False,2018-07-27,2023-05-03,Vancouver,NS,B5L 4H5,CA
+SUPP_50,4.82,Inactive,False,True,2018-12-26,2020-08-12,Bordeaux,Nouvelle-Aquitaine,31563,FR

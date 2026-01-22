@@ -1,0 +1,101 @@
+campaign_id,campaign_name,campaign_type,start_date,end_date,budget,spent_amount,impressions,clicks,conversions,campaign_status,target_audience
+1,Year End Search Push 2023,Search,2026-02-18,2026-05-14,85391.03,0.0,0.0,0.0,0.0,Planned,Budget Conscious
+2,Product Showcase Social 2024,Social Media,2025-12-05,2026-03-19,50261.07,9749.31,591896.0,6191.0,268.0,Paused,Loyalty Members
+3,Limited Time Offer SMS 2024,SMS,2025-05-02,2025-06-18,1529.97,1458.67,223600.0,22499.0,2185.0,Completed,"Weekend Browsers, First-Time Buyers, Returning Customers"
+4,Product Category Search 2023,Search,2025-07-19,2025-10-13,46407.45,48075.35,8809610.0,278308.0,11747.0,Completed,"Email Engaged, VIP Customers"
+5,Community Engagement 2024,Social Media,2025-08-28,2025-10-27,76435.87,72530.59,13728130.0,74335.0,2484.0,Completed,"High LTV Customers, Cart Abandoners, Holiday Shoppers"
+6,Labor Day Social Campaign 2025,Social Media,2025-03-06,2025-04-23,82942.74,69696.24,4034860.0,79954.0,874.0,Completed,Premium Shoppers
+7,Product Category Search 2025,Search,2026-02-04,2026-02-26,51744.58,0.0,0.0,0.0,0.0,Planned,"Frequent Buyers, Parents"
+8,Programmatic Display 2023,Display,2025-02-27,2025-04-10,25502.04,25363.97,3192876.0,12868.0,224.0,Completed,"First-Time Buyers, Premium Shoppers"
+9,Product Display Ads 2024,Display,2025-11-12,2026-01-27,85183.4,43634.33,3144777.0,12861.0,317.0,Active,"Gen Z 18-24, Email Engaged"
+10,Q3 Newsletter Campaign 2025,Email,2025-12-08,2026-01-23,5754.78,1946.66,171720.0,12050.0,136.0,Active,"Budget Conscious, Premium Shoppers, New Customers"
+11,Social Proof Campaign 2025,Social Media,2025-02-11,2025-05-03,78789.2,68687.15,4049171.0,115560.0,3382.0,Completed,Gen Z 18-24
+12,Product Showcase Social 2023,Social Media,2025-06-11,2025-07-07,4882.68,4304.88,607306.0,17643.0,122.0,Completed,"Email Engaged, First-Time Buyers"
+13,Product Showcase Social 2025,Social Media,2025-10-29,2026-02-06,91925.07,51526.74,5926115.0,57448.0,2644.0,Paused,Parents
+14,Product Launch Announcement 2024,Email,2025-09-07,2025-10-14,5158.49,5059.7,425851.0,18213.0,1116.0,Completed,High LTV Customers
+15,Cross-Network Display 2024,Display,2025-11-04,2026-01-15,77359.53,53696.97,3764217.0,13237.0,575.0,Active,"VIP Customers, Homeowners"
+16,Abandoned Cart Recovery 2024,Email,2025-11-12,2026-03-11,9784.56,3021.16,156667.0,11535.0,155.0,Paused,"Millennials 25-34, Desktop Users"
+17,Labor Day Social Campaign 2024,Social Media,2025-01-21,2025-03-25,11418.29,11826.13,666313.0,15538.0,760.0,Completed,"Millennials 25-34, Cart Abandoners, Gen Z 18-24"
+18,Influencer Partnership 2023,Social Media,2025-09-03,2025-09-13,96270.95,2202.97,185812.0,2551.0,116.0,Cancelled,Homeowners
+19,Summer Social Push 2025,Social Media,2025-12-10,2026-01-12,59672.02,28297.15,4453188.0,107749.0,2967.0,Paused,"Loyalty Members, Desktop Users"
+20,Local Search Campaign 2025,Search,2025-11-17,2026-01-01,26429.35,18594.27,1294466.0,96942.0,8431.0,Paused,High LTV Customers
+21,Q3 SMS Blast 2024,SMS,2025-11-19,2026-01-14,6755.31,4033.48,215845.0,21647.0,523.0,Paused,"VIP Customers, Mobile Users"
+22,Shopping Ads Campaign 2025,Search,2026-01-17,2026-04-08,50789.1,0.0,0.0,0.0,0.0,Planned,Loyalty Members
+23,Birthday Special Campaign 2025,Email,2025-05-04,2025-05-18,9331.79,1263.21,219124.0,12228.0,975.0,Cancelled,"Homeowners, Fashion Forward"
+24,Easter Social Campaign 2024,Social Media,2025-08-03,2025-09-10,74538.37,63303.44,4617958.0,137954.0,4874.0,Completed,"Budget Conscious, Holiday Shoppers"
+25,Spring Search Campaign 2024,Search,2025-07-09,2025-07-27,26054.31,23564.09,1564531.0,36834.0,2149.0,Completed,"Newsletter Subscribers, Gen Z 18-24, Budget Conscious"
+26,Native Advertising 2024,Display,2026-01-25,2026-02-10,22921.24,0.0,0.0,0.0,0.0,Planned,Homeowners
+27,Fall Search Campaign 2023,Search,2025-03-13,2025-04-27,78947.44,77640.86,5681398.0,283732.0,16107.0,Completed,"Lapsed Customers, Mobile Users, Weekend Browsers"
+28,Winter Search Campaign 2025,Search,2025-08-05,2025-10-02,45264.16,46655.35,5847314.0,263283.0,21531.0,Completed,Desktop Users
+29,Streaming TV Ads 2025,Video,2025-07-29,2025-10-15,47295.58,39153.55,2639129.0,38508.0,1058.0,Completed,First-Time Buyers
+30,Birthday Special Campaign 2024,Email,2025-02-17,2025-04-23,6012.24,5957.89,794546.0,11610.0,124.0,Completed,"Gen Z 18-24, Cart Abandoners"
+31,User Generated Content 2024,Social Media,2025-11-18,2026-01-03,4408.68,3468.22,252850.0,6833.0,244.0,Active,Tech Enthusiasts
+32,Flash Sale Alert 2024,Email,2025-11-13,2026-01-13,4760.82,2847.69,172481.0,7331.0,263.0,Active,"Returning Customers, Fashion Forward, High LTV Customers"
+33,Local Search Campaign 2023,Search,2025-01-02,2025-01-31,13083.57,12298.37,696648.0,65306.0,1842.0,Completed,"Gen Z 18-24, Newsletter Subscribers"
+34,Trending Topic Campaign 2024,Social Media,2025-11-27,2026-03-18,5176.71,1123.67,69277.0,801.0,32.0,Active,"Loyalty Members, High LTV Customers"
+35,Q4 Search Campaign 2023,Search,2025-09-06,2025-10-27,54819.96,52080.46,8561338.0,850007.0,61898.0,Completed,"Frequent Buyers, Lapsed Customers"
+36,Product Launch Announcement 2023,Email,2025-02-22,2025-03-10,6036.25,5195.28,490464.0,27641.0,1281.0,Completed,Holiday Shoppers
+37,Anniversary Mailing 2023,Direct Mail,2025-12-01,2026-01-17,32195.41,16929.46,NaN,NaN,NaN,Active,Premium Shoppers
+38,Valentine Email Blast 2023,Email,2025-06-13,2025-09-10,6118.87,5451.18,367396.0,25356.0,893.0,Completed,"Returning Customers, Mobile Users"
+39,Dynamic Search Ads 2025,Search,2025-09-12,2025-09-21,97102.55,17737.21,1292646.0,43866.0,3122.0,Cancelled,"Premium Shoppers, Homeowners, Parents"
+40,Product Display Ads 2025,Display,2025-11-26,2025-12-26,40358.7,36341.33,3299634.0,21709.0,711.0,Paused,"High LTV Customers, First-Time Buyers"
+41,Brand Keywords Campaign 2025,Search,2025-12-17,2026-02-08,17720.02,2508.52,161083.0,13318.0,1257.0,Active,Newsletter Subscribers
+42,Cross-Network Display 2025,Display,2025-12-09,2026-03-17,9659.23,1599.02,234535.0,1728.0,70.0,Paused,Premium Shoppers
+43,Dynamic Search Ads 2023,Search,2025-05-28,2025-08-02,36274.41,37995.96,3494005.0,327912.0,24501.0,Completed,"New Customers, Budget Conscious, Millennials 25-34"
+44,Brand Awareness Drive 2024,Social Media,2025-07-27,2025-09-02,39039.11,36025.32,3781534.0,54634.0,1505.0,Completed,"Homeowners, Millennials 25-34"
+45,Competitor Conquest 2024,Search,2025-03-02,2025-05-11,71404.85,61342.4,7739230.0,297055.0,12920.0,Completed,Budget Conscious
+46,Memorial Day Email Blast 2025,Email,2025-11-14,2026-01-19,3536.69,1935.05,98296.0,7113.0,122.0,Active,VIP Customers
+47,High Intent Keywords 2025,Search,2025-11-03,2026-01-09,66172.75,45659.55,3637506.0,109826.0,5498.0,Paused,"Homeowners, New Customers, Social Followers"
+48,Remarketing Search 2024,Search,2026-02-01,2026-04-18,15666.12,0.0,0.0,0.0,0.0,Planned,"Premium Shoppers, High LTV Customers"
+49,Shopping Ads Campaign 2023,Search,2025-06-27,2025-08-08,50607.3,41207.28,4294599.0,215810.0,16458.0,Completed,Loyalty Members
+50,Product Category Search 2024,Search,2025-11-05,2026-02-14,78784.76,41683.69,2297910.0,173571.0,3920.0,Active,"High LTV Customers, Newsletter Subscribers, Loyalty Members"
+51,Remarketing Search 2023,Search,2025-05-20,2025-06-18,74273.55,63693.56,5482057.0,138157.0,8639.0,Completed,Tech Enthusiasts
+52,Brand Awareness Display 2025,Display,2025-04-02,2025-04-16,99725.74,102532.85,5823552.0,38974.0,947.0,Completed,"Desktop Users, Lapsed Customers, Returning Customers"
+53,Q2 Social Push 2024,Social Media,2025-09-10,2025-11-16,77757.4,63231.02,6720367.0,71768.0,832.0,Completed,Mobile Users
+54,New Customer Welcome Kit 2025,Direct Mail,2025-08-18,2025-08-31,19540.84,2314.34,NaN,NaN,NaN,Cancelled,"Budget Conscious, Newsletter Subscribers"
+55,Competitor Conquest 2025,Search,2025-12-10,2026-01-24,8728.73,2382.91,249223.0,15475.0,364.0,Active,"VIP Customers, Millennials 25-34"
+56,Cyber Monday Social Campaign 2023,Social Media,2025-12-04,2026-02-02,29152.36,9335.12,1444796.0,29387.0,242.0,Paused,Desktop Users
+57,Short Form Video 2023,Video,2025-12-15,2026-01-14,20963.54,6734.23,802261.0,6339.0,147.0,Active,"Parents, Loyalty Members"
+58,Fall Newsletter Campaign 2023,Email,2025-03-06,2025-04-03,3177.4,2862.62,162305.0,9440.0,288.0,Completed,"Premium Shoppers, Lapsed Customers, Homeowners"
+59,Retargeting Display 2024,Display,2026-01-14,2026-02-08,15888.05,0.0,0.0,0.0,0.0,Planned,"Loyalty Members, Homeowners, Cart Abandoners"
+60,VIP Early Access SMS 2025,SMS,2025-11-26,2026-01-15,8176.84,4175.59,392678.0,47268.0,3121.0,Active,"Email Engaged, Holiday Shoppers, Weekend Browsers"
+61,Local Search Campaign 2024,Search,2025-11-01,2026-01-28,55598.0,34942.9,6510430.0,646158.0,17573.0,Active,"Mobile Users, Desktop Users"
+62,Prime Day Email Blast 2024,Email,2025-04-16,2025-05-26,4057.59,3810.67,359803.0,22151.0,446.0,Completed,VIP Customers
+63,User Generated Content 2023,Social Media,2025-05-25,2025-06-22,70375.79,7904.09,907412.0,17101.0,838.0,Cancelled,"Desktop Users, Newsletter Subscribers"
+64,YouTube Pre-Roll 2024,Video,2026-01-28,2026-03-18,5213.98,0.0,0.0,0.0,0.0,Planned,"New Customers, Tech Enthusiasts, Mobile Users"
+65,Back to School Video Push 2023,Video,2025-11-02,2026-02-21,97828.83,38057.3,2369216.0,31083.0,786.0,Active,"Weekend Browsers, Loyalty Members, Millennials 25-34"
+66,Labor Day SMS Deals 2024,SMS,2026-03-14,2026-04-10,1235.21,0.0,0.0,0.0,0.0,Planned,Gen Z 18-24
+67,High Intent Keywords 2024,Search,2025-04-30,2025-06-01,95396.13,96198.23,6357318.0,409480.0,16255.0,Completed,"Email Engaged, Cart Abandoners, Loyalty Members"
+68,Summer Newsletter Campaign 2025,Email,2025-12-28,2026-01-12,6837.72,571.01,41189.0,2602.0,122.0,Cancelled,Holiday Shoppers
+69,Spring Newsletter Campaign 2023,Email,2025-01-26,2025-03-09,8344.63,7538.22,675058.0,23365.0,1413.0,Completed,"Returning Customers, Mobile Users, Holiday Shoppers"
+70,Social Video Ads 2024,Video,2024-12-05,2025-03-01,43364.78,37454.37,3326875.0,29036.0,1089.0,Completed,Gen Z 18-24
+71,Q2 Search Campaign 2023,Search,2025-12-14,2026-02-25,80909.56,11797.29,716306.0,59169.0,2000.0,Active,"Frequent Buyers, Cart Abandoners"
+72,Influencer Partnership 2025,Social Media,2025-11-29,2026-03-02,88129.71,25833.27,2182365.0,22478.0,664.0,Active,"Newsletter Subscribers, Social Followers, Premium Shoppers"
+73,Loyalty Rewards Email 2025,Email,2026-01-22,2026-02-20,2257.07,0.0,0.0,0.0,0.0,Planned,"Gen Z 18-24, Holiday Shoppers, Lapsed Customers"
+74,Back to School Social Campaign 2025,Social Media,2026-01-17,2026-02-01,93061.76,0.0,0.0,0.0,0.0,Planned,Frequent Buyers
+75,Valentine Search Push 2025,Search,2025-11-06,2026-01-14,3130.34,1968.94,367485.0,8421.0,398.0,Active,"High LTV Customers, Email Engaged, Returning Customers"
+76,Q2 Video Campaign 2024,Video,2025-06-23,2025-07-28,46850.79,47697.99,2388577.0,28072.0,786.0,Completed,"Returning Customers, Homeowners"
+77,Black Friday Email Blast 2024,Email,2025-08-15,2025-09-15,6799.86,5943.92,957788.0,30429.0,1019.0,Completed,"High LTV Customers, Homeowners"
+78,Winter Video Campaign 2023,Video,2026-03-20,2026-05-12,53169.44,0.0,0.0,0.0,0.0,Planned,"Holiday Shoppers, VIP Customers, Cart Abandoners"
+79,Flash Sale Alert 2025,Email,2025-09-06,2025-11-08,5212.29,4379.64,613623.0,26376.0,2058.0,Completed,Frequent Buyers
+80,Easter Video Push 2024,Video,2025-02-10,2025-03-04,75634.85,62771.96,4202026.0,100013.0,3641.0,Completed,"Lapsed Customers, Desktop Users"
+81,Weekly Deals Newsletter 2025,Email,2025-12-11,2026-02-09,6455.16,1567.49,165890.0,4645.0,288.0,Active,Returning Customers
+82,Programmatic Display 2024,Display,2025-11-30,2026-01-16,26477.06,4835.04,774937.0,4556.0,48.0,Cancelled,"Cart Abandoners, Homeowners"
+83,Social Proof Campaign 2024,Social Media,2025-08-04,2025-09-28,88574.27,82844.69,13637730.0,166711.0,5997.0,Completed,"Parents, Loyalty Members, Millennials 25-34"
+84,Cross-Network Display 2023,Display,2025-08-17,2025-09-06,24103.69,20026.04,1424368.0,4188.0,77.0,Completed,"Holiday Shoppers, Gen Z 18-24"
+85,Abandoned Cart Recovery 2023,Email,2025-02-13,2025-03-10,4678.41,4472.6,275316.0,19066.0,238.0,Completed,"Returning Customers, Weekend Browsers"
+86,Social Video Ads 2025,Video,2025-11-19,2026-01-05,98656.86,77227.1,6408923.0,54200.0,428.0,Paused,Mobile Users
+87,Restock Alert SMS 2024,SMS,2026-03-25,2026-04-28,654.16,0.0,0.0,0.0,0.0,Planned,Lapsed Customers
+88,Q2 Social Push 2023,Social Media,2025-09-04,2025-12-01,16286.3,15641.68,917175.0,6021.0,257.0,Completed,"Newsletter Subscribers, Desktop Users, Parents"
+89,Winter Newsletter Campaign 2023,Email,2025-11-09,2026-02-10,5344.13,2890.6,265897.0,5121.0,389.0,Active,"Email Engaged, Budget Conscious, First-Time Buyers"
+90,New Arrivals Newsletter 2023,Email,2025-11-23,2026-01-17,9109.5,5547.67,685032.0,24195.0,728.0,Active,Tech Enthusiasts
+91,Fall Social Push 2023,Social Media,2025-01-20,2025-02-22,63547.52,63708.32,3838307.0,21498.0,940.0,Completed,"Parents, Mobile Users"
+92,Customer Win-Back Email 2025,Email,2025-03-25,2025-04-06,5255.53,464.95,80425.0,4844.0,177.0,Cancelled,"Parents, Homeowners"
+93,Dynamic Search Ads 2024,Search,2025-07-13,2025-10-04,4018.77,3882.98,268346.0,17770.0,887.0,Completed,VIP Customers
+94,Brand Keywords Campaign 2024,Search,2025-12-04,2026-02-24,94034.85,20898.96,1248897.0,71616.0,4530.0,Active,First-Time Buyers
+95,Spring Catalog Mailing 2023,Direct Mail,2025-11-02,2025-12-29,31312.97,24472.46,NaN,NaN,NaN,Paused,Homeowners
+96,Shopping Ads Campaign 2024,Search,2025-02-14,2025-04-18,90095.24,81880.65,4681235.0,243482.0,19108.0,Completed,Weekend Browsers
+97,Contextual Targeting 2023,Display,2025-07-13,2025-09-22,17517.02,14088.5,1844287.0,9614.0,440.0,Completed,Holiday Shoppers
+98,Black Friday Video Push 2023,Video,2025-06-17,2025-06-30,79701.32,10151.47,947386.0,11865.0,155.0,Cancelled,"Mobile Users, Budget Conscious, First-Time Buyers"
+99,Q4 Social Push 2025,Social Media,2026-03-05,2026-04-19,83305.84,0.0,0.0,0.0,0.0,Planned,Desktop Users
+100,User Generated Content 2025,Social Media,2025-11-12,2026-02-18,43026.04,20152.85,2710633.0,14956.0,569.0,Active,"New Customers, Returning Customers"
