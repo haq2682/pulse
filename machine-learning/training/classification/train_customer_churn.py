@@ -53,7 +53,7 @@ def create_spark_session():
         ) \
         .config("spark.dynamicAllocation.enabled", "true") \
         .config("spark.dynamicAllocation.minExecutors", "0") \
-        .config("spark.dynamicAllocation.maxExecutors", "8") \
+        .config("spark.dynamicAllocation.maxExecutors", "1000") \
         .config("spark.dynamicAllocation.initialExecutors", "1") \
         .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT")) \
         .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY")) \
