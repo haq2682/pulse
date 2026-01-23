@@ -9,7 +9,7 @@ from pyspark.sql.functions import (
 from pyspark.sql.types import StringType, DoubleType
 from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.classification import (
-    LogisticRegressionModel, RandomForestClassificationModel, GBTClassificationModel
+    LogisticRegressionModel, RandomForestClassificationModel
 )
 from pyspark.ml.feature import StringIndexerModel
 import findspark
@@ -22,9 +22,8 @@ INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
 OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/customer_churn_predictions"
 MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/models/customer_churn"
 
-# ⚠️ MANUAL INTERVENTION REQUIRED: Select model to use for inference
-# Available options: "LogisticRegression", "RandomForest", "GBT"
-SELECTED_MODEL = "RandomForest"  # <-- CHANGE THIS BASED ON TRAINING RESULTS
+# Available options: "LogisticRegression", "RandomForest"
+SELECTED_MODEL = "RandomForest"
 
 MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
 
@@ -98,8 +97,6 @@ def load_model(spark, model_dir, model_name):
             model = LogisticRegressionModel.load(model_path)
         elif model_name == "RandomForest":
             model = RandomForestClassificationModel.load(model_path)
-        elif model_name == "GBT":
-            model = GBTClassificationModel.load(model_path)
         else:
             raise ValueError(f"Unknown model type: {model_name}")
         
@@ -154,7 +151,7 @@ def prepare_features(df, feature_cols):
 
 def extract_feature_importance(model, model_name, feature_cols):
     """Extract feature importance from model"""
-    if model_name in ["RandomForest", "GBT"]:
+    if model_name == "RandomForest":
         importances = model.featureImportances.toArray()
         feature_importance = {
             feature_cols[i]: float(importances[i]) 

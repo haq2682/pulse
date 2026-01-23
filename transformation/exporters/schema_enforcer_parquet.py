@@ -365,22 +365,76 @@ def get_spark_type(type_string: str):
 
 def enforce_schema_with_types(df: DataFrame, schema_def: List[Tuple[str, str]], 
                               preserve_types: bool = True) -> DataFrame:
-    """Enforce schema with column types for Parquet export."""
+    """Enforce schema with column types for Parquet export.
+    
+    This function handles duplicate columns by renaming them temporarily,
+    then selecting only the first occurrence of each column, and finally
+    enforcing the expected schema.
+    
+    Args:
+        df: Input DataFrame
+        schema_def: List of (column_name, type_string) tuples defining expected schema
+        preserve_types: If True, cast columns to expected types
+        
+    Returns:
+        DataFrame with enforced schema
+    """
+    
+    # Step 1: Handle duplicate columns by renaming them
+    all_columns = df.columns
+    
+    # Check if there are any duplicates
+    if len(all_columns) != len(set(all_columns)):
+        # Rename duplicate columns with a suffix
+        renamed_cols = []
+        seen_count = {}
+        
+        for col_name in all_columns:
+            if col_name not in seen_count:
+                seen_count[col_name] = 0
+                renamed_cols.append(col_name)
+            else:
+                seen_count[col_name] += 1
+                renamed_cols.append(f"{col_name}_dup_{seen_count[col_name]}")
+        
+        # Rename all columns in the DataFrame
+        df = df.toDF(*renamed_cols)
+        
+        # Now select only the non-duplicate columns (keeping first occurrence)
+        seen = set()
+        cols_to_keep = []
+        final_col_names = []
+        
+        for new_col in renamed_cols:
+            # Extract the base name (remove _dup_N suffix if present)
+            base_name = new_col.split('_dup_')[0]
+            if base_name not in seen:
+                seen.add(base_name)
+                cols_to_keep.append(new_col)
+                final_col_names.append(base_name)
+        
+        # Select the columns to keep
+        df = df.select(*cols_to_keep)
+        
+        # Rename back to original names
+        df = df.toDF(*final_col_names)
+    
     current_columns = set(df.columns)
     expected_columns = [col_name for col_name, _ in schema_def]
     
-    # Add missing columns with appropriate NULL type
+    # Step 2: Remove extra columns not in schema
+    extra_columns = current_columns - set(expected_columns)
+    if extra_columns:
+        df = df.drop(*extra_columns)
+    
+    # Step 3: Add missing columns with appropriate NULL type
+    current_columns = set(df.columns)  # Refresh after drop
     for col_name, col_type in schema_def:
         if col_name not in current_columns:
             spark_type = get_spark_type(col_type)
             df = df.withColumn(col_name, lit(None).cast(spark_type))
     
-    # Remove extra columns not in schema
-    extra_columns = current_columns - set(expected_columns)
-    if extra_columns:
-        df = df.drop(*extra_columns)
-    
-    # Reorder and optionally cast columns to expected types
+    # Step 4: Reorder and optionally cast columns to expected types
     select_exprs = []
     for col_name, col_type in schema_def:
         if preserve_types:

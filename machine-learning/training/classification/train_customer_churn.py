@@ -7,9 +7,9 @@ from pyspark.sql.functions import (
 )
 from pyspark.ml.feature import VectorAssembler, StringIndexer
 from pyspark.ml.classification import (
-    LogisticRegression, RandomForestClassifier, GBTClassifier
+    LogisticRegression, RandomForestClassifier
 )
-from pyspark.ml.evaluation import MulticlassClassificationEvaluator, BinaryClassificationEvaluator
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 import findspark
 
 findspark.init()
@@ -174,7 +174,7 @@ def prepare_features(df, feature_cols):
 
 def train_logistic_regression(train_df):
     """Train Logistic Regression model"""
-    print("\n[1/3] Training Logistic Regression...")
+    print("\n[1/2] Training Logistic Regression...")
     lr = LogisticRegression(maxIter=100, regParam=0.01, elasticNetParam=0.5)
     model = lr.fit(train_df)
     print("✓ Logistic Regression trained")
@@ -183,20 +183,11 @@ def train_logistic_regression(train_df):
 
 def train_random_forest(train_df):
     """Train Random Forest model"""
-    print("\n[2/3] Training Random Forest...")
+    print("\n[2/2] Training Random Forest...")
     rf = RandomForestClassifier(numTrees=100, maxDepth=10, seed=42)
     model = rf.fit(train_df)
     print("✓ Random Forest trained")
     return model, "RandomForest"
-
-
-def train_gradient_boosted_trees(train_df):
-    """Train Gradient Boosted Trees model"""
-    print("\n[3/3] Training Gradient Boosted Trees...")
-    gbt = GBTClassifier(maxIter=50, maxDepth=5, seed=42)
-    model = gbt.fit(train_df)
-    print("✓ Gradient Boosted Trees trained")
-    return model, "GBT"
 
 
 def evaluate_model(model, test_df, model_name):
@@ -214,21 +205,12 @@ def evaluate_model(model, test_df, model_name):
     recall = mc_evaluator.evaluate(predictions, {mc_evaluator.metricName: "weightedRecall"})
     f1 = mc_evaluator.evaluate(predictions, {mc_evaluator.metricName: "f1"})
     
-    # Binary metrics (for ROC-AUC, treat as binary: High risk vs others)
-    # Note: GBT doesn't support probability, so ROC-AUC may not be available
-    try:
-        binary_evaluator = BinaryClassificationEvaluator(labelCol="label", rawPredictionCol="rawPrediction")
-        roc_auc = binary_evaluator.evaluate(predictions, {binary_evaluator.metricName: "areaUnderROC"})
-    except:
-        roc_auc = None
-    
     metrics = {
         "model_name": model_name,
         "accuracy": accuracy,
         "precision": precision,
         "recall": recall,
-        "f1_score": f1,
-        "roc_auc": roc_auc
+        "f1_score": f1
     }
     
     print(f"\n{model_name} Metrics:")
@@ -236,8 +218,6 @@ def evaluate_model(model, test_df, model_name):
     print(f"  Precision: {precision:.4f}")
     print(f"  Recall:    {recall:.4f}")
     print(f"  F1-Score:  {f1:.4f}")
-    if roc_auc:
-        print(f"  ROC-AUC:   {roc_auc:.4f}")
     
     return metrics
 
@@ -292,11 +272,10 @@ def main():
     train_df, test_df = df_prepared.randomSplit([0.8, 0.2], seed=42)
     print(f"✓ Split data: {train_df.count()} train, {test_df.count()} test")
     
-    # Train multiple models
+    # Train multiple models (GBT excluded - only supports binary classification)
     models = [
         train_logistic_regression(train_df),
-        train_random_forest(train_df),
-        train_gradient_boosted_trees(train_df)
+        train_random_forest(train_df)
     ]
     
     # Evaluate all models
@@ -326,7 +305,7 @@ def main():
     print("   1. Review model metrics above")
     print("   2. Select ONE model for inference based on F1-score or business needs")
     print(f"   3. Update inference script to load selected model")
-    print("   4. Available models: LogisticRegression, RandomForest, GBT")
+    print("   4. Available models: LogisticRegression, RandomForest")
     print(f"   5. Models saved to: {MODEL_OUTPUT_DIR}")
     
     spark.stop()
