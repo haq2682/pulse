@@ -15,7 +15,7 @@ findspark.init()
 BUCKET_NAME = "pulse-bucket-1"
 INPUT_PATH_AFFINITY = f"s3a://{BUCKET_NAME}/transformed/agg_product_affinity.parquet"
 INPUT_PATH_PRODUCTS = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/models/product_bundling"
+MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/product_bundling"
 MIN_LABELED_RECORDS = 100
 
 # CRITICAL: Avoid data leakage - DO NOT use lift/confidence/support as features

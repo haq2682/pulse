@@ -17,7 +17,7 @@ findspark.init()
 # Configuration
 BUCKET_NAME = "pulse-bucket-1"
 INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_reviews.parquet"
-MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/models/review_sentiment"
+MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/review_sentiment"
 MIN_LABELED_RECORDS = 100
 
 TARGET_COLUMN = "review_sentiment"

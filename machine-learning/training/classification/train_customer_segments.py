@@ -12,7 +12,7 @@ findspark.init()
 BUCKET_NAME = "pulse-bucket-1"
 INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
 INPUT_PATH_RFM = f"s3a://{BUCKET_NAME}/transformed/agg_rfm_segmentation.parquet"
-MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/models/customer_segments"
+MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/customer_segments"
 MIN_LABELED_RECORDS = 100
 
 # Feature columns - ONLY raw behavioral features, NOT RFM scores (to prevent leakage)

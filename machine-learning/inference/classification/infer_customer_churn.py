@@ -19,8 +19,8 @@ findspark.init()
 # Configuration
 BUCKET_NAME = "pulse-bucket-1"
 INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/customer_churn_predictions"
-MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/models/customer_churn"
+OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/customer_churn_predictions"
+MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/customer_churn"
 
 # Available options: "LogisticRegression", "RandomForest"
 SELECTED_MODEL = "RandomForest"

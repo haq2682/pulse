@@ -17,8 +17,8 @@ BUCKET_NAME = "pulse-bucket-1"
 INPUT_PATH_PAYMENTS = f"s3a://{BUCKET_NAME}/transformed/agg_payments.parquet"
 INPUT_PATH_ORDERS = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
 INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/payment_success_predictions"
-MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/models/payment_success"
+OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/payment_success_predictions"
+MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/payment_success"
 
 # ⚠️ MANUAL INTERVENTION REQUIRED: Select model to use for inference
 # Available options: "LogisticRegression", "RandomForest", "RandomForestOptimized", "DecisionTree", "MultilayerPerceptron"

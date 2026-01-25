@@ -16,7 +16,7 @@ BUCKET_NAME = "pulse-bucket-1"
 INPUT_PATH_PAYMENTS = f"s3a://{BUCKET_NAME}/transformed/agg_payments.parquet"
 INPUT_PATH_ORDERS = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
 INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/models/payment_success"
+MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/payment_success"
 MIN_LABELED_RECORDS = 100
 
 # Features - NO LEAKAGE: exclude anything known only after payment completion

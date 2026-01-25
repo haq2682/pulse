@@ -15,8 +15,8 @@ findspark.init()
 # Configuration
 BUCKET_NAME = "pulse-bucket-1"
 INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_reviews.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/review_sentiment_predictions"
-MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/models/review_sentiment"
+OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/review_sentiment_predictions"
+MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/review_sentiment"
 
 # ⚠️ MANUAL INTERVENTION REQUIRED: Select model to use for inference
 # Available options: "LogisticRegression", "NaiveBayes", "RandomForest", "MultilayerPerceptron"

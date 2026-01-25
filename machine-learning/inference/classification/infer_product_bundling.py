@@ -16,8 +16,8 @@ findspark.init()
 BUCKET_NAME = "pulse-bucket-1"
 INPUT_PATH_AFFINITY = f"s3a://{BUCKET_NAME}/transformed/agg_product_affinity.parquet"
 INPUT_PATH_PRODUCTS = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/product_bundling_predictions"
-MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/models/product_bundling"
+OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/product_bundling_predictions"
+MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/product_bundling"
 
 # ⚠️ MANUAL INTERVENTION REQUIRED: Select model to use for inference
 # Available options: "LogisticRegression", "RandomForest", "DecisionTree", "MultilayerPerceptron"

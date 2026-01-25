@@ -17,7 +17,7 @@ findspark.init()
 # Configuration
 BUCKET_NAME = "pulse-bucket-1"
 INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/models/customer_churn"
+MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/customer_churn"
 MIN_LABELED_RECORDS = 100
 
 # Feature columns used for training
