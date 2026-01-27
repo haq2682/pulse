@@ -14,6 +14,8 @@ def get_minio_client():
     )
 
 
+
+
 def get_agg_tables(spark, db_config=None):
     """
     Load aggregated tables from MinIO transformed/ directory.
@@ -39,25 +41,25 @@ def get_agg_tables(spark, db_config=None):
         tables_found = []
         
         for obj in objects:
-            if not obj.object_name.endswith(".csv"):
+            if not obj.object_name.endswith(".parquet"):
                 continue
                 
-            # Extract table name from path: transformed/{table_name}.csv
-            table_name = obj.object_name.replace("transformed/", "").replace(".csv", "")
+            # Extract table name from path: transformed/{table_name}.parquet
+            table_name = obj.object_name.replace("transformed/", "").replace(".parquet", "")
             tables_found.append(table_name)
         
         print(f"Found tables: {tables_found}")
         
         for table_name in tables_found:
             try:
-                file_path = f"transformed/{table_name}.csv"
+                file_path = f"transformed/{table_name}.parquet"
                 print(f"Loading table: {table_name}...")
                 
                 df = (
                     spark.read
                     .option("header", "true")
                     .option("inferSchema", "true")
-                    .csv(f"s3a://{bucket_name}/{file_path}")
+                    .parquet(f"s3a://{bucket_name}/{file_path}")
                 )
                 
                 spark_dfs[table_name] = df
@@ -104,16 +106,32 @@ def is_column_all_null_or_zero(df, col_name):
 
     return False
 
-
 def add_time_grain(df, date_col, grain="day"):
-    if grain == "day": 
-        return df.withColumn("grain_date", F.col(date_col))
+    """
+    Adds time grain columns safely. 
+    Standardizes 'day' by removing time components.
+    Standardizes 'week' and 'month' by using the start date of that period.
+    """
+    
+    # 1. Day: Ensure we remove time components (hh:mm:ss)
+    if grain == "day":
+        return df.withColumn("grain_date", F.to_date(F.col(date_col)))
+
+    # 2. Week: Use date_trunc to get the Monday of that week
+    # This solves the year-crossover issue perfectly.
     elif grain == "week":
-        return df.withColumn("grain_year", F.year(date_col)) \
-                 .withColumn("grain_week", F.weekofyear(date_col))
-    elif grain == "month": 
-        return df.withColumn("grain_year", F.year(date_col)) \
-                 .withColumn("grain_month", F.month(date_col))
+        # Returns a DATE column representing the start of the week
+        # We also extract year/week for your group_cols logic
+        return df.withColumn("grain_date", F.to_date(F.date_trunc("week", F.col(date_col)))) \
+                 .withColumn("grain_year", F.year(F.col(date_col))) \
+                 .withColumn("grain_week", F.weekofyear(F.col(date_col)))
+
+    # 3. Month: Truncate to the 1st of the month
+    elif grain == "month":
+        return df.withColumn("grain_date", F.to_date(F.trunc(F.col(date_col), "month"))) \
+                 .withColumn("grain_year", F.year(F.col(date_col))) \
+                 .withColumn("grain_month", F.month(F.col(date_col)))
+
     else:
         raise ValueError("grain must be 'day', 'week', or 'month'")
 
