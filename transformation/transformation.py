@@ -47,10 +47,10 @@ def main():
     transform_customer_sessions(dataframes)
     transform_reviews(dataframes)
     transform_carts(dataframes)
-    transform_carts(dataframes)
+    transform_products(dataframes)
 
     aggregate_customers(dataframes)
-    aggregate_products(dataframes)
+    aggregate_products(spark, dataframes)
     aggregate_categories(dataframes)
     aggregate_suppliers(dataframes)
     aggregate_campaigns(dataframes)

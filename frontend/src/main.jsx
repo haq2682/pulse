@@ -55,7 +55,7 @@ createRoot(document.getElementById('root')).render(
            <AdminAuthProvider>
                 <Routes>
                     {/* PUBLIC ROUTES */}
-                    <Route path="/" element={<Landing />} />
+                    <Route path="/" element={<GuestRoute><Landing /></GuestRoute>} />
                     <Route path="/theme" element={<ThemeReference />} />
                     <Route path="/theme2" element={<ThemeReferenceV2 />} />
 
@@ -67,11 +67,12 @@ createRoot(document.getElementById('root')).render(
                     <Route path="/reset-password-email" element={<GuestRoute><ResetPasswordEmail /></GuestRoute>} />
 
                     {/* USER PROTECTED ROUTES */}
-                    <Route path="/analytics" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                    <Route path="/onboarding/business" element={<ProtectedRoute><AddBusiness /></ProtectedRoute>} />
-                    <Route path="/onboarding/data-type" element={<ProtectedRoute><DataType /></ProtectedRoute>} />
-                    <Route path="/onboarding/connect" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
-                    <Route path="/onboarding/mapping" element={<ProtectedRoute><Mapping /></ProtectedRoute>} />
+                    <Route path="/analytics/:businessId?" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                    <Route path="/analytics/:businessId?/forecasts" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                    <Route path="/onboarding/business/:onboardingId" element={<ProtectedRoute><AddBusiness /></ProtectedRoute>} />
+                    <Route path="/onboarding/data-type/:onboardingId" element={<ProtectedRoute><DataType /></ProtectedRoute>} />
+                    <Route path="/onboarding/connect/:onboardingId" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
+                    <Route path="/onboarding/mapping/:onboardingId" element={<ProtectedRoute><Mapping /></ProtectedRoute>} />
 
                     {/* --- ADMIN ROUTES --- */}
                     

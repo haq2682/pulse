@@ -1,6 +1,6 @@
 """
-Average Order Value (AOV) Prediction - Inference Script
-Generates predictions for customers' next order values
+Average Order Value (AOV) Prediction - Improved Inference Script
+Matches expanded feature set from training
 """
 
 import os
@@ -26,34 +26,43 @@ load_dotenv()
 BUCKET_NAME = "pulse-bucket-1"
 INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
 INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
 OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/aov_prediction/"
 MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/aov_prediction/"
 
 # ⚠️ MANUAL CONFIGURATION REQUIRED:
-MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
+MODEL_NAME = "linear_regression"  # Options: "linear_regression", "random_forest", "gbt"
 
-# Feature columns (must match training)
-FEATURE_COLUMNS = [
-    "total_orders",
-    "customer_tenure_days",
-    "avg_items_per_order",
-    "avg_days_between_orders",
-    "days_since_last_purchase",
-    "session_conversion_rate",
-    "cart_abandonment_rate",
-    "cancellation_rate",
-    "avg_discount_per_order",
-    "recency_score",
-    "frequency_score",
-    "monetary_score",
-    "aov_lag_1",
-    "aov_lag_2",
-    "aov_lag_3",
-    "aov_rolling_3",
-    "aov_trend",
-    "customer_segment_label_idx",
-    "preferred_payment_method_idx",
-    "preferred_device_type_idx"
+# Feature set (must match training - REMOVED avg_days_between_orders)
+NUMERIC_FEATURES = [
+    "total_orders", "customer_tenure_days", "total_items_purchased",
+    "avg_items_per_order", "days_since_last_purchase",
+    # MANUALLY CALCULATED temporal
+    "calc_avg_days_between_orders", "days_since_prev_order",
+    "order_frequency_per_month", "avg_days_per_order",
+    # Behavioral
+    "session_conversion_rate", "cart_abandonment_rate", "cancellation_rate",
+    "total_reviews_written", "avg_review_rating", "customer_activity_score",
+    # Engagement
+    "total_pages_viewed", "total_products_viewed", "total_sessions", "wishlist_items_count",
+    # RFM
+    "recency_score", "frequency_score", "monetary_score",
+    # Lags
+    "aov_lag_1", "aov_lag_2", "aov_lag_3", "aov_rolling_3", "aov_rolling_6",
+    "aov_trend", "aov_volatility",
+    # Patterns (ENHANCED)
+    "avg_discount_per_order", "avg_order_discount_pct", "discount_rolling_3",
+    "discount_sensitivity", "spending_acceleration", "avg_products_per_order",
+    "avg_product_price", "avg_category_diversity",
+    # Temporal
+    "order_placed_month", "order_placed_day_of_week", "days_since_first_order"
+]
+
+CATEGORICAL_FEATURES = [
+    "customer_segment_label",
+    "preferred_payment_method",
+    "preferred_device_type"
 ]
 
 
@@ -61,7 +70,7 @@ def create_spark_session():
     """Initialize Spark session"""
     return (
         SparkSession.builder
-        .appName("AOV_Prediction_Inference")
+        .appName("AOV_Prediction_Improved_Inference")
         .master(os.getenv("SPARK_SERVER", "local[*]"))
         .config(
             "spark.jars.packages",
@@ -121,9 +130,9 @@ def validate_dataset(spark, path, name):
         return None, 0
 
 
-def create_inference_features(customers_df, orders_df):
+def create_inference_features(customers_df, orders_df, order_items_df, products_df):
     """
-    Create inference features for each customer based on most recent orders
+    Create same features as training for inference (with manual temporal calculation)
     """
     print("Creating inference features...")
     
@@ -134,14 +143,70 @@ def create_inference_features(customers_df, orders_df):
         (F.col("total_amount") > 0)
     )
     
-    # Create window for each customer
+    # Join with order items and products for category info
+    orders_with_items = orders_filtered.alias("o").join(
+        order_items_df.alias("oi"),
+        F.col("o.order_id") == F.col("oi.order_id"),
+        "left"
+    ).join(
+        products_df.alias("p").select("product_id", "category", "sell_price"),
+        F.col("oi.product_id") == F.col("p.product_id"),
+        "left"
+    )
+    
+    # Aggregate order metrics
+    order_agg = orders_with_items.groupBy("o.order_id").agg(
+        F.first("o.customer_id").alias("customer_id"),
+        F.first("o.order_placed_at").alias("order_placed_at"),
+        F.first("o.total_amount").alias("total_amount"),
+        F.first("o.total_discount").alias("total_discount"),
+        F.first("o.order_placed_month").alias("order_placed_month"),
+        F.first("o.order_placed_day_of_week").alias("order_placed_day_of_week"),
+        F.count("oi.order_item_id").alias("products_in_order"),
+        F.avg("oi.product_price").alias("avg_product_price_order"),
+        F.countDistinct("p.category").alias("unique_categories_in_order"),
+        F.first("p.category").alias("primary_category_order")
+    ).select(
+        "customer_id", "order_placed_at", "total_amount", "total_discount",
+        "order_placed_month", "order_placed_day_of_week", "products_in_order",
+        "avg_product_price_order", "unique_categories_in_order", "primary_category_order"
+    )
+    
+    # Customer window
     customer_window = Window.partitionBy("customer_id").orderBy("order_placed_at")
     
-    # Add order sequence and lag features
-    orders_with_lags = orders_filtered.withColumn(
+    # Add sequence and MANUAL temporal features
+    orders_with_seq = order_agg.withColumn(
         "order_seq",
         F.row_number().over(customer_window)
     ).withColumn(
+        "days_since_first_order",
+        F.datediff(F.col("order_placed_at"), F.first("order_placed_at").over(customer_window))
+    ).withColumn(
+        "days_since_prev_order",
+        F.datediff(F.col("order_placed_at"), F.lag("order_placed_at", 1).over(customer_window))
+    ).withColumn(
+        "orders_up_to_now",
+        F.row_number().over(customer_window)
+    )
+    
+    # MANUAL avg_days_between_orders
+    orders_with_seq = orders_with_seq.withColumn(
+        "calc_avg_days_between_orders",
+        F.when(
+            F.col("order_seq") > 1,
+            F.col("days_since_first_order") / (F.col("order_seq") - 1)
+        ).otherwise(0)
+    ).withColumn(
+        "order_frequency_per_month",
+        F.when(
+            F.col("days_since_first_order") > 0,
+            (F.col("order_seq") - 1) / (F.col("days_since_first_order") / 30.0)
+        ).otherwise(0)
+    )
+    
+    # Lag features
+    orders_with_lags = orders_with_seq.withColumn(
         "aov_lag_1",
         F.lag("total_amount", 1).over(customer_window)
     ).withColumn(
@@ -152,21 +217,60 @@ def create_inference_features(customers_df, orders_df):
         F.lag("total_amount", 3).over(customer_window)
     )
     
-    # Calculate rolling average and trend
-    window_rolling = Window.partitionBy("customer_id").orderBy("order_placed_at").rowsBetween(-3, -1)
+    # Rolling averages
+    window_rolling_3 = Window.partitionBy("customer_id").orderBy("order_placed_at").rowsBetween(-3, -1)
+    window_rolling_6 = Window.partitionBy("customer_id").orderBy("order_placed_at").rowsBetween(-6, -1)
     
     orders_with_lags = orders_with_lags.withColumn(
         "aov_rolling_3",
-        F.avg("total_amount").over(window_rolling)
+        F.avg("total_amount").over(window_rolling_3)
     ).withColumn(
+        "aov_rolling_6",
+        F.avg("total_amount").over(window_rolling_6)
+    ).withColumn(
+        "discount_rolling_3",
+        F.avg("total_discount").over(window_rolling_3)
+    )
+    
+    # Trend, volatility, acceleration
+    orders_with_lags = orders_with_lags.withColumn(
         "aov_trend",
         F.when(
             (F.col("aov_lag_1").isNotNull()) & (F.col("aov_lag_2").isNotNull()) & (F.col("aov_lag_2") > 0),
             (F.col("aov_lag_1") - F.col("aov_lag_2")) / F.col("aov_lag_2")
         ).otherwise(0)
+    ).withColumn(
+        "aov_volatility",
+        F.stddev("total_amount").over(window_rolling_6)
+    ).withColumn(
+        "spending_acceleration",
+        F.when(
+            (F.col("aov_rolling_3").isNotNull()) & (F.col("aov_rolling_6").isNotNull()) & (F.col("aov_rolling_6") > 0),
+            (F.col("aov_rolling_3") - F.col("aov_rolling_6")) / F.col("aov_rolling_6")
+        ).otherwise(0)
     )
     
-    # Get latest order for each customer (most recent state)
+    # Discount percentage and sensitivity
+    orders_with_lags = orders_with_lags.withColumn(
+        "order_discount_pct",
+        F.when(
+            F.col("total_amount") > 0,
+            (F.col("total_discount") / F.col("total_amount")) * 100
+        ).otherwise(0)
+    ).withColumn(
+        "discount_sensitivity",
+        F.avg(
+            F.when(F.col("total_discount") > 0, 1).otherwise(0)
+        ).over(window_rolling_6)
+    )
+    
+    # Category diversity
+    orders_with_lags = orders_with_lags.withColumn(
+        "avg_category_diversity",
+        F.avg("unique_categories_in_order").over(window_rolling_6)
+    )
+    
+    # Get latest order for each customer
     window_latest = Window.partitionBy("customer_id").orderBy(F.desc("order_placed_at"))
     
     latest_orders = orders_with_lags.withColumn(
@@ -174,53 +278,66 @@ def create_inference_features(customers_df, orders_df):
         F.row_number().over(window_latest)
     ).filter(
         (F.col("row_num") == 1) &
-        (F.col("order_seq") > 1)  # Need at least 1 previous order
+        (F.col("order_seq") > 1)
     ).drop("row_num")
     
     # Join with customer data
     customer_features = latest_orders.join(
         customers_df.select(
-            "customer_id",
-            "total_orders",
-            "customer_tenure_days",
-            "avg_items_per_order",
-            "avg_days_between_orders",
-            "days_since_last_purchase",
-            "session_conversion_rate",
-            "cart_abandonment_rate",
-            "cancellation_rate",
-            "avg_discount_per_order",
-            "recency_score",
-            "frequency_score",
-            "monetary_score",
-            "customer_segment_label",
-            "preferred_payment_method",
+            "customer_id", "total_orders", "customer_tenure_days", "total_items_purchased",
+            "avg_items_per_order", "days_since_last_purchase",
+            "session_conversion_rate", "cart_abandonment_rate", "cancellation_rate",
+            "total_reviews_written", "avg_review_rating", "customer_activity_score",
+            "total_pages_viewed", "total_products_viewed", "total_sessions",
+            "wishlist_items_count", "recency_score", "frequency_score", "monetary_score",
+            "avg_discount_per_order", "customer_segment_label", "preferred_payment_method",
             "preferred_device_type"
         ),
         "customer_id",
         "left"
     )
     
+    # Calculate metrics
+    customer_features = customer_features.withColumn(
+        "avg_products_per_order",
+        F.when(
+            F.col("total_orders") > 0,
+            F.col("total_items_purchased") / F.col("total_orders")
+        ).otherwise(0)
+    ).withColumn(
+        "avg_product_price",
+        F.coalesce(F.col("avg_product_price_order"), F.lit(0))
+    ).withColumn(
+        "avg_order_discount_pct",
+        F.coalesce(F.col("order_discount_pct"), F.lit(0))
+    ).withColumn(
+        "avg_days_per_order",
+        F.when(
+            F.col("total_orders") > 0,
+            F.col("customer_tenure_days") / F.col("total_orders")
+        ).otherwise(0)
+    )
+    
     # Fill nulls
     customer_features = customer_features.fillna({
-        "aov_lag_1": 0,
-        "aov_lag_2": 0,
-        "aov_lag_3": 0,
-        "aov_rolling_3": 0,
-        "aov_trend": 0,
-        "session_conversion_rate": 0,
-        "cart_abandonment_rate": 0,
-        "cancellation_rate": 0,
+        "aov_lag_1": 0, "aov_lag_2": 0, "aov_lag_3": 0,
+        "aov_rolling_3": 0, "aov_rolling_6": 0, "aov_trend": 0, "aov_volatility": 0,
+        "discount_rolling_3": 0, "spending_acceleration": 0, "discount_sensitivity": 0,
+        "avg_category_diversity": 0,
+        "total_items_purchased": 0, "session_conversion_rate": 0,
+        "cart_abandonment_rate": 0, "cancellation_rate": 0,
+        "total_reviews_written": 0, "avg_review_rating": 0,
+        "customer_activity_score": 0, "total_pages_viewed": 0,
+        "total_products_viewed": 0, "total_sessions": 0, "wishlist_items_count": 0,
         "avg_discount_per_order": 0,
-        "avg_days_between_orders": 0,
-        "days_since_last_purchase": 0,
-        "avg_items_per_order": 0,
-        "recency_score": 0,
-        "frequency_score": 0,
-        "monetary_score": 0,
-        "customer_segment_label": "Unknown",
-        "preferred_payment_method": "Unknown",
-        "preferred_device_type": "Unknown"
+        "days_since_last_purchase": 0, "avg_items_per_order": 0,
+        "recency_score": 0, "frequency_score": 0, "monetary_score": 0,
+        "customer_segment_label": "Unknown", "preferred_payment_method": "Unknown",
+        "preferred_device_type": "Unknown", "days_since_first_order": 0,
+        "days_since_prev_order": 0, "calc_avg_days_between_orders": 0,
+        "order_frequency_per_month": 0, "avg_products_per_order": 0,
+        "avg_product_price": 0, "avg_days_per_order": 0,
+        "primary_category_order": "Unknown"
     })
     
     print(f"✓ Inference features created: {customer_features.count()} customers")
@@ -231,40 +348,33 @@ def prepare_inference_data(df):
     """
     Prepare and scale features for inference
     """
-    # Encode categorical features
-    indexer_segment = StringIndexer(
-        inputCol="customer_segment_label",
-        outputCol="customer_segment_label_idx",
-        handleInvalid="keep"
-    )
+    # Encode categorical
+    indexed_cols = []
     
-    indexer_payment = StringIndexer(
-        inputCol="preferred_payment_method",
-        outputCol="preferred_payment_method_idx",
-        handleInvalid="keep"
-    )
+    for cat_col in CATEGORICAL_FEATURES:
+        idx_col = f"{cat_col}_idx"
+        indexed_cols.append(idx_col)
+        indexer = StringIndexer(
+            inputCol=cat_col,
+            outputCol=idx_col,
+            handleInvalid="keep"
+        )
+        df = indexer.fit(df).transform(df)
     
-    indexer_device = StringIndexer(
-        inputCol="preferred_device_type",
-        outputCol="preferred_device_type_idx",
-        handleInvalid="keep"
-    )
+    # Combine features
+    all_features = NUMERIC_FEATURES + indexed_cols
+    existing_features = [f for f in all_features if f in df.columns]
     
-    # Apply indexers
-    df_indexed = indexer_segment.fit(df).transform(df)
-    df_indexed = indexer_payment.fit(df_indexed).transform(df_indexed)
-    df_indexed = indexer_device.fit(df_indexed).transform(df_indexed)
-    
-    # Assemble features
+    # Assemble
     assembler = VectorAssembler(
-        inputCols=FEATURE_COLUMNS,
+        inputCols=existing_features,
         outputCol="features_unscaled",
         handleInvalid="keep"
     )
     
-    df_assembled = assembler.transform(df_indexed)
+    df_assembled = assembler.transform(df)
     
-    # Scale features
+    # Scale
     scaler = StandardScaler(
         inputCol="features_unscaled",
         outputCol="features",
@@ -288,13 +398,12 @@ def prepare_inference_data(df):
 
 
 def generate_predictions(model, df, model_name):
-    """Generate predictions with influencing factors"""
+    """Generate predictions with factors"""
     predictions_df = model.transform(df)
     
     prediction_id_udf = F.udf(lambda: str(uuid.uuid4()), StringType())
     current_timestamp = F.lit(datetime.now())
     
-    # Create factors JSON
     factors_udf = F.udf(
         lambda lag1, rolling3, trend: json.dumps({
             "last_order_value": float(lag1) if lag1 else 0,
@@ -364,7 +473,7 @@ def display_sample_predictions(df, n=5):
 def main():
     """Main inference pipeline"""
     print("\n" + "="*60)
-    print("AOV Prediction - Inference")
+    print("AOV Prediction - Improved Inference")
     print("="*60)
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Model: {MODEL_NAME}\n")
@@ -388,8 +497,10 @@ def main():
     
     customers_df, _ = validate_dataset(spark, INPUT_CUSTOMERS_PATH, "Customers")
     orders_df, _ = validate_dataset(spark, INPUT_ORDERS_PATH, "Orders")
+    order_items_df, _ = validate_dataset(spark, INPUT_ORDER_ITEMS_PATH, "Order Items")
+    products_df, _ = validate_dataset(spark, INPUT_PRODUCTS_PATH, "Products")
     
-    if None in [customers_df, orders_df]:
+    if None in [customers_df, orders_df, order_items_df, products_df]:
         print("\n✗ Inference aborted: Missing datasets")
         spark.stop()
         return
@@ -397,7 +508,7 @@ def main():
     # Create features
     print("\nStep 3: Feature Engineering")
     print("-" * 60)
-    df_features = create_inference_features(customers_df, orders_df)
+    df_features = create_inference_features(customers_df, orders_df, order_items_df, products_df)
     
     # Prepare data
     print("\nStep 4: Data Preparation & Encoding")

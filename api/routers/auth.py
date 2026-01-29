@@ -87,11 +87,23 @@ def login(credentials: UserLogin, response: Response, db=Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     session_id = session_service.create_session(row.user_id, credentials.email, row.username)
     response.set_cookie(key=COOKIE_NAME, value=session_id, **COOKIE_SETTINGS)
+    business = db.execute(
+        text("""
+            SELECT business_id 
+            FROM businesses 
+            WHERE user_id = :user_id 
+            ORDER BY business_id ASC 
+            LIMIT 1
+        """),
+        {"user_id": row.user_id}
+    ).fetchone()
+
     return {
         "user_id": row.user_id,
         "username": row.username,
         "email": credentials.email,
-        "message": "Login successful"
+        "message": "Login successful",
+        "business_id": business[0] if business else None
     }
 
 @router.post("/logout")
@@ -279,9 +291,20 @@ async def google_callback(code: str, state: str, db=Depends(get_db)):
 
         # 4. Create Session
         session_id = session_service.create_session(user_id, google_email, username)
+        
+        business = db.execute(
+            text("""
+                SELECT business_id 
+                FROM businesses 
+                WHERE user_id = :user_id 
+                ORDER BY business_id ASC 
+                LIMIT 1
+            """),
+            {"user_id": row.user_id}
+        ).fetchone()
 
         # 5. Redirect to Frontend Dashboard
-        redirect_url = f"{settings.frontend_url}/analytics"
+        redirect_url = f"{settings.frontend_url}/analytics/{business[0] if business else ''}"
         
         response = RedirectResponse(url=redirect_url)
         

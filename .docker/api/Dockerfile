@@ -11,8 +11,10 @@ RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache-dir -r packages.txt
 
 COPY ./api /app
-COPY ./cleaning /app/
+COPY ./cleaning /app/cleaning
 COPY ./mapping /app/mapping
 COPY ./transformation /app/transformation
+COPY ./analysis /app/analysis
+COPY ./machine-learning /app/machine-learning
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

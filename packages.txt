@@ -45,3 +45,9 @@ google-generativeai
 python-dotenv
 fastparquet
 pyarrow
+hdbscan
+scikit-learn
+scikit-learn-extra
+
+ray[rllib]
+gymnasium

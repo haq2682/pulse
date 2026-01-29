@@ -180,7 +180,7 @@ CREATE TABLE ml_review_sentiment_predictions (
 ```
 ---
 
-### 5. Product Category Classification Based on Description and Attributes
+### 5. Product Category Classification Based on Description and Attributes ⛔
 **Task:** Automatically classify products into categories based on product descriptions and attributes
 
 **Description:** Uses Natural Language Processing (NLP) and classification algorithms to analyze product descriptions, names, and attributes to automatically assign products to the correct categories and sub-categories. This enables automated product cataloging and improved product organization.
@@ -225,7 +225,7 @@ CREATE TABLE ml_product_category_predictions (
 ```
 ---
 
-### 6. Product Bundling - Complementary Items Classification ✅
+### 6. Product Bundling - Complementary Items Classification ✅ ⛔
 **Task:** Identify and classify complementary items that should be bundled together
 
 **Description:** Uses association rule mining and classification techniques to identify products that are frequently purchased together and should be bundled as complementary items. This enables creation of product bundles, cross-sell recommendations, and "frequently bought together" suggestions.
@@ -387,7 +387,7 @@ CREATE TABLE ml_clv_predictions (
 ```
 ---
 
-### 2. Product Demand Forecasting with Seasonal Fluctuation Analysis ✅
+### 2. Product Demand Forecasting with Seasonal Fluctuation Analysis ✅ ⛔
 **Task:** Predict future sales and forecast product demand with seasonal demand fluctuation patterns
 
 **Description:** Uses time-series regression models to forecast future product demand, accounting for:
@@ -523,7 +523,7 @@ CREATE TABLE ml_aov_predictions (
 ```
 ---
 
-### 5. Inventory Restock Quantity Prediction 
+### 5. Inventory Restock Quantity Prediction ✅
 **Task:** Predict optimal restock quantity
 
 **Input Features (from `agg_product_inventory_health`, `agg_products`):**
@@ -560,7 +560,7 @@ CREATE TABLE ml_restock_quantity_predictions (
 ```
 ---
 
-### 6. Safety Stock Level Prediction
+### 6. Safety Stock Level Prediction ✅
 **Task:** Estimate required safety stock levels to prevent stockouts while minimizing holding costs
 
 **Description:** Uses regression models to calculate optimal safety stock levels based on demand variability, lead time uncertainty, and desired service levels. Safety stock acts as a buffer to handle demand fluctuations and supply chain uncertainties.
@@ -614,7 +614,7 @@ CREATE TABLE ml_safety_stock_predictions (
 
 ---
 
-### 7. Stockout Probability Prediction
+### 7. Stockout Probability Prediction ✅
 **Task:** Predict the probability and timing of stockouts for proactive inventory management
 
 **Description:** Uses regression and time-series models to forecast when products are likely to experience stockouts based on current inventory levels, demand patterns, and replenishment schedules. Enables proactive restocking decisions.
@@ -664,7 +664,7 @@ CREATE TABLE ml_stockout_predictions (
 
 ---
 
-### 8. Campaign ROI Prediction
+### 8. Campaign ROI Prediction 🔁 ⛔
 **Task:** Predict marketing campaign return on investment
 
 **Input Features (from `agg_marketing_campaigns`):**
@@ -705,7 +705,7 @@ CREATE TABLE ml_campaign_roi_predictions (
 ```
 ---
 
-### 9. Product Price Optimization
+### 9. Product Price Optimization ⛔
 **Task:** Predict optimal product price for maximizing revenue
 
 **Input Features (from `agg_products`, `agg_orders`):**
@@ -742,7 +742,7 @@ CREATE TABLE ml_price_optimization_predictions (
 ```
 ---
 
-### 10. Delivery Time Prediction
+### 10. Delivery Time Prediction ✅ ⛔
 **Task:** Predict order delivery time
 
 **Input Features (from `agg_orders`, `agg_customers`):**
@@ -777,7 +777,7 @@ CREATE TABLE ml_delivery_time_predictions (
 ```
 ---
 
-### 11. Session Conversion Value Prediction
+### 11. Session Conversion Value Prediction ✅
 **Task:** Predict potential conversion value from a session
 
 **Input Features (from `agg_customer_sessions`):**
@@ -814,7 +814,7 @@ CREATE TABLE ml_session_conversion_predictions (
 
 ## Clustering Models
 
-### 1. Customer Segmentation (RFM Clustering)
+### 1. Customer Segmentation (RFM Clustering) ✅
 **Task:** Cluster customers based on RFM metrics
 
 **Input Features (from `agg_customers`, `agg_rfm_segmentation`):**
@@ -853,7 +853,7 @@ CREATE TABLE ml_customer_clustering (
 ```
 ---
 
-### 2. Product Affinity Clustering
+### 2. Product Affinity Clustering ✅ ⛔
 **Task:** Cluster products frequently purchased together
 
 **Input Features (from `agg_product_affinity`, `agg_products`):**
@@ -887,7 +887,7 @@ CREATE TABLE ml_product_affinity_clustering (
 ```
 ---
 
-### 3. Geographic Sales Clustering for Regional Performance Patterns
+### 3. Geographic Sales Clustering for Regional Performance Patterns ✅
 **Task:** Create geographic sales maps identifying regional performance patterns and market characteristics
 
 **Description:** Uses clustering algorithms to segment geographic regions based on sales performance, customer behavior, and market potential. This creates visual sales maps showing regional patterns, identifying high-performing markets, growth opportunities, and underperforming regions requiring strategic attention.
@@ -951,7 +951,7 @@ CREATE TABLE ml_geographic_clustering (
 ```
 ---
 
-### 4. Supplier Performance Clustering
+### 4. Supplier Performance Clustering 🔁
 **Task:** Cluster suppliers by performance metrics
 
 **Input Features (from `agg_suppliers`, `agg_supplier_inventory_health`):**
@@ -986,7 +986,7 @@ CREATE TABLE ml_supplier_clustering (
 ```
 ---
 
-### 5. Session Behavior Clustering
+### 5. Session Behavior Clustering ✅
 **Task:** Cluster sessions by user behavior patterns
 
 **Input Features (from `agg_customer_sessions`):**
@@ -1022,7 +1022,7 @@ CREATE TABLE ml_session_behavior_clustering (
 ```
 ---
 
-### 6. Product Lifecycle Clustering
+### 6. Product Lifecycle Clustering ✅ ⛔
 **Task:** Cluster products by lifecycle stage
 
 **Input Features (from `agg_products`):**
@@ -1123,7 +1123,7 @@ CREATE TABLE rl_inventory_metrics (
 
 ---
 
-### 2. Dynamic Pricing Optimization (Ray RLLib)
+### 2. Dynamic Pricing Optimization (Ray RLLib) ⛔
 **Task:** Optimize product pricing dynamically
 
 **Framework:** Ray RLLib (DDPG or TD3 for continuous actions)
@@ -1168,7 +1168,7 @@ CREATE TABLE rl_pricing_optimization_actions (
 
 ---
 
-### 3. Marketing Budget Allocation (Ray RLLib)
+### 3. Marketing Budget Allocation (Ray RLLib) ⛔
 **Task:** Optimize marketing budget allocation across campaigns
 
 **Framework:** Ray RLLib (PPO algorithm)
@@ -1212,7 +1212,7 @@ CREATE TABLE rl_marketing_budget_actions (
 
 ---
 
-### 4. Cart Recovery Optimization (Ray RLLib)
+### 4. Cart Recovery Optimization (Ray RLLib) ⛔
 **Task:** Optimize cart recovery actions and timing
 
 **Framework:** Ray RLLib (DQN algorithm)
@@ -1277,7 +1277,7 @@ CREATE TABLE rl_cart_recovery_results (
 
 ---
 
-### 5. Supplier Selection and Ordering (Ray RLLib)
+### 5. Supplier Selection and Ordering (Ray RLLib) ⛔
 **Task:** Optimize supplier selection for product restocking
 
 **Framework:** Ray RLLib (A3C algorithm)

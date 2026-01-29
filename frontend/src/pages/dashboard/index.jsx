@@ -7,15 +7,20 @@ import { Button } from 'primereact/button';
 import { Dropdown } from 'primereact/dropdown';
 // Removed 'Menu' import as we are building a custom one
 import { useAuth } from '@/context/AuthContext';
+import { useLocation } from 'react-router-dom';
+import axiosInstance from '@/services/api/axiosInstance';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
-    
+    const navigate = useNavigate();
+    const [isAddBusinessLoading, setIsAddBusinessLoading] = useState(false);
+
+    const { pathname } = useLocation();
     // NEW: State to toggle the custom profile menu
     const [isProfileOpen, setIsProfileOpen] = useState(false);
-    
     // NEW: Ref to detect clicks outside the menu to close it
     const profileRef = useRef(null);
 
@@ -33,8 +38,13 @@ const Dashboard = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const handleAddBusiness = () => {
-        console.log('Add business clicked');
+    const handleAddBusiness = async () => {
+        setIsAddBusinessLoading(true);
+        const response = await axiosInstance.post('/onboarding/create', {userId: user.user_id});
+        if(response.data.status === 200) {
+            navigate(`/onboarding/${response.data.current_step}/${response.data.onboarding_id}`);
+        }
+        setIsAddBusinessLoading(false);
     };
 
     return (
@@ -126,9 +136,12 @@ const Dashboard = () => {
                                     background: 'white',
                                     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
                                 }}
+                                disabled={isAddBusinessLoading}
                             >
-                                <i className="pi pi-building mr-2"></i>
-                                <span className="font-medium text-xs sm:text-sm">Add Business/Organization</span>
+                                <div style={{ opacity: isAddBusinessLoading ? 0.5 : 1 }} className="flex items-center">
+                                    <i className="pi pi-building mr-2"></i>
+                                    <span className="font-medium text-xs sm:text-sm">Add Business/Organization</span>
+                                </div>
                             </Button>
                         </div>
                         <div className="w-48">
@@ -142,7 +155,7 @@ const Dashboard = () => {
                             />
                         </div>
                     </div>
-
+                    
                     <div className="flex items-center justify-center min-h-[60vh]">
                         <div className="text-center max-w-md">
                             <Text className="text-gray-500 text-base md:text-lg leading-relaxed">

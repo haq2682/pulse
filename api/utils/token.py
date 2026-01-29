@@ -23,7 +23,7 @@ def verify_password_reset_token(token: str) -> str | None:
     """Verify password reset token and return email if valid."""
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
-        if payload. get("type") != "password_reset":
+        if payload.get("type") != "password_reset":
             return None
         return payload.get("sub")
     except JWTError:

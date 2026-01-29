@@ -2,59 +2,37 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import Heading from '@/components/global/Typography/Heading';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const Sidebar = ({ isOpen, onClose }) => {
     const navigate = useNavigate();
     const location = useLocation();
 
+    const pathSegments = location.pathname.split('/').filter(Boolean);
+
+    // Example paths:
+    // /analytics
+    // /analytics/<uuid>/revenue-analytics
+    // /analytics/product-performance   <-- NOT a UUID
+
+    const analyticsIndex = pathSegments.indexOf('analytics');
+    const possibleId = pathSegments[analyticsIndex + 1];
+
+    const businessId = UUID_REGEX.test(possibleId) ? possibleId : null;
+
+    const basePath = businessId 
+        ? `/analytics/${businessId}` 
+        : `/analytics`;
+
     const menuItems = [
-        {
-            icon: 'pi pi-home',
-            label: 'Overview',
-            path: '/analytics',
-            activeIcon: 'pi pi-home'
-        },
-        {
-            icon: 'pi pi-chart-line',
-            label: 'Revenue Analytics',
-            path: '/analytics/revenue-analytics',
-            activeIcon: 'pi pi-chart-line'
-        },
-        {
-            icon: 'pi pi-users',
-            label: 'Customer Insights',
-            path: '/analytics/customer-insights',
-            activeIcon: 'pi pi-users'
-        },
-        {
-            icon: 'pi pi-box',
-            label: 'Product Performance',
-            path: '/analytics/product-performance',
-            activeIcon: 'pi pi-box'
-        },
-        {
-            icon: 'pi pi-chart-bar',
-            label: 'Sales Forecasting',
-            path: '/analytics/sales-forecasting',
-            activeIcon: 'pi pi-chart-bar'
-        },
-        {
-            icon: 'pi pi-globe',
-            label: 'Geographic Analysis',
-            path: '/analytics/geographic-analysis',
-            activeIcon: 'pi pi-globe'
-        },
-        {
-            icon: 'pi pi-inbox',
-            label: 'Inventory Management',
-            path: '/analytics/inventory-management',
-            activeIcon: 'pi pi-inbox'
-        },
-        {
-            icon: 'pi pi-sparkles',
-            label: 'AI Predictions',
-            path: '/analytics/ai-predictions',
-            activeIcon: 'pi pi-sparkles'
-        },
+        { icon: 'pi pi-home', label: 'Overview', path: `${basePath}` },
+        { icon: 'pi pi-chart-line', label: 'Revenue Analytics', path: `${basePath}/revenue-analytics` },
+        { icon: 'pi pi-users', label: 'Customer Insights', path: `${basePath}/customer-insights` },
+        { icon: 'pi pi-box', label: 'Product Performance', path: `${basePath}/product-performance` },
+        { icon: 'pi pi-chart-bar', label: 'Forecasts & Predictions', path: `${basePath}/forecasts` },
+        { icon: 'pi pi-globe', label: 'Geographic Analysis', path: `${basePath}/geographic-analysis` },
+        { icon: 'pi pi-inbox', label: 'Inventory Management', path: `${basePath}/inventory-management` },
+        { icon: 'pi pi-sparkles', label: 'AI Predictions', path: `${basePath}/ai-predictions` },
     ];
 
     const handleNavigation = (path) => {
@@ -66,40 +44,27 @@ const Sidebar = ({ isOpen, onClose }) => {
 
     return (
         <>
-            {/* Mobile Overlay */}
             {isOpen && (
-                <div
-                    className="fixed inset-0 bg-black bg-opacity-50 z-40 lg: hidden"
-                    onClick={onClose}
-                />
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden" onClick={onClose} />
             )}
 
-            {/* Sidebar */}
-            <aside
-                className={`
-                    fixed lg:sticky top-0 left-0 h-screen w-64 
-                    bg-white border-r border-gray-200
-                    transform transition-transform duration-300 ease-in-out z-50
-                    ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-                    flex flex-col
-                `}
-            >
-                {/* Logo Section */}
+            <aside className={`
+                fixed lg:sticky top-0 left-0 h-screen w-64 
+                bg-white border-r border-gray-200
+                transform transition-transform duration-300 ease-in-out z-50
+                ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                flex flex-col
+            `}>
                 <div className="p-5.5 border-b border-gray-200 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Heading level={3} gradient={true} className="text-xl md:text-2xl m-0">
-                            Pulse Analytics
-                        </Heading>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    >
+                    <Heading level={3} gradient className="text-xl md:text-2xl m-0">
+                        Pulse Analytics
+                    </Heading>
+
+                    <button onClick={onClose} className="lg:hidden p-2 hover:bg-gray-100 rounded-lg">
                         <i className="pi pi-times text-gray-600"></i>
                     </button>
                 </div>
 
-                {/* Navigation Menu */}
                 <nav className="flex-1 overflow-y-auto py-4 px-3">
                     <ul className="space-y-1">
                         {menuItems.map((item, index) => (
@@ -115,7 +80,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                                         }
                                     `}
                                 >
-                                    <i className={`${item.icon} text-lg`}></i>
+                                    <i className={`${item.icon} text-lg`} />
                                     <span className="text-sm">{item.label}</span>
                                 </button>
                             </li>

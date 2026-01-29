@@ -130,7 +130,7 @@ def create_advanced_features(orders_df, order_items_df, products_df, categories_
     print("Creating advanced feature set...")
     
     # Filter delivered orders
-    orders_filtered = orders_df.filter(F.col("order_status") == "Delivered")
+    orders_filtered = orders_df.filter((F.col("order_status") == "Delivered") | (F.col("order_status") == "delivered") | (F.col("order_status") == "Completed") | (F.col("order_status") == "completed") | (F.col("order_status") == "complete") | (F.col("order_status") == "Complete"))
     
     # Join orders → order_items → products
     orders_items = orders_filtered.alias("o").join(

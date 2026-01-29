@@ -1,6 +1,7 @@
 from typing import Union
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from middleware import auth_middleware
 
 # Import your configuration (if you use .env and frontend URL there)
 try:
@@ -12,8 +13,8 @@ except ImportError:
 
 # Import your auth router (assuming in routers/auth.py)
 from routers.auth import router as auth_router
-
 from routers.admin import router as admin_router
+from routers.onboarding import router as onboarding_router
 
 
 origins = [
@@ -36,9 +37,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def analytics_middleware(request, call_next):
+    return await auth_middleware(request, call_next)
+
+
 # Register your authentication router
 app.include_router(auth_router)
 app.include_router(admin_router)
+app.include_router(onboarding_router)
 
 @app.get("/")
 def read_root():

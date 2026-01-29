@@ -114,7 +114,7 @@ const Signup = () => {
             </div>
 
             {/* Right Section - Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-8 lg:p-12 z-20 bg-neutral-50 lg:rounded-l-4xl">
+            <div className="w-full lg:w-1/2 flex items-center justify-center z-20 bg-neutral-50 lg:rounded-l-4xl">
                 <div className="w-full max-w-md">
                     {/* Mobile/Tablet Header */}
                     <div className="lg:hidden mb-8">
@@ -266,7 +266,6 @@ const Signup = () => {
                                 iconPos="right"
                                 icon="pi pi-google"
                                 className="w-full text-base font-semibold"
-                                disabled={!formData.agreeToTerms}
                             />
                         </form>
                     </div>
