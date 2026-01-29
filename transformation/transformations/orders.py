@@ -25,8 +25,8 @@ def transform_orders(dataframes):
     # Skip transformation if required dataframes don't exist
     required_dataframes = ["orders", "order_items", "products"]
     for df_name in required_dataframes:
-        if df_name not in dataframes or dataframes[df_name] is None:
-            print(f"⚠️ Skipping transform_orders: '{df_name}' dataframe not found")
+        if df_name not in dataframes or dataframes[df_name] is None or dataframes[df_name].count() == 0:
+            print(f"⚠️ Skipping transform_orders: '{df_name}' dataframe not found or empty")
             return
     
     orders = dataframes["orders"]

@@ -43,3 +43,5 @@ kafka-python
 google-generativeai
 
 python-dotenv
+fastparquet
+pyarrow

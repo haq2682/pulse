@@ -48,6 +48,7 @@ def create_spark_session():
         .config("mergeSchema", "true")
         .getOrCreate()
     )
+    spark.sparkContext.setLogLevel("ERROR")
     return spark
 
 

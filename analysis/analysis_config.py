@@ -15,6 +15,7 @@ DB_PASS = os.getenv("POSTGRES_PASSWORD", "postgres")
 DB_CONFIG = {
     "host": DB_HOST,
     "port":  DB_PORT,
+    "port":  DB_PORT,
     "database": DB_NAME,
     "user": DB_USER,
     "password": DB_PASS,
@@ -28,9 +29,15 @@ MINIO_CONFIG = {
     "secret_key": os.getenv("MINIO_SECRET_KEY"),
 }
 
-def create_spark_session(app_name="analysis"):
+MINIO_CONFIG = {
+    "endpoint": os.getenv("MINIO_ENDPOINT"),
+    "access_key": os.getenv("MINIO_ACCESS_KEY"),
+    "secret_key": os.getenv("MINIO_SECRET_KEY"),
+}
+
+def create_spark_session(app_name="Analysis"):
     spark = (
-        SparkSession.builder.appName("Cleaning")
+        SparkSession.builder.appName(app_name)
         .master(os.getenv("SPARK_SERVER", "local[*]"))
         .config("spark.dynamicAllocation.enabled", "true")
         .config("spark.dynamicAllocation.minExecutors", "0")

@@ -272,6 +272,13 @@ def validate_dates_and_timestamps(dataframes):
     Returns:
         dict: Updated dictionary
     """
+    date_cols_not_to_check = [
+        "start_date",
+        "end_date",
+        "launch_date",
+        "contract_start_date",
+        "contract_end_date",
+    ]
     print("🕒 Validating dates and timestamps...")
 
     for table_name, df in dataframes.items():
@@ -289,6 +296,10 @@ def validate_dates_and_timestamps(dataframes):
         result_df = df
 
         for col_name, col_type in date_timestamp_cols:
+            if col_name in date_cols_not_to_check:
+                print(f"  🔍 Skipping {col_name} ({col_type}) as it's in the exclusion list.")
+                continue
+            
             print(f"  🔍 Checking {col_name} ({col_type})...")
 
             if isinstance(col_type, DateType):

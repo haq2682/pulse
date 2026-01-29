@@ -12,7 +12,10 @@ def create_spark_session():
         .config("spark.dynamicAllocation.enabled", "true")
         .config("spark.dynamicAllocation.minExecutors", "0")
         .config("spark.dynamicAllocation.maxExecutors", "8")
-        .config("spark.dynamicAllocation.initialExecutors", "1")
+        .config("spark.dynamicAllocation.initialExecutors", "2")
+        .config("spark.executor.cores", "2")
+        .config("spark.executor.memory", "6g")
+        .config("spark.driver.memory", "2g")
         .config(
             "spark.jars.packages",
             "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
@@ -31,3 +34,12 @@ def create_spark_session():
         .config("mergeSchema", "true")
         .getOrCreate()
     )
+
+        # .config("spark.dynamicAllocation.enabled", "true")
+        # .config("spark.dynamicAllocation.minExecutors", "0")
+        # .config("spark.dynamicAllocation.maxExecutors", "8")
+        # .config("spark.dynamicAllocation.initialExecutors", "1")
+        # .config("spark.executor.instances", "2")
+        # .config("spark.executor.cores", "2")
+        # .config("spark.executor.memory", "6g")
+        # .config("spark.driver.memory", "2g")

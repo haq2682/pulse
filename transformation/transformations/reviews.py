@@ -3,8 +3,8 @@ from pyspark.sql.functions import col, when
 
 def transform_reviews(dataframes):
     # Skip transformation if reviews doesn't exist
-    if "reviews" not in dataframes or dataframes["reviews"] is None:
-        print("⚠️ Skipping transform_reviews: 'reviews' dataframe not found")
+    if "reviews" not in dataframes or dataframes["reviews"] is None or dataframes["reviews"].count() == 0:
+        print("⚠️ Skipping transform_reviews: 'reviews' dataframe not found or empty")
         return
     
     dataframes["reviews"] = (

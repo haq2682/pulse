@@ -5,6 +5,7 @@ from config.spark_config import create_spark_session
 from config.minio_config import create_minio_client, BUCKET_NAME
 from loaders.data_loader import load_data_from_minio
 from exporters.minio_exporter import export_to_minio
+from exporters.minio_exporter import export_to_minio
 from transformations.campaigns import transform_campaigns
 from transformations.carts import transform_carts
 from transformations.customer_sessions import transform_customer_sessions
@@ -33,6 +34,7 @@ load_dotenv(find_dotenv())
 
 def main():
     spark = create_spark_session()
+    spark.sparkContext.setLogLevel("ERROR")
     minio_client = create_minio_client()
 
     dataframes = load_data_from_minio(spark, minio_client, BUCKET_NAME)
@@ -44,6 +46,7 @@ def main():
     transform_inventory(dataframes)
     transform_customer_sessions(dataframes)
     transform_reviews(dataframes)
+    transform_carts(dataframes)
     transform_carts(dataframes)
 
     aggregate_customers(dataframes)
@@ -59,6 +62,7 @@ def main():
     rfm_segmentation(dataframes)
     product_affinity(dataframes)
     global_aggregations(spark, dataframes)
+    
     if "order_items" in dataframes and dataframes["order_items"] is not None:
         dataframes["order_items"] = dataframes["order_items"].dropDuplicates(
             ["order_item_id"]
@@ -66,7 +70,19 @@ def main():
 
     if "payments" in dataframes and dataframes["payments"] is not None:
         dataframes["payments"] = dataframes["payments"].dropDuplicates(["payment_id"])
-    export_to_minio(dataframes)
+    
+    # Path to SQL schema file - adjust based on your project structure
+    sql_schema_path = "/app/sql/agg_schema.sql"
+    
+    # Export as Parquet with schema enforcement and type preservation
+    export_to_minio(
+        dataframes, 
+        sql_schema_path=sql_schema_path,
+        enforce_schemas=True,          # Add missing columns as NULL
+        preserve_types=True,            # Cast to correct data types
+        compression='snappy'            # Options: snappy, gzip, lz4, zstd, none
+    )
+    
     spark.stop()
 
 

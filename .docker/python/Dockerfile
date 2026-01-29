@@ -18,13 +18,16 @@ RUN wget https://www.python.org/ftp/python/3.10.19/Python-3.10.19.tgz && \
     make altinstall && \
     cd / && rm -rf /tmp/Python-3.10.19 /tmp/Python-3.10.19.tgz
 
-# Set python3 to exact version (no pip3 alternative)
+# Set python3 to exact version
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python3.10 1
 
 WORKDIR /app
 
 # Copy requirements and install
 COPY requirements.txt packages.txt ./
+
+# Ensure /app is fully writable by root
+RUN chmod -R 777 /app
 
 # Use python3 -m pip instead of pip3 and bootstrap pip explicitly
 RUN python3 -m ensurepip && \
@@ -36,9 +39,12 @@ RUN python3 -m ensurepip && \
 RUN python3 -m spacy download en_core_web_md
 
 # Copy scripts
+COPY ./sql /app/sql
 COPY ./bash /app/bash
 COPY ./mapping /app/mapping
 COPY ./cleaning /app/cleaning
 COPY ./transformation /app/transformation
+COPY ./analysis /app/analysis
+COPY ./machine-learning /app/machine-learning
 
 CMD ["tail", "-f", "/dev/null"]

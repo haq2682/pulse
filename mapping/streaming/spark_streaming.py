@@ -176,7 +176,7 @@ def run_streaming():
     
     # Initialize
     spark = create_spark_session()
-    spark.sparkContext.setLogLevel("WARN")
+    spark.sparkContext.setLogLevel("ERROR")
     
     # Use hardcoded columns_info from canonical schema
     columns_info = COLUMNS_INFO

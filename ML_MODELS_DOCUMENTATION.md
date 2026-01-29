@@ -31,7 +31,7 @@ This document outlines the machine learning models for the Pulse E-Commerce Anal
 
 ## Classification Models
 
-### 1. Customer Churn Prediction
+### 1. Customer Churn Prediction ✅
 **Task:** Predict which customers are likely to churn (stop purchasing)
 
 **Input Features (from `agg_customers`):**
@@ -57,9 +57,22 @@ This document outlines the machine learning models for the Pulse E-Commerce Anal
 
 **Output Schema:** `ml_customer_churn_predictions`
 
+```sql
+CREATE TABLE ml_customer_churn_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    customer_id VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    predicted_churn_risk VARCHAR(50),  -- 'High', 'Medium', 'Low'
+    churn_probability DOUBLE,
+    confidence_score DOUBLE,
+    contributing_factors JSON,  -- Top features influencing prediction
+    model_version VARCHAR(50),
+    FOREIGN KEY (customer_id) REFERENCES agg_customers(customer_id)
+);
+```
 ---
 
-### 2. Customer Segment Classification (RFM-Based)
+### 2. Customer Segment Classification (RFM-Based) ✅
 **Task:** Categorize customers into different behavioral segments based on their RFM (Recency, Frequency, Monetary) metrics
 
 **Description:** Uses classification techniques to segment customers based on:
@@ -86,9 +99,22 @@ This document outlines the machine learning models for the Pulse E-Commerce Anal
 
 **Output Schema:** `ml_customer_segment_predictions`
 
+```sql
+CREATE TABLE ml_customer_segment_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    customer_id VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    predicted_segment VARCHAR(100),  -- 'Champions', 'Loyal', etc.
+    segment_probability DOUBLE,
+    rfm_score DOUBLE,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (customer_id) REFERENCES agg_customers(customer_id)
+);
+```
 ---
 
-### 3. Payment Success Prediction
+### 3. Payment Success Prediction ✅
 **Task:** Predict likelihood of payment success/failure
 
 **Input Features (from `agg_payments`, `agg_orders`):**
@@ -106,9 +132,23 @@ This document outlines the machine learning models for the Pulse E-Commerce Anal
 
 **Output Schema:** `ml_payment_success_predictions`
 
+```sql
+CREATE TABLE ml_payment_success_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    payment_id VARCHAR(255) NOT NULL,
+    order_id VARCHAR(255),
+    prediction_date TIMESTAMP NOT NULL,
+    predicted_status VARCHAR(50),  -- 'Success', 'Failure'
+    success_probability DOUBLE,
+    risk_factors JSON,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (payment_id) REFERENCES agg_payments(payment_id)
+);
+```
 ---
 
-### 4. Review Sentiment Classification
+### 4. Review Sentiment Classification ✅
 **Task:** Classify product review sentiment
 
 **Input Features (from `agg_reviews`):**
@@ -124,6 +164,20 @@ This document outlines the machine learning models for the Pulse E-Commerce Anal
 
 **Output Schema:** `ml_review_sentiment_predictions`
 
+```sql
+CREATE TABLE ml_review_sentiment_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    review_id VARCHAR(255) NOT NULL,
+    product_id VARCHAR(255),
+    prediction_date TIMESTAMP NOT NULL,
+    predicted_sentiment VARCHAR(50),  -- 'Positive', 'Neutral', 'Negative'
+    sentiment_score DOUBLE,  -- -1 to 1
+    confidence_score DOUBLE,
+    key_phrases JSON,
+    model_version VARCHAR(50),
+    FOREIGN KEY (review_id) REFERENCES agg_reviews(review_id)
+);
+```
 ---
 
 ### 5. Product Category Classification Based on Description and Attributes
@@ -156,9 +210,22 @@ This document outlines the machine learning models for the Pulse E-Commerce Anal
 
 **Output Schema:** `ml_product_category_predictions`
 
+```sql
+CREATE TABLE ml_product_category_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    predicted_category VARCHAR(255),
+    predicted_sub_category VARCHAR(255),
+    category_probability DOUBLE,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (product_id) REFERENCES agg_products(product_id)
+);
+```
 ---
 
-### 6. Product Bundling - Complementary Items Classification
+### 6. Product Bundling - Complementary Items Classification ✅
 **Task:** Identify and classify complementary items that should be bundled together
 
 **Description:** Uses association rule mining and classification techniques to identify products that are frequently purchased together and should be bundled as complementary items. This enables creation of product bundles, cross-sell recommendations, and "frequently bought together" suggestions.
@@ -208,7 +275,7 @@ CREATE TABLE ml_product_bundling_predictions (
 
 ---
 
-### 7. Cart Abandonment Risk Classification
+### 7. Cart Abandonment Risk Classification ✅
 **Task:** Predict if a cart will be abandoned
 
 **Input Features (from `agg_cart_abandonment_analysis`, `agg_customer_sessions`):**
@@ -227,9 +294,25 @@ CREATE TABLE ml_product_bundling_predictions (
 
 **Output Schema:** `ml_cart_abandonment_predictions`
 
+```sql
+CREATE TABLE ml_cart_abandonment_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    cart_id VARCHAR(255) NOT NULL,
+    customer_id VARCHAR(255),
+    prediction_date TIMESTAMP NOT NULL,
+    predicted_status VARCHAR(50),  -- 'Will Abandon', 'Will Convert'
+    abandonment_probability DOUBLE,
+    abandonment_risk_score DOUBLE,
+    key_risk_factors JSON,
+    recommended_actions JSON,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (cart_id) REFERENCES agg_shopping_cart(cart_id)
+);
+```
 ---
 
-### 8. Stock Status Classification
+### 8. Stock Status Classification ✅
 **Task:** Classify inventory stock health
 
 **Input Features (from `agg_product_inventory_health`, `agg_inventory`):**
@@ -248,11 +331,24 @@ CREATE TABLE ml_product_bundling_predictions (
 
 **Output Schema:** `ml_stock_status_predictions`
 
+```sql
+CREATE TABLE ml_stock_status_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    predicted_status VARCHAR(50),  -- 'In Stock', 'Low Stock', 'Out of Stock', 'Overstock'
+    days_until_stockout DOUBLE,
+    reorder_recommendation BOOLEAN,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (product_id) REFERENCES agg_products(product_id)
+);
+```
 ---
 
 ## Regression Models
 
-### 1. Customer Lifetime Value (CLV) Prediction
+### 1. Customer Lifetime Value (CLV) Prediction ✅
 **Task:** Predict future customer lifetime value
 
 **Input Features (from `agg_customers`):**
@@ -275,9 +371,23 @@ CREATE TABLE ml_product_bundling_predictions (
 
 **Output Schema:** `ml_clv_predictions`
 
+```sql
+CREATE TABLE ml_clv_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    customer_id VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    predicted_clv DOUBLE,
+    prediction_horizon_days INTEGER,  -- e.g., 365 for 1-year prediction
+    confidence_interval_lower DOUBLE,
+    confidence_interval_upper DOUBLE,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (customer_id) REFERENCES agg_customers(customer_id)
+);
+```
 ---
 
-### 2. Product Demand Forecasting with Seasonal Fluctuation Analysis
+### 2. Product Demand Forecasting with Seasonal Fluctuation Analysis ✅
 **Task:** Predict future sales and forecast product demand with seasonal demand fluctuation patterns
 
 **Description:** Uses time-series regression models to forecast future product demand, accounting for:
@@ -321,9 +431,26 @@ CREATE TABLE ml_product_bundling_predictions (
 
 **Output Schema:** `ml_demand_forecast_predictions`
 
+```sql
+CREATE TABLE ml_demand_forecast_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    forecast_date DATE NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    predicted_demand_units DOUBLE,
+    confidence_interval_lower DOUBLE,
+    confidence_interval_upper DOUBLE,
+    forecast_horizon_days INTEGER,
+    seasonality_factor DOUBLE,
+    trend_factor DOUBLE,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (product_id) REFERENCES agg_products(product_id)
+);
+```
 ---
 
-### 3. Revenue Forecasting
+### 3. Revenue Forecasting ✅
 **Task:** Forecast future revenue by time period
 
 **Input Features (from `agg_daily_aggregations`, `agg_weekly_aggregations`, `agg_monthly_aggregations`):**
@@ -344,9 +471,25 @@ CREATE TABLE ml_product_bundling_predictions (
 
 **Output Schema:** `ml_revenue_forecast_predictions`
 
+```sql
+CREATE TABLE ml_revenue_forecast_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    forecast_date DATE NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    predicted_revenue DOUBLE,
+    predicted_orders INTEGER,
+    confidence_interval_lower DOUBLE,
+    confidence_interval_upper DOUBLE,
+    forecast_horizon_days INTEGER,
+    seasonality_factor DOUBLE,
+    trend_factor DOUBLE,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50)
+);
+```
 ---
 
-### 4. Average Order Value (AOV) Prediction
+### 4. Average Order Value (AOV) Prediction 🔁
 **Task:** Predict expected order value for a customer
 
 **Input Features (from `agg_customers`, `agg_orders`):**
@@ -364,9 +507,23 @@ CREATE TABLE ml_product_bundling_predictions (
 
 **Output Schema:** `ml_aov_predictions`
 
+```sql
+CREATE TABLE ml_aov_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    customer_id VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    predicted_next_aov DOUBLE,
+    confidence_interval_lower DOUBLE,
+    confidence_interval_upper DOUBLE,
+    factors_influencing_aov JSON,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (customer_id) REFERENCES agg_customers(customer_id)
+);
+```
 ---
 
-### 5. Inventory Restock Quantity Prediction
+### 5. Inventory Restock Quantity Prediction 
 **Task:** Predict optimal restock quantity
 
 **Input Features (from `agg_product_inventory_health`, `agg_products`):**
@@ -386,6 +543,21 @@ CREATE TABLE ml_product_bundling_predictions (
 
 **Output Schema:** `ml_restock_quantity_predictions`
 
+```sql
+CREATE TABLE ml_restock_quantity_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    recommended_restock_quantity INTEGER,
+    expected_demand_next_30_days DOUBLE,
+    optimal_order_point INTEGER,
+    safety_stock_level INTEGER,
+    estimated_cost DOUBLE,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (product_id) REFERENCES agg_products(product_id)
+);
+```
 ---
 
 ### 6. Safety Stock Level Prediction
@@ -514,6 +686,23 @@ CREATE TABLE ml_stockout_predictions (
 
 **Output Schema:** `ml_campaign_roi_predictions`
 
+```sql
+CREATE TABLE ml_campaign_roi_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    campaign_id VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    predicted_roi DOUBLE,
+    predicted_revenue DOUBLE,
+    predicted_conversions INTEGER,
+    predicted_ctr DOUBLE,
+    confidence_interval_lower DOUBLE,
+    confidence_interval_upper DOUBLE,
+    optimization_recommendations JSON,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (campaign_id) REFERENCES agg_marketing_campaigns(campaign_id)
+);
+```
 ---
 
 ### 9. Product Price Optimization
@@ -535,6 +724,22 @@ CREATE TABLE ml_stockout_predictions (
 
 **Output Schema:** `ml_price_optimization_predictions`
 
+```sql
+CREATE TABLE ml_price_optimization_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    current_price DOUBLE,
+    optimal_price DOUBLE,
+    expected_revenue_at_optimal DOUBLE,
+    expected_units_at_optimal INTEGER,
+    price_elasticity DOUBLE,
+    competitor_price_range JSON,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (product_id) REFERENCES agg_products(product_id)
+);
+```
 ---
 
 ### 10. Delivery Time Prediction
@@ -555,6 +760,21 @@ CREATE TABLE ml_stockout_predictions (
 
 **Output Schema:** `ml_delivery_time_predictions`
 
+```sql
+CREATE TABLE ml_delivery_time_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    order_id VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    predicted_delivery_days DOUBLE,
+    predicted_delivery_date DATE,
+    confidence_interval_lower DOUBLE,
+    confidence_interval_upper DOUBLE,
+    factors_affecting_delivery JSON,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (order_id) REFERENCES agg_orders(order_id)
+);
+```
 ---
 
 ### 11. Session Conversion Value Prediction
@@ -576,6 +796,20 @@ CREATE TABLE ml_stockout_predictions (
 
 **Output Schema:** `ml_session_conversion_predictions`
 
+```sql
+CREATE TABLE ml_session_conversion_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    session_id VARCHAR(255) NOT NULL,
+    customer_id VARCHAR(255),
+    prediction_date TIMESTAMP NOT NULL,
+    predicted_conversion_value DOUBLE,
+    conversion_probability DOUBLE,
+    recommended_interventions JSON,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (session_id) REFERENCES agg_customer_sessions(session_id)
+);
+```
 ---
 
 ## Clustering Models
@@ -601,6 +835,22 @@ CREATE TABLE ml_stockout_predictions (
 
 **Output Schema:** `ml_customer_clustering`
 
+```sql
+CREATE TABLE ml_customer_clustering (
+    clustering_id VARCHAR(50) PRIMARY KEY,
+    customer_id VARCHAR(255) NOT NULL,
+    cluster_date TIMESTAMP NOT NULL,
+    cluster_id INTEGER,
+    cluster_label VARCHAR(100),  -- 'High Value', 'At Risk', etc.
+    cluster_centroid_distance DOUBLE,
+    recency_score INTEGER,
+    frequency_score INTEGER,
+    monetary_score INTEGER,
+    cluster_characteristics JSON,
+    model_version VARCHAR(50),
+    FOREIGN KEY (customer_id) REFERENCES agg_customers(customer_id)
+);
+```
 ---
 
 ### 2. Product Affinity Clustering
@@ -621,6 +871,20 @@ CREATE TABLE ml_stockout_predictions (
 
 **Output Schema:** `ml_product_affinity_clustering`
 
+```sql
+CREATE TABLE ml_product_affinity_clustering (
+    clustering_id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    cluster_date TIMESTAMP NOT NULL,
+    cluster_id INTEGER,
+    cluster_label VARCHAR(100),
+    cluster_centroid_distance DOUBLE,
+    recommended_products JSON,  -- Array of product_ids in same cluster
+    cross_sell_opportunities JSON,
+    model_version VARCHAR(50),
+    FOREIGN KEY (product_id) REFERENCES agg_products(product_id)
+);
+```
 ---
 
 ### 3. Geographic Sales Clustering for Regional Performance Patterns
@@ -670,6 +934,21 @@ CREATE TABLE ml_stockout_predictions (
 
 **Output Schema:** `ml_geographic_clustering`
 
+```sql
+CREATE TABLE ml_geographic_clustering (
+    clustering_id VARCHAR(50) PRIMARY KEY,
+    country VARCHAR(255),
+    state_province VARCHAR(255),
+    city VARCHAR(255),
+    cluster_date TIMESTAMP NOT NULL,
+    cluster_id INTEGER,
+    market_segment VARCHAR(100),  -- 'High Value', 'Growth', etc.
+    cluster_centroid_distance DOUBLE,
+    segment_characteristics JSON,
+    expansion_opportunity_score DOUBLE,
+    model_version VARCHAR(50)
+);
+```
 ---
 
 ### 4. Supplier Performance Clustering
@@ -691,6 +970,20 @@ CREATE TABLE ml_stockout_predictions (
 
 **Output Schema:** `ml_supplier_clustering`
 
+```sql
+CREATE TABLE ml_supplier_clustering (
+    clustering_id VARCHAR(50) PRIMARY KEY,
+    supplier_id VARCHAR(255) NOT NULL,
+    cluster_date TIMESTAMP NOT NULL,
+    cluster_id INTEGER,
+    performance_tier VARCHAR(100),  -- 'Premium', 'Standard', 'At Risk'
+    cluster_centroid_distance DOUBLE,
+    performance_metrics JSON,
+    improvement_recommendations JSON,
+    model_version VARCHAR(50),
+    FOREIGN KEY (supplier_id) REFERENCES agg_suppliers(supplier_id)
+);
+```
 ---
 
 ### 5. Session Behavior Clustering
@@ -713,6 +1006,20 @@ CREATE TABLE ml_stockout_predictions (
 
 **Output Schema:** `ml_session_behavior_clustering`
 
+```sql
+CREATE TABLE ml_session_behavior_clustering (
+    clustering_id VARCHAR(50) PRIMARY KEY,
+    session_id VARCHAR(255) NOT NULL,
+    cluster_date TIMESTAMP NOT NULL,
+    cluster_id INTEGER,
+    behavior_type VARCHAR(100),  -- 'Browser', 'Researcher', 'Buyer', etc.
+    cluster_centroid_distance DOUBLE,
+    behavior_characteristics JSON,
+    engagement_recommendations JSON,
+    model_version VARCHAR(50),
+    FOREIGN KEY (session_id) REFERENCES agg_customer_sessions(session_id)
+);
+```
 ---
 
 ### 6. Product Lifecycle Clustering
@@ -734,6 +1041,20 @@ CREATE TABLE ml_stockout_predictions (
 
 **Output Schema:** `ml_product_lifecycle_clustering`
 
+```sql
+CREATE TABLE ml_product_lifecycle_clustering (
+    clustering_id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    cluster_date TIMESTAMP NOT NULL,
+    cluster_id INTEGER,
+    lifecycle_stage VARCHAR(100),  -- 'Introduction', 'Growth', 'Maturity', 'Decline'
+    cluster_centroid_distance DOUBLE,
+    stage_characteristics JSON,
+    strategic_recommendations JSON,
+    model_version VARCHAR(50),
+    FOREIGN KEY (product_id) REFERENCES agg_products(product_id)
+);
+```
 ---
 
 ## Reinforcement Learning Models
@@ -1081,6 +1402,27 @@ CREATE TABLE ml_product_category_predictions (
     FOREIGN KEY (product_id) REFERENCES agg_products(product_id)
 );
 ```
+#### `ml_product_bundling_predictions`
+```sql
+CREATE TABLE ml_product_bundling_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    product_id_a VARCHAR(255) NOT NULL,
+    product_id_b VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    is_complementary BOOLEAN,
+    bundle_category VARCHAR(100),
+    affinity_score DOUBLE,  -- 0 to 1
+    support DOUBLE,
+    confidence DOUBLE,
+    lift DOUBLE,
+    expected_bundle_revenue DOUBLE,
+    recommended_bundle_discount DOUBLE,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (product_id_a) REFERENCES agg_products(product_id),
+    FOREIGN KEY (product_id_b) REFERENCES agg_products(product_id)
+);
+```
 
 #### `ml_cart_abandonment_predictions`
 ```sql
@@ -1199,6 +1541,47 @@ CREATE TABLE ml_restock_quantity_predictions (
     optimal_order_point INTEGER,
     safety_stock_level INTEGER,
     estimated_cost DOUBLE,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (product_id) REFERENCES agg_products(product_id)
+);
+```
+#### `ml_safety_stock_predictions`
+```sql
+CREATE TABLE ml_safety_stock_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    required_safety_stock_units DOUBLE,
+    minimum_stock_level DOUBLE,
+    reorder_point DOUBLE,
+    service_level_target DOUBLE,
+    demand_variability DOUBLE,
+    lead_time_variability DOUBLE,
+    expected_stockout_probability DOUBLE,
+    holding_cost_impact DOUBLE,
+    confidence_interval_lower DOUBLE,
+    confidence_interval_upper DOUBLE,
+    confidence_score DOUBLE,
+    model_version VARCHAR(50),
+    FOREIGN KEY (product_id) REFERENCES agg_products(product_id)
+);
+```
+#### `ml_stockout_predictions`
+```sql
+CREATE TABLE ml_stockout_predictions (
+    prediction_id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    prediction_date TIMESTAMP NOT NULL,
+    stockout_probability DOUBLE,
+    days_until_stockout DOUBLE,
+    expected_stockout_date DATE,
+    stockout_risk_level VARCHAR(50),
+    current_days_of_supply DOUBLE,
+    safety_stock_breach BOOLEAN,
+    reorder_recommended BOOLEAN,
+    recommended_reorder_quantity INTEGER,
+    urgency_score DOUBLE,  -- 0 to 100
     confidence_score DOUBLE,
     model_version VARCHAR(50),
     FOREIGN KEY (product_id) REFERENCES agg_products(product_id)
@@ -1375,6 +1758,128 @@ CREATE TABLE ml_product_lifecycle_clustering (
     strategic_recommendations JSON,
     model_version VARCHAR(50),
     FOREIGN KEY (product_id) REFERENCES agg_products(product_id)
+);
+```
+---
+
+### Reinforcement Learning Outputs
+
+#### `rl_inventory_optimization_actions`
+```sql
+CREATE TABLE rl_inventory_optimization_actions (
+    action_id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    current_stock INTEGER,
+    recommended_reorder_quantity INTEGER,
+    recommended_reorder_timing VARCHAR(50),
+    expected_reward DOUBLE,
+    confidence_score DOUBLE,
+    state_representation JSON,
+    model_version VARCHAR(50)
+);
+```
+
+#### `rl_inventory_metrics`
+```sql
+CREATE TABLE rl_inventory_metrics (
+    metric_id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(255),
+    date DATE,
+    total_revenue DOUBLE,
+    total_holding_cost DOUBLE,
+    total_stockout_penalty DOUBLE,
+    total_reward DOUBLE,
+    service_level DOUBLE,
+    inventory_turnover DOUBLE,
+    model_version VARCHAR(50)
+);
+```
+
+#### `rl_pricing_optimization_actions`
+```sql
+CREATE TABLE rl_pricing_optimization_actions (
+    action_id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    current_price DOUBLE,
+    recommended_price DOUBLE,
+    expected_revenue DOUBLE,
+    expected_units_sold DOUBLE,
+    expected_reward DOUBLE,
+    confidence_score DOUBLE,
+    state_representation JSON,
+    model_version VARCHAR(50)
+);
+```
+#### `rl_marketing_budget_actions`
+```sql
+CREATE TABLE rl_marketing_budget_actions (
+    action_id VARCHAR(50) PRIMARY KEY,
+    period VARCHAR(50),
+    timestamp TIMESTAMP NOT NULL,
+    total_budget DOUBLE,
+    allocation_email DOUBLE,
+    allocation_social DOUBLE,
+    allocation_search DOUBLE,
+    allocation_display DOUBLE,
+    expected_total_roi DOUBLE,
+    expected_revenue DOUBLE,
+    confidence_score DOUBLE,
+    state_representation JSON,
+    model_version VARCHAR(50)
+);
+```
+
+#### `rl_cart_recovery_actions`
+```sql
+CREATE TABLE rl_cart_recovery_actions (
+    action_id VARCHAR(50) PRIMARY KEY,
+    cart_id VARCHAR(255) NOT NULL,
+    customer_id VARCHAR(255) NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    recommended_action_type INTEGER,
+    action_description VARCHAR(255),
+    expected_recovery_probability DOUBLE,
+    expected_revenue DOUBLE,
+    expected_cost DOUBLE,
+    confidence_score DOUBLE,
+    state_representation JSON,
+    model_version VARCHAR(50)
+);
+```
+
+#### `rl_cart_recovery_results`
+```sql
+CREATE TABLE rl_cart_recovery_results (
+    result_id VARCHAR(50) PRIMARY KEY,
+    action_id VARCHAR(50),
+    cart_id VARCHAR(255),
+    action_taken BOOLEAN,
+    cart_recovered BOOLEAN,
+    recovery_time_hours INTEGER,
+    recovered_value DOUBLE,
+    discount_given DOUBLE,
+    actual_reward DOUBLE,
+    FOREIGN KEY (action_id) REFERENCES rl_cart_recovery_actions(action_id)
+);
+```
+
+#### `rl_supplier_selection_actions`
+```sql
+CREATE TABLE rl_supplier_selection_actions (
+    action_id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    recommended_supplier_id VARCHAR(255),
+    recommended_order_quantity INTEGER,
+    expected_total_cost DOUBLE,
+    expected_delivery_date DATE,
+    expected_reliability_score DOUBLE,
+    alternative_suppliers JSON,
+    confidence_score DOUBLE,
+    state_representation JSON,
+    model_version VARCHAR(50)
 );
 ```
 
