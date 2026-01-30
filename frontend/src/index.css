@@ -32,7 +32,7 @@ h1 {
 
 button {
   border-radius: 8px;
-  border: 1px solid transparent;
+  /* border: 1px solid transparent; */
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
@@ -40,9 +40,9 @@ button {
   transition: border-color 0.25s;
 }
 
-button:hover {
+/* button:hover {
   border-color: var(--color-g2);
-}
+} */
 
 button:focus,
 button:focus-visible {
@@ -72,6 +72,7 @@ button:focus-visible {
   --color-g1: #00C597;
   --color-g2: #12EFBC;
   --color-text-primary: #636363;
+  --color-danger: #FF4D4F;
 
   /* Custom Shadows */
   --shadow-primary: 0 4px 5px 0 rgba(0, 197, 151, 0.39);

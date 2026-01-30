@@ -304,7 +304,7 @@ async def google_callback(code: str, state: str, db=Depends(get_db)):
         ).fetchone()
 
         # 5. Redirect to Frontend Dashboard
-        redirect_url = f"{settings.frontend_url}/analytics/{business[0] if business else ''}"
+        redirect_url = f"{settings.frontend_url}/analytics{'/' + business[0] if business else ''}"
         
         response = RedirectResponse(url=redirect_url)
         

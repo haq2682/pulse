@@ -276,7 +276,7 @@ services:
       POSTGRES_SERVER: ${POSTGRES_SERVER}
       KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
       SINGLE_USER_CREDENTIALS_USERNAME: admin
-      SINGLE_USER_CREDENTIALS_PASSWORD: admin
+      SINGLE_USER_CREDENTIALS_PASSWORD: adminadminadmin
     volumes:
       - nifi_data:/opt/nifi/nifi-current/data
       - ./nifi/custom_processors:/opt/nifi/nifi-current/custom_processors # optional for custom scripts

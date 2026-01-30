@@ -25,6 +25,8 @@ mysql-connector-python
 pyodbc
 
 redis
+aioredis
+pycountry
 
 pydantic
 pydantic-settings
@@ -48,6 +50,3 @@ pyarrow
 hdbscan
 scikit-learn
 scikit-learn-extra
-
-ray[rllib]
-gymnasium
