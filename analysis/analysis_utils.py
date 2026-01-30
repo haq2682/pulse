@@ -1,5 +1,4 @@
 import os
-import os
 import pyspark.sql.functions as F
 from pyspark.sql import Window
 from minio import Minio
@@ -15,21 +14,6 @@ def get_minio_client():
     )
 
 
-def get_agg_tables(spark, db_config=None):
-    """
-    Load aggregated tables from MinIO transformed/ directory.
-    
-from minio import Minio
-
-
-def get_minio_client():
-    """Create and return a MinIO client instance."""
-    return Minio(
-        os.getenv("MINIO_ENDPOINT"),
-        access_key=os.getenv("MINIO_ACCESS_KEY"),
-        secret_key=os.getenv("MINIO_SECRET_KEY"),
-        secure=False,
-    )
 
 
 def get_agg_tables(spark, db_config=None):
@@ -37,9 +21,6 @@ def get_agg_tables(spark, db_config=None):
     Load aggregated tables from MinIO transformed/ directory.
     
     Args:
-        spark: SparkSession
-        db_config: Deprecated parameter kept for backward compatibility
-        
         spark: SparkSession
         db_config: Deprecated parameter kept for backward compatibility
         
@@ -53,7 +34,7 @@ def get_agg_tables(spark, db_config=None):
         print(f"Loading aggregated tables from MinIO bucket: {bucket_name}")
         print(f"Directory: transformed/")
         
-        # List all Parquet files in the transformed/ directory
+        # List all CSV files in the transformed/ directory
         objects = minio_client.list_objects(bucket_name, prefix="transformed/", recursive=True)
         
         spark_dfs = {}
@@ -74,7 +55,12 @@ def get_agg_tables(spark, db_config=None):
                 file_path = f"transformed/{table_name}.parquet"
                 print(f"Loading table: {table_name}...")
                 
-                df = spark.read.parquet(f"s3a://{bucket_name}/{file_path}")
+                df = (
+                    spark.read
+                    .option("header", "true")
+                    .option("inferSchema", "true")
+                    .parquet(f"s3a://{bucket_name}/{file_path}")
+                )
                 
                 spark_dfs[table_name] = df
                 print(f"  ✅ Loaded {table_name}: {df.count()} rows")
@@ -86,15 +72,12 @@ def get_agg_tables(spark, db_config=None):
 
     except Exception as e:
         print(f"Error loading tables from MinIO: {e}")
-        print(f"Error loading tables from MinIO: {e}")
         import traceback
         traceback.print_exc()
         return {}
 
 
-
 def is_column_all_null_or_zero(df, col_name):
-    if df is None: 
     if df is None: 
         return True                    
 
@@ -123,19 +106,32 @@ def is_column_all_null_or_zero(df, col_name):
 
     return False
 
-
-
 def add_time_grain(df, date_col, grain="day"):
-    if grain == "day": 
-    if grain == "day": 
-        return df.withColumn("grain_date", F.col(date_col))
+    """
+    Adds time grain columns safely. 
+    Standardizes 'day' by removing time components.
+    Standardizes 'week' and 'month' by using the start date of that period.
+    """
+    
+    # 1. Day: Ensure we remove time components (hh:mm:ss)
+    if grain == "day":
+        return df.withColumn("grain_date", F.to_date(F.col(date_col)))
+
+    # 2. Week: Use date_trunc to get the Monday of that week
+    # This solves the year-crossover issue perfectly.
     elif grain == "week":
-        return df.withColumn("grain_year", F.year(date_col)) \
-                 .withColumn("grain_week", F.weekofyear(date_col))
-    elif grain == "month": 
-    elif grain == "month": 
-        return df.withColumn("grain_year", F.year(date_col)) \
-                 .withColumn("grain_month", F.month(date_col))
+        # Returns a DATE column representing the start of the week
+        # We also extract year/week for your group_cols logic
+        return df.withColumn("grain_date", F.to_date(F.date_trunc("week", F.col(date_col)))) \
+                 .withColumn("grain_year", F.year(F.col(date_col))) \
+                 .withColumn("grain_week", F.weekofyear(F.col(date_col)))
+
+    # 3. Month: Truncate to the 1st of the month
+    elif grain == "month":
+        return df.withColumn("grain_date", F.to_date(F.trunc(F.col(date_col), "month"))) \
+                 .withColumn("grain_year", F.year(F.col(date_col))) \
+                 .withColumn("grain_month", F.month(F.col(date_col)))
+
     else:
         raise ValueError("grain must be 'day', 'week', or 'month'")
 
@@ -149,7 +145,6 @@ def check_null_dataframes(dataframe):
         if df is None:
             empty_dataframes.append(key)
             print(f"dataframe['{key}'] is None")
-        else: 
         else: 
             row_count = df.count()
             
@@ -177,11 +172,7 @@ def check_null_dataframes(dataframe):
         print(f"   - {key}")
     print(f"\n⚠️  All-NULL DataFrames ({len(all_null_dataframes)}):")
     for key in all_null_dataframes: 
-    for key in all_null_dataframes: 
         print(f"   - {key}")
     print(f"\n⚡ DataFrames with Some NULL values ({len(has_null_values)}):")
-    for key, cols in has_null_values: 
-        print(f"   - {key}:  {cols}")
-
     for key, cols in has_null_values: 
         print(f"   - {key}:  {cols}")
