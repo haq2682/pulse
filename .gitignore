@@ -4,6 +4,9 @@
 *.txt
 *gpt
 *.md
+!PROJECT_DOCUMENTATION.md
+!README.md
+!ML_MODELS_DOCUMENTATION.md
 !requirements.txt
 !packages.txt
 .vscode
