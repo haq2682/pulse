@@ -23,7 +23,12 @@ class TableData(BaseModel):
     @field_validator('table_name')
     @classmethod
     def validate_table_name(cls, v: str) -> str:
-        """Validate table name is not empty and follows naming conventions."""
+        """
+        Validate table name is not empty and follows naming conventions.
+        
+        Note: Table names are automatically converted to lowercase for consistency
+        with the canonical schema table names used throughout the system.
+        """
         if not v or not v.strip():
             raise ValueError("table_name cannot be empty")
         # Allow alphanumeric, underscores, and hyphens
@@ -33,8 +38,12 @@ class TableData(BaseModel):
     
     @field_validator('data')
     @classmethod
-    def validate_data_not_empty(cls, v: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Validate that data list is not None."""
+    def validate_data_not_none(cls, v: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Validate that data is not None.
+        
+        Note: Empty lists are allowed - use [] if there is no data.
+        """
         if v is None:
             raise ValueError("data cannot be None, use empty list [] if no data")
         return v

@@ -3,6 +3,7 @@ from io import BytesIO
 import os
 import re
 import json
+import traceback
 from utils.helpers import normalize_name
 
 
@@ -55,7 +56,6 @@ def load_all_files_from_minio(minio_client, bucket_name, spark):
 
         except Exception as e:
             print(f"Error processing {file_name}: {str(e)}")
-            import traceback
             traceback.print_exc()
 
     print(f"Loaded {len(dataframes)} dataframes: {', '.join(dataframes.keys())}")
@@ -164,21 +164,24 @@ def load_file_from_minio(minio_client, bucket_name, file_name, spark):
             result = {}
             has_valid_tables = False
             for key, value in json_data.items():
-                if isinstance(value, list) and value and isinstance(value[0], dict):
-                    # This looks like a table
-                    pdf = pd.DataFrame(value)
-                    if not pdf.empty:
-                        pdf = pdf.astype(str)
-                        spark_df = spark.createDataFrame(pdf)
-                        spark_df.cache()
-                        spark_df.count()
-                        # Normalize table name
-                        normalized_name = normalize_name(key)
-                        if normalized_name:
-                            result[normalized_name] = spark_df
-                        else:
-                            result[key] = spark_df
-                        has_valid_tables = True
+                # Check if value is a non-empty list with dict elements
+                if isinstance(value, list) and len(value) > 0:
+                    # Verify all elements are dictionaries
+                    if all(isinstance(item, dict) for item in value):
+                        # This looks like a table
+                        pdf = pd.DataFrame(value)
+                        if not pdf.empty:
+                            pdf = pdf.astype(str)
+                            spark_df = spark.createDataFrame(pdf)
+                            spark_df.cache()
+                            spark_df.count()
+                            # Normalize table name
+                            normalized_name = normalize_name(key)
+                            if normalized_name:
+                                result[normalized_name] = spark_df
+                            else:
+                                result[key] = spark_df
+                            has_valid_tables = True
             
             if has_valid_tables:
                 return result
