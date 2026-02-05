@@ -15,44 +15,52 @@ from pyspark.sql import functions as F
 
 # Constants for General Model Training
 GENERAL_MODEL_BUCKET = "pulse-bucket-1"
-BUCKET_PREFIX = "pulse-bucket-"
 
-
-def get_minio_buckets(spark: SparkSession, max_buckets: int = 100) -> List[str]:
+def get_minio_buckets(spark: SparkSession, bucket_prefix: str = None) -> List[str]:
     """
-    Get list of all pulse buckets from MinIO.
+    Get list of all buckets from MinIO.
     
     Args:
         spark: SparkSession with MinIO configuration
-        max_buckets: Maximum number of buckets to scan (default 100)
+        bucket_prefix: Optional prefix to filter buckets (default None for all buckets)
     
     Returns:
-        List of bucket names matching the pulse bucket pattern
+        List of bucket names (optionally filtered by prefix)
     """
-    buckets = []
-    
-    # Try to list buckets by checking if they exist
-    for i in range(1, max_buckets + 1):
-        bucket_name = f"{BUCKET_PREFIX}{i}"
-        try:
-            # Check if bucket exists by trying to list root path
-            test_path = f"s3a://{bucket_name}/"
-            # Use a quick existence check
-            jvm = spark._jvm
-            hadoop_conf = spark._jsc.hadoopConfiguration()
-            path = jvm.org.apache.hadoop.fs.Path(test_path)
-            fs = path.getFileSystem(hadoop_conf)
-            if fs.exists(path):
-                buckets.append(bucket_name)
-        except Exception:
-            # Bucket doesn't exist or not accessible
-            continue
-    
-    if not buckets:
-        # Fallback: at minimum, add the main bucket
-        buckets = [GENERAL_MODEL_BUCKET]
-    
-    return buckets
+    try:
+        # Get Hadoop FileSystem
+        jvm = spark._jvm
+        hadoop_conf = spark._jsc.hadoopConfiguration()
+        
+        # Get the S3A FileSystem instance
+        uri = jvm.java.net.URI("s3a://")
+        fs = jvm.org.apache.hadoop.fs.FileSystem.get(uri, hadoop_conf)
+        
+        # List all buckets at root level
+        root_path = jvm.org.apache.hadoop.fs.Path("s3a://")
+        file_statuses = fs.listStatus(root_path)
+        
+        # Extract bucket names
+        buckets = []
+        for file_status in file_statuses:
+            path = file_status.getPath()
+            # Get bucket name from path (format: s3a://bucket-name)
+            bucket_name = path.toUri().getHost()
+            if bucket_name:
+                # Apply optional prefix filter
+                if bucket_prefix is None or bucket_name.startswith(bucket_prefix):
+                    buckets.append(bucket_name)
+        
+        if not buckets and bucket_prefix:
+            # Fallback: if filtering by prefix and no buckets found, try the general bucket
+            buckets = [GENERAL_MODEL_BUCKET]
+        
+        return sorted(buckets)
+        
+    except Exception as e:
+        print(f"Error listing MinIO buckets: {e}")
+        # Fallback to general bucket
+        return [GENERAL_MODEL_BUCKET]
 
 
 def load_data_from_all_buckets(
