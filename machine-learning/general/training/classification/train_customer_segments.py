@@ -371,7 +371,12 @@ def main():
         return
     
     # Load RFM data from all buckets
-    rfm_df, _ = load_data_from_all_buckets(spark, INPUT_RFM_PATH, filter_nulls=False)
+    rfm_required_cols = ["customer_id", "days_since_last_order"]
+    rfm_df, _ = load_data_from_all_buckets(
+        spark, INPUT_RFM_PATH, 
+        required_columns=rfm_required_cols,
+        filter_nulls=True
+    )
     
     if rfm_df is None:
         print("⚠️  Training skipped: Failed to load RFM data")
