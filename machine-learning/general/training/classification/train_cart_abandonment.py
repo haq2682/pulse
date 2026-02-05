@@ -699,9 +699,24 @@ def main():
         return
     
     # Load sessions data
-    sessions_df, _ = load_data_from_all_buckets(spark, INPUT_SESSIONS_PATH, filter_nulls=False)
-    customers_df, _ = load_data_from_all_buckets(spark, INPUT_CUSTOMERS_PATH, filter_nulls=False)
-    orders_df, _ = load_data_from_all_buckets(spark, INPUT_ORDERS_PATH, filter_nulls=False)
+    sessions_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_SESSIONS_PATH,
+        required_columns=["session_id"],
+        filter_nulls=False
+    )
+    customers_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_CUSTOMERS_PATH,
+        required_columns=["customer_id"],
+        filter_nulls=False
+    )
+    orders_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_ORDERS_PATH,
+        required_columns=["order_id", "customer_id"],
+        filter_nulls=False
+    )
     
     if sessions_df is None:
         print("⚠️  Training skipped: Failed to load sessions data")

@@ -388,8 +388,18 @@ def main():
         return
     
     # Load orders and customers data from all buckets
-    orders_df, _ = load_data_from_all_buckets(spark, INPUT_ORDERS_PATH, filter_nulls=False)
-    customers_df, _ = load_data_from_all_buckets(spark, INPUT_CUSTOMERS_PATH, filter_nulls=False)
+    orders_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_ORDERS_PATH,
+        required_columns=["order_id", "customer_id"],
+        filter_nulls=False
+    )
+    customers_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_CUSTOMERS_PATH,
+        required_columns=["customer_id"],
+        filter_nulls=False
+    )
     
     if orders_df is None or customers_df is None:
         print("⚠️  Training skipped: Failed to load orders or customers data")

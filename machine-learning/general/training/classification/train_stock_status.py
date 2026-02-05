@@ -25,7 +25,7 @@ from utils.multi_bucket_loader import (
 # Configuration - General models output to pulse-bucket-1
 MODEL_NAME = "stock_status"
 INPUT_RELATIVE_PATH = "transformed/agg_product_inventory_health.parquet"
-INPUT_INVENTORY_PATH = "transformed/agg_inventory.parquet"
+INPUT_INVENTORY_RELATIVE_PATH = "transformed/agg_inventory.parquet"
 MODEL_OUTPUT_DIR = get_general_model_output_path("classification", MODEL_NAME)
 
 # Training record window (min, max records for training)
@@ -454,7 +454,12 @@ def main():
         return
     
     # Load inventory data from all buckets
-    inventory_df, _ = load_data_from_all_buckets(spark, INPUT_INVENTORY_PATH, filter_nulls=False)
+    inventory_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_INVENTORY_RELATIVE_PATH,
+        required_columns=["inventory_id", "product_id"],
+        filter_nulls=False
+    )
     
     if inventory_df is None:
         print("⚠️  Training skipped: Failed to load inventory data")
