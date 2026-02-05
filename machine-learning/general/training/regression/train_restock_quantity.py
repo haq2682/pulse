@@ -4,10 +4,21 @@ Predicts optimal restock quantity using demand patterns and inventory optimizati
 """
 
 import os
+import sys
 import findspark
 from dotenv import load_dotenv
 
 findspark.init()
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils.multi_bucket_loader import (
+    load_data_from_all_buckets,
+    validate_training_data,
+    get_general_model_output_path,
+    get_training_window,
+    GENERAL_MODEL_BUCKET
+)
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
@@ -22,15 +33,17 @@ import math
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-INPUT_INVENTORY_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
-INPUT_SUPPLIERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_suppliers.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/restock_quantity/"
-MIN_RECORDS_THRESHOLD = 100
+# Configuration - General models output to pulse-bucket-1
+MODEL_NAME = "restock_quantity"
+INPUT_RELATIVE_PATH = "transformed/agg_products.parquet"
+INPUT_INVENTORY_RELATIVE_PATH = "transformed/agg_product_inventory_health.parquet"
+INPUT_SUPPLIERS_RELATIVE_PATH = "transformed/agg_suppliers.parquet"
+INPUT_ORDERS_RELATIVE_PATH = "transformed/agg_orders.parquet"
+INPUT_ORDER_ITEMS_RELATIVE_PATH = "transformed/agg_order_items.parquet"
+MODEL_OUTPUT_DIR = get_general_model_output_path("regression", MODEL_NAME)
+
+# Training record window (min, max records for training)
+MIN_RECORDS, MAX_RECORDS = get_training_window(MODEL_NAME)
 MAX_NULL_PERCENTAGE = 95.0
 MIN_DEMAND_DAYS = 30  # Need at least 30 days of demand history
 
@@ -657,7 +670,7 @@ def evaluate_model(predictions, model_name):
 
 def save_model(model, model_name):
     """Save model to MinIO"""
-    model_path = f"{MODEL_OUTPUT_PATH}{model_name}"
+    model_path = f"{MODEL_OUTPUT_DIR}/{model_name}"
     model.write().overwrite().save(model_path)
     print(f"✓ Model saved: {model_path}")
 
@@ -665,59 +678,123 @@ def save_model(model, model_name):
 def main():
     """Main training pipeline"""
     print("\n" + "="*60)
-    print("Inventory Restock Quantity Prediction - Training")
+    print("Inventory Restock Quantity - General Model Training")
     print("="*60)
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Training window: {MIN_RECORDS} - {MAX_RECORDS} records")
+    print(f"Model output: {MODEL_OUTPUT_DIR}")
     print(f"Cross-Validation: {'ENABLED' if USE_CROSS_VALIDATION else 'DISABLED'}")
-    print(f"Safety Stock Z-Score: {Z_SCORE_SAFETY_STOCK} (95% service level)\n")
+    print(f"Safety Stock Z-Score: {Z_SCORE_SAFETY_STOCK} (95% service level)")
+    print("="*60 + "\n")
     
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
     
-    # Load datasets
-    print("Step 1: Load Datasets")
+    # Step 1: Load datasets from all buckets
+    print("Step 1: Loading data from all MinIO buckets...")
     print("-" * 60)
     
-    products_df, _ = validate_dataset(spark, INPUT_PRODUCTS_PATH, "Products")
-    inventory_df, _ = validate_dataset(spark, INPUT_INVENTORY_PATH, "Inventory")
-    suppliers_df, _ = validate_dataset(spark, INPUT_SUPPLIERS_PATH, "Suppliers")
-    orders_df, _ = validate_dataset(spark, INPUT_ORDERS_PATH, "Orders")
-    order_items_df, _ = validate_dataset(spark, INPUT_ORDER_ITEMS_PATH, "Order Items")
+    products_df, prod_count = load_data_from_all_buckets(
+        spark,
+        INPUT_RELATIVE_PATH,
+        required_columns=REQUIRED_PRODUCT_COLUMNS,
+        filter_nulls=True
+    )
     
-    if None in [products_df, inventory_df, suppliers_df, orders_df, order_items_df]:
-        print("\n✗ Training aborted: Missing datasets")
+    if products_df is None:
+        print("⚠️  No products data available. Skipping training.")
         spark.stop()
         return
     
-    # Validate columns
-    print("\nStep 2: Column Validation")
+    inventory_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_INVENTORY_RELATIVE_PATH,
+        required_columns=REQUIRED_INVENTORY_COLUMNS,
+        filter_nulls=True
+    )
+    
+    if inventory_df is None:
+        print("⚠️  No inventory data available. Skipping training.")
+        spark.stop()
+        return
+    
+    suppliers_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_SUPPLIERS_RELATIVE_PATH,
+        required_columns=["supplier_id"],
+        filter_nulls=True
+    )
+    
+    if suppliers_df is None:
+        print("⚠️  No suppliers data available. Skipping training.")
+        spark.stop()
+        return
+    
+    orders_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_ORDERS_RELATIVE_PATH,
+        required_columns=["order_id", "order_status"],
+        filter_nulls=True
+    )
+    
+    if orders_df is None:
+        print("⚠️  No orders data available. Skipping training.")
+        spark.stop()
+        return
+    
+    order_items_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_ORDER_ITEMS_RELATIVE_PATH,
+        required_columns=["order_id", "product_id", "quantity"],
+        filter_nulls=True
+    )
+    
+    if order_items_df is None:
+        print("⚠️  No order items data available. Skipping training.")
+        spark.stop()
+        return
+    
+    # Step 2: Validate training data window
+    print("\nStep 2: Validate Training Data Window")
+    print("-" * 60)
+    is_valid, products_df = validate_training_data(
+        products_df, prod_count, MIN_RECORDS, MAX_RECORDS, MODEL_NAME
+    )
+    
+    if not is_valid:
+        print("⚠️  Training skipped due to insufficient data.")
+        spark.stop()
+        return
+    
+    # Step 3: Column validation
+    print("\nStep 3: Column Validation")
     print("-" * 60)
     
     prod_valid, _, _ = validate_columns(products_df, REQUIRED_PRODUCT_COLUMNS, "Products")
     inv_valid, _, _ = validate_columns(inventory_df, REQUIRED_INVENTORY_COLUMNS, "Inventory")
     
     if not (prod_valid and inv_valid):
-        print("\n✗ Training aborted: Required columns missing or entirely null")
+        print("⚠️  Training skipped due to required columns missing or entirely null")
         spark.stop()
         return
     
-    # Calculate demand metrics
-    print("\nStep 3: Calculate Demand Metrics from Order History")
+    # Step 4: Calculate demand metrics
+    print("\nStep 4: Calculate Demand Metrics from Order History")
     print("-" * 60)
     demand_stats = calculate_demand_metrics(orders_df, order_items_df)
     
-    # Create features
-    print("\nStep 4: Feature Engineering with Target Calculation")
+    # Step 5: Create features
+    print("\nStep 5: Feature Engineering with Target Calculation")
     print("-" * 60)
     df_features = create_restock_features(products_df, inventory_df, suppliers_df, demand_stats)
     
-    # Prepare data
-    print("\nStep 5: Data Preparation")
+    # Step 6: Prepare data
+    print("\nStep 6: Data Preparation")
     print("-" * 60)
     result = prepare_training_data(df_features)
     
     if result is None:
-        print("\n✗ Training aborted: Insufficient data")
+        print("⚠️  Training skipped due to insufficient data")
         spark.stop()
         return
     
@@ -729,15 +806,15 @@ def main():
     for i, feat in enumerate(feature_list, 1):
         print(f"{i:2d}. {feat}")
     
-    # Split data
-    print("\nStep 6: Train/Test Split")
+    # Step 7: Split data
+    print("\nStep 7: Train/Test Split")
     print("-" * 60)
     train_df, test_df = df_prepared.randomSplit([0.8, 0.2], seed=42)
     print(f"Training set: {train_df.count()} records")
     print(f"Test set: {test_df.count()} records")
     
-    # Train models
-    print("\nStep 7: Model Training")
+    # Step 8: Train models
+    print("\nStep 8: Model Training")
     print("-" * 60)
     
     models_results = []

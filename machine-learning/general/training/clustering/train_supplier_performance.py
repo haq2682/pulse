@@ -4,9 +4,19 @@ Includes: Stability validation, HDBSCAN, comprehensive profiling
 """
 
 import os
+import sys
 import findspark
 
 findspark.init()
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils.multi_bucket_loader import (
+    load_data_from_all_buckets,
+    validate_training_data,
+    get_general_model_output_path,
+    get_training_window,
+    GENERAL_MODEL_BUCKET
+)
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when, lit, coalesce, log1p, sqrt, pow as _pow
@@ -20,9 +30,11 @@ from sklearn.metrics import adjusted_rand_score
 import hdbscan
 
 # Environment configuration
-BUCKET = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
+MODEL_NAME = "supplier_performance"
+INPUT_RELATIVE_PATH = "transformed/agg_suppliers.parquet"
+INPUT_RELATIVE_PATH_INV_HEALTH = "transformed/agg_supplier_inventory_health.parquet"
+MODEL_OUTPUT_DIR = get_general_model_output_path("clustering", MODEL_NAME)
+MIN_RECORDS, MAX_RECORDS = get_training_window(MODEL_NAME)
 LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
 
 # Enhanced feature set with business-critical metrics
@@ -69,32 +81,58 @@ def create_spark_session():
 
 
 def load_and_validate_data(spark):
-    """Load supplier data from multiple tables"""
-    try:
-        suppliers_path = f"{INPUT_PATH}agg_suppliers.parquet"
-        inv_health_path = f"{INPUT_PATH}agg_supplier_inventory_health.parquet"
-        
-        print(f"Loading suppliers from: {suppliers_path}")
-        suppliers_df = spark.read.parquet(suppliers_path)
-        
-        print(f"Loading inventory health from: {inv_health_path}")
-        inv_health_df = spark.read.parquet(inv_health_path)
+    """Load supplier data from multiple tables using multi-bucket loader"""
+    # Load agg_suppliers from all buckets
+    suppliers_df, suppliers_count = load_data_from_all_buckets(
+        spark,
+        INPUT_RELATIVE_PATH,
+        required_columns=["supplier_id", "supplier_rating", "total_revenue_generated", 
+                         "avg_profit_margin", "stockout_rate", "supplier_reliability_score"],
+        filter_nulls=False
+    )
 
-        # Select specific columns to avoid duplicates
-        inv_health_df = inv_health_df.select(
-            col("supplier_id"),
-            col("breach_rate"),
-            col("supplier_inventory_health_score").alias("inv_health_score"),
-        )
-
-        df = suppliers_df.join(inv_health_df, on="supplier_id", how="left")
-        
-        print(f"Joined dataset: {df.count()} suppliers, {len(df.columns)} columns")
-        return df
-
-    except Exception as e:
-        print(f"ERROR: Failed to load data: {str(e)}")
+    if suppliers_df is None:
+        print("⚠️  No supplier data available. Skipping training.")
         return None
+
+    print(f"Loaded {suppliers_count} suppliers from all buckets")
+
+    # Load agg_supplier_inventory_health from all buckets
+    inv_health_df, inv_health_count = load_data_from_all_buckets(
+        spark,
+        INPUT_RELATIVE_PATH_INV_HEALTH,
+        required_columns=["supplier_id", "breach_rate", "supplier_inventory_health_score"],
+        filter_nulls=False
+    )
+
+    if inv_health_df is None:
+        print("⚠️  No inventory health data available. Skipping training.")
+        return None
+
+    print(f"Loaded {inv_health_count} inventory health records from all buckets")
+
+    # Select specific columns to avoid duplicates
+    inv_health_df = inv_health_df.select(
+        col("supplier_id"),
+        col("breach_rate"),
+        col("supplier_inventory_health_score").alias("inv_health_score"),
+    )
+
+    df = suppliers_df.join(inv_health_df, on="supplier_id", how="left")
+    
+    record_count = df.count()
+    print(f"Joined dataset: {record_count} suppliers, {len(df.columns)} columns")
+
+    # Validate training data
+    is_valid, df = validate_training_data(
+        df, record_count, MIN_RECORDS, MAX_RECORDS, MODEL_NAME
+    )
+
+    if not is_valid:
+        print("⚠️  Training skipped due to insufficient data.")
+        return None
+
+    return df
 
 
 def prepare_features(df):
@@ -414,7 +452,7 @@ def save_enhanced_metrics(all_metrics, cluster_profiles, spark):
     # Upload to MinIO
     metrics_df = spark.createDataFrame([metrics_data])
     metrics_df.coalesce(1).write.mode("overwrite").json(
-        f"{MODEL_OUTPUT_PATH}supplier_enhanced_metrics.json"
+        f"{MODEL_OUTPUT_DIR}/supplier_enhanced_metrics.json"
     )
     
     print(f"✅ Saved enhanced metrics to MinIO")
@@ -430,12 +468,14 @@ def main():
     # Load data
     df = load_and_validate_data(spark)
     if df is None:
+        print("⚠️  Training skipped due to data validation failure")
         spark.stop()
         return
 
     # Prepare features
     df = prepare_features(df)
     if df is None:
+        print("⚠️  Training skipped due to insufficient data")
         spark.stop()
         return
 
@@ -483,9 +523,9 @@ def main():
 
     # Save models and metrics
     print("\nSaving models...")
-    scaler_model.write().overwrite().save(f"{MODEL_OUTPUT_PATH}supplier_scaler")
-    pca_model.write().overwrite().save(f"{MODEL_OUTPUT_PATH}supplier_pca")
-    best_model["model"].write().overwrite().save(f"{MODEL_OUTPUT_PATH}supplier_kmeans")
+    scaler_model.write().overwrite().save(f"{MODEL_OUTPUT_DIR}/supplier_scaler")
+    pca_model.write().overwrite().save(f"{MODEL_OUTPUT_DIR}/supplier_pca")
+    best_model["model"].write().overwrite().save(f"{MODEL_OUTPUT_DIR}/supplier_kmeans")
     
     save_enhanced_metrics(all_metrics, cluster_profiles, spark)
 

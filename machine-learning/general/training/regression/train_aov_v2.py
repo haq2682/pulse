@@ -3,10 +3,21 @@ Average Order Value (AOV) Prediction - FIXED Training Script
 """
 
 import os
+import sys
 import findspark
 from dotenv import load_dotenv
 
 findspark.init()
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils.multi_bucket_loader import (
+    load_data_from_all_buckets,
+    validate_training_data,
+    get_general_model_output_path,
+    get_training_window,
+    GENERAL_MODEL_BUCKET
+)
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
@@ -20,15 +31,17 @@ from datetime import datetime
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/aov_prediction/"
-SCALER_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/aov_prediction/scaler"
-MIN_RECORDS_THRESHOLD = 100
+# Configuration - General models output to pulse-bucket-1
+MODEL_NAME = "aov_v2"
+INPUT_RELATIVE_PATH = "transformed/agg_customers.parquet"
+INPUT_ORDERS_RELATIVE_PATH = "transformed/agg_orders.parquet"
+INPUT_ORDER_ITEMS_RELATIVE_PATH = "transformed/agg_order_items.parquet"
+INPUT_PRODUCTS_RELATIVE_PATH = "transformed/agg_products.parquet"
+MODEL_OUTPUT_DIR = get_general_model_output_path("regression", MODEL_NAME)
+SCALER_OUTPUT_PATH = f"{MODEL_OUTPUT_DIR}/scaler"
+
+# Training record window (min, max records for training)
+MIN_RECORDS, MAX_RECORDS = get_training_window(MODEL_NAME)
 MAX_NULL_PERCENTAGE = 95.0
 
 # Configuration
@@ -824,7 +837,7 @@ def evaluate_model(predictions, model_name):
 
 def save_model(model, model_name):
     """Save model to MinIO"""
-    model_path = f"{MODEL_OUTPUT_PATH}{model_name}"
+    model_path = f"{MODEL_OUTPUT_DIR}/{model_name}"
     model.write().overwrite().save(model_path)
     print(f"✓ Model saved: {model_path}")
 
@@ -855,9 +868,11 @@ def print_feature_importance(model, feature_list, model_name):
 def main():
     """Main training pipeline with all fixes"""
     print("\n" + "="*60)
-    print("AOV Prediction - FIXED Training Pipeline")
+    print("AOV Prediction V2 - General Model Training")
     print("="*60)
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Training window: {MIN_RECORDS} - {MAX_RECORDS} records")
+    print(f"Model output: {MODEL_OUTPUT_DIR}")
     print(f"Cross-Validation: {'ENABLED' if USE_CROSS_VALIDATION else 'DISABLED'}")
     print("\nFixes Applied:")
     print("  ✓ Target Leakage: Using lead() for next_order_value")
@@ -867,27 +882,77 @@ def main():
     print("  ✓ Rolling Window: Stable calculation for early sequences")
     print("  ✓ Discount Sensitivity: Weighted by spend")
     print("  ✓ Tree Scaling: No scaling for RF/GBT")
-    print()
+    print("="*60 + "\n")
     
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
     
-    # Load datasets
-    print("Step 1: Load Datasets")
+    # Step 1: Load datasets from all buckets
+    print("Step 1: Loading data from all MinIO buckets...")
     print("-" * 60)
     
-    customers_df, _ = validate_dataset(spark, INPUT_CUSTOMERS_PATH, "Customers")
-    orders_df, _ = validate_dataset(spark, INPUT_ORDERS_PATH, "Orders")
-    order_items_df, _ = validate_dataset(spark, INPUT_ORDER_ITEMS_PATH, "Order Items")
-    products_df, _ = validate_dataset(spark, INPUT_PRODUCTS_PATH, "Products")
+    customers_df, cust_count = load_data_from_all_buckets(
+        spark,
+        INPUT_RELATIVE_PATH,
+        required_columns=REQUIRED_CUSTOMER_COLUMNS,
+        filter_nulls=True
+    )
     
-    if None in [customers_df, orders_df, order_items_df, products_df]:
-        print("\n✗ Training aborted: Missing datasets")
+    if customers_df is None:
+        print("⚠️  No customer data available. Skipping training.")
         spark.stop()
         return
     
-    # Validate columns
-    print("\nStep 2: Column Validation")
+    orders_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_ORDERS_RELATIVE_PATH,
+        required_columns=REQUIRED_ORDER_COLUMNS,
+        filter_nulls=True
+    )
+    
+    if orders_df is None:
+        print("⚠️  No orders data available. Skipping training.")
+        spark.stop()
+        return
+    
+    order_items_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_ORDER_ITEMS_RELATIVE_PATH,
+        required_columns=["order_id", "product_id"],
+        filter_nulls=True
+    )
+    
+    if order_items_df is None:
+        print("⚠️  No order items data available. Skipping training.")
+        spark.stop()
+        return
+    
+    products_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_PRODUCTS_RELATIVE_PATH,
+        required_columns=["product_id", "category"],
+        filter_nulls=True
+    )
+    
+    if products_df is None:
+        print("⚠️  No products data available. Skipping training.")
+        spark.stop()
+        return
+    
+    # Step 2: Validate training data window
+    print("\nStep 2: Validate Training Data Window")
+    print("-" * 60)
+    is_valid, customers_df = validate_training_data(
+        customers_df, cust_count, MIN_RECORDS, MAX_RECORDS, MODEL_NAME
+    )
+    
+    if not is_valid:
+        print("⚠️  Training skipped due to insufficient data.")
+        spark.stop()
+        return
+    
+    # Step 3: Column validation
+    print("\nStep 3: Column Validation")
     print("-" * 60)
     
     cust_valid, cust_missing, cust_null = validate_columns(
@@ -899,22 +964,22 @@ def main():
     )
     
     if not (cust_valid and ord_valid):
-        print("\n✗ Training aborted: Required columns missing or entirely null")
+        print("⚠️  Training skipped due to required columns missing or entirely null")
         spark.stop()
         return
     
-    # Create features
-    print("\nStep 3: Feature Engineering")
+    # Step 4: Create features
+    print("\nStep 4: Feature Engineering")
     print("-" * 60)
     df_features = create_enhanced_features(customers_df, orders_df, order_items_df, products_df)
     
-    # Prepare data - SCALED version for Linear Regression
-    print("\nStep 4a: Data Preparation (Scaled for Linear Regression)")
+    # Step 5: Prepare data - SCALED version for Linear Regression
+    print("\nStep 5a: Data Preparation (Scaled for Linear Regression)")
     print("-" * 60)
     result_scaled = prepare_training_data(df_features, scale_features=True)
     
     if result_scaled is None:
-        print("\n✗ Training aborted: Insufficient data")
+        print("⚠️  Training skipped due to insufficient data")
         spark.stop()
         return
     
@@ -926,7 +991,7 @@ def main():
         print(f"✓ Scaler saved: {SCALER_OUTPUT_PATH}")
     
     # Prepare data - UNSCALED version for Tree models
-    print("\nStep 4b: Data Preparation (Unscaled for Tree Models)")
+    print("\nStep 5b: Data Preparation (Unscaled for Tree Models)")
     print("-" * 60)
     result_unscaled = prepare_training_data(df_features, scale_features=False)
     df_prepared_unscaled, _, _ = result_unscaled
@@ -937,15 +1002,15 @@ def main():
     for i, feat in enumerate(feature_list, 1):
         print(f"{i:2d}. {feat}")
     
-    # FIX #2: Time-based split
-    print("\nStep 5: Time-Based Train/Test Split")
+    # Step 6: Time-based split
+    print("\nStep 6: Time-Based Train/Test Split")
     print("-" * 60)
     
     train_df_scaled, test_df_scaled = time_based_split(df_prepared_scaled, TRAIN_SPLIT_RATIO)
     train_df_unscaled, test_df_unscaled = time_based_split(df_prepared_unscaled, TRAIN_SPLIT_RATIO)
     
-    # Train models
-    print("\nStep 6: Model Training")
+    # Step 7: Train models
+    print("\nStep 7: Model Training")
     print("-" * 60)
     
     models_results = []

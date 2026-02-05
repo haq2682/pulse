@@ -4,10 +4,21 @@ Predicts future revenue using time-series features from monthly aggregations
 """
 
 import os
+import sys
 import findspark
 from dotenv import load_dotenv
 
 findspark.init()
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils.multi_bucket_loader import (
+    load_data_from_all_buckets,
+    validate_training_data,
+    get_general_model_output_path,
+    get_training_window,
+    GENERAL_MODEL_BUCKET
+)
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
@@ -22,11 +33,13 @@ import math
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_MONTHLY_AGG_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_monthly_aggregations.parquet"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/revenue_forecast/"
-MIN_RECORDS_THRESHOLD = 12  # At least 12 months of data
+# Configuration - General models output to pulse-bucket-1
+MODEL_NAME = "revenue_forecast"
+INPUT_RELATIVE_PATH = "transformed/agg_monthly_aggregations.parquet"
+MODEL_OUTPUT_DIR = get_general_model_output_path("regression", MODEL_NAME)
+
+# Training record window (min, max records for training)
+MIN_RECORDS, MAX_RECORDS = get_training_window(MODEL_NAME)
 
 # Configuration
 USE_CROSS_VALIDATION = False  # Set to True for hyperparameter tuning
@@ -423,7 +436,7 @@ def evaluate_model(predictions, model_name):
 
 def save_model(model, model_name):
     """Save model to MinIO"""
-    model_path = f"{MODEL_OUTPUT_PATH}{model_name}"
+    model_path = f"{MODEL_OUTPUT_DIR}/{model_name}"
     model.write().overwrite().save(model_path)
     print(f"✓ Model saved: {model_path}")
 
@@ -431,51 +444,71 @@ def save_model(model, model_name):
 def main():
     """Main training pipeline"""
     print("\n" + "="*60)
-    print("Revenue Forecasting Model Training")
+    print("Revenue Forecasting Model Training - General Model")
     print("="*60)
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Cross-Validation: {'ENABLED' if USE_CROSS_VALIDATION else 'DISABLED'}\n")
+    print(f"Training window: {MIN_RECORDS} - {MAX_RECORDS} records")
+    print(f"Model output: {MODEL_OUTPUT_DIR}")
+    print(f"Cross-Validation: {'ENABLED' if USE_CROSS_VALIDATION else 'DISABLED'}")
+    print("="*60 + "\n")
     
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
     
-    # Load dataset
-    print("Step 1: Load Monthly Aggregations")
+    # Step 1: Load data from all buckets
+    print("Step 1: Loading Monthly Aggregations from all MinIO buckets...")
     print("-" * 60)
     
-    monthly_df, monthly_count = validate_dataset(spark, INPUT_MONTHLY_AGG_PATH, "Monthly Aggregations")
+    monthly_df, record_count = load_data_from_all_buckets(
+        spark,
+        INPUT_RELATIVE_PATH,
+        required_columns=["year_month", "total_revenue"],
+        filter_nulls=True
+    )
     
     if monthly_df is None:
-        print("\n✗ Training aborted: Dataset not found")
+        print("⚠️  No data available. Skipping training.")
         spark.stop()
         return
     
-    # Create time-series features
-    print("\nStep 2: Time-Series Feature Engineering")
+    # Step 2: Validate training data window
+    print("\nStep 2: Validate Training Data Window")
+    print("-" * 60)
+    is_valid, monthly_df = validate_training_data(
+        monthly_df, record_count, MIN_RECORDS, MAX_RECORDS, MODEL_NAME
+    )
+    
+    if not is_valid:
+        print("⚠️  Training skipped due to insufficient data.")
+        spark.stop()
+        return
+    
+    # Step 3: Time-series feature engineering
+    print("\nStep 3: Time-Series Feature Engineering")
     print("-" * 60)
     df_features = create_time_series_features(monthly_df)
     
-    # Prepare training data
-    print("\nStep 3: Data Preparation & Scaling")
+    # Step 4: Prepare training data
+    print("\nStep 4: Data Preparation & Scaling")
     print("-" * 60)
     result = prepare_training_data(df_features)
     
     if result is None:
-        print("\n✗ Training aborted: Insufficient data")
+        print("⚠️  Training skipped due to insufficient data")
         spark.stop()
         return
     
     df_prepared, scaler_model = result
     
-    # Split data (80/20)
-    print("\nStep 4: Train/Test Split")
+    # Step 5: Split data (80/20)
+    print("\nStep 5: Train/Test Split")
     print("-" * 60)
     train_df, test_df = df_prepared.randomSplit([0.8, 0.2], seed=42)
     print(f"Training set: {train_df.count()} records")
     print(f"Test set: {test_df.count()} records")
     
-    # Train models
-    print("\nStep 5: Model Training")
+    # Step 6: Train models
+    print("\nStep 6: Model Training")
     print("-" * 60)
     
     models_results = []
