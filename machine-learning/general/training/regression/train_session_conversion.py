@@ -8,10 +8,21 @@ Target Calculation:
 """
 
 import os
+import sys
 import findspark
 from dotenv import load_dotenv
 
 findspark.init()
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils.multi_bucket_loader import (
+    load_data_from_all_buckets,
+    validate_training_data,
+    get_general_model_output_path,
+    get_training_window,
+    GENERAL_MODEL_BUCKET
+)
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
@@ -25,13 +36,15 @@ from datetime import datetime
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_SESSIONS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customer_sessions.parquet"
-INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/session_conversion_value/"
-MIN_RECORDS_THRESHOLD = 100
+# Configuration - General models output to pulse-bucket-1
+MODEL_NAME = "session_conversion"
+INPUT_RELATIVE_PATH = "transformed/agg_customer_sessions.parquet"
+INPUT_CUSTOMERS_RELATIVE_PATH = "transformed/agg_customers.parquet"
+INPUT_ORDERS_RELATIVE_PATH = "transformed/agg_orders.parquet"
+MODEL_OUTPUT_DIR = get_general_model_output_path("regression", MODEL_NAME)
+
+# Training record window (min, max records for training)
+MIN_RECORDS, MAX_RECORDS = get_training_window(MODEL_NAME)
 MAX_NULL_PERCENTAGE = 95.0
 
 # Configuration
@@ -545,7 +558,7 @@ def evaluate_model(predictions, model_name):
 
 def save_model(model, model_name):
     """Save model to MinIO"""
-    model_path = f"{MODEL_OUTPUT_PATH}{model_name}"
+    model_path = f"{MODEL_OUTPUT_DIR}/{model_name}"
     model.write().overwrite().save(model_path)
     print(f"✓ Model saved: {model_path}")
 
@@ -553,51 +566,93 @@ def save_model(model, model_name):
 def main():
     """Main training pipeline"""
     print("\n" + "="*60)
-    print("Session Conversion Value Prediction - Training")
+    print("Session Conversion Value - General Model Training")
     print("="*60)
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Cross-Validation: {'ENABLED' if USE_CROSS_VALIDATION else 'DISABLED'}\n")
+    print(f"Training window: {MIN_RECORDS} - {MAX_RECORDS} records")
+    print(f"Model output: {MODEL_OUTPUT_DIR}")
+    print(f"Cross-Validation: {'ENABLED' if USE_CROSS_VALIDATION else 'DISABLED'}")
+    print("="*60 + "\n")
     
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
     
-    # Load datasets
-    print("Step 1: Load Datasets")
+    # Step 1: Load datasets from all buckets
+    print("Step 1: Loading data from all MinIO buckets...")
     print("-" * 60)
     
-    sessions_df, _ = validate_dataset(spark, INPUT_SESSIONS_PATH, "Customer Sessions")
-    customers_df, _ = validate_dataset(spark, INPUT_CUSTOMERS_PATH, "Customers")
-    orders_df, _ = validate_dataset(spark, INPUT_ORDERS_PATH, "Orders")
+    sessions_df, sess_count = load_data_from_all_buckets(
+        spark,
+        INPUT_RELATIVE_PATH,
+        required_columns=REQUIRED_SESSION_COLUMNS,
+        filter_nulls=True
+    )
     
-    if None in [sessions_df, customers_df, orders_df]:
-        print("\n✗ Training aborted: Missing datasets")
+    if sessions_df is None:
+        print("⚠️  No sessions data available. Skipping training.")
         spark.stop()
         return
     
-    # Validate columns
-    print("\nStep 2: Column Validation")
+    customers_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_CUSTOMERS_RELATIVE_PATH,
+        required_columns=["customer_id"],
+        filter_nulls=True
+    )
+    
+    if customers_df is None:
+        print("⚠️  No customers data available. Skipping training.")
+        spark.stop()
+        return
+    
+    orders_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_ORDERS_RELATIVE_PATH,
+        required_columns=REQUIRED_ORDER_COLUMNS,
+        filter_nulls=True
+    )
+    
+    if orders_df is None:
+        print("⚠️  No orders data available. Skipping training.")
+        spark.stop()
+        return
+    
+    # Step 2: Validate training data window
+    print("\nStep 2: Validate Training Data Window")
+    print("-" * 60)
+    is_valid, sessions_df = validate_training_data(
+        sessions_df, sess_count, MIN_RECORDS, MAX_RECORDS, MODEL_NAME
+    )
+    
+    if not is_valid:
+        print("⚠️  Training skipped due to insufficient data.")
+        spark.stop()
+        return
+    
+    # Step 3: Column validation
+    print("\nStep 3: Column Validation")
     print("-" * 60)
     
     session_valid, _, _ = validate_columns(sessions_df, REQUIRED_SESSION_COLUMNS, "Sessions")
     order_valid, _, _ = validate_columns(orders_df, REQUIRED_ORDER_COLUMNS, "Orders")
     
     if not (session_valid and order_valid):
-        print("\n✗ Training aborted: Required columns missing or entirely null")
+        print("⚠️  Training skipped due to required columns missing or entirely null")
         spark.stop()
         return
     
-    # Create features
-    print("\nStep 3: Feature Engineering with Target Calculation")
+    # Step 4: Create features
+    print("\nStep 4: Feature Engineering with Target Calculation")
     print("-" * 60)
     df_features = create_session_conversion_features(sessions_df, customers_df, orders_df)
     
-    # Prepare data
-    print("\nStep 4: Data Preparation")
+    # Step 5: Prepare data
+    print("\nStep 5: Data Preparation")
     print("-" * 60)
     result = prepare_training_data(df_features)
     
     if result is None:
-        print("\n✗ Training aborted: Insufficient data")
+        print("⚠️  Training skipped due to insufficient data")
         spark.stop()
         return
     
@@ -609,15 +664,15 @@ def main():
     for i, feat in enumerate(feature_list, 1):
         print(f"{i:2d}. {feat}")
     
-    # Split data
-    print("\nStep 5: Train/Test Split")
+    # Step 6: Split data
+    print("\nStep 6: Train/Test Split")
     print("-" * 60)
     train_df, test_df = df_prepared.randomSplit([0.8, 0.2], seed=42)
     print(f"Training set: {train_df.count()} records")
     print(f"Test set: {test_df.count()} records")
     
-    # Train models
-    print("\nStep 6: Model Training")
+    # Step 7: Train models
+    print("\nStep 7: Model Training")
     print("-" * 60)
     
     models_results = []
