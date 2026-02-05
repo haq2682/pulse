@@ -94,6 +94,7 @@ def load_data_from_all_buckets(
         full_path = f"s3a://{bucket}/{relative_path}"
         try:
             df = spark.read.parquet(full_path)
+            df = df.cache()
             record_count = df.count()
             
             if record_count > 0:
