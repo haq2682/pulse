@@ -6,7 +6,6 @@ buckets in MinIO for training general machine learning models across all
 business data in the data lake.
 """
 
-import os
 import warnings
 from typing import List, Optional, Tuple
 from pyspark.sql import SparkSession, DataFrame
