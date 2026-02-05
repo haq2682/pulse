@@ -148,10 +148,9 @@ def load_data_from_all_buckets(
     if "_source_bucket" in combined_df.columns:
         combined_df = combined_df.drop("_source_bucket")
     
-    final_count = combined_df.count()
-    print(f"   📊 Total aggregated: {final_count} records")
+    print(f"   📊 Total aggregated: {total_loaded} records")
     
-    return combined_df, final_count
+    return combined_df, total_loaded
 
 
 def validate_training_data(
