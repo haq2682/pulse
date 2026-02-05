@@ -1,0 +1,229 @@
+{
+  "name": "Pulse Batch File Ingestion Flow",
+  "description": "Receives file uploads from frontend, validates, stores in MinIO, and tracks in PostgreSQL",
+  "version": "1.0.0",
+  "created": "2026-02-05",
+  "processors": [
+    {
+      "name": "HandleHttpRequest",
+      "type": "org.apache.nifi.processors.standard.HandleHttpRequest",
+      "position": {"x": 100, "y": 100},
+      "properties": {
+        "Listening Port": "8082",
+        "Allowed Paths": "/upload",
+        "HTTP Methods": "POST",
+        "Container Queue Size": "10",
+        "Maximum Thread Count": "10"
+      },
+      "relationships": {
+        "success": "ValidateRecord"
+      },
+      "notes": "Receives file uploads from frontend. Frontend should send multipart/form-data with file and metadata."
+    },
+    {
+      "name": "ValidateRecord",
+      "type": "org.apache.nifi.processors.standard.ValidateRecord",
+      "position": {"x": 100, "y": 250},
+      "properties": {
+        "Record Reader": "MultiFormatReader",
+        "Record Writer": "JSONRecordSetWriter",
+        "Schema Access Strategy": "Infer Schema",
+        "Allow Extra Fields": "true"
+      },
+      "relationships": {
+        "valid": "UpdateAttribute",
+        "invalid": "LogAttributeAndDrop"
+      },
+      "notes": "Validates file format (CSV, Excel, JSON, Parquet). Rejects invalid files early."
+    },
+    {
+      "name": "UpdateAttribute",
+      "type": "org.apache.nifi.processors.attributes.UpdateAttribute",
+      "position": {"x": 100, "y": 400},
+      "properties": {
+        "s3.bucket": "${businessId}",
+        "s3.key": "ingested/${filename}",
+        "mime.type": "${mime.type}",
+        "user.id": "${userId}",
+        "file.size": "${fileSize}",
+        "file.id": "${fileId}"
+      },
+      "relationships": {
+        "success": "PutS3Object"
+      },
+      "notes": "Sets metadata attributes for downstream processors. businessId should come from form data."
+    },
+    {
+      "name": "PutS3Object",
+      "type": "org.apache.nifi.processors.aws.s3.PutS3Object",
+      "position": {"x": 100, "y": 550},
+      "properties": {
+        "Bucket": "${s3.bucket}",
+        "Object Key": "${s3.key}",
+        "Endpoint Override URL": "http://10.5.0.4:9000",
+        "Access Key ID": "${env:MINIO_ACCESS_KEY}",
+        "Secret Access Key": "${env:MINIO_SECRET_KEY}",
+        "Signer Override": "AWSS3V4SignerType",
+        "Region": "us-east-1",
+        "Use Path Style Access": "true",
+        "Multipart Threshold": "5 GB",
+        "Multipart Part Size": "5 MB"
+      },
+      "relationships": {
+        "success": "ExecuteSQL",
+        "failure": "LogAttributeAndRetry"
+      },
+      "notes": "Stores file in MinIO. Uses multipart upload for large files automatically."
+    },
+    {
+      "name": "ExecuteSQL",
+      "type": "org.apache.nifi.processors.standard.ExecuteSQL",
+      "position": {"x": 100, "y": 700},
+      "properties": {
+        "Database Connection Pooling Service": "PostgreSQLConnectionPool",
+        "SQL Statement": "INSERT INTO uploaded_files (file_id, business_id, file_name, file_size, file_type, s3_key, upload_status, created_at) VALUES ('${file.id}', '${s3.bucket}', '${filename}', ${file.size}, '${mime.type}', '${s3.key}', 'completed', NOW()) ON CONFLICT (file_id) DO UPDATE SET upload_status = 'completed', updated_at = NOW();"
+      },
+      "relationships": {
+        "success": "HandleHttpResponse",
+        "failure": "LogAttributeAndRetry"
+      },
+      "notes": "Inserts file metadata into PostgreSQL. Uses ON CONFLICT for idempotency."
+    },
+    {
+      "name": "HandleHttpResponse",
+      "type": "org.apache.nifi.processors.standard.HandleHttpResponse",
+      "position": {"x": 100, "y": 850},
+      "properties": {
+        "HTTP Status Code": "200",
+        "HTTP Response Body": "{\"status\": 200, \"fileId\": \"${file.id}\", \"message\": \"File uploaded successfully\"}"
+      },
+      "relationships": {
+        "success": "End"
+      },
+      "notes": "Returns success response to frontend."
+    },
+    {
+      "name": "LogAttributeAndDrop",
+      "type": "org.apache.nifi.processors.standard.LogAttribute",
+      "position": {"x": 400, "y": 250},
+      "properties": {
+        "Log Level": "error",
+        "Attributes to Log": ".*",
+        "Attributes to Ignore": "",
+        "Log Payload": "true"
+      },
+      "relationships": {
+        "success": "Terminate"
+      },
+      "notes": "Logs invalid files for debugging. Configure alerts on this processor."
+    },
+    {
+      "name": "LogAttributeAndRetry",
+      "type": "org.apache.nifi.processors.standard.LogAttribute",
+      "position": {"x": 400, "y": 550},
+      "properties": {
+        "Log Level": "warn",
+        "Attributes to Log": ".*"
+      },
+      "relationships": {
+        "success": "RetryFlowFile"
+      },
+      "notes": "Logs failures before retry."
+    },
+    {
+      "name": "RetryFlowFile",
+      "type": "org.apache.nifi.processors.standard.RetryFlowFile",
+      "position": {"x": 400, "y": 700},
+      "properties": {
+        "Retry Attribute": "retry.count",
+        "Maximum Retries": "3",
+        "Penalize Retries": "true",
+        "Reuse Mode": "Fail on Reuse"
+      },
+      "relationships": {
+        "retry": "PutS3Object",
+        "retries_exceeded": "HandleHttpResponseError",
+        "failure": "HandleHttpResponseError"
+      },
+      "notes": "Retries failed uploads up to 3 times with exponential backoff."
+    },
+    {
+      "name": "HandleHttpResponseError",
+      "type": "org.apache.nifi.processors.standard.HandleHttpResponse",
+      "position": {"x": 400, "y": 850},
+      "properties": {
+        "HTTP Status Code": "500",
+        "HTTP Response Body": "{\"status\": 500, \"error\": \"Upload failed after retries\"}"
+      },
+      "relationships": {
+        "success": "End"
+      },
+      "notes": "Returns error response to frontend after all retries exhausted."
+    }
+  ],
+  "controllerServices": [
+    {
+      "name": "PostgreSQLConnectionPool",
+      "type": "org.apache.nifi.dbcp.DBCPConnectionPool",
+      "properties": {
+        "Database Connection URL": "jdbc:postgresql://10.5.0.5:5432/${env:POSTGRES_DB}",
+        "Database Driver Class Name": "org.postgresql.Driver",
+        "Database Driver Location": "/opt/nifi/nifi-current/lib/postgresql-42.6.0.jar",
+        "Database User": "${env:POSTGRES_USER}",
+        "Database Password": "${env:POSTGRES_PASSWORD}",
+        "Max Wait Time": "500 milliseconds",
+        "Max Total Connections": "10"
+      },
+      "notes": "Requires PostgreSQL JDBC driver to be installed in /opt/nifi/nifi-current/lib/"
+    },
+    {
+      "name": "MultiFormatReader",
+      "type": "org.apache.nifi.csv.CSVReader",
+      "properties": {
+        "Schema Access Strategy": "Infer Schema",
+        "CSV Format": "Custom Format",
+        "Allow Extra Fields": "true",
+        "Allow Missing Fields": "true"
+      },
+      "notes": "Handles CSV, JSON, and other formats. Configure based on expected file types."
+    },
+    {
+      "name": "JSONRecordSetWriter",
+      "type": "org.apache.nifi.json.JsonRecordSetWriter",
+      "properties": {
+        "Schema Write Strategy": "full-schema-attribute",
+        "Schema Access Strategy": "Inherit Record Schema"
+      }
+    }
+  ],
+  "setup_instructions": [
+    "1. Import this template into NiFi UI",
+    "2. Install PostgreSQL JDBC driver: docker exec -it nifi bash && cd /opt/nifi/nifi-current/lib && wget https://jdbc.postgresql.org/download/postgresql-42.6.0.jar",
+    "3. Restart NiFi: docker restart nifi",
+    "4. Configure PostgreSQLConnectionPool controller service",
+    "5. Enable all controller services",
+    "6. Start all processors",
+    "7. Test with: curl -X POST http://localhost:8082/upload -F 'file=@test.csv' -F 'fileId=test-123' -F 'fileName=test.csv' -F 'userId=user-1' -F 'businessId=business-1'"
+  ],
+  "expected_attributes": {
+    "filename": "Original filename from frontend",
+    "fileId": "Unique file identifier (UUID)",
+    "userId": "User who uploaded the file",
+    "businessId": "Business/bucket identifier",
+    "fileSize": "File size in bytes",
+    "mime.type": "MIME type of the file"
+  },
+  "monitoring": {
+    "key_metrics": [
+      "HandleHttpRequest - Number of requests",
+      "PutS3Object - Success rate",
+      "ExecuteSQL - Database insert latency",
+      "RetryFlowFile - Retry count"
+    ],
+    "alerts": [
+      "Alert if ValidateRecord invalid rate > 10%",
+      "Alert if PutS3Object failure rate > 5%",
+      "Alert if RetryFlowFile retries_exceeded > 0"
+    ]
+  }
+}
