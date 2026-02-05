@@ -10,3 +10,4 @@ scikit-learn
 scikit-learn-extra
 ray[rllib]
 gymnasium
+pydantic>=2.0.0
