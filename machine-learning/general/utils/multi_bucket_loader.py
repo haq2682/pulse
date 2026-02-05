@@ -202,8 +202,11 @@ def validate_training_data(
         )
         # Randomly select exactly max_records rows (since record_count > max_records)
         df = df.orderBy(F.rand(42)).limit(max_records)
+        final_record_count = max_records
+    else:
+        final_record_count = record_count
     
-    print(f"✓ [{model_name}] Training data validated: {df.count()} records "
+    print(f"✓ [{model_name}] Training data validated: {final_record_count} records "
           f"(window: {min_records} - {max_records})")
     
     return True, df
