@@ -196,12 +196,12 @@ def validate_training_data(
         return False, None
     
     if record_count > max_records:
-        sample_fraction = max_records / record_count
-        print(f"   ℹ️  [{model_name}] Dataset exceeds maximum ({record_count} > {max_records}). "
-              f"Sampling {max_records} records ({sample_fraction*100:.1f}%)")
-        df = df.sample(withReplacement=False, fraction=sample_fraction, seed=42)
-        # Ensure we have exactly max_records (or close to it)
-        df = df.limit(max_records)
+        print(
+            f"   ℹ️  [{model_name}] Dataset exceeds maximum ({record_count} > {max_records}). "
+            f"Randomly selecting {max_records} records for training."
+        )
+        # Randomly select exactly max_records rows (since record_count > max_records)
+        df = df.orderBy(F.rand(42)).limit(max_records)
     
     print(f"✓ [{model_name}] Training data validated: {df.count()} records "
           f"(window: {min_records} - {max_records})")
