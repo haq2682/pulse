@@ -1,0 +1,360 @@
+{
+  "name": "Pulse Database Streaming Flow",
+  "description": "Queries external databases incrementally and publishes to Kafka in canonical format",
+  "version": "1.0.0",
+  "created": "2026-02-05",
+  "processors": [
+    {
+      "name": "QueryDatabaseTableRecord_Customers",
+      "type": "org.apache.nifi.processors.standard.QueryDatabaseTableRecord",
+      "position": {"x": 100, "y": 100},
+      "properties": {
+        "Database Connection Pooling Service": "ExternalDBConnectionPool",
+        "Table Name": "customers",
+        "Maximum-value Columns": "updated_at,created_at",
+        "Columns to Return": "*",
+        "Max Wait Time": "0 seconds",
+        "Record Writer": "JSONRecordSetWriter",
+        "Normalize Table/Column Names": "true",
+        "Use Avro Logical Types": "false"
+      },
+      "scheduling": {
+        "strategy": "TIMER_DRIVEN",
+        "period": "10 sec"
+      },
+      "relationships": {
+        "success": "SplitRecord_Customers"
+      },
+      "notes": "Queries customers table incrementally using max-value tracking. Polls every 10 seconds. Duplicate this processor for each table."
+    },
+    {
+      "name": "SplitRecord_Customers",
+      "type": "org.apache.nifi.processors.standard.SplitRecord",
+      "position": {"x": 100, "y": 250},
+      "properties": {
+        "Record Reader": "JsonTreeReader",
+        "Record Writer": "JsonRecordSetWriter",
+        "Records Per Split": "1"
+      },
+      "relationships": {
+        "splits": "AddTableMetadata_Customers",
+        "original": "Terminate",
+        "failure": "LogAttributeAndRetry"
+      },
+      "notes": "Splits result set into individual records for processing."
+    },
+    {
+      "name": "AddTableMetadata_Customers",
+      "type": "org.apache.nifi.processors.attributes.UpdateAttribute",
+      "position": {"x": 100, "y": 400},
+      "properties": {
+        "table": "customers",
+        "source_type": "db",
+        "vendor": "custom",
+        "schema_version": "v1",
+        "operation": "r"
+      },
+      "relationships": {
+        "success": "JoltTransformJSON_Customers"
+      },
+      "notes": "Adds metadata attributes for canonical format."
+    },
+    {
+      "name": "JoltTransformJSON_Customers",
+      "type": "org.apache.nifi.processors.standard.JoltTransformJSON",
+      "position": {"x": 100, "y": 550},
+      "properties": {
+        "Jolt Specification": "[\n  {\n    \"operation\": \"shift\",\n    \"spec\": {\n      \"*\": \"payload.&\"\n    }\n  },\n  {\n    \"operation\": \"default\",\n    \"spec\": {\n      \"source_type\": \"${source_type}\",\n      \"vendor\": \"${vendor}\",\n      \"table\": \"${table}\",\n      \"schema_version\": \"${schema_version}\",\n      \"timestamp\": \"${now():format('yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\')}\",\n      \"operation\": \"${operation}\"\n    }\n  }\n]",
+        "Jolt Transform": "Chain"
+      },
+      "relationships": {
+        "success": "PublishKafka_Customers",
+        "failure": "LogAttributeAndRetry"
+      },
+      "notes": "Transforms to canonical Kafka message format. See mapping/streaming/canonical_message.py for format."
+    },
+    {
+      "name": "PublishKafka_Customers",
+      "type": "org.apache.nifi.processors.kafka.pubsub.PublishKafka_2_6",
+      "position": {"x": 100, "y": 700},
+      "properties": {
+        "Kafka Brokers": "10.5.0.7:9092",
+        "Topic Name": "ecom.customers",
+        "Delivery Guarantee": "Best Effort",
+        "Message Key Field": "",
+        "Compression Type": "snappy",
+        "Acks": "1",
+        "Max Request Size": "1 MB",
+        "Use Transactions": "false"
+      },
+      "relationships": {
+        "success": "LogSuccess",
+        "failure": "RetryFlowFile"
+      },
+      "notes": "Publishes to ecom.customers Kafka topic. Topic is auto-created if it doesn't exist."
+    },
+    {
+      "name": "QueryDatabaseTableRecord_Orders",
+      "type": "org.apache.nifi.processors.standard.QueryDatabaseTableRecord",
+      "position": {"x": 500, "y": 100},
+      "properties": {
+        "Database Connection Pooling Service": "ExternalDBConnectionPool",
+        "Table Name": "orders",
+        "Maximum-value Columns": "updated_at,created_at",
+        "Columns to Return": "*",
+        "Max Wait Time": "0 seconds",
+        "Record Writer": "JSONRecordSetWriter",
+        "Normalize Table/Column Names": "true"
+      },
+      "scheduling": {
+        "strategy": "TIMER_DRIVEN",
+        "period": "10 sec"
+      },
+      "relationships": {
+        "success": "SplitRecord_Orders"
+      },
+      "notes": "Queries orders table. Duplicate this entire branch for each table (products, addresses, etc.)."
+    },
+    {
+      "name": "SplitRecord_Orders",
+      "type": "org.apache.nifi.processors.standard.SplitRecord",
+      "position": {"x": 500, "y": 250},
+      "properties": {
+        "Record Reader": "JsonTreeReader",
+        "Record Writer": "JsonRecordSetWriter",
+        "Records Per Split": "1"
+      },
+      "relationships": {
+        "splits": "AddTableMetadata_Orders",
+        "original": "Terminate",
+        "failure": "LogAttributeAndRetry"
+      }
+    },
+    {
+      "name": "AddTableMetadata_Orders",
+      "type": "org.apache.nifi.processors.attributes.UpdateAttribute",
+      "position": {"x": 500, "y": 400},
+      "properties": {
+        "table": "orders",
+        "source_type": "db",
+        "vendor": "custom",
+        "schema_version": "v1",
+        "operation": "r"
+      },
+      "relationships": {
+        "success": "JoltTransformJSON_Orders"
+      }
+    },
+    {
+      "name": "JoltTransformJSON_Orders",
+      "type": "org.apache.nifi.processors.standard.JoltTransformJSON",
+      "position": {"x": 500, "y": 550},
+      "properties": {
+        "Jolt Specification": "[\n  {\n    \"operation\": \"shift\",\n    \"spec\": {\n      \"*\": \"payload.&\"\n    }\n  },\n  {\n    \"operation\": \"default\",\n    \"spec\": {\n      \"source_type\": \"${source_type}\",\n      \"vendor\": \"${vendor}\",\n      \"table\": \"${table}\",\n      \"schema_version\": \"${schema_version}\",\n      \"timestamp\": \"${now():format('yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\')}\",\n      \"operation\": \"${operation}\"\n    }\n  }\n]",
+        "Jolt Transform": "Chain"
+      },
+      "relationships": {
+        "success": "PublishKafka_Orders",
+        "failure": "LogAttributeAndRetry"
+      }
+    },
+    {
+      "name": "PublishKafka_Orders",
+      "type": "org.apache.nifi.processors.kafka.pubsub.PublishKafka_2_6",
+      "position": {"x": 500, "y": 700},
+      "properties": {
+        "Kafka Brokers": "10.5.0.7:9092",
+        "Topic Name": "ecom.orders",
+        "Delivery Guarantee": "Best Effort",
+        "Compression Type": "snappy",
+        "Acks": "1"
+      },
+      "relationships": {
+        "success": "LogSuccess",
+        "failure": "RetryFlowFile"
+      },
+      "notes": "Publishes to ecom.orders Kafka topic."
+    },
+    {
+      "name": "LogSuccess",
+      "type": "org.apache.nifi.processors.standard.LogAttribute",
+      "position": {"x": 300, "y": 850},
+      "properties": {
+        "Log Level": "info",
+        "Attributes to Log": "table,operation",
+        "Log Payload": "false"
+      },
+      "relationships": {
+        "success": "End"
+      },
+      "notes": "Logs successful Kafka publishes. Can be disabled in production."
+    },
+    {
+      "name": "LogAttributeAndRetry",
+      "type": "org.apache.nifi.processors.standard.LogAttribute",
+      "position": {"x": 700, "y": 400},
+      "properties": {
+        "Log Level": "warn",
+        "Attributes to Log": ".*",
+        "Log Payload": "true"
+      },
+      "relationships": {
+        "success": "RetryFlowFile"
+      }
+    },
+    {
+      "name": "RetryFlowFile",
+      "type": "org.apache.nifi.processors.standard.RetryFlowFile",
+      "position": {"x": 700, "y": 550},
+      "properties": {
+        "Retry Attribute": "retry.count",
+        "Maximum Retries": "5",
+        "Penalize Retries": "true",
+        "Reuse Mode": "Fail on Reuse"
+      },
+      "relationships": {
+        "retry": "JoltTransformJSON_Customers",
+        "retries_exceeded": "TerminateWithAlert",
+        "failure": "TerminateWithAlert"
+      }
+    },
+    {
+      "name": "TerminateWithAlert",
+      "type": "org.apache.nifi.processors.standard.LogAttribute",
+      "position": {"x": 700, "y": 700},
+      "properties": {
+        "Log Level": "error",
+        "Attributes to Log": ".*",
+        "Log Payload": "true"
+      },
+      "relationships": {
+        "success": "Terminate"
+      },
+      "notes": "Configure alerts on this processor for failed records."
+    }
+  ],
+  "controllerServices": [
+    {
+      "name": "ExternalDBConnectionPool",
+      "type": "org.apache.nifi.dbcp.DBCPConnectionPool",
+      "properties": {
+        "Database Connection URL": "${db.connection.url}",
+        "Database Driver Class Name": "${db.driver.class}",
+        "Database Driver Location": "${db.driver.location}",
+        "Database User": "${db.username}",
+        "Database Password": "${db.password}",
+        "Max Wait Time": "500 milliseconds",
+        "Max Total Connections": "5",
+        "Validation query": "SELECT 1"
+      },
+      "notes": "Configure based on external database type. Examples:\n- PostgreSQL: jdbc:postgresql://host:5432/db, org.postgresql.Driver\n- MySQL: jdbc:mysql://host:3306/db, com.mysql.cj.jdbc.Driver\n- SQL Server: jdbc:sqlserver://host:1433;databaseName=db, com.microsoft.sqlserver.jdbc.SQLServerDriver"
+    },
+    {
+      "name": "JsonTreeReader",
+      "type": "org.apache.nifi.json.JsonTreeReader",
+      "properties": {
+        "Schema Access Strategy": "Infer Schema"
+      }
+    },
+    {
+      "name": "JsonRecordSetWriter",
+      "type": "org.apache.nifi.json.JsonRecordSetWriter",
+      "properties": {
+        "Schema Write Strategy": "full-schema-attribute",
+        "Schema Access Strategy": "Inherit Record Schema",
+        "Timestamp Format": "yyyy-MM-dd HH:mm:ss"
+      }
+    },
+    {
+      "name": "JSONRecordSetWriter",
+      "type": "org.apache.nifi.json.JsonRecordSetWriter",
+      "properties": {
+        "Schema Write Strategy": "full-schema-attribute"
+      }
+    }
+  ],
+  "variables": {
+    "db.connection.url": "jdbc:postgresql://external-host:5432/external_db",
+    "db.driver.class": "org.postgresql.Driver",
+    "db.driver.location": "/opt/nifi/nifi-current/lib/postgresql-42.6.0.jar",
+    "db.username": "debezium_user",
+    "db.password": "password"
+  },
+  "setup_instructions": [
+    "1. Install appropriate JDBC driver for your database (PostgreSQL, MySQL, etc.)",
+    "2. Configure ExternalDBConnectionPool with connection details",
+    "3. Update db.connection.url variable with actual database URI",
+    "4. For each table you want to ingest:",
+    "   - Duplicate the QueryDatabaseTableRecord → SplitRecord → AddTableMetadata → JoltTransformJSON → PublishKafka branch",
+    "   - Update table name in QueryDatabaseTableRecord",
+    "   - Update table attribute in AddTableMetadata",
+    "   - Update Kafka topic name in PublishKafka (ecom.{table_name})",
+    "5. Enable all controller services",
+    "6. Start all processors",
+    "7. Verify Kafka messages: docker exec -it kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic ecom.customers --from-beginning"
+  ],
+  "canonical_tables": [
+    "addresses",
+    "cart_items",
+    "categories",
+    "customer_sessions",
+    "customers",
+    "inventory",
+    "marketing_campaigns",
+    "order_items",
+    "orders",
+    "payments",
+    "products",
+    "reviews",
+    "shopping_cart",
+    "suppliers",
+    "wishlist"
+  ],
+  "kafka_topics": {
+    "addresses": "ecom.addresses",
+    "cart_items": "ecom.cart_items",
+    "categories": "ecom.categories",
+    "customer_sessions": "ecom.customer_sessions",
+    "customers": "ecom.customers",
+    "inventory": "ecom.inventory",
+    "marketing_campaigns": "ecom.marketing_campaigns",
+    "order_items": "ecom.order_items",
+    "orders": "ecom.orders",
+    "payments": "ecom.payments",
+    "products": "ecom.products",
+    "reviews": "ecom.reviews",
+    "shopping_cart": "ecom.shopping_cart",
+    "suppliers": "ecom.suppliers",
+    "wishlist": "ecom.wishlist"
+  },
+  "cdc_operations": {
+    "c": "create - New record inserted",
+    "r": "read - Snapshot/initial load (default)",
+    "u": "update - Record updated",
+    "d": "delete - Record deleted"
+  },
+  "monitoring": {
+    "key_metrics": [
+      "QueryDatabaseTableRecord - Records fetched per poll",
+      "PublishKafka - Messages published per second",
+      "RetryFlowFile - Retry count",
+      "Database connection pool - Active connections"
+    ],
+    "alerts": [
+      "Alert if QueryDatabaseTableRecord failures > 0",
+      "Alert if PublishKafka failure rate > 5%",
+      "Alert if RetryFlowFile retries_exceeded > 0",
+      "Alert if Database connection pool exhausted"
+    ]
+  },
+  "performance_tuning": {
+    "recommendations": [
+      "Increase Records Per Split for higher throughput (100-1000)",
+      "Adjust polling interval based on data change frequency",
+      "Add ControlRate processor to limit throughput if needed",
+      "Configure Kafka compression (snappy or gzip)",
+      "Increase database connection pool size for many tables",
+      "Use partitioned Kafka topics for high-volume tables"
+    ]
+  }
+}
