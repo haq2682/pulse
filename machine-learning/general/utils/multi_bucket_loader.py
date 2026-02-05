@@ -105,6 +105,12 @@ def load_data_from_all_buckets(
                     for col_name in required_columns:
                         if col_name in df.columns:
                             df = df.filter(F.col(col_name).isNotNull())
+                        else:
+                            warnings.warn(
+                                f"Required column '{col_name}' is missing in bucket '{bucket}' "
+                                f"for path '{full_path}'. Skipping null filtering for this column.",
+                                UserWarning,
+                            )
                 
                 filtered_count = df.count()
                 if filtered_count > 0:
