@@ -262,45 +262,53 @@ chmod -R 755 nifi/
 
 ### Overview
 
-Replace FastAPI chunked upload with NiFi's built-in HTTP listener and S3 processor.
+Replace FastAPI chunked upload with NiFi's production-ready HTTP listener, format-specific validation, and S3 processor designed for big data.
 
-### NiFi Flow Design
+**⚠️ Critical Corrections Applied**:
+- ❌ **MultiFormatReader doesn't exist** → Route by format first, then validate per format
+- ❌ **ValidateRecord cannot validate Excel** → Convert Excel to CSV first
+- ❌ **ExecuteSQL is wrong for INSERTs** → Use PutSQL instead
+- ❌ **HandleHttpRequest is dangerous for big files** → Tuned for large uploads with proper backpressure
+- ✅ **Proper controller services** → CSVReader, JsonTreeReader, ParquetReader with schema handling
+
+### NiFi Flow Design (Production-Ready)
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    BATCH INGESTION FLOW                      │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                    BATCH INGESTION FLOW (BIG DATA SAFE)              │
+└─────────────────────────────────────────────────────────────────────┘
 
-[HandleHttpRequest]
-       ↓
-  (file upload)
-       ↓
-[ValidateRecord]
-       ↓
-  (CSV, Excel, JSON, Parquet validation)
-       ↓
-[UpdateAttribute]
-       ↓
-  (Set S3 path: ingested/{filename})
-       ↓
-[PutS3Object]
-       ↓
-  (Store in MinIO)
-       ↓
-[ExecuteSQL]
-       ↓
-  (Insert into uploaded_files table)
-       ↓
-[HandleHttpResponse]
-       ↓
-  (Return success to frontend)
+[HandleHttpRequest] (tuned for 5GB+ files)
+        ↓
+[PutDistributedMapCache] (request tracking for async response)
+        ↓
+[UpdateAttribute] (detect format, uuid, metadata)
+        ↓
+[RouteOnAttribute] (route by file extension)
+   ├── csv     → [ValidateRecord] (CSVReader)
+   ├── json    → [ValidateRecord] (JsonTreeReader)
+   ├── parquet → [ValidateRecord] (ParquetReader + Schema Registry)
+   └── excel   → [ConvertExcelToCSVProcessor] → [ValidateRecord] (CSVReader)
+        ↓
+[PutS3Object] (MinIO with multipart upload enabled)
+        ↓
+[PutSQL] (INSERT with ON CONFLICT upsert)
+        ↓
+[FetchDistributedMapCache] (retrieve request context)
+        ↓
+[HandleHttpResponse] (async-safe response)
 ```
 
 ### Processor Configuration
 
-#### 1. HandleHttpRequest
+#### 1. HandleHttpRequest (Big Data Safe)
 
-**Purpose**: Receive file uploads from frontend
+**Purpose**: Receive large file uploads from frontend
+
+**⚠️ Important**: This processor buffers files in memory. For production:
+- Deploy NiFi behind Nginx/HAProxy with upload limits
+- Configure proper JVM heap (see Big Data Hardening section)
+- Enable backpressure thresholds
 
 **Configuration**:
 ```
@@ -309,58 +317,215 @@ Properties:
   - Listening Port: 8082
   - Allowed Paths: /upload
   - HTTP Methods: POST
-  - Container Queue Size: 10
-  - Maximum Thread Count: 10
+  - Container Queue Size: 100
+  - Maximum Thread Count: 20
+  - Max Request Size: 5 GB
 
 Relationships:
-  - success → ValidateRecord
+  - success → PutDistributedMapCache
 ```
 
-#### 2. ValidateRecord
+**Notes**:
+- Increased queue size from 10 to 100 for concurrent uploads
+- Increased threads from 10 to 20 for better throughput
+- Set max request size to 5GB (adjust based on requirements)
 
-**Purpose**: Validate file format (CSV, Excel, JSON, Parquet)
+#### 2. PutDistributedMapCache (Request Tracking)
+
+**Purpose**: Store request context for async response correlation
 
 **Configuration**:
 ```
-Processor: ValidateRecord
+Processor: PutDistributedMapCache
 Properties:
-  - Record Reader: MultiFormatReader (CSV, JSON, Avro)
-  - Record Writer: JSON RecordSetWriter
-  - Schema Access Strategy: Infer Schema
-  - Allow Extra Fields: true
+  - Cache Entry Identifier: ${http.context.identifier}
+  - Distributed Cache Service: DistributedMapCacheClientService
+  - Cache Update Strategy: Replace if present
+  - Max Cache Entry Life: 1 hour
+
+Custom Properties:
+  - request.id: ${http.context.identifier}
+  - file.id: ${uuid()}
+  - business.id: ${businessId}
+  - user.id: ${userId}
 
 Relationships:
-  - valid → UpdateAttribute
-  - invalid → LogAttribute (log and drop)
+  - success → UpdateAttribute
+  - failure → HandleHttpResponseError
 ```
 
-**Supported Formats**:
-- ✅ CSV (`.csv`)
-- ✅ Excel (`.xlsx`, `.xls`)
-- ✅ JSON (`.json`)
-- ✅ Parquet (`.parquet`)
+**Notes**:
+- Required for async request/response correlation under load
+- Stores context in distributed cache (Redis-backed recommended for production)
+- Prevents response mismatching when processing multiple concurrent uploads
 
-#### 3. UpdateAttribute
+#### 3. UpdateAttribute (Format Detection)
 
-**Purpose**: Set metadata for S3 storage
+**Purpose**: Detect file format and set metadata
 
 **Configuration**:
 ```
 Processor: UpdateAttribute
 Properties:
-  - s3.bucket: ${business.id}
+  - uuid: ${uuid()}
+  - file.ext: ${filename:toLower():substringAfterLast('.')}
+  - s3.bucket: ${businessId}
   - s3.key: ingested/${filename}
   - mime.type: ${mime.type}
-  - user.id: ${user.id}
+  - user.id: ${userId}
   - file.size: ${file.size}
+  - file.id: ${uuid}
 
 Relationships:
-  - success → PutS3Object
+  - success → RouteOnAttribute
 ```
 
-#### 4. PutS3Object
+**Notes**:
+- `file.ext` extracts extension in lowercase for routing
+- `uuid` generates unique file identifier
+- All attributes from HTTP request are preserved
 
-**Purpose**: Store file in MinIO
+#### 4. RouteOnAttribute (Format Routing)
+
+**Purpose**: Route to format-specific validation processors
+
+**⚠️ Critical**: NiFi cannot auto-detect formats. You **must** route by extension first.
+
+**Configuration**:
+```
+Processor: RouteOnAttribute
+Properties:
+  - Routing Strategy: Route to Property name
+
+Custom Properties:
+  - csv: ${file.ext:equals('csv')}
+  - json: ${file.ext:equals('json')}
+  - parquet: ${file.ext:equals('parquet')}
+  - excel: ${file.ext:matches('xls|xlsx')}
+
+Relationships:
+  - csv → ValidateRecord (CSV)
+  - json → ValidateRecord (JSON)
+  - parquet → ValidateRecord (Parquet)
+  - excel → ConvertExcelToCSVProcessor
+  - unmatched → HandleHttpResponseError (unsupported format)
+```
+
+**Supported Formats**:
+- ✅ CSV (`.csv`)
+- ✅ JSON (`.json`)
+- ✅ Parquet (`.parquet`)
+- ✅ Excel (`.xls`, `.xlsx`) - **converted to CSV first**
+
+#### 5a. ValidateRecord (CSV)
+
+**Purpose**: Validate CSV files
+
+**Configuration**:
+```
+Processor: ValidateRecord
+Name: ValidateRecord_CSV
+Properties:
+  - Record Reader: CSVReader
+  - Record Writer: CSVRecordSetWriter
+  - Schema Access Strategy: Infer Schema
+  - Allow Extra Fields: true
+  - Max Invalid Records: 10
+
+Relationships:
+  - valid → PutS3Object
+  - invalid → LogInvalidRecords
+  - failure → HandleHttpResponseError
+```
+
+**Controller Service**: CSVReader (see Controller Services section)
+
+#### 5b. ValidateRecord (JSON)
+
+**Purpose**: Validate JSON files
+
+**Configuration**:
+```
+Processor: ValidateRecord
+Name: ValidateRecord_JSON
+Properties:
+  - Record Reader: JsonTreeReader
+  - Record Writer: JsonRecordSetWriter
+  - Schema Access Strategy: Infer Schema
+  - Allow Extra Fields: true
+  - Max Invalid Records: 10
+
+Relationships:
+  - valid → PutS3Object
+  - invalid → LogInvalidRecords
+  - failure → HandleHttpResponseError
+```
+
+**Controller Service**: JsonTreeReader (see Controller Services section)
+
+#### 5c. ValidateRecord (Parquet)
+
+**Purpose**: Validate Parquet files
+
+**⚠️ Important**: Parquet **requires** schema registry. Cannot reliably infer schema at scale.
+
+**Configuration**:
+```
+Processor: ValidateRecord
+Name: ValidateRecord_Parquet
+Properties:
+  - Record Reader: ParquetReader
+  - Record Writer: ParquetRecordSetWriter
+  - Schema Access Strategy: Use 'Schema Name' Property
+  - Schema Registry: DatabaseTableSchemaRegistry
+  - Schema Name: pulse_schema
+  - Allow Extra Fields: true
+
+Relationships:
+  - valid → PutS3Object
+  - invalid → LogInvalidRecords
+  - failure → HandleHttpResponseError
+```
+
+**Controller Services**:
+- ParquetReader (see Controller Services section)
+- DatabaseTableSchemaRegistry (see Controller Services section)
+
+**Notes**:
+- Schema registry is **mandatory** for Parquet at scale
+- Database-backed schema registry recommended for production
+- Schema must be pre-registered in `nifi_schemas` table
+
+#### 5d. ConvertExcelToCSVProcessor (Excel)
+
+**Purpose**: Convert Excel files to CSV format
+
+**⚠️ Critical**: NiFi's ValidateRecord **cannot validate Excel**. Must convert first.
+
+**Configuration**:
+```
+Processor: ConvertExcelToCSVProcessor
+Properties:
+  - Number of Rows to Skip: 0
+  - Columns to Skip: (empty)
+  - Format Cell Values: true
+  - Sheet Names to Extract: (empty - all sheets)
+
+Relationships:
+  - success → ValidateRecord_CSV
+  - failure → HandleHttpResponseError
+```
+
+**Notes**:
+- Converts all sheets to CSV
+- Multi-sheet Excel files create multiple flowfiles (one per sheet)
+- After conversion, routed to CSV validation
+
+#### 6. PutS3Object (MinIO - Big Data Safe)
+
+**Purpose**: Store file in MinIO with multipart upload
+
+**⚠️ Critical**: Use controller service for credentials, enable multipart for large files
 
 **Configuration**:
 ```
@@ -369,96 +534,629 @@ Properties:
   - Bucket: ${s3.bucket}
   - Object Key: ${s3.key}
   - Endpoint Override URL: http://10.5.0.4:9000
-  - Access Key ID: ${MINIO_ACCESS_KEY}
-  - Secret Access Key: ${MINIO_SECRET_KEY}
+  - AWS Credentials Provider Service: MinIOCredentialsService
   - Signer Override: AWSS3V4SignerType
   - Region: us-east-1
   - Use Path Style Access: true
+  - Multipart Upload: true
+  - Multipart Part Size: 64 MB
+  - Multipart Upload Age-off Interval: 24 hours
+  - Multipart Upload Max Age: 7 days
 
 Relationships:
-  - success → ExecuteSQL
-  - failure → LogAttribute
+  - success → PutSQL
+  - failure → RetryFlowFile
 ```
 
-#### 5. ExecuteSQL
+**Notes**:
+- **Multipart upload is mandatory** for files > 64MB
+- Part size of 64MB optimizes for large files
+- Uses controller service (no inline credentials)
+- Age-off cleans up incomplete multipart uploads
+
+#### 7. PutSQL (Database Insert - CORRECTED)
 
 **Purpose**: Insert file metadata into PostgreSQL
 
+**❌ OLD (Wrong)**: ExecuteSQL is read-only
+**✅ NEW (Correct)**: PutSQL for INSERT/UPDATE/UPSERT
+
 **Configuration**:
 ```
-Processor: ExecuteSQL
+Processor: PutSQL
 Properties:
-  - Database Connection Pooling Service: PostgreSQLConnectionPool
+  - JDBC Connection Pool: PostgreSQLConnectionPool
   - SQL Statement:
     INSERT INTO uploaded_files
     (file_id, business_id, file_name, file_size, file_type, s3_key, upload_status, created_at)
     VALUES
-    ('${uuid}', '${business.id}', '${filename}', ${file.size}, '${mime.type}', '${s3.key}', 'completed', NOW())
-    ON CONFLICT (file_id) DO UPDATE SET upload_status = 'completed';
+    (?, ?, ?, ?, ?, ?, 'completed', NOW())
+    ON CONFLICT (file_id)
+    DO UPDATE SET upload_status = 'completed', updated_at = NOW();
+  - Statement Type: INSERT
+  - Obtain Generated Keys: false
+  - Rollback On Failure: true
+  - Batch Size: 1
+
+SQL Parameters (set via UpdateAttribute before PutSQL):
+  - sql.args.1.value: ${file.id}
+  - sql.args.2.value: ${s3.bucket}
+  - sql.args.3.value: ${filename}
+  - sql.args.4.value: ${file.size}
+  - sql.args.5.value: ${mime.type}
+  - sql.args.6.value: ${s3.key}
+
+Relationships:
+  - success → FetchDistributedMapCache
+  - retry → RetryFlowFile
+  - failure → HandleHttpResponseError
+```
+
+**Notes**:
+- Uses parameterized queries (prevents SQL injection)
+- ON CONFLICT provides idempotent upsert
+- Rollback on failure ensures consistency
+
+#### 8. FetchDistributedMapCache (Retrieve Request Context)
+
+**Purpose**: Retrieve original request context for async response
+
+**Configuration**:
+```
+Processor: FetchDistributedMapCache
+Properties:
+  - Cache Entry Identifier: ${http.context.identifier}
+  - Distributed Cache Service: DistributedMapCacheClientService
+  - Put Cache Value In Attribute: request.context
 
 Relationships:
   - success → HandleHttpResponse
-  - failure → LogAttribute
+  - not-found → HandleHttpResponseError
 ```
 
-#### 6. HandleHttpResponse
+**Notes**:
+- Retrieves request context stored in step 2
+- Required for async response correlation
+- Ensures correct response sent to correct client
 
-**Purpose**: Send response to frontend
+#### 9. HandleHttpResponse (Async-Safe)
+
+**Purpose**: Send success response to frontend
 
 **Configuration**:
 ```
 Processor: HandleHttpResponse
 Properties:
+  - HTTP Context Map: HttpContextMap
   - HTTP Status Code: 200
   - HTTP Response Body:
     {
       "status": 200,
-      "fileId": "${uuid}",
+      "fileId": "${file.id}",
+      "fileName": "${filename}",
+      "fileSize": ${file.size},
+      "s3Key": "${s3.key}",
       "message": "File uploaded successfully"
     }
 
 Relationships:
-  - success → End
+  - success → LogSuccess
+  - failure → LogAttribute
 ```
+
+**Notes**:
+- Uses HttpContextMap for proper request/response pairing
+- Returns detailed file information to frontend
+- Safe for concurrent uploads
+
+#### 10. HandleHttpResponseError (Error Handling)
+
+**Purpose**: Send error response to frontend
+
+**Configuration**:
+```
+Processor: HandleHttpResponse
+Properties:
+  - HTTP Context Map: HttpContextMap
+  - HTTP Status Code: 500
+  - HTTP Response Body:
+    {
+      "status": 500,
+      "error": "Upload failed: ${errorMessage}",
+      "fileId": "${file.id}"
+    }
+
+Relationships:
+  - success → LogError
+```
+
+#### 11. RetryFlowFile (Retry Logic)
+
+**Purpose**: Retry failed operations with exponential backoff
+
+**Configuration**:
+```
+Processor: RetryFlowFile
+Properties:
+  - Retry Attribute: retry.count
+  - Maximum Retries: 3
+  - Penalize Retries: true
+  - Retry Delay: 5 sec
+  - Reuse Mode: Fail on Reuse
+
+Relationships:
+  - retry → PutS3Object (or PutSQL depending on where it failed)
+  - retries_exceeded → HandleHttpResponseError
+  - failure → HandleHttpResponseError
+```
+
+**Notes**:
+- Retries up to 3 times with exponential backoff
+- Penalization adds delay between retries
+- Prevents overwhelming downstream systems
 
 ### NiFi Controller Services
 
-#### PostgreSQLConnectionPool
+Mode 1 requires the following controller services:
+
+#### 1. PostgreSQLConnectionPool
+
+**Purpose**: Database connection pooling for metadata storage
 
 **Configuration**:
 ```
 Service: DBCPConnectionPool
+Name: PostgreSQLConnectionPool
 Properties:
-  - Database Connection URL: jdbc:postgresql://10.5.0.5:5432/${POSTGRES_DB}
+  - Database Connection URL: jdbc:postgresql://10.5.0.5:5432/${env:POSTGRES_DB}
   - Database Driver Class Name: org.postgresql.Driver
   - Database Driver Location: /opt/nifi/nifi-current/lib/postgresql-42.6.0.jar
-  - Database User: ${POSTGRES_USER}
-  - Database Password: ${POSTGRES_PASSWORD}
+  - Database User: ${env:POSTGRES_USER}
+  - Database Password: ${env:POSTGRES_PASSWORD}
   - Max Wait Time: 500 milliseconds
-  - Max Total Connections: 10
+  - Max Total Connections: 20
+  - Validation query: SELECT 1
 ```
 
 **Install PostgreSQL Driver**:
 ```bash
-# Download PostgreSQL JDBC driver
 docker exec -it nifi bash
 cd /opt/nifi/nifi-current/lib
 wget https://jdbc.postgresql.org/download/postgresql-42.6.0.jar
 exit
-
-# Restart NiFi
 docker restart nifi
 ```
 
-#### MinIOCredentialsService
+**Notes**:
+- Increased max connections from 10 to 20 for better concurrency
+- Uses environment variables for credentials
+- Validation query ensures connection health
+
+#### 2. MinIOCredentialsService
+
+**Purpose**: Secure credential management for MinIO access
+
+**✅ Critical**: Use controller service instead of inline credentials
 
 **Configuration**:
 ```
 Service: AWSCredentialsProviderControllerService
+Name: MinIOCredentialsService
 Properties:
-  - Access Key: ${MINIO_ACCESS_KEY}
-  - Secret Key: ${MINIO_SECRET_KEY}
+  - Access Key ID: ${env:MINIO_ACCESS_KEY}
+  - Secret Access Key: ${env:MINIO_SECRET_KEY}
 ```
+
+**Notes**:
+- Never hardcode credentials in processor properties
+- Uses environment variables from docker-compose.yml
+- Supports credential rotation without flow changes
+
+#### 3. CSVReader
+
+**Purpose**: Read and parse CSV files
+
+**Configuration**:
+```
+Service: CSVReader
+Name: CSVReader
+Properties:
+  - Schema Access Strategy: Infer Schema
+  - CSV Format: Custom Format
+  - Value Separator: ,
+  - First Line is Header: true
+  - Ignore CSV Header: false
+  - Quote Character: "
+  - Escape Character: \
+  - Comment Marker: #
+  - Trim Fields: true
+  - Allow Extra Characters: true
+  - Charset: UTF-8
+```
+
+**Notes**:
+- Infers schema automatically from header row
+- Handles quoted fields and escape characters
+- Trims whitespace from fields
+
+#### 4. CSVRecordSetWriter
+
+**Purpose**: Write CSV output after validation
+
+**Configuration**:
+```
+Service: CSVRecordSetWriter
+Name: CSVRecordSetWriter
+Properties:
+  - Schema Write Strategy: Set 'schema.name' Attribute
+  - Schema Access Strategy: Inherit Record Schema
+  - CSV Format: Custom Format
+  - Value Separator: ,
+  - Include Header Line: true
+  - Quote Character: "
+  - Escape Character: \
+  - Charset: UTF-8
+```
+
+#### 5. JsonTreeReader
+
+**Purpose**: Read and parse JSON files
+
+**Configuration**:
+```
+Service: JsonTreeReader
+Name: JsonTreeReader
+Properties:
+  - Schema Access Strategy: Infer Schema
+  - Schema Inference Cache: No cache
+  - Allow Comments: true
+  - Max String Length: 20 MB
+```
+
+**Notes**:
+- Infers schema from JSON structure
+- Allows JSON comments (non-standard but common)
+- Max string length of 20MB for large text fields
+
+#### 6. JsonRecordSetWriter
+
+**Purpose**: Write JSON output after validation
+
+**Configuration**:
+```
+Service: JsonRecordSetWriter
+Name: JsonRecordSetWriter
+Properties:
+  - Schema Write Strategy: Set 'schema.name' Attribute
+  - Schema Access Strategy: Inherit Record Schema
+  - Suppress Null Values: Never Suppress
+  - Pretty Print JSON: false
+  - Timestamp Format: yyyy-MM-dd'T'HH:mm:ss'Z'
+  - Date Format: yyyy-MM-dd
+```
+
+#### 7. ParquetReader
+
+**Purpose**: Read Parquet files
+
+**⚠️ Requires Schema Registry**
+
+**Configuration**:
+```
+Service: ParquetReader
+Name: ParquetReader
+Properties:
+  - Schema Access Strategy: Use 'Schema Name' Property
+  - Schema Registry: DatabaseTableSchemaRegistry
+  - Cache Size: 100
+```
+
+**Notes**:
+- **Cannot reliably infer Parquet schema at scale**
+- Requires pre-registered schema in schema registry
+- Cache improves performance for repeated schemas
+
+#### 8. ParquetRecordSetWriter
+
+**Purpose**: Write Parquet output
+
+**Configuration**:
+```
+Service: ParquetRecordSetWriter
+Name: ParquetRecordSetWriter
+Properties:
+  - Schema Write Strategy: Set 'schema.name' Attribute
+  - Schema Access Strategy: Inherit Record Schema
+  - Compression Type: SNAPPY
+  - Row Group Size: 128 MB
+  - Page Size: 1 MB
+```
+
+**Notes**:
+- SNAPPY compression provides good balance of speed and compression
+- Row group size of 128MB optimized for analytics queries
+
+#### 9. DatabaseTableSchemaRegistry
+
+**Purpose**: Store and manage schemas for Parquet files
+
+**Configuration**:
+```
+Service: DatabaseTableSchemaRegistry
+Name: DatabaseTableSchemaRegistry
+Properties:
+  - Database Connection Pooling Service: PostgreSQLConnectionPool
+  - Table Name: nifi_schemas
+  - Schema Name Column: schema_name
+  - Schema Column: schema_text
+  - Version Column: version
+```
+
+**Setup Schema Table**:
+```sql
+-- Create schema registry table
+CREATE TABLE IF NOT EXISTS nifi_schemas (
+    schema_name VARCHAR(255) PRIMARY KEY,
+    schema_text TEXT NOT NULL,
+    version INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Insert default schema for pulse data
+INSERT INTO nifi_schemas (schema_name, schema_text) VALUES
+('pulse_schema', '{
+  "type": "record",
+  "name": "PulseData",
+  "fields": [
+    {"name": "id", "type": ["null", "string"], "default": null},
+    {"name": "timestamp", "type": ["null", "long"], "default": null}
+  ]
+}')
+ON CONFLICT (schema_name) DO NOTHING;
+```
+
+**Notes**:
+- Database-backed for durability and consistency
+- Supports schema versioning
+- Shared across all NiFi nodes in a cluster
+
+#### 10. DistributedMapCacheClientService
+
+**Purpose**: Distributed cache for async request tracking
+
+**Configuration**:
+```
+Service: DistributedMapCacheClientService
+Name: DistributedMapCacheClientService
+Properties:
+  - Server Hostname: 10.5.0.11 (Redis)
+  - Server Port: 6379
+  - SSL Context Service: (none)
+  - Communications Timeout: 30 sec
+```
+
+**Requires**: DistributedMapCacheServer (see server configuration below)
+
+**Notes**:
+- Uses Redis for production deployments
+- Required for async request/response correlation
+- Shared across all NiFi nodes in a cluster
+
+#### 11. DistributedMapCacheServer
+
+**Purpose**: Cache server for distributed operations
+
+**Configuration**:
+```
+Service: DistributedMapCacheServer
+Name: DistributedMapCacheServer
+Properties:
+  - Port: 4557
+  - Max Cache Entries: 10000
+  - Eviction Strategy: Least Recently Used
+  - Persistence Directory: /opt/nifi/nifi-current/cache
+  - Max Read Size: 10 MB
+```
+
+**Alternative**: Use Redis for production (recommended)
+
+**Notes**:
+- For single-node NiFi, can use embedded server
+- For production clusters, use external Redis
+- Persistence directory survives NiFi restarts
+
+#### 12. HttpContextMap
+
+**Purpose**: HTTP request/response context management
+
+**Configuration**:
+```
+Service: StandardHttpContextMap
+Name: HttpContextMap
+Properties:
+  - Maximum Outstanding Requests: 5000
+  - Request Timeout: 5 minutes
+```
+
+**Notes**:
+- Maps HTTP requests to responses
+- Required for HandleHttpRequest/HandleHttpResponse pairing
+- Timeout prevents memory leaks from abandoned requests
+
+### Big Data Hardening
+
+#### JVM Configuration
+
+Add to `docker-compose.yml` or `nifi.properties`:
+
+```yaml
+# docker-compose.yml
+environment:
+  NIFI_JVM_HEAP_INIT: 8g
+  NIFI_JVM_HEAP_MAX: 16g
+  JAVA_OPTS: >-
+    -Xms8g
+    -Xmx16g
+    -XX:+UseG1GC
+    -XX:MaxGCPauseMillis=500
+    -XX:InitiatingHeapOccupancyPercent=45
+    -XX:G1HeapRegionSize=16m
+```
+
+**Notes**:
+- Minimum 8GB heap for production
+- G1GC recommended for large heaps
+- Adjust based on concurrent upload volume
+
+#### Repository Configuration
+
+Update `nifi.properties`:
+
+```properties
+# FlowFile Repository (fast SSD recommended)
+nifi.flowfile.repository.directory=/opt/nifi/nifi-current/flowfile_repository
+nifi.flowfile.repository.checkpoint.interval=2 min
+nifi.flowfile.repository.always.sync=false
+
+# Content Repository (large SSD recommended)
+nifi.content.repository.directory.default=/opt/nifi/nifi-current/content_repository
+nifi.content.claim.max.appendable.size=10 MB
+nifi.content.claim.max.flow.files=100
+nifi.content.repository.archive.max.retention.period=7 days
+nifi.content.repository.archive.max.usage.percentage=50%
+
+# Provenance Repository (can be slower storage)
+nifi.provenance.repository.directory.default=/opt/nifi/nifi-current/provenance_repository
+nifi.provenance.repository.max.storage.time=30 days
+nifi.provenance.repository.max.storage.size=100 GB
+```
+
+**Notes**:
+- Use **SSD for FlowFile and Content repos** (critical for performance)
+- HDD acceptable for Provenance repo
+- Archive settings prevent disk exhaustion
+
+#### Backpressure Configuration
+
+Configure on **all connections**:
+
+```
+Connection Settings:
+  - Object Threshold: 10,000
+  - Data Size Threshold: 50 GB
+  - Prioritizers: FirstInFirstOutPrioritizer
+  - Load Balance Strategy: Do Not Load Balance (single node)
+```
+
+**Notes**:
+- Backpressure prevents memory exhaustion
+- Object threshold limits number of flowfiles
+- Data size threshold limits total data in queue
+- Adjust based on your data volumes
+
+#### Production Deployment Architecture
+
+For production, deploy behind reverse proxy:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│               NGINX / HAProxy (Load Balancer)            │
+│  - Upload size limit: 10 GB                              │
+│  - Timeout: 30 minutes                                   │
+│  - Connection limit: 1000 concurrent                     │
+└────────────────────┬────────────────────────────────────┘
+                     │
+        ┌────────────┼────────────┐
+        │            │            │
+    ┌───▼───┐   ┌───▼───┐   ┌───▼───┐
+    │ NiFi  │   │ NiFi  │   │ NiFi  │
+    │ Node1 │   │ Node2 │   │ Node3 │
+    │       │   │       │   │       │
+    └───┬───┘   └───┬───┘   └───┬───┘
+        │            │            │
+        └────────────┼────────────┘
+                     │
+        ┌────────────▼────────────┐
+        │    External ZooKeeper    │
+        │    (3-5 nodes)           │
+        └─────────────────────────┘
+```
+
+**Nginx Configuration**:
+```nginx
+upstream nifi {
+    least_conn;
+    server 10.5.0.12:8082 max_fails=3 fail_timeout=30s;
+    server 10.5.0.13:8082 max_fails=3 fail_timeout=30s;
+    server 10.5.0.14:8082 max_fails=3 fail_timeout=30s;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name nifi.yourdomain.com;
+
+    # SSL configuration
+    ssl_certificate /etc/nginx/ssl/cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/key.pem;
+
+    # Upload limits
+    client_max_body_size 10G;
+    client_body_timeout 1800s;
+    proxy_read_timeout 1800s;
+    proxy_send_timeout 1800s;
+
+    # Connection limits
+    limit_conn_zone $binary_remote_addr zone=upload_limit:10m;
+    limit_conn upload_limit 10;
+
+    location /upload {
+        proxy_pass http://nifi;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_request_buffering off;
+    }
+}
+```
+
+### Monitoring & Alerts
+
+Configure these metrics for monitoring:
+
+| Metric | Threshold | Alert |
+|--------|-----------|-------|
+| **FlowFile Queue** | > 5,000 | Warning |
+| **Content Repo Usage** | > 80% | Critical |
+| **JVM Heap Usage** | > 85% | Critical |
+| **HandleHttpRequest errors** | > 5% | Warning |
+| **PutS3Object failures** | > 5% | Critical |
+| **PutSQL failures** | > 1% | Critical |
+| **Backpressure active** | > 10 min | Warning |
+
+**Setup Prometheus Exporter**:
+```yaml
+# Add to docker-compose.yml
+prometheus-nifi-exporter:
+  image: msiedlarek/nifi_exporter
+  ports:
+    - "9092:9092"
+  environment:
+    NIFI_URL: http://10.5.0.12:8080/nifi
+```
+
+### Summary
+
+Mode 1 Batch Flow is now production-ready with:
+
+✅ **Format-specific validation** (CSV, JSON, Parquet, Excel)
+✅ **Big data safe** (multipart uploads, proper backpressure)
+✅ **Async-safe** (distributed cache for request tracking)
+✅ **Proper database operations** (PutSQL instead of ExecuteSQL)
+✅ **Comprehensive error handling** (retry logic with exponential backoff)
+✅ **Monitoring & alerting** (metrics and thresholds)
+✅ **Production hardening** (JVM tuning, repository configuration)
+✅ **Clustering ready** (distributed cache, external ZooKeeper)
 
 ---
 
