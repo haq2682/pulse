@@ -658,9 +658,13 @@ Relationships:
   - failure → RetryFlowFile
 ```
 
-### Database Connection Configuration
+### NiFi Controller Services
 
-#### For External Databases
+Mode 2 (Database Streaming) requires the following controller services to be configured:
+
+#### 1. ExternalDBConnectionPool
+
+**Purpose**: Manages connections to external databases for incremental queries
 
 Create a new `DBCPConnectionPool` for each external database:
 
@@ -671,10 +675,21 @@ Name: ExternalPostgreSQLPool
 Properties:
   - Database Connection URL: jdbc:postgresql://external-host:5432/external_db
   - Database Driver Class Name: org.postgresql.Driver
+  - Database Driver Location: /opt/nifi/nifi-current/lib/postgresql-42.6.0.jar
   - Database User: debezium_user
   - Database Password: ${STREAMING_DB_PASSWORD}
   - Max Wait Time: 500 milliseconds
   - Max Total Connections: 5
+  - Validation query: SELECT 1
+```
+
+**Install PostgreSQL Driver**:
+```bash
+docker exec -it nifi bash
+cd /opt/nifi/nifi-current/lib
+wget https://jdbc.postgresql.org/download/postgresql-42.6.0.jar
+exit
+docker restart nifi
 ```
 
 **MySQL Example**:
@@ -684,9 +699,114 @@ Name: ExternalMySQLPool
 Properties:
   - Database Connection URL: jdbc:mysql://external-host:3306/external_db
   - Database Driver Class Name: com.mysql.cj.jdbc.Driver
+  - Database Driver Location: /opt/nifi/nifi-current/lib/mysql-connector-j-8.0.33.jar
   - Database User: debezium_user
   - Database Password: ${STREAMING_DB_PASSWORD}
+  - Max Wait Time: 500 milliseconds
+  - Max Total Connections: 5
+  - Validation query: SELECT 1
 ```
+
+**Install MySQL Driver**:
+```bash
+docker exec -it nifi bash
+cd /opt/nifi/nifi-current/lib
+wget https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar
+exit
+docker restart nifi
+```
+
+**SQL Server Example**:
+```
+Service: DBCPConnectionPool
+Name: ExternalSQLServerPool
+Properties:
+  - Database Connection URL: jdbc:sqlserver://external-host:1433;databaseName=external_db
+  - Database Driver Class Name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+  - Database Driver Location: /opt/nifi/nifi-current/lib/mssql-jdbc-12.2.0.jre11.jar
+  - Database User: debezium_user
+  - Database Password: ${STREAMING_DB_PASSWORD}
+  - Max Wait Time: 500 milliseconds
+  - Max Total Connections: 5
+```
+
+**Install SQL Server Driver**:
+```bash
+docker exec -it nifi bash
+cd /opt/nifi/nifi-current/lib
+wget https://repo1.maven.org/maven2/com/microsoft/sqlserver/mssql-jdbc/12.2.0.jre11/mssql-jdbc-12.2.0.jre11.jar
+exit
+docker restart nifi
+```
+
+#### 2. JsonTreeReader
+
+**Purpose**: Reads JSON records from database query results
+
+**Configuration**:
+```
+Service: JsonTreeReader
+Name: JsonTreeReader
+Properties:
+  - Schema Access Strategy: Infer Schema
+  - Schema Inference Cache: No cache
+```
+
+**Notes**:
+- This service is used by SplitRecord processor to parse JSON records
+- Automatically infers schema from incoming data
+- No additional configuration required
+
+#### 3. JsonRecordSetWriter
+
+**Purpose**: Writes JSON records for transformation pipeline
+
+**Configuration**:
+```
+Service: JsonRecordSetWriter
+Name: JsonRecordSetWriter
+Properties:
+  - Schema Write Strategy: full-schema-attribute
+  - Schema Access Strategy: Inherit Record Schema
+  - Timestamp Format: yyyy-MM-dd HH:mm:ss
+  - Date Format: yyyy-MM-dd
+  - Time Format: HH:mm:ss
+  - Pretty Print JSON: false
+  - Suppress Null Values: Never Suppress
+```
+
+**Notes**:
+- Used by QueryDatabaseTableRecord and SplitRecord processors
+- Preserves schema information in flowfile attributes
+- Timestamp format matches PostgreSQL/MySQL defaults
+
+#### 4. JSONRecordSetWriter (for QueryDatabaseTableRecord)
+
+**Purpose**: Initial JSON writer for database query output
+
+**Configuration**:
+```
+Service: JsonRecordSetWriter
+Name: JSONRecordSetWriter
+Properties:
+  - Schema Write Strategy: full-schema-attribute
+  - Schema Access Strategy: Inherit Record Schema
+  - Output Grouping: output-array
+```
+
+**Notes**:
+- This is a separate instance used by QueryDatabaseTableRecord
+- Outputs records as JSON array for downstream processing
+
+### Database Connection Summary
+
+| Database | JDBC Driver | Driver Class | Connection URL Format |
+|----------|-------------|--------------|----------------------|
+| **PostgreSQL** | postgresql-42.6.0.jar | org.postgresql.Driver | jdbc:postgresql://host:5432/db |
+| **MySQL** | mysql-connector-j-8.0.33.jar | com.mysql.cj.jdbc.Driver | jdbc:mysql://host:3306/db |
+| **SQL Server** | mssql-jdbc-12.2.0.jre11.jar | com.microsoft.sqlserver.jdbc.SQLServerDriver | jdbc:sqlserver://host:1433;databaseName=db |
+| **Oracle** | ojdbc8.jar | oracle.jdbc.OracleDriver | jdbc:oracle:thin:@host:1521:db |
+| **MongoDB** | mongo-java-driver-3.12.11.jar | mongodb.jdbc.MongoDriver | mongodb://host:27017/db |
 
 ### CDC Operations Mapping
 
@@ -975,6 +1095,138 @@ Relationships:
   - failure → RetryFlowFile
 ```
 
+### NiFi Controller Services
+
+Mode 3 (API Polling) requires minimal controller services. Most processing is done with standard JSON processors that don't require explicit controller services.
+
+#### Controller Services Required: **NONE**
+
+**Why?**
+- Mode 3 uses simple JSON processors (ValidateJson, SplitJson, EvaluateJsonPath, JoltTransformJSON)
+- These processors work directly with JSON text without requiring Record Readers/Writers
+- PublishKafka works with raw JSON bytes, no serialization service needed
+
+#### Optional: SSL Context Service (for HTTPS APIs)
+
+If your external API uses HTTPS with custom certificates:
+
+**Configuration**:
+```
+Service: StandardSSLContextService
+Name: APISSLContextService
+Properties:
+  - Keystore Filename: /opt/nifi/nifi-current/conf/keystore.jks
+  - Keystore Password: ${KEYSTORE_PASSWORD}
+  - Keystore Type: JKS
+  - Truststore Filename: /opt/nifi/nifi-current/conf/truststore.jks
+  - Truststore Password: ${TRUSTSTORE_PASSWORD}
+  - Truststore Type: JKS
+  - TLS Protocol: TLS
+```
+
+**Usage**:
+- Reference this service in the InvokeHTTP processor's "SSL Context Service" property
+- Required only if API uses HTTPS with self-signed or custom certificates
+- For public APIs with valid certificates, this service is not needed
+
+#### Optional: HTTP Context Map (for stateful sessions)
+
+If your API requires session management (cookies, tokens):
+
+**Configuration**:
+```
+Service: StandardHttpContextMap
+Name: APIHttpContextMap
+Properties:
+  - Maximum Outstanding Requests: 5000
+  - Request Timeout: 30 sec
+```
+
+**Usage**:
+- Reference in InvokeHTTP processor if API requires session cookies
+- Not needed for stateless REST APIs (most common case)
+
+### API Authentication Options
+
+Mode 3 supports several authentication methods directly in the InvokeHTTP processor:
+
+#### 1. No Authentication
+```
+InvokeHTTP Properties:
+  - Basic Authentication Username: (empty)
+  - Basic Authentication Password: (empty)
+```
+
+#### 2. Basic Authentication
+```
+InvokeHTTP Properties:
+  - Basic Authentication Username: api_user
+  - Basic Authentication Password: ${API_PASSWORD}
+```
+
+**Best Practice**: Store password in NiFi variable, not hardcoded
+
+#### 3. Bearer Token Authentication
+```
+InvokeHTTP Properties:
+  - Dynamic Property: Authorization = Bearer ${API_TOKEN}
+```
+
+**Setup**:
+1. Add custom property in InvokeHTTP processor
+2. Property Name: `Authorization`
+3. Property Value: `Bearer ${API_TOKEN}`
+4. Set `API_TOKEN` in Process Group variables
+
+#### 4. API Key Authentication
+```
+InvokeHTTP Properties:
+  - Dynamic Property: X-API-Key = ${API_KEY}
+```
+
+**Setup**:
+1. Add custom property in InvokeHTTP processor
+2. Property Name: `X-API-Key` (or API's required header name)
+3. Property Value: `${API_KEY}`
+4. Set `API_KEY` in Process Group variables
+
+### Rate Limiting for APIs
+
+To respect API rate limits, add a **ControlRate** processor after GenerateFlowFile:
+
+**Configuration**:
+```
+Processor: ControlRate
+Position: Between GenerateFlowFile and InvokeHTTP
+Properties:
+  - Rate Control Criteria: flowfile count
+  - Maximum Rate: 60
+  - Time Duration: 1 min
+  - Grouping Attribute: (empty)
+
+Relationships:
+  - success → InvokeHTTP
+  - failure → (terminate)
+```
+
+**Example Use Cases**:
+- API allows 60 requests per minute → Set Maximum Rate: 60, Time Duration: 1 min
+- API allows 1000 requests per hour → Set Maximum Rate: 1000, Time Duration: 1 hour
+- API allows 10 requests per second → Set Maximum Rate: 10, Time Duration: 1 sec
+
+### Configuration Summary
+
+| Feature | Controller Service Required | Configuration Location |
+|---------|----------------------------|----------------------|
+| **Basic JSON Processing** | ❌ No | Built-in processors |
+| **Kafka Publishing** | ❌ No | PublishKafka processor |
+| **HTTPS with custom certs** | ✅ Yes (Optional) | StandardSSLContextService |
+| **Session management** | ✅ Yes (Optional) | StandardHttpContextMap |
+| **Basic Auth** | ❌ No | InvokeHTTP properties |
+| **Bearer Token** | ❌ No | InvokeHTTP dynamic property |
+| **API Key** | ❌ No | InvokeHTTP dynamic property |
+| **Rate Limiting** | ❌ No | ControlRate processor |
+
 ---
 
 ## Frontend Integration Changes
@@ -1198,6 +1450,49 @@ All of these processors are **included by default** in NiFi 2.7.2:
 | **MergeContent** | Merge flowfiles | nifi-standard-nar |
 | **GenerateFlowFile** | Generate triggers | nifi-standard-nar |
 | **EvaluateJsonPath** | Extract JSON values | nifi-standard-nar |
+
+### Controller Services Summary
+
+Controller services are reusable components that provide shared functionality to processors. Here's what each mode requires:
+
+#### Mode 1: Batch File Ingestion
+
+| Service | Required | Purpose |
+|---------|----------|---------|
+| **PostgreSQLConnectionPool** | ✅ Yes | Connect to internal PostgreSQL for metadata tracking |
+| **MultiFormatReader** | ✅ Yes | Read CSV, JSON, Excel, Parquet files |
+| **JSONRecordSetWriter** | ✅ Yes | Write validated records as JSON |
+| **AWSCredentialsProvider** | ⚠️ Optional | MinIO credentials (can use direct config) |
+
+**Configuration Location**: See [Mode 1: NiFi Controller Services](#nifi-controller-services)
+
+#### Mode 2: Database Streaming
+
+| Service | Required | Purpose |
+|---------|----------|---------|
+| **ExternalDBConnectionPool** | ✅ Yes | Connect to external databases (PostgreSQL, MySQL, SQL Server, etc.) |
+| **JsonTreeReader** | ✅ Yes | Read JSON records from database queries |
+| **JsonRecordSetWriter** | ✅ Yes | Write records for transformation pipeline |
+| **JSONRecordSetWriter** | ✅ Yes | Initial JSON writer for query output |
+
+**Configuration Location**: See [Mode 2: NiFi Controller Services](#nifi-controller-services-1)
+
+**JDBC Drivers Required**:
+- PostgreSQL: `postgresql-42.6.0.jar`
+- MySQL: `mysql-connector-j-8.0.33.jar`
+- SQL Server: `mssql-jdbc-12.2.0.jre11.jar`
+
+#### Mode 3: API Polling & Streaming
+
+| Service | Required | Purpose |
+|---------|----------|---------|
+| **None** | ❌ No | Uses built-in JSON processors |
+| **StandardSSLContextService** | ⚠️ Optional | HTTPS with custom certificates only |
+| **StandardHttpContextMap** | ⚠️ Optional | Session management (rare) |
+
+**Configuration Location**: See [Mode 3: NiFi Controller Services](#nifi-controller-services-2)
+
+**Note**: Mode 3 is the simplest - no mandatory controller services required!
 
 ### Environment Variables Configuration
 
