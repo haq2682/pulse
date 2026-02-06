@@ -739,6 +739,195 @@ exit
 docker restart nifi
 ```
 
+**Oracle Example**:
+```
+Service: DBCPConnectionPool
+Name: ExternalOraclePool
+Properties:
+  - Database Connection URL: jdbc:oracle:thin:@external-host:1521:external_db
+  - Database Driver Class Name: oracle.jdbc.OracleDriver
+  - Database Driver Location: /opt/nifi/nifi-current/lib/ojdbc8.jar
+  - Database User: debezium_user
+  - Database Password: ${STREAMING_DB_PASSWORD}
+  - Max Wait Time: 500 milliseconds
+  - Max Total Connections: 5
+  - Validation query: SELECT 1 FROM DUAL
+```
+
+**Install Oracle Driver**:
+```bash
+# Oracle JDBC driver requires Oracle account to download
+# Download ojdbc8.jar from https://www.oracle.com/database/technologies/jdbc-ucp-122-downloads.html
+# Then copy to NiFi container:
+docker cp ojdbc8.jar nifi:/opt/nifi/nifi-current/lib/
+docker restart nifi
+```
+
+**Notes for Oracle**:
+- Oracle requires `FROM DUAL` in validation queries
+- For Oracle 19c+, use `ojdbc8.jar` (Java 8+)
+- For Oracle 12c, use `ojdbc7.jar` (Java 7+)
+- Connection URL format: `jdbc:oracle:thin:@host:port:SID` or `jdbc:oracle:thin:@//host:port/SERVICE_NAME`
+
+**IBM Db2 Example**:
+```
+Service: DBCPConnectionPool
+Name: ExternalDb2Pool
+Properties:
+  - Database Connection URL: jdbc:db2://external-host:50000/external_db
+  - Database Driver Class Name: com.ibm.db2.jcc.DB2Driver
+  - Database Driver Location: /opt/nifi/nifi-current/lib/db2jcc4.jar
+  - Database User: debezium_user
+  - Database Password: ${STREAMING_DB_PASSWORD}
+  - Max Wait Time: 500 milliseconds
+  - Max Total Connections: 5
+  - Validation query: SELECT 1 FROM SYSIBM.SYSDUMMY1
+```
+
+**Install Db2 Driver**:
+```bash
+# Download Db2 JDBC driver from IBM website
+# Or use Maven repository:
+docker exec -it nifi bash
+cd /opt/nifi/nifi-current/lib
+wget https://repo1.maven.org/maven2/com/ibm/db2/jcc/11.5.8.0/jcc-11.5.8.0.jar
+mv jcc-11.5.8.0.jar db2jcc4.jar
+exit
+docker restart nifi
+```
+
+**Notes for Db2**:
+- Db2 requires `FROM SYSIBM.SYSDUMMY1` in validation queries
+- Default port is 50000
+- Supports both Type 4 (pure Java) and Type 2 (native) drivers
+- Use Type 4 driver for NiFi (no native libraries needed)
+
+**MongoDB Example**:
+```
+Service: DBCPConnectionPool
+Name: ExternalMongoDBPool
+Properties:
+  - Database Connection URL: mongodb://external-host:27017/external_db?replicaSet=rs0
+  - Database Driver Class Name: com.mongodb.jdbc.MongoDriver
+  - Database Driver Location: /opt/nifi/nifi-current/lib/mongodb-jdbc-2.0.2-all.jar
+  - Database User: debezium_user
+  - Database Password: ${STREAMING_DB_PASSWORD}
+  - Max Wait Time: 500 milliseconds
+  - Max Total Connections: 5
+  - Validation query: db.runCommand({ping: 1})
+```
+
+**Install MongoDB Driver**:
+```bash
+docker exec -it nifi bash
+cd /opt/nifi/nifi-current/lib
+# MongoDB JDBC driver (for SQL-like queries)
+wget https://github.com/mongodb/mongo-jdbc-driver/releases/download/v2.0.2/mongodb-jdbc-2.0.2-all.jar
+exit
+docker restart nifi
+```
+
+**Notes for MongoDB**:
+- MongoDB must be configured as a **replica set** for CDC
+- Connection URL must include `?replicaSet=rs0` parameter
+- MongoDB 3.6+ required for change streams
+- Alternative: Use `mongo-java-driver` with custom NiFi processors
+
+**Cassandra Example**:
+```
+Service: DBCPConnectionPool
+Name: ExternalCassandraPool
+Properties:
+  - Database Connection URL: jdbc:cassandra://external-host:9042/external_keyspace
+  - Database Driver Class Name: com.github.adejanovski.cassandra.jdbc.CassandraDriver
+  - Database Driver Location: /opt/nifi/nifi-current/lib/cassandra-jdbc-wrapper-3.1.0-bundle.jar
+  - Database User: debezium_user
+  - Database Password: ${STREAMING_DB_PASSWORD}
+  - Max Wait Time: 1000 milliseconds
+  - Max Total Connections: 3
+  - Validation query: SELECT now() FROM system.local
+```
+
+**Install Cassandra Driver**:
+```bash
+docker exec -it nifi bash
+cd /opt/nifi/nifi-current/lib
+wget https://github.com/adejanovski/cassandra-jdbc-wrapper/releases/download/v3.1.0/cassandra-jdbc-wrapper-3.1.0-bundle.jar
+exit
+docker restart nifi
+```
+
+**Notes for Cassandra**:
+- Cassandra has no native CDC support in JDBC
+- Use custom NiFi processors or REST API for best performance
+- Default port is 9042 (CQL native protocol)
+- Connection URL format: `jdbc:cassandra://host:port/keyspace`
+- **Recommended**: Use Debezium Cassandra connector instead of JDBC
+
+**Google Cloud Spanner Example**:
+```
+Service: DBCPConnectionPool
+Name: ExternalSpannerPool
+Properties:
+  - Database Connection URL: jdbc:cloudspanner:/projects/PROJECT_ID/instances/INSTANCE_ID/databases/DATABASE_NAME
+  - Database Driver Class Name: com.google.cloud.spanner.jdbc.JdbcDriver
+  - Database Driver Location: /opt/nifi/nifi-current/lib/google-cloud-spanner-jdbc-2.9.0-single-jar-with-dependencies.jar
+  - Database User: (empty - uses service account)
+  - Database Password: (empty - uses service account)
+  - Max Wait Time: 2000 milliseconds
+  - Max Total Connections: 5
+  - Validation query: SELECT 1
+```
+
+**Install Spanner Driver**:
+```bash
+docker exec -it nifi bash
+cd /opt/nifi/nifi-current/lib
+wget https://repo1.maven.org/maven2/com/google/cloud/google-cloud-spanner-jdbc/2.9.0/google-cloud-spanner-jdbc-2.9.0-single-jar-with-dependencies.jar
+exit
+docker restart nifi
+```
+
+**Notes for Google Spanner**:
+- Requires Google Cloud service account JSON key
+- Set environment variable: `GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json`
+- No username/password - uses service account authentication
+- Connection URL format: `jdbc:cloudspanner:/projects/PROJECT_ID/instances/INSTANCE_ID/databases/DATABASE_NAME`
+- Supports full ANSI SQL
+
+**Vitess Example**:
+```
+Service: DBCPConnectionPool
+Name: ExternalVitessPool
+Properties:
+  - Database Connection URL: jdbc:vitess://external-host:15306/external_db?TABLET_TYPE=master
+  - Database Driver Class Name: io.vitess.jdbc.VitessDriver
+  - Database Driver Location: /opt/nifi/nifi-current/lib/vitess-jdbc-7.0.0.jar
+  - Database User: debezium_user
+  - Database Password: ${STREAMING_DB_PASSWORD}
+  - Max Wait Time: 500 milliseconds
+  - Max Total Connections: 5
+  - Validation query: SELECT 1
+```
+
+**Install Vitess Driver**:
+```bash
+docker exec -it nifi bash
+cd /opt/nifi/nifi-current/lib
+# Vitess JDBC driver (compatible with MySQL protocol)
+wget https://repo1.maven.org/maven2/io/vitess/vitess-jdbc/7.0.0/vitess-jdbc-7.0.0.jar
+# Also need MySQL driver as dependency
+wget https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar
+exit
+docker restart nifi
+```
+
+**Notes for Vitess**:
+- Vitess uses MySQL-compatible protocol
+- Default VTGate port is 15306
+- Connection URL must specify `TABLET_TYPE` (master, replica, rdonly)
+- Supports MySQL syntax and most MySQL features
+
 #### 2. JsonTreeReader
 
 **Purpose**: Reads JSON records from database query results
@@ -800,13 +989,88 @@ Properties:
 
 ### Database Connection Summary
 
-| Database | JDBC Driver | Driver Class | Connection URL Format |
-|----------|-------------|--------------|----------------------|
-| **PostgreSQL** | postgresql-42.6.0.jar | org.postgresql.Driver | jdbc:postgresql://host:5432/db |
-| **MySQL** | mysql-connector-j-8.0.33.jar | com.mysql.cj.jdbc.Driver | jdbc:mysql://host:3306/db |
-| **SQL Server** | mssql-jdbc-12.2.0.jre11.jar | com.microsoft.sqlserver.jdbc.SQLServerDriver | jdbc:sqlserver://host:1433;databaseName=db |
-| **Oracle** | ojdbc8.jar | oracle.jdbc.OracleDriver | jdbc:oracle:thin:@host:1521:db |
-| **MongoDB** | mongo-java-driver-3.12.11.jar | mongodb.jdbc.MongoDriver | mongodb://host:27017/db |
+Comprehensive reference for all supported databases:
+
+| Database | JDBC Driver | Driver Class | Connection URL Format | Default Port | Validation Query |
+|----------|-------------|--------------|----------------------|--------------|-----------------|
+| **PostgreSQL** | postgresql-42.6.0.jar | org.postgresql.Driver | jdbc:postgresql://host:5432/db | 5432 | SELECT 1 |
+| **MySQL** | mysql-connector-j-8.0.33.jar | com.mysql.cj.jdbc.Driver | jdbc:mysql://host:3306/db | 3306 | SELECT 1 |
+| **SQL Server** | mssql-jdbc-12.2.0.jre11.jar | com.microsoft.sqlserver.jdbc.SQLServerDriver | jdbc:sqlserver://host:1433;databaseName=db | 1433 | SELECT 1 |
+| **Oracle** | ojdbc8.jar | oracle.jdbc.OracleDriver | jdbc:oracle:thin:@host:1521:SID | 1521 | SELECT 1 FROM DUAL |
+| **IBM Db2** | db2jcc4.jar | com.ibm.db2.jcc.DB2Driver | jdbc:db2://host:50000/db | 50000 | SELECT 1 FROM SYSIBM.SYSDUMMY1 |
+| **MongoDB** | mongodb-jdbc-2.0.2-all.jar | com.mongodb.jdbc.MongoDriver | mongodb://host:27017/db?replicaSet=rs0 | 27017 | db.runCommand({ping: 1}) |
+| **Cassandra** | cassandra-jdbc-wrapper-3.1.0-bundle.jar | com.github.adejanovski.cassandra.jdbc.CassandraDriver | jdbc:cassandra://host:9042/keyspace | 9042 | SELECT now() FROM system.local |
+| **Google Spanner** | google-cloud-spanner-jdbc-2.9.0-single-jar-with-dependencies.jar | com.google.cloud.spanner.jdbc.JdbcDriver | jdbc:cloudspanner:/projects/PROJECT_ID/instances/INSTANCE_ID/databases/DB | N/A | SELECT 1 |
+| **Vitess** | vitess-jdbc-7.0.0.jar | io.vitess.jdbc.VitessDriver | jdbc:vitess://host:15306/db?TABLET_TYPE=master | 15306 | SELECT 1 |
+
+### Database-Specific Prerequisites
+
+Before configuring NiFi for database ingestion, ensure the database administrator has completed these prerequisites:
+
+#### PostgreSQL
+- ✅ Enable logical replication: `wal_level = logical`
+- ✅ Create dedicated streaming user with replication permissions
+- ✅ Create publication: `CREATE PUBLICATION pulse_pub FOR ALL TABLES;`
+- ✅ Grant permissions: `GRANT SELECT ON ALL TABLES IN SCHEMA public TO debezium_user;`
+
+#### MySQL
+- ✅ Enable binary logging: `log_bin = mysql-bin` and `binlog_format = ROW`
+- ✅ Create streaming user
+- ✅ Grant permissions: `GRANT REPLICATION SLAVE, REPLICATION CLIENT, SELECT ON *.* TO debezium_user;`
+
+#### SQL Server
+- ✅ Enable SQL Server Agent
+- ✅ Enable CDC on database: `EXEC sys.sp_cdc_enable_db;`
+- ✅ Enable CDC on tables: `EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'table_name', @role_name = NULL;`
+- ✅ Create login and grant permissions
+
+#### Oracle
+- ✅ Enable ARCHIVELOG mode
+- ✅ Enable supplemental logging
+- ✅ Create streaming user with LOGMINING permissions
+- ✅ Grant permissions: `GRANT CREATE SESSION, LOGMINING, SELECT ANY TRANSACTION TO debezium_user;`
+
+#### IBM Db2
+- ✅ Enable log retain for recovery: `db2 update db cfg for DBNAME using LOGARCHMETH1 LOGRETAIN`
+- ✅ Create streaming user
+- ✅ Grant permissions: `GRANT SELECT ON SCHEMA SCHEMANAME TO debezium_user;`
+
+#### MongoDB
+- ✅ Configure as **replica set** (required for change streams)
+- ✅ Initialize replica set: `rs.initiate()`
+- ✅ Create user with read permissions
+- ✅ MongoDB 3.6+ required for change streams
+
+#### Cassandra
+- ✅ No native CDC support via JDBC
+- ✅ **Recommended**: Use Debezium Cassandra connector or custom NiFi processors
+- ✅ Alternative: Poll tables directly (not real-time)
+
+#### Google Cloud Spanner
+- ✅ Create service account with Cloud Spanner Database Reader role
+- ✅ Download service account JSON key
+- ✅ Set environment variable: `GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json`
+- ✅ Enable Spanner API in Google Cloud Console
+
+#### Vitess
+- ✅ Vitess cluster must be running
+- ✅ VTGate must be accessible
+- ✅ Create user in underlying MySQL databases
+- ✅ Configure tablet type (master, replica, or rdonly)
+
+### Driver Download Links
+
+| Database | Download Link |
+|----------|--------------|
+| **PostgreSQL** | https://jdbc.postgresql.org/download/postgresql-42.6.0.jar |
+| **MySQL** | https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar |
+| **SQL Server** | https://repo1.maven.org/maven2/com/microsoft/sqlserver/mssql-jdbc/12.2.0.jre11/mssql-jdbc-12.2.0.jre11.jar |
+| **Oracle** | https://www.oracle.com/database/technologies/jdbc-ucp-122-downloads.html (requires Oracle account) |
+| **IBM Db2** | https://repo1.maven.org/maven2/com/ibm/db2/jcc/11.5.8.0/jcc-11.5.8.0.jar |
+| **MongoDB** | https://github.com/mongodb/mongo-jdbc-driver/releases/download/v2.0.2/mongodb-jdbc-2.0.2-all.jar |
+| **Cassandra** | https://github.com/adejanovski/cassandra-jdbc-wrapper/releases/download/v3.1.0/cassandra-jdbc-wrapper-3.1.0-bundle.jar |
+| **Google Spanner** | https://repo1.maven.org/maven2/com/google/cloud/google-cloud-spanner-jdbc/2.9.0/google-cloud-spanner-jdbc-2.9.0-single-jar-with-dependencies.jar |
+| **Vitess** | https://repo1.maven.org/maven2/io/vitess/vitess-jdbc/7.0.0/vitess-jdbc-7.0.0.jar |
 
 ### CDC Operations Mapping
 
@@ -1477,10 +1741,18 @@ Controller services are reusable components that provide shared functionality to
 
 **Configuration Location**: See [Mode 2: NiFi Controller Services](#nifi-controller-services-1)
 
-**JDBC Drivers Required**:
-- PostgreSQL: `postgresql-42.6.0.jar`
-- MySQL: `mysql-connector-j-8.0.33.jar`
-- SQL Server: `mssql-jdbc-12.2.0.jre11.jar`
+**JDBC Drivers Required** (choose based on your database):
+- **PostgreSQL**: `postgresql-42.6.0.jar`
+- **MySQL**: `mysql-connector-j-8.0.33.jar`
+- **SQL Server**: `mssql-jdbc-12.2.0.jre11.jar`
+- **Oracle**: `ojdbc8.jar` (requires Oracle account)
+- **IBM Db2**: `db2jcc4.jar` (or `jcc-11.5.8.0.jar`)
+- **MongoDB**: `mongodb-jdbc-2.0.2-all.jar`
+- **Cassandra**: `cassandra-jdbc-wrapper-3.1.0-bundle.jar`
+- **Google Spanner**: `google-cloud-spanner-jdbc-2.9.0-single-jar-with-dependencies.jar`
+- **Vitess**: `vitess-jdbc-7.0.0.jar` + `mysql-connector-j-8.0.33.jar`
+
+**Supported Databases**: PostgreSQL, MySQL, SQL Server, Oracle, IBM Db2, MongoDB, Cassandra, Google Cloud Spanner, Vitess
 
 #### Mode 3: API Polling & Streaming
 
