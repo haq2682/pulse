@@ -288,11 +288,11 @@ Replace FastAPI chunked upload with NiFi's production-ready HTTP listener, forma
    ├── csv     → [ValidateRecord] (CSVReader)
    ├── json    → [ValidateRecord] (JsonTreeReader)
    ├── parquet → [ValidateRecord] (ParquetReader + Schema Registry)
-   └── excel   → [ConvertExcelToCSVProcessor] → [ValidateRecord] (CSVReader)
+   └── excel   → [ConvertRecord] (ExcelReader→CSV) → [ValidateRecord] (CSVReader)
         ↓
 [PutS3Object] (MinIO with multipart upload enabled)
         ↓
-[PutSQL] (INSERT with ON CONFLICT upsert)
+[PutDatabaseRecord] (Record-based INSERT) OR [PutSQL] (for ON CONFLICT)
         ↓
 [FetchDistributedMapCache] (retrieve request context)
         ↓
@@ -407,7 +407,7 @@ Relationships:
   - csv → ValidateRecord (CSV)
   - json → ValidateRecord (JSON)
   - parquet → ValidateRecord (Parquet)
-  - excel → ConvertExcelToCSVProcessor
+  - excel → ConvertRecord_Excel
   - unmatched → HandleHttpResponseError (unsupported format)
 ```
 
@@ -496,20 +496,22 @@ Relationships:
 - Database-backed schema registry recommended for production
 - Schema must be pre-registered in `nifi_schemas` table
 
-#### 5d. ConvertExcelToCSVProcessor (Excel)
+#### 5d. ConvertRecord (Excel to CSV)
 
-**Purpose**: Convert Excel files to CSV format
+**Purpose**: Convert Excel files to CSV format using Record-based processing
 
-**⚠️ Critical**: NiFi's ValidateRecord **cannot validate Excel**. Must convert first.
+**⚠️ Critical**: NiFi 2.x deprecated `ConvertExcelToCSVProcessor`. Use `ConvertRecord` with `ExcelReader` + `CSVRecordSetWriter` instead.
+
+**NiFi 2.x Update**: The old `ConvertExcelToCSVProcessor` has been deprecated in favor of the record-based approach using `ExcelReader` controller service.
 
 **Configuration**:
 ```
-Processor: ConvertExcelToCSVProcessor
+Processor: ConvertRecord
+Name: ConvertExcel_CSV
 Properties:
-  - Number of Rows to Skip: 0
-  - Columns to Skip: (empty)
-  - Format Cell Values: true
-  - Sheet Names to Extract: (empty - all sheets)
+  - Record Reader: ExcelReader
+  - Record Writer: CSVRecordSetWriter
+  - Include Zero Record FlowFiles: false
 
 Relationships:
   - success → ValidateRecord_CSV
@@ -517,9 +519,11 @@ Relationships:
 ```
 
 **Notes**:
-- Converts all sheets to CSV
-- Multi-sheet Excel files create multiple flowfiles (one per sheet)
-- After conversion, routed to CSV validation
+- Uses **ExcelReader** controller service (see Controller Services section)
+- Handles both .xlsx (XSSF 2007 OOXML) and .xls (HSSF '97-2007) formats
+- Supports password-protected Excel files
+- Multi-sheet Excel files: Each sheet becomes a separate record set
+- For splitting sheets into separate flowfiles, add **SplitRecord** after ConvertRecord
 
 #### 6. PutS3Object (MinIO - Big Data Safe)
 
@@ -554,14 +558,67 @@ Relationships:
 - Uses controller service (no inline credentials)
 - Age-off cleans up incomplete multipart uploads
 
-#### 7. PutSQL (Database Insert - CORRECTED)
+#### 7. PutDatabaseRecord (Database Insert - NiFi 2.x Recommended)
 
-**Purpose**: Insert file metadata into PostgreSQL
+**Purpose**: Insert file metadata into PostgreSQL using Record-based approach
 
-**❌ OLD (Wrong)**: ExecuteSQL is read-only
-**✅ NEW (Correct)**: PutSQL for INSERT/UPDATE/UPSERT
+**❌ OLD (Deprecated approach)**: PutSQL with manual SQL and parameters
+**✅ NEW (NiFi 2.x Best Practice)**: PutDatabaseRecord with automatic SQL generation
+
+**NiFi 2.x Update**: While `PutSQL` still works, `PutDatabaseRecord` is the modern recommended approach for database inserts, offering better performance and simpler configuration.
 
 **Configuration**:
+```
+Processor: PutDatabaseRecord
+Properties:
+  - Record Reader: JsonTreeReader
+  - Statement Type: INSERT
+  - Database Connection Pooling Service: PostgreSQLConnectionPool
+  - Schema Name: public
+  - Table Name: uploaded_files
+  - Translate Field Names: true
+  - Unmatched Field Behavior: Ignore Unmatched Fields
+  - Unmatched Column Behavior: Fail on Unmatched Columns
+  - Update Keys: file_id
+  - Field Containing SQL: (empty)
+  - Allow Multiple TableNames: false
+  - Maximum Batch Size: 100
+  - Statement Timeout: 0 seconds
+  - Rollback On Failure: true
+
+Relationships:
+  - success → FetchDistributedMapCache
+  - retry → RetryFlowFile
+  - failure → HandleHttpResponseError
+```
+
+**Required: Prepare JSON Record Before PutDatabaseRecord**
+
+Add **UpdateAttribute** processor before PutDatabaseRecord to create JSON record:
+
+```
+Processor: UpdateAttribute (before PutDatabaseRecord)
+Name: PrepareDBRecord
+Properties:
+  - db.record: {
+      "file_id": "${file.id}",
+      "business_id": "${s3.bucket}",
+      "file_name": "${filename}",
+      "file_size": ${file.size},
+      "file_type": "${mime.type}",
+      "s3_key": "${s3.key}",
+      "upload_status": "completed"
+    }
+
+Then use ReplaceText:
+  - Search Value: .*
+  - Replacement Value: ${db.record}
+```
+
+**Alternative: Use PutSQL for ON CONFLICT Upsert**
+
+If you need PostgreSQL-specific `ON CONFLICT` upsert logic, use `PutSQL`:
+
 ```
 Processor: PutSQL
 Properties:
@@ -573,29 +630,22 @@ Properties:
     (?, ?, ?, ?, ?, ?, 'completed', NOW())
     ON CONFLICT (file_id)
     DO UPDATE SET upload_status = 'completed', updated_at = NOW();
-  - Statement Type: INSERT
-  - Obtain Generated Keys: false
-  - Rollback On Failure: true
-  - Batch Size: 1
 
-SQL Parameters (set via UpdateAttribute before PutSQL):
+SQL Parameters (set via UpdateAttribute):
   - sql.args.1.value: ${file.id}
   - sql.args.2.value: ${s3.bucket}
   - sql.args.3.value: ${filename}
   - sql.args.4.value: ${file.size}
   - sql.args.5.value: ${mime.type}
   - sql.args.6.value: ${s3.key}
-
-Relationships:
-  - success → FetchDistributedMapCache
-  - retry → RetryFlowFile
-  - failure → HandleHttpResponseError
 ```
 
 **Notes**:
-- Uses parameterized queries (prevents SQL injection)
-- ON CONFLICT provides idempotent upsert
-- Rollback on failure ensures consistency
+- **PutDatabaseRecord** is recommended for NiFi 2.x (simpler, better performance)
+- Automatically generates SQL from record structure
+- Supports batch inserts (up to 100 records per batch)
+- For complex upsert logic (ON CONFLICT), use `PutSQL` as shown in alternative
+- Rollback on failure ensures transaction consistency
 
 #### 8. FetchDistributedMapCache (Retrieve Request Context)
 
@@ -798,7 +848,60 @@ Properties:
   - Charset: UTF-8
 ```
 
-#### 5. JsonTreeReader
+#### 5. ExcelReader (NiFi 2.x)
+
+**Purpose**: Read and parse Excel files (.xlsx and .xls)
+
+**NiFi 2.x Update**: Replaces the deprecated `ConvertExcelToCSVProcessor`. Use with `ConvertRecord` for Excel processing.
+
+**Configuration**:
+```
+Service: ExcelReader
+Name: ExcelReader
+Properties:
+  - Schema Access Strategy: Infer Schema
+  - Required Sheets: (empty - all sheets)
+  - Starting Row: 1
+  - Timestamp Format: yyyy-MM-dd HH:mm:ss
+  - Date Format: yyyy-MM-dd
+  - Time Format: HH:mm:ss
+  - Password: (empty - for password-protected files)
+```
+
+**Supported Formats**:
+- ✅ `.xlsx` - XSSF 2007 OOXML file format
+- ✅ `.xls` - HSSF '97(-2007) file format
+- ✅ Password-protected Excel files (set Password property)
+
+**Notes**:
+- Infers schema from Excel headers automatically
+- Each sheet is processed as a separate record set
+- Cell formulas are evaluated automatically
+- Shared formulas supported (fixed in recent NiFi versions)
+- For multi-sheet files, use `SplitRecord` processor to separate sheets into individual flowfiles
+
+**Multi-Sheet Handling**:
+
+Option 1 - Single flowfile with all sheets:
+```
+ExcelReader → ConvertRecord → [merged output]
+```
+
+Option 2 - Separate flowfile per sheet (recommended):
+```
+ExcelReader → ConvertRecord → SplitRecord → [one flowfile per sheet]
+```
+
+**Configuration for Splitting Sheets**:
+```
+Processor: SplitRecord
+Properties:
+  - Record Reader: JsonTreeReader
+  - Record Writer: JsonRecordSetWriter
+  - Records Per Split: (varies based on sheet size)
+```
+
+#### 6. JsonTreeReader
 
 **Purpose**: Read and parse JSON files
 
@@ -1806,7 +1909,7 @@ Poll external API endpoints and publish data to Kafka for the mapping pipeline.
        ↓
   (GET external API)
        ↓
-[ValidateJSON]
+[ValidateJson]
        ↓
   (Validate API format)
        ↓
@@ -1905,12 +2008,12 @@ Properties:
   - Use Chunked Encoding: false
 
 Relationships:
-  - Response → ValidateJSON
+  - Response → ValidateJson
   - No Retry → LogAttribute
   - Failure → RetryFlowFile
 ```
 
-#### 3. ValidateJSON
+#### 3. ValidateJson
 
 **Purpose**: Validate API response format
 
@@ -2191,6 +2294,125 @@ Relationships:
 
 ---
 
+## NiFi 2.x Kafka Processor Architecture
+
+### Important Note for NiFi 2.7.2 Users
+
+Apache NiFi 2.x introduced significant changes to Kafka processor architecture. This guide uses `PublishKafka_2_6` for compatibility and ease of transition, but you should be aware of the new recommended approach.
+
+### Current Approach (Used in This Guide)
+
+**Processor**: `PublishKafka_2_6`
+
+**Why we use it**:
+- ✅ Preserved in NiFi 2.x for backward compatibility
+- ✅ Works immediately without migration
+- ✅ Well-documented and battle-tested
+- ✅ Suitable for quick setup and testing
+
+**Configuration**:
+```
+Processor: PublishKafka_2_6
+Module: nifi-kafka-2-6-nar
+Properties:
+  - Kafka Brokers: 10.5.0.7:9092
+  - Topic Name: ecom.${table}
+  - Delivery Guarantee: Best Effort
+  - Compression Type: snappy
+  - Acks: 1
+```
+
+### Modern Approach (Recommended for New Deployments)
+
+**Architecture**: Controller Service-Based
+
+**Components**:
+1. **Kafka3ConnectionService** (Controller Service) - Manages connections to Kafka
+2. **PublishKafka** (Processor without version suffix) - Publishes messages
+
+**Why it's better**:
+- ✅ Cleaner separation of concerns (connection vs. processing)
+- ✅ Easier to update Kafka client libraries
+- ✅ Better connection pooling and management
+- ✅ Future-proof architecture
+- ✅ Supports latest Kafka 3.x features
+
+**Migration Path**:
+
+#### Step 1: Create Kafka3ConnectionService
+
+```
+Service: Kafka3ConnectionService
+Name: Kafka3Connection
+Properties:
+  - Bootstrap Servers: 10.5.0.7:9092
+  - Connection Timeout: 30 sec
+  - Max Request Size: 1 MB
+  - Compression Type: snappy
+  - Acknowledgment Mode: Leader Acknowledged (acks=1)
+```
+
+#### Step 2: Update Processors
+
+**OLD (PublishKafka_2_6)**:
+```
+Processor: PublishKafka_2_6
+Properties:
+  - Kafka Brokers: 10.5.0.7:9092
+  - Topic Name: ecom.customers
+  - Delivery Guarantee: Best Effort
+  - Compression Type: snappy
+  - Acks: 1
+```
+
+**NEW (PublishKafka with Kafka3ConnectionService)**:
+```
+Processor: PublishKafka
+Properties:
+  - Connection Service: Kafka3Connection
+  - Topic Name: ecom.customers
+  - Message Key: (optional)
+  - Delivery Guarantee: Best Effort
+```
+
+### Breaking Changes Summary
+
+| Feature | NiFi 1.x | NiFi 2.x (Legacy) | NiFi 2.x (Modern) |
+|---------|----------|-------------------|-------------------|
+| **Processor** | PublishKafka_2_6 | PublishKafka_2_6 (preserved) | PublishKafka |
+| **Connection** | Embedded in processor | Embedded in processor | Kafka3ConnectionService |
+| **Kafka Client** | 2.6.x | 2.6.x | 3.x |
+| **Module** | nifi-kafka-2-6-nar | nifi-kafka-2-6-nar | nifi-kafka-nar |
+
+### Which Approach Should You Use?
+
+#### Use `PublishKafka_2_6` (This Guide) If:
+- ⏱️ You need to get started quickly
+- 🔄 You're migrating from NiFi 1.x
+- 📚 You prefer well-documented, proven solutions
+- 🧪 You're setting up a development/test environment
+
+#### Use `PublishKafka` + `Kafka3ConnectionService` (Modern) If:
+- 🚀 You're building a new production deployment
+- 🔮 You want to future-proof your architecture
+- 🎯 You need latest Kafka 3.x features
+- 🏗️ You prefer cleaner architectural separation
+
+### Migration Timeline Recommendation
+
+1. **Phase 1 (Immediate)**: Use `PublishKafka_2_6` as documented in this guide
+2. **Phase 2 (After testing)**: Plan migration to `PublishKafka` + `Kafka3ConnectionService`
+3. **Phase 3 (Production)**: Complete migration before next major NiFi upgrade
+
+### Additional Resources
+
+- [Apache NiFi Kafka Architecture Documentation](https://nifi.apache.org/components/org.apache.nifi.kafka.processors.PublishKafka/)
+- [Kafka3ConnectionService Documentation](https://nifi.apache.org/components/org.apache.nifi.kafka.service.Kafka3ConnectionService/)
+- [NiFi 2.x Breaking Changes](https://docs.cloudera.com/cfm/latest/release-notes/topics/cfm-nifi2-breaking-changes.html)
+- [Migration Guidance for NiFi 2.0](https://cwiki.apache.org/confluence/display/NIFI/Migration+Guidance)
+
+---
+
 ## Frontend Integration Changes
 
 ### Current Implementation
@@ -2399,7 +2621,7 @@ All of these processors are **included by default** in NiFi 2.7.2:
 | **InvokeHTTP** | Call external APIs | nifi-standard-nar |
 | **QueryDatabaseTableRecord** | Query databases | nifi-standard-nar |
 | **PutS3Object** | Upload to S3/MinIO | nifi-aws-nar |
-| **PublishKafka_2_6** | Publish to Kafka | nifi-kafka-2-6-nar |
+| **PublishKafka_2_6** | Publish to Kafka (preserved for compatibility)* | nifi-kafka-2-6-nar |
 | **JoltTransformJSON** | Transform JSON | nifi-standard-nar |
 | **ValidateJson** | Validate JSON schema | nifi-standard-nar |
 | **ValidateRecord** | Validate records | nifi-standard-nar |
@@ -2407,11 +2629,15 @@ All of these processors are **included by default** in NiFi 2.7.2:
 | **SplitRecord** | Split record sets | nifi-standard-nar |
 | **UpdateAttribute** | Set flowfile attributes | nifi-update-attribute-nar |
 | **RouteOnAttribute** | Route by attributes | nifi-standard-nar |
-| **ExecuteSQL** | Execute SQL | nifi-standard-nar |
+| **PutDatabaseRecord** | Insert records to database (recommended) | nifi-standard-nar |
+| **PutSQL** | Execute parameterized SQL (alternative) | nifi-standard-nar |
+| **ConvertRecord** | Convert between record formats | nifi-standard-nar |
 | **LogAttribute** | Log for debugging | nifi-standard-nar |
 | **MergeContent** | Merge flowfiles | nifi-standard-nar |
 | **GenerateFlowFile** | Generate triggers | nifi-standard-nar |
 | **EvaluateJsonPath** | Extract JSON values | nifi-standard-nar |
+
+**\* Note on Kafka Processors**: NiFi 2.x introduces a new controller service-based Kafka architecture (`PublishKafka` + `Kafka3ConnectionService`). This guide uses `PublishKafka_2_6` which is preserved for compatibility. See the [NiFi 2.x Kafka Processor Architecture](#nifi-2x-kafka-processor-architecture) section for migration guidance.
 
 ### Controller Services Summary
 
@@ -2422,11 +2648,19 @@ Controller services are reusable components that provide shared functionality to
 | Service | Required | Purpose |
 |---------|----------|---------|
 | **PostgreSQLConnectionPool** | ✅ Yes | Connect to internal PostgreSQL for metadata tracking |
-| **MultiFormatReader** | ✅ Yes | Read CSV, JSON, Excel, Parquet files |
-| **JSONRecordSetWriter** | ✅ Yes | Write validated records as JSON |
+| **CSVReader** | ✅ Yes | Read CSV files |
+| **JsonTreeReader** | ✅ Yes | Read JSON files |
+| **ExcelReader** | ✅ Yes | Read Excel files (.xlsx, .xls) |
+| **ParquetReader** | ✅ Yes | Read Parquet files |
+| **CSVRecordSetWriter** | ✅ Yes | Write CSV records |
+| **JsonRecordSetWriter** | ✅ Yes | Write JSON records |
+| **DistributedMapCacheClientService** | ✅ Yes | Async request tracking |
+| **DistributedMapCacheServer** | ✅ Yes | Cache server for async tracking |
 | **AWSCredentialsProvider** | ⚠️ Optional | MinIO credentials (can use direct config) |
 
 **Configuration Location**: See [Mode 1: NiFi Controller Services](#nifi-controller-services)
+
+**Note**: Mode 1 routes by file format, so each format needs its own reader service.
 
 #### Mode 2: Database Streaming
 
@@ -2464,7 +2698,11 @@ Controller services are reusable components that provide shared functionality to
 
 **Note**: Mode 3 is the simplest - no mandatory controller services required!
 
-### Environment Variables Configuration
+### Environment Variables & Parameter Contexts
+
+**NiFi 2.x Update**: Variable Registry has been removed. Use **Parameter Contexts** and environment variables instead.
+
+#### Using Environment Variables
 
 NiFi can access environment variables from `docker-compose.yml`:
 
@@ -2487,6 +2725,43 @@ ${env:MINIO_ACCESS_KEY}
 ${env:POSTGRES_USER}
 ${env:KAFKA_BOOTSTRAP}
 ```
+
+#### Using Parameter Contexts (NiFi 2.x Recommended)
+
+**Parameter Contexts** replace the old Variable Registry and provide better organization and inheritance.
+
+**Create Parameter Context**:
+1. Right-click on canvas → **Configure**
+2. Go to **Parameter Contexts** tab
+3. Click **+** to create new context
+4. Name: `PulseConfiguration`
+5. Add parameters:
+
+| Parameter Name | Value | Sensitive |
+|----------------|-------|-----------|
+| `minio.endpoint` | `http://10.5.0.4:9000` | No |
+| `minio.access.key` | `${env:MINIO_ACCESS_KEY}` | Yes |
+| `minio.secret.key` | `${env:MINIO_SECRET_KEY}` | Yes |
+| `postgres.url` | `jdbc:postgresql://10.5.0.5:5432/${env:POSTGRES_DB}` | No |
+| `postgres.user` | `${env:POSTGRES_USER}` | No |
+| `postgres.password` | `${env:POSTGRES_PASSWORD}` | Yes |
+| `kafka.bootstrap` | `${env:KAFKA_BOOTSTRAP}` | No |
+
+6. Apply parameter context to Process Group
+
+**Use in Processors**:
+```
+#{minio.endpoint}
+#{postgres.url}
+#{kafka.bootstrap}
+```
+
+**Benefits**:
+- ✅ Organized configuration management
+- ✅ Sensitive parameter masking
+- ✅ Parameter inheritance across process groups
+- ✅ Easy updates without modifying flows
+- ✅ Can reference environment variables: `${env:VAR_NAME}`
 
 ### NiFi Templates
 
