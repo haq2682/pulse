@@ -4,9 +4,19 @@ Trains K-Means and Gaussian Mixture Models on RFM metrics
 """
 
 import os
+import sys
 import findspark
 
 findspark.init()
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils.multi_bucket_loader import (
+    load_data_from_all_buckets,
+    validate_training_data,
+    get_general_model_output_path,
+    get_training_window,
+    GENERAL_MODEL_BUCKET
+)
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when, lit, coalesce
@@ -17,9 +27,11 @@ from datetime import datetime
 import json
 
 # Environment configuration
-BUCKET = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
+MODEL_NAME = "customer_segment"
+INPUT_RELATIVE_PATH = "transformed/agg_customers.parquet"
+INPUT_RELATIVE_PATH_RFM = "transformed/agg_rfm_segmentation.parquet"
+MODEL_OUTPUT_DIR = get_general_model_output_path("clustering", MODEL_NAME)
+MIN_RECORDS, MAX_RECORDS = get_training_window(MODEL_NAME)
 LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
 
 # Required input columns
@@ -74,48 +86,72 @@ def create_spark_session():
 
 
 def load_and_validate_data(spark):
-    """Load data from multiple tables and validate required columns"""
-    try:
-        # Load agg_customers
-        customers_path = f"{INPUT_PATH}agg_customers.parquet"
-        print(f"Loading customers from: {customers_path}")
-        customers_df = spark.read.parquet(customers_path)
+    """Load data from multiple tables using multi-bucket loader and validate required columns"""
+    # Load agg_customers from all buckets
+    customers_df, customers_count = load_data_from_all_buckets(
+        spark,
+        INPUT_RELATIVE_PATH,
+        required_columns=["customer_id", "total_orders", "total_revenue", "avg_order_value", 
+                         "customer_tenure_days", "session_conversion_rate"],
+        filter_nulls=False
+    )
 
-        # Load agg_rfm_segmentation
-        rfm_path = f"{INPUT_PATH}agg_rfm_segmentation.parquet"
-        print(f"Loading RFM data from: {rfm_path}")
-        rfm_df = spark.read.parquet(rfm_path)
-
-        # Rename columns to avoid duplicates during join
-        rfm_df = rfm_df.select(
-            col("customer_id"),
-            col("days_since_last_order"),
-        )
-
-        # Join tables on customer_id
-        df = customers_df.join(rfm_df, on="customer_id", how="inner")
-
-        print(f"Joined dataset shape: {df.count()} rows, {len(df.columns)} columns")
-
-        # Validate required columns exist
-        missing_cols = [c for c in REQUIRED_COLS if c not in df.columns]
-        if missing_cols:
-            print(f"ERROR: Missing required columns: {missing_cols}")
-            return None
-
-        # Check for at least some non-null values in feature columns
-        for col_name in FEATURE_COLS:
-            non_null_count = df.filter(col(col_name).isNotNull()).count()
-            if non_null_count == 0:
-                print(f"ERROR: Column '{col_name}' has all NULL values")
-                return None
-            print(f"Column '{col_name}': {non_null_count} non-null values")
-
-        return df
-
-    except Exception as e:
-        print(f"ERROR: Failed to load data: {str(e)}")
+    if customers_df is None:
+        print("⚠️  No customer data available. Skipping training.")
         return None
+
+    print(f"Loaded {customers_count} customers from all buckets")
+
+    # Load agg_rfm_segmentation from all buckets
+    rfm_df, rfm_count = load_data_from_all_buckets(
+        spark,
+        INPUT_RELATIVE_PATH_RFM,
+        required_columns=["customer_id", "days_since_last_order"],
+        filter_nulls=False
+    )
+
+    if rfm_df is None:
+        print("⚠️  No RFM data available. Skipping training.")
+        return None
+
+    print(f"Loaded {rfm_count} RFM records from all buckets")
+
+    # Rename columns to avoid duplicates during join
+    rfm_df = rfm_df.select(
+        col("customer_id"),
+        col("days_since_last_order"),
+    )
+
+    # Join tables on customer_id
+    df = customers_df.join(rfm_df, on="customer_id", how="inner")
+
+    record_count = df.count()
+    print(f"Joined dataset shape: {record_count} rows, {len(df.columns)} columns")
+
+    # Validate training data
+    is_valid, df = validate_training_data(
+        df, record_count, MIN_RECORDS, MAX_RECORDS, MODEL_NAME
+    )
+
+    if not is_valid:
+        print("⚠️  Training skipped due to insufficient data.")
+        return None
+
+    # Validate required columns exist
+    missing_cols = [c for c in REQUIRED_COLS if c not in df.columns]
+    if missing_cols:
+        print(f"⚠️  Training skipped - Missing required columns: {missing_cols}")
+        return None
+
+    # Check for at least some non-null values in feature columns
+    for col_name in FEATURE_COLS:
+        non_null_count = df.filter(col(col_name).isNotNull()).count()
+        if non_null_count == 0:
+            print(f"⚠️  Training skipped - Column '{col_name}' has all NULL values")
+            return None
+        print(f"Column '{col_name}': {non_null_count} non-null values")
+
+    return df
 
 
 def prepare_features(df):
@@ -203,10 +239,10 @@ def train_gmm(df, features_col, k_values):
 
 def save_models_and_metrics(kmeans_models, kmeans_metrics, gmm_models, gmm_metrics, all_metrics, scaler, spark):
     """Save best k model for each algorithm type to MinIO"""
-    print(f"\nSaving models to MinIO: {MODEL_OUTPUT_PATH}")
+    print(f"\nSaving models to MinIO: {MODEL_OUTPUT_DIR}")
 
     # Save scaler to MinIO
-    scaler_path = f"{MODEL_OUTPUT_PATH}scaler"
+    scaler_path = f"{MODEL_OUTPUT_DIR}/scaler"
     scaler.write().overwrite().save(scaler_path)
     print(f"Saved scaler to: {scaler_path}")
 
@@ -214,7 +250,7 @@ def save_models_and_metrics(kmeans_models, kmeans_metrics, gmm_models, gmm_metri
     best_kmeans = max(kmeans_metrics, key=lambda x: x["silhouette"])
     best_kmeans_model = next(m for m in kmeans_models if m["k"] == best_kmeans["k"])
     
-    kmeans_path = f"{MODEL_OUTPUT_PATH}kmeans"
+    kmeans_path = f"{MODEL_OUTPUT_DIR}/kmeans"
     best_kmeans_model["model"].write().overwrite().save(kmeans_path)
     print(f"Saved K-Means (k={best_kmeans['k']}, silhouette={best_kmeans['silhouette']:.4f}) to: {kmeans_path}")
 
@@ -222,7 +258,7 @@ def save_models_and_metrics(kmeans_models, kmeans_metrics, gmm_models, gmm_metri
     best_gmm = max(gmm_metrics, key=lambda x: x["silhouette"])
     best_gmm_model = next(m for m in gmm_models if m["k"] == best_gmm["k"])
     
-    gmm_path = f"{MODEL_OUTPUT_PATH}gmm"
+    gmm_path = f"{MODEL_OUTPUT_DIR}/gmm"
     best_gmm_model["model"].write().overwrite().save(gmm_path)
     print(f"Saved GMM (k={best_gmm['k']}, silhouette={best_gmm['silhouette']:.4f}) to: {gmm_path}")
 
@@ -254,12 +290,12 @@ def save_models_and_metrics(kmeans_models, kmeans_metrics, gmm_models, gmm_metri
     print(f"Saved metrics locally to: {local_metrics_file}")
     
     # Upload metrics to MinIO using Spark
-    metrics_s3_path = f"{MODEL_OUTPUT_PATH}metrics.json"
+    metrics_s3_path = f"{MODEL_OUTPUT_DIR}/metrics.json"
     metrics_df = spark.createDataFrame([metrics_data])
     metrics_df.coalesce(1).write.mode("overwrite").json(metrics_s3_path)
     print(f"Uploaded metrics to MinIO: {metrics_s3_path}")
     
-    print(f"\nAll models saved to MinIO bucket: {BUCKET}")
+    print(f"\nAll models saved to MinIO bucket: {GENERAL_MODEL_BUCKET}")
 
 
 def main():
@@ -272,14 +308,14 @@ def main():
     # Load and validate data
     df = load_and_validate_data(spark)
     if df is None:
-        print("Training aborted due to data validation failure")
+        print("⚠️  Training skipped due to data validation failure")
         spark.stop()
         return
 
     # Prepare features
     df = prepare_features(df)
     if df is None:
-        print("Training aborted due to insufficient data")
+        print("⚠️  Training skipped due to insufficient data")
         spark.stop()
         return
 
@@ -319,10 +355,10 @@ def main():
     print("Training completed successfully")
     print("=" * 80)
     print("\nSaved models:")
-    print("- K-Means: s3a://pulse-bucket-1/machine-learning/clustering/models/kmeans")
-    print("- GMM: s3a://pulse-bucket-1/machine-learning/clustering/models/gmm")
-    print("- Scaler: s3a://pulse-bucket-1/machine-learning/clustering/models/scaler")
-    print("- Metrics: s3a://pulse-bucket-1/machine-learning/clustering/models/metrics.json")
+    print(f"- K-Means: {MODEL_OUTPUT_DIR}/kmeans")
+    print(f"- GMM: {MODEL_OUTPUT_DIR}/gmm")
+    print(f"- Scaler: {MODEL_OUTPUT_DIR}/scaler")
+    print(f"- Metrics: {MODEL_OUTPUT_DIR}/metrics.json")
     print("=" * 80)
 
     spark.stop()

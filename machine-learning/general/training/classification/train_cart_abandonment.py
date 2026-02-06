@@ -1,4 +1,5 @@
 import os
+import sys
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, when, lit, hour, dayofweek, 
@@ -18,14 +19,26 @@ import findspark
 
 findspark.init()
 
-# Configuration
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH_CART = f"s3a://{BUCKET_NAME}/transformed/agg_cart_abandonment_analysis.parquet"
-INPUT_PATH_SESSIONS = f"s3a://{BUCKET_NAME}/transformed/agg_customer_sessions.parquet"
-INPUT_PATH_ORDERS = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"  # If available
-INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"  # If available
-MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/cart_abandonment"
-MIN_LABELED_RECORDS = 100
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils.multi_bucket_loader import (
+    load_data_from_all_buckets,
+    validate_training_data,
+    get_general_model_output_path,
+    get_training_window,
+    GENERAL_MODEL_BUCKET
+)
+
+# Configuration - General models output to pulse-bucket-1
+MODEL_NAME = "cart_abandonment"
+INPUT_RELATIVE_PATH = "transformed/agg_cart_abandonment_analysis.parquet"
+INPUT_SESSIONS_PATH = "transformed/agg_customer_sessions.parquet"
+INPUT_ORDERS_PATH = "transformed/agg_orders.parquet"
+INPUT_CUSTOMERS_PATH = "transformed/agg_customers.parquet"
+MODEL_OUTPUT_DIR = get_general_model_output_path("classification", MODEL_NAME)
+
+# Training record window (min, max records for training)
+MIN_RECORDS, MAX_RECORDS = get_training_window(MODEL_NAME)
 
 # Base features (CRITICAL: Exclude time_in_cart_hours to prevent leakage)
 NUMERICAL_FEATURES = [
@@ -650,6 +663,9 @@ def main():
     print("=" * 80)
     print("Cart Abandonment Risk - IMPROVED Training Pipeline")
     print("=" * 80)
+    print(f"Training window: {MIN_RECORDS} - {MAX_RECORDS} records")
+    print(f"Model output: {MODEL_OUTPUT_DIR}")
+    print("=" * 80)
     
     # ========== CONFIGURATION ==========
     BALANCE_METHOD = "combined"  # Options: "undersample", "oversample", "combined", None
@@ -658,14 +674,53 @@ def main():
     
     spark = create_spark_session()
     
-    # ========== LOAD DATA ==========
-    cart_df = load_data(spark, INPUT_PATH_CART)
-    sessions_df = load_data(spark, INPUT_PATH_SESSIONS)
-    customers_df = load_data(spark, INPUT_PATH_CUSTOMERS)  # Optional
-    orders_df = load_data(spark, INPUT_PATH_ORDERS)  # Optional
+    # ========== LOAD DATA FROM ALL BUCKETS ==========
+    print("\nStep 1: Loading data from all MinIO buckets...")
+    cart_df, cart_count = load_data_from_all_buckets(
+        spark,
+        INPUT_RELATIVE_PATH,
+        required_columns=["cart_id", "cart_status", "customer_id", "session_id"],
+        filter_nulls=False
+    )
     
-    if cart_df is None or sessions_df is None:
-        print("✗ Training stopped: Failed to load required data")
+    if cart_df is None:
+        print("⚠️  No cart data available. Skipping training.")
+        spark.stop()
+        return
+    
+    # Validate training data window
+    is_valid, cart_df = validate_training_data(
+        cart_df, cart_count, MIN_RECORDS, MAX_RECORDS, MODEL_NAME
+    )
+    
+    if not is_valid:
+        print("⚠️  Training skipped due to insufficient cart data.")
+        spark.stop()
+        return
+    
+    # Load sessions data
+    sessions_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_SESSIONS_PATH,
+        required_columns=["session_id"],
+        filter_nulls=False
+    )
+    customers_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_CUSTOMERS_PATH,
+        required_columns=["customer_id"],
+        filter_nulls=False
+    )
+    orders_df, _ = load_data_from_all_buckets(
+        spark,
+        INPUT_ORDERS_PATH,
+        required_columns=["order_id", "customer_id"],
+        filter_nulls=False
+    )
+    
+    if sessions_df is None:
+        print("⚠️  Training skipped: Failed to load sessions data")
+        spark.stop()
         return
     
     # ========== JOIN DATASETS ==========

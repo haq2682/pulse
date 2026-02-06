@@ -93,7 +93,7 @@ const AddBusiness = () => {
             navigate(`/onboarding/data-type/${pathname.split('/')[3]}`);
         }
         catch (e) {
-            setErrors((prev) => ({ ...prev, form: e.message + ": " + e.response?.data?.detail || 'An error occurred. Please try again.' }));
+            setErrors((prev) => ({ ...prev, form: e.message || 'An error occurred. Please try again.' }));
         }
         finally {
             setLoading(false);
