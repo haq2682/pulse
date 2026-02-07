@@ -10,7 +10,7 @@ echo ""
 # Phase 1: Start core services
 echo "=== Phase 1: Starting Core Services ==="
 echo "Starting PostgreSQL, MinIO, Redis, Zookeeper, and Kafka..."
-docker compose up -d postgresql minio redis zookeeper kafka
+docker compose up -d --build postgresql minio redis zookeeper kafka
 
 echo ""
 echo "Waiting for services to be ready..."
@@ -20,8 +20,8 @@ echo ""
 
 # Phase 2: Start Spark
 echo "=== Phase 2: Starting Spark ==="
-echo "Starting Spark Master and Workers..."
-docker compose up -d spark_master
+echo "Starting Spark Master..."
+docker compose up -d --build spark_master
 
 echo ""
 echo "Waiting for Spark to be ready..."
@@ -32,7 +32,7 @@ echo ""
 #Phase 3: Start Python service
 echo "=== Phase 3: Starting Python Service ==="
 echo "Starting Python application..."
-docker compose up -d python
+docker compose up -d --build python
 
 echo ""
 echo "Waiting for Python service to be ready..."
@@ -44,22 +44,50 @@ echo "=== Phase 4: Setup Kafka ==="
 echo "Setting up Kafka..."
 sleep 30
 ./bash/setup_kafka.sh
+echo "✓ Kafka setup complete"
+echo ""
 
-# Phase 5: Start FastAPI Backend
-echo "=== Phase 5: Starting FastAPI Backend ==="
-echo "Starting FastAPI backend..."
-docker compose up -d api
+# Phase 5: Start Debezium
+echo "=== Phase 5: Starting Debezium ==="
+echo "Starting Debezium connector..."
+docker compose up -d --build debezium
 
-# Phase 6: Start React Frontend
-echo "=== Phase 6: Starting React Frontend ==="
-echo "Starting React frontend..."
-docker compose up -d frontend
+echo ""
+echo "✓ Debezium started"
+echo ""
 
-echo "=== Phase 7: Start Worker ==="
-echo "Starting Spark Worker 1..."
-./bash/start_worker_linux.sh
-echo "Starting Spark Worker 2..."
-./bash/start_worker_linux.sh
+# Phase 6: Start FastAPI Backend
+echo "=== Phase 6: Starting FastAPI Backend ==="
+echo "Starting API backend..."
+docker compose up -d --build api
+echo ""
+echo "✓ API started"
+echo ""
+
+# Phase 7: Start NiFi
+echo "=== Phase 7: Starting Apache NiFi ==="
+echo "Starting NiFi..."
+docker compose up -d --build nifi
+
+echo ""
+echo "✓ NiFi started"
+echo ""
+
+# Phase 8: Start React Frontend
+echo "=== Phase 8: Starting React Frontend ==="
+echo "Starting frontend..."
+docker compose up -d --build frontend
+echo ""
+echo "✓ Frontend started"
+echo ""
+
+# Phase 9: Start Spark Workers
+# echo "=== Phase 9: Starting Spark Workers ==="
+# echo "Starting Spark Worker 1..."
+# ./bash/start_worker_linux.sh
+
+# echo "Starting Spark Worker 2..."
+# ./bash/start_worker_linux.sh
 
 echo ""
 echo "=========================================="

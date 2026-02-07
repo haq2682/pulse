@@ -1,4 +1,5 @@
 import os
+import sys
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when, lit
 from pyspark.ml.feature import VectorAssembler, StringIndexer, StandardScaler, OneHotEncoder
@@ -8,12 +9,24 @@ import findspark
 
 findspark.init()
 
-# Configuration
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-INPUT_PATH_RFM = f"s3a://{BUCKET_NAME}/transformed/agg_rfm_segmentation.parquet"
-MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/customer_segments"
-MIN_LABELED_RECORDS = 100
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils.multi_bucket_loader import (
+    load_data_from_all_buckets,
+    validate_training_data,
+    get_general_model_output_path,
+    get_training_window,
+    GENERAL_MODEL_BUCKET
+)
+
+# Configuration - General models output to pulse-bucket-1
+MODEL_NAME = "customer_segments"
+INPUT_RELATIVE_PATH = "transformed/agg_customers.parquet"
+INPUT_RFM_PATH = "transformed/agg_rfm_segmentation.parquet"
+MODEL_OUTPUT_DIR = get_general_model_output_path("classification", MODEL_NAME)
+
+# Training record window (min, max records for training)
+MIN_RECORDS, MAX_RECORDS = get_training_window(MODEL_NAME)
 
 # Feature columns - ONLY raw behavioral features, NOT RFM scores (to prevent leakage)
 NUMERICAL_FEATURES = [
@@ -327,21 +340,54 @@ def main():
     print("=" * 60)
     print("Customer Segment Classification - Training Pipeline")
     print("=" * 60)
+    print(f"Training window: {MIN_RECORDS} - {MAX_RECORDS} records")
+    print(f"Model output: {MODEL_OUTPUT_DIR}")
+    print("=" * 60)
     
     spark = create_spark_session()
     
-    # Load both tables
-    customers_df = load_data(spark, INPUT_PATH_CUSTOMERS)
-    rfm_df = load_data(spark, INPUT_PATH_RFM)
+    # Load data from all buckets
+    print("\nStep 1: Loading data from all MinIO buckets...")
+    customers_df, customers_count = load_data_from_all_buckets(
+        spark,
+        INPUT_RELATIVE_PATH,
+        required_columns=NUMERICAL_FEATURES,
+        filter_nulls=True
+    )
     
-    if customers_df is None or rfm_df is None:
-        print("✗ Training stopped: Failed to load data")
+    if customers_df is None:
+        print("⚠️  No customer data available. Skipping training.")
+        spark.stop()
+        return
+    
+    # Validate training data window
+    is_valid, customers_df = validate_training_data(
+        customers_df, customers_count, MIN_RECORDS, MAX_RECORDS, MODEL_NAME
+    )
+    
+    if not is_valid:
+        print("⚠️  Training skipped due to insufficient data.")
+        spark.stop()
+        return
+    
+    # Load RFM data from all buckets
+    rfm_required_cols = ["customer_id", "days_since_last_order"]
+    rfm_df, _ = load_data_from_all_buckets(
+        spark, INPUT_RFM_PATH, 
+        required_columns=rfm_required_cols,
+        filter_nulls=True
+    )
+    
+    if rfm_df is None:
+        print("⚠️  Training skipped: Failed to load RFM data")
+        spark.stop()
         return
     
     # Join datasets
     df = join_datasets(customers_df, rfm_df)
     if df is None:
-        print("✗ Training stopped: Failed to join datasets")
+        print("⚠️  Training skipped: Failed to join datasets")
+        spark.stop()
         return
     
     # Generate labels if not present
@@ -352,13 +398,15 @@ def main():
     all_required_cols = NUMERICAL_FEATURES + CATEGORICAL_FEATURES + [TARGET_COLUMN]
     is_valid, message = validate_dataset(df, all_required_cols)
     if not is_valid:
-        print(f"✗ Training stopped: {message}")
+        print(f"⚠️  Training skipped: {message}")
+        spark.stop()
         return
     
     # Check minimum labeled records
     labeled_count = df.filter(col(TARGET_COLUMN).isNotNull()).count()
-    if labeled_count < MIN_LABELED_RECORDS:
-        print(f"✗ Training stopped: Insufficient labeled data ({labeled_count} < {MIN_LABELED_RECORDS})")
+    if labeled_count < MIN_RECORDS:
+        print(f"⚠️  Training skipped: Insufficient labeled data ({labeled_count} < {MIN_RECORDS})")
+        spark.stop()
         return
     
     print(f"✓ Dataset validated: {labeled_count} labeled records")

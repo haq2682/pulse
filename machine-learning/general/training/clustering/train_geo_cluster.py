@@ -4,9 +4,19 @@ Clusters geographic regions by sales performance and market characteristics
 """
 
 import os
+import sys
 import findspark
 
 findspark.init()
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils.multi_bucket_loader import (
+    load_data_from_all_buckets,
+    validate_training_data,
+    get_general_model_output_path,
+    get_training_window,
+    GENERAL_MODEL_BUCKET
+)
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when, lit, coalesce, log1p, concat_ws
@@ -17,9 +27,10 @@ from datetime import datetime
 import json
 
 # Environment configuration
-BUCKET = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
+MODEL_NAME = "geo_cluster"
+INPUT_RELATIVE_PATH = "transformed/agg_city_aggregations.parquet"
+MODEL_OUTPUT_DIR = get_general_model_output_path("clustering", MODEL_NAME)
+MIN_RECORDS, MAX_RECORDS = get_training_window(MODEL_NAME)
 LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
 
 # Feature columns for geographic clustering
@@ -67,43 +78,54 @@ def create_spark_session():
 
 
 def load_and_validate_data(spark):
-    """Load geographic data from city-level aggregations"""
-    try:
-        # Load city-level data (most granular)
-        city_path = f"{INPUT_PATH}agg_city_aggregations.parquet"
-        print(f"Loading city data from: {city_path}")
-        df = spark.read.parquet(city_path)
+    """Load geographic data from city-level aggregations using multi-bucket loader"""
+    # Load city-level data from all buckets
+    required_cols = [
+        "country",
+        "state_province",
+        "city",
+        "total_customers",
+        "total_orders",
+        "total_revenue",
+    ]
 
-        print(f"Loaded {df.count()} cities/regions")
+    df, record_count = load_data_from_all_buckets(
+        spark,
+        INPUT_RELATIVE_PATH,
+        required_columns=required_cols,
+        filter_nulls=False
+    )
 
-        # Validate required columns
-        required_cols = [
-            "country",
-            "state_province",
-            "city",
-            "total_customers",
-            "total_orders",
-            "total_revenue",
-        ]
-
-        missing_cols = [c for c in required_cols if c not in df.columns]
-        if missing_cols:
-            print(f"ERROR: Missing required columns: {missing_cols}")
-            return None
-
-        # Check for non-null values
-        for col_name in ["total_customers", "total_orders", "total_revenue"]:
-            non_null_count = df.filter(col(col_name).isNotNull()).count()
-            if non_null_count == 0:
-                print(f"ERROR: Column '{col_name}' has all NULL values")
-                return None
-            print(f"Column '{col_name}': {non_null_count} non-null values")
-
-        return df
-
-    except Exception as e:
-        print(f"ERROR: Failed to load data: {str(e)}")
+    if df is None:
+        print("⚠️  No data available. Skipping training.")
         return None
+
+    print(f"Loaded {record_count} cities/regions from all buckets")
+
+    # Validate training data
+    is_valid, df = validate_training_data(
+        df, record_count, MIN_RECORDS, MAX_RECORDS, MODEL_NAME
+    )
+
+    if not is_valid:
+        print("⚠️  Training skipped due to insufficient data.")
+        return None
+
+    # Validate required columns exist
+    missing_cols = [c for c in required_cols if c not in df.columns]
+    if missing_cols:
+        print(f"⚠️  Training skipped - Missing required columns: {missing_cols}")
+        return None
+
+    # Check for non-null values
+    for col_name in ["total_customers", "total_orders", "total_revenue"]:
+        non_null_count = df.filter(col(col_name).isNotNull()).count()
+        if non_null_count == 0:
+            print(f"⚠️  Training skipped - Column '{col_name}' has all NULL values")
+            return None
+        print(f"Column '{col_name}': {non_null_count} non-null values")
+
+    return df
 
 
 def prepare_features(df):
@@ -303,17 +325,17 @@ def save_models(
     spark,
 ):
     """Save models to MinIO"""
-    print(f"\nSaving models to MinIO: {MODEL_OUTPUT_PATH}")
+    print(f"\nSaving models to MinIO: {MODEL_OUTPUT_DIR}")
 
     # Save preprocessing models
-    scaler_model.write().overwrite().save(f"{MODEL_OUTPUT_PATH}geographic_scaler")
-    pca_model.write().overwrite().save(f"{MODEL_OUTPUT_PATH}geographic_pca")
+    scaler_model.write().overwrite().save(f"{MODEL_OUTPUT_DIR}/geographic_scaler")
+    pca_model.write().overwrite().save(f"{MODEL_OUTPUT_DIR}/geographic_pca")
     print("Saved preprocessing models")
 
     # Save best K-Means
     best_kmeans = max(kmeans_metrics, key=lambda x: x["silhouette"])
     best_kmeans_model = next(m for m in kmeans_models if m["k"] == best_kmeans["k"])
-    best_kmeans_model["model"].write().overwrite().save(f"{MODEL_OUTPUT_PATH}geographic_kmeans")
+    best_kmeans_model["model"].write().overwrite().save(f"{MODEL_OUTPUT_DIR}/geographic_kmeans")
     print(f"Saved K-Means k={best_kmeans['k']} (silhouette={best_kmeans['silhouette']:.4f})")
 
     # Save best GMM if exists
@@ -321,7 +343,7 @@ def save_models(
     if gmm_metrics:
         best_gmm = max(gmm_metrics, key=lambda x: x["silhouette"])
         best_gmm_model = next(m for m in gmm_models if m["k"] == best_gmm["k"])
-        best_gmm_model["model"].write().overwrite().save(f"{MODEL_OUTPUT_PATH}geographic_gmm")
+        best_gmm_model["model"].write().overwrite().save(f"{MODEL_OUTPUT_DIR}/geographic_gmm")
         print(f"Saved GMM k={best_gmm['k']} (silhouette={best_gmm['silhouette']:.4f})")
     else:
         print("No valid GMM models to save")
@@ -330,7 +352,7 @@ def save_models(
     best_bkm = max(bkm_metrics, key=lambda x: x["silhouette"])
     best_bkm_model = next(m for m in bkm_models if m["k"] == best_bkm["k"])
     best_bkm_model["model"].write().overwrite().save(
-        f"{MODEL_OUTPUT_PATH}geographic_bisecting_kmeans"
+        f"{MODEL_OUTPUT_DIR}/geographic_bisecting_kmeans"
     )
     print(f"Saved Bisecting K-Means k={best_bkm['k']} (silhouette={best_bkm['silhouette']:.4f})")
 
@@ -354,7 +376,7 @@ def save_models(
 
     metrics_df = spark.createDataFrame([metrics_data])
     metrics_df.coalesce(1).write.mode("overwrite").json(
-        f"{MODEL_OUTPUT_PATH}geographic_metrics.json"
+        f"{MODEL_OUTPUT_DIR}/geographic_metrics.json"
     )
     print("Saved metrics")
 
@@ -369,14 +391,14 @@ def main():
     # Load data
     df = load_and_validate_data(spark)
     if df is None:
-        print("Training aborted")
+        print("⚠️  Training skipped due to data validation failure")
         spark.stop()
         return
 
     # Prepare features
     df = prepare_features(df)
     if df is None:
-        print("Training aborted")
+        print("⚠️  Training skipped due to insufficient data")
         spark.stop()
         return
 
@@ -414,7 +436,7 @@ def main():
     all_metrics = kmeans_metrics + gmm_metrics + bkm_metrics
 
     if not all_metrics:
-        print("ERROR: No valid models")
+        print("⚠️  Training skipped - No valid models")
         spark.stop()
         return
 

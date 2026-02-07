@@ -145,9 +145,9 @@ const Mapping = () => {
     return (
         <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
             {/* Breadcrumb and Step Indicator */}
-            <div className="max-w-6xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="max-w-6xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start gap-4">
                 <Breadcrumb items={breadcrumbItems} />
-                <Text className="text-sm text-gray-500 m-0 font-medium">
+                <Text className="text-sm text-gray-500 m-0 font-medium w-24 mt-4">
                     Step 4 of 4
                 </Text>
             </div>

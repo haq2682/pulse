@@ -105,7 +105,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/bitnami/postgresql
     networks:
       spark-network:
         ipv4_address: 10.5.0.5
@@ -246,6 +246,45 @@ services:
         ipv4_address: 10.5.0.11
     restart: always
     command: redis-server --appendonly yes
+
+  nifi:
+    image: apache/nifi:latest
+    container_name: nifi
+    depends_on:
+      - kafka
+      - zookeeper
+      - minio
+      - postgresql
+      - redis
+    ports:
+      - "8081:8080"   # NiFi UI
+      - "10000:10000" # Site-to-Site protocol port (optional)
+      - "8443:8443" # HTTPS port (optional)
+    environment:
+      NIFI_WEB_HTTP_PORT: 8080
+      NIFI_WEB_HTTP_HOST: 0.0.0.0
+      NIFI_WEB_HTTPS_PORT: 8443
+      NIFI_SENSITIVE_PROPS_KEY: nifi-sensitive-key
+      NIFI_SENSITIVE_PROPS_ALGORITHM: AES/GCM/NoPadding
+      NIFI_CLUSTER_IS_NODE: "false" # single-node NiFi
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DATABASE_NAME}
+      POSTGRES_SERVER: ${POSTGRES_SERVER}
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      SINGLE_USER_CREDENTIALS_USERNAME: admin
+      SINGLE_USER_CREDENTIALS_PASSWORD: adminadminadmin
+    volumes:
+      - nifi_data:/opt/nifi/nifi-current/data
+      - ./nifi/custom_processors:/opt/nifi/nifi-current/custom_processors # optional for custom scripts
+      - ./nifi/flows:/opt/nifi/nifi-current/flows # prebuilt flows (optional)
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.12
+    restart: always
 
 networks:
   spark-network:

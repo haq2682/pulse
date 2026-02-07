@@ -1,0 +1,458 @@
+{
+  "name": "Pulse API Polling Flow",
+  "description": "Polls external API endpoints and publishes to Kafka in canonical format",
+  "version": "1.0.0",
+  "created": "2026-02-05",
+  "processors": [
+    {
+      "name": "GenerateFlowFile",
+      "type": "org.apache.nifi.processors.standard.GenerateFlowFile",
+      "position": {"x": 100, "y": 100},
+      "properties": {
+        "Batch Size": "1",
+        "Data Format": "Text",
+        "Unique FlowFiles": "true",
+        "Custom Text": "{\"trigger\": \"api_poll\"}"
+      },
+      "scheduling": {
+        "strategy": "TIMER_DRIVEN",
+        "period": "10 sec"
+      },
+      "relationships": {
+        "success": "InvokeHTTP"
+      },
+      "notes": "Triggers API polling every 10 seconds. Adjust period based on API rate limits and data freshness requirements."
+    },
+    {
+      "name": "InvokeHTTP",
+      "type": "org.apache.nifi.processors.standard.InvokeHTTP",
+      "position": {"x": 100, "y": 250},
+      "properties": {
+        "HTTP Method": "GET",
+        "Remote URL": "${api.endpoint.url}",
+        "SSL Context Service": "",
+        "Connection Timeout": "30 sec",
+        "Read Timeout": "30 sec",
+        "Include Date Header": "false",
+        "Follow Redirects": "true",
+        "Attributes to Send": "",
+        "Basic Authentication Username": "${api.username}",
+        "Basic Authentication Password": "${api.password}",
+        "Penalize on \"No Retry\"": "false",
+        "Use Chunked Encoding": "false"
+      },
+      "relationships": {
+        "Response": "ValidateJSON",
+        "No Retry": "LogAttributeAndTerminate",
+        "Failure": "RetryFlowFile"
+      },
+      "notes": "Calls external API endpoint. Configure authentication if required."
+    },
+    {
+      "name": "ValidateJSON",
+      "type": "org.apache.nifi.processors.standard.ValidateJson",
+      "position": {"x": 100, "y": 400},
+      "properties": {
+        "Schema Access Strategy": "Use String Property",
+        "Schema Text": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"required\": [\"tables\"],\n  \"properties\": {\n    \"tables\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"required\": [\"table_name\", \"data\"],\n        \"properties\": {\n          \"table_name\": {\"type\": \"string\"},\n          \"data\": {\"type\": \"array\"}\n        }\n      }\n    }\n  }\n}"
+      },
+      "relationships": {
+        "valid": "EvaluateJsonPath",
+        "invalid": "LogInvalidAPIResponse"
+      },
+      "notes": "Validates API response format. See mapping/API_AND_FILE_INGESTION_GUIDE.md for expected format."
+    },
+    {
+      "name": "EvaluateJsonPath",
+      "type": "org.apache.nifi.processors.standard.EvaluateJsonPath",
+      "position": {"x": 100, "y": 550},
+      "properties": {
+        "Destination": "flowfile-content",
+        "Return Type": "json",
+        "Path Not Found Behavior": "warn",
+        "tables": "$.tables"
+      },
+      "relationships": {
+        "matched": "SplitJson_Tables",
+        "unmatched": "LogAttributeAndTerminate"
+      },
+      "notes": "Extracts tables array from API response."
+    },
+    {
+      "name": "SplitJson_Tables",
+      "type": "org.apache.nifi.processors.standard.SplitJson",
+      "position": {"x": 100, "y": 700},
+      "properties": {
+        "JsonPath Expression": "$.tables[*]",
+        "Null Value Representation": "empty string"
+      },
+      "relationships": {
+        "split": "ExtractTableName",
+        "original": "Terminate",
+        "failure": "LogAttributeAndRetry"
+      },
+      "notes": "Splits tables array into individual table objects."
+    },
+    {
+      "name": "ExtractTableName",
+      "type": "org.apache.nifi.processors.standard.EvaluateJsonPath",
+      "position": {"x": 100, "y": 850},
+      "properties": {
+        "Destination": "flowfile-attribute",
+        "Return Type": "auto-detect",
+        "table": "$.table_name",
+        "data": "$.data"
+      },
+      "relationships": {
+        "matched": "AddSourceMetadata",
+        "unmatched": "LogAttributeAndTerminate"
+      },
+      "notes": "Extracts table_name for routing."
+    },
+    {
+      "name": "AddSourceMetadata",
+      "type": "org.apache.nifi.processors.attributes.UpdateAttribute",
+      "position": {"x": 100, "y": 1000},
+      "properties": {
+        "source_type": "api",
+        "vendor": "custom",
+        "schema_version": "v1"
+      },
+      "relationships": {
+        "success": "JoltTransformJSON_ExtractData"
+      },
+      "notes": "Adds canonical message metadata."
+    },
+    {
+      "name": "JoltTransformJSON_ExtractData",
+      "type": "org.apache.nifi.processors.standard.JoltTransformJSON",
+      "position": {"x": 100, "y": 1150},
+      "properties": {
+        "Jolt Specification": "[\n  {\n    \"operation\": \"shift\",\n    \"spec\": {\n      \"data\": \"data\"\n    }\n  }\n]",
+        "Jolt Transform": "Chain"
+      },
+      "relationships": {
+        "success": "SplitJson_Data",
+        "failure": "LogAttributeAndRetry"
+      },
+      "notes": "Extracts data array from table object."
+    },
+    {
+      "name": "SplitJson_Data",
+      "type": "org.apache.nifi.processors.standard.SplitJson",
+      "position": {"x": 100, "y": 1300},
+      "properties": {
+        "JsonPath Expression": "$.data[*]",
+        "Null Value Representation": "empty string"
+      },
+      "relationships": {
+        "split": "JoltTransformJSON_ToCanonical",
+        "original": "Terminate",
+        "failure": "LogAttributeAndRetry"
+      },
+      "notes": "Splits data array into individual records."
+    },
+    {
+      "name": "JoltTransformJSON_ToCanonical",
+      "type": "org.apache.nifi.processors.standard.JoltTransformJSON",
+      "position": {"x": 100, "y": 1450},
+      "properties": {
+        "Jolt Specification": "[\n  {\n    \"operation\": \"shift\",\n    \"spec\": {\n      \"*\": \"payload.&\"\n    }\n  },\n  {\n    \"operation\": \"default\",\n    \"spec\": {\n      \"source_type\": \"${source_type}\",\n      \"vendor\": \"${vendor}\",\n      \"table\": \"${table}\",\n      \"schema_version\": \"${schema_version}\",\n      \"timestamp\": \"${now():format('yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\')}\"\n    }\n  }\n]",
+        "Jolt Transform": "Chain"
+      },
+      "relationships": {
+        "success": "RouteOnAttribute",
+        "failure": "LogAttributeAndRetry"
+      },
+      "notes": "Transforms to canonical Kafka message format."
+    },
+    {
+      "name": "RouteOnAttribute",
+      "type": "org.apache.nifi.processors.standard.RouteOnAttribute",
+      "position": {"x": 100, "y": 1600},
+      "properties": {
+        "Routing Strategy": "Route to Property name",
+        "customers": "${table:equals('customers')}",
+        "orders": "${table:equals('orders')}",
+        "products": "${table:equals('products')}",
+        "addresses": "${table:equals('addresses')}",
+        "cart_items": "${table:equals('cart_items')}",
+        "categories": "${table:equals('categories')}",
+        "customer_sessions": "${table:equals('customer_sessions')}",
+        "inventory": "${table:equals('inventory')}",
+        "marketing_campaigns": "${table:equals('marketing_campaigns')}",
+        "order_items": "${table:equals('order_items')}",
+        "payments": "${table:equals('payments')}",
+        "reviews": "${table:equals('reviews')}",
+        "shopping_cart": "${table:equals('shopping_cart')}",
+        "suppliers": "${table:equals('suppliers')}",
+        "wishlist": "${table:equals('wishlist')}"
+      },
+      "relationships": {
+        "customers": "PublishKafka_Customers",
+        "orders": "PublishKafka_Orders",
+        "products": "PublishKafka_Products",
+        "unmatched": "LogUnknownTable"
+      },
+      "notes": "Routes to appropriate Kafka topic based on table name. Add routing for all 15 canonical tables."
+    },
+    {
+      "name": "PublishKafka_Customers",
+      "type": "org.apache.nifi.processors.kafka.pubsub.PublishKafka_2_6",
+      "position": {"x": 500, "y": 1600},
+      "properties": {
+        "Kafka Brokers": "10.5.0.7:9092",
+        "Topic Name": "ecom.customers",
+        "Delivery Guarantee": "Best Effort",
+        "Compression Type": "snappy",
+        "Acks": "1"
+      },
+      "relationships": {
+        "success": "LogSuccess",
+        "failure": "RetryFlowFile"
+      },
+      "notes": "Publishes to ecom.customers. Duplicate for each table with corresponding topic."
+    },
+    {
+      "name": "PublishKafka_Orders",
+      "type": "org.apache.nifi.processors.kafka.pubsub.PublishKafka_2_6",
+      "position": {"x": 700, "y": 1600},
+      "properties": {
+        "Kafka Brokers": "10.5.0.7:9092",
+        "Topic Name": "ecom.orders",
+        "Delivery Guarantee": "Best Effort",
+        "Compression Type": "snappy",
+        "Acks": "1"
+      },
+      "relationships": {
+        "success": "LogSuccess",
+        "failure": "RetryFlowFile"
+      }
+    },
+    {
+      "name": "PublishKafka_Products",
+      "type": "org.apache.nifi.processors.kafka.pubsub.PublishKafka_2_6",
+      "position": {"x": 900, "y": 1600},
+      "properties": {
+        "Kafka Brokers": "10.5.0.7:9092",
+        "Topic Name": "ecom.products",
+        "Delivery Guarantee": "Best Effort",
+        "Compression Type": "snappy",
+        "Acks": "1"
+      },
+      "relationships": {
+        "success": "LogSuccess",
+        "failure": "RetryFlowFile"
+      },
+      "notes": "Continue adding PublishKafka processors for all 15 tables."
+    },
+    {
+      "name": "LogSuccess",
+      "type": "org.apache.nifi.processors.standard.LogAttribute",
+      "position": {"x": 700, "y": 1800},
+      "properties": {
+        "Log Level": "info",
+        "Attributes to Log": "table",
+        "Log Payload": "false"
+      },
+      "relationships": {
+        "success": "End"
+      }
+    },
+    {
+      "name": "LogInvalidAPIResponse",
+      "type": "org.apache.nifi.processors.standard.LogAttribute",
+      "position": {"x": 400, "y": 400},
+      "properties": {
+        "Log Level": "error",
+        "Attributes to Log": ".*",
+        "Log Payload": "true"
+      },
+      "relationships": {
+        "success": "Terminate"
+      },
+      "notes": "Logs invalid API responses. Configure alerts on this processor."
+    },
+    {
+      "name": "LogUnknownTable",
+      "type": "org.apache.nifi.processors.standard.LogAttribute",
+      "position": {"x": 400, "y": 1600},
+      "properties": {
+        "Log Level": "warn",
+        "Attributes to Log": "table",
+        "Log Payload": "true"
+      },
+      "relationships": {
+        "success": "Terminate"
+      },
+      "notes": "Logs unknown table names. Review and add to canonical schema if valid."
+    },
+    {
+      "name": "LogAttributeAndTerminate",
+      "type": "org.apache.nifi.processors.standard.LogAttribute",
+      "position": {"x": 400, "y": 700},
+      "properties": {
+        "Log Level": "warn",
+        "Attributes to Log": ".*"
+      },
+      "relationships": {
+        "success": "Terminate"
+      }
+    },
+    {
+      "name": "LogAttributeAndRetry",
+      "type": "org.apache.nifi.processors.standard.LogAttribute",
+      "position": {"x": 400, "y": 1000},
+      "properties": {
+        "Log Level": "warn",
+        "Attributes to Log": ".*"
+      },
+      "relationships": {
+        "success": "RetryFlowFile"
+      }
+    },
+    {
+      "name": "RetryFlowFile",
+      "type": "org.apache.nifi.processors.standard.RetryFlowFile",
+      "position": {"x": 400, "y": 1150},
+      "properties": {
+        "Retry Attribute": "retry.count",
+        "Maximum Retries": "3",
+        "Penalize Retries": "true",
+        "Reuse Mode": "Fail on Reuse"
+      },
+      "relationships": {
+        "retry": "InvokeHTTP",
+        "retries_exceeded": "TerminateWithAlert",
+        "failure": "TerminateWithAlert"
+      }
+    },
+    {
+      "name": "TerminateWithAlert",
+      "type": "org.apache.nifi.processors.standard.LogAttribute",
+      "position": {"x": 400, "y": 1300},
+      "properties": {
+        "Log Level": "error",
+        "Attributes to Log": ".*",
+        "Log Payload": "true"
+      },
+      "relationships": {
+        "success": "Terminate"
+      },
+      "notes": "Configure alerts on this processor."
+    }
+  ],
+  "controllerServices": [],
+  "variables": {
+    "api.endpoint.url": "http://external-api.com/api/data",
+    "api.username": "",
+    "api.password": "",
+    "api.poll.interval": "10 sec"
+  },
+  "setup_instructions": [
+    "1. Update api.endpoint.url variable with your API endpoint",
+    "2. Configure authentication in InvokeHTTP if required",
+    "3. Adjust GenerateFlowFile scheduling period based on API rate limits",
+    "4. For each PublishKafka processor, verify Kafka topic matches canonical schema",
+    "5. Start all processors",
+    "6. Verify API is being polled: Check InvokeHTTP processor stats",
+    "7. Verify Kafka messages: docker exec -it kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic ecom.customers --from-beginning"
+  ],
+  "api_format": {
+    "description": "Expected API response format (see mapping/API_AND_FILE_INGESTION_GUIDE.md)",
+    "example": {
+      "tables": [
+        {
+          "table_name": "customers",
+          "data": [
+            {
+              "customer_id": "1",
+              "name": "Alice",
+              "email": "alice@example.com"
+            },
+            {
+              "customer_id": "2",
+              "name": "Bob",
+              "email": "bob@example.com"
+            }
+          ]
+        },
+        {
+          "table_name": "orders",
+          "data": [
+            {
+              "order_id": "101",
+              "customer_id": "1",
+              "amount": 250
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "canonical_tables": [
+    "addresses",
+    "cart_items",
+    "categories",
+    "customer_sessions",
+    "customers",
+    "inventory",
+    "marketing_campaigns",
+    "order_items",
+    "orders",
+    "payments",
+    "products",
+    "reviews",
+    "shopping_cart",
+    "suppliers",
+    "wishlist"
+  ],
+  "kafka_topics": {
+    "addresses": "ecom.addresses",
+    "cart_items": "ecom.cart_items",
+    "categories": "ecom.categories",
+    "customer_sessions": "ecom.customer_sessions",
+    "customers": "ecom.customers",
+    "inventory": "ecom.inventory",
+    "marketing_campaigns": "ecom.marketing_campaigns",
+    "order_items": "ecom.order_items",
+    "orders": "ecom.orders",
+    "payments": "ecom.payments",
+    "products": "ecom.products",
+    "reviews": "ecom.reviews",
+    "shopping_cart": "ecom.shopping_cart",
+    "suppliers": "ecom.suppliers",
+    "wishlist": "ecom.wishlist"
+  },
+  "monitoring": {
+    "key_metrics": [
+      "InvokeHTTP - API call success rate",
+      "ValidateJSON - Validation success rate",
+      "PublishKafka - Messages published per poll",
+      "RetryFlowFile - Retry count"
+    ],
+    "alerts": [
+      "Alert if InvokeHTTP failure rate > 10%",
+      "Alert if ValidateJSON invalid rate > 5%",
+      "Alert if PublishKafka failure rate > 5%",
+      "Alert if RetryFlowFile retries_exceeded > 0"
+    ]
+  },
+  "rate_limiting": {
+    "note": "Add ControlRate processor after InvokeHTTP if API has rate limits",
+    "example": {
+      "Rate Control Criteria": "flowfile count",
+      "Maximum Rate": "10",
+      "Time Duration": "1 min"
+    }
+  },
+  "performance_tuning": {
+    "recommendations": [
+      "Adjust polling interval based on data freshness requirements",
+      "Add ControlRate processor to respect API rate limits",
+      "Configure Kafka compression (snappy or gzip)",
+      "For high-volume APIs, increase concurrent tasks on processors",
+      "Consider batching records before Kafka publish for better throughput"
+    ]
+  }
+}

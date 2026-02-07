@@ -1,22 +1,27 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { useLocation } from 'react-router-dom';
 import { RadioButton } from 'primereact/radiobutton';
 import Breadcrumb from '../Breadcrumb';
 import Heading from '@/components/global/Typography/Heading';
 import Text from '@/components/global/Typography/Text';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
+import { useAuth } from '@/context/AuthContext';
+import axiosInstance from '@/services/api/axiosInstance';
 
 const DataType = () => {
     const navigate = useNavigate();
-    const [selectedDataSource, setSelectedDataSource] = useState('files');
+    const [selectedDataSource, setSelectedDataSource] = useState('batch');
+    const { user } = useAuth();
+    const [error, setError] = useState('');
+    const { pathname } = useLocation();
     const [loading, setLoading] = useState(false);
 
     const breadcrumbItems = [
         {
             label: 'Business',
             active: false,
-            clickable: true,
-            onClick: () => navigate('/onboarding/business')
+            clickable: false
         },
         {
             label: 'Data Type',
@@ -37,13 +42,13 @@ const DataType = () => {
 
     const dataSourceOptions = [
         {
-            id: 'files',
+            id: 'batch',
             title: 'Files (CSV/Excel/Parquet)',
             description: 'Upload transaction, customer, product, inventory files.',
             icon: 'pi-file'
         },
         {
-            id: 'database',
+            id: 'db',
             title: 'Database',
             description: 'Connect to a read-only schema or warehouse tables.',
             icon: 'pi-database'
@@ -60,20 +65,29 @@ const DataType = () => {
         e.preventDefault();
         setLoading(true);
 
-        // TODO: Add your API call here
-        setTimeout(() => {
+        try {
+            const response = await axiosInstance.post('/onboarding/select-data-type', {
+                userId: user.user_id,
+                dataType: selectedDataSource,
+            });
+            if(response.status === 200) {
+                navigate(`/onboarding/connect/${pathname.split('/')[3]}`);
+            }
+        }
+        catch (e) {
+            setError(e.message || 'An unexpected error occurred. Please try again.');
+        }
+        finally {
             setLoading(false);
-            // Navigate to next step based on selection
-            navigate('/onboarding/connect');
-        }, 1500);
+        }
     };
 
     return (
         <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
             {/* Breadcrumb and Step Indicator */}
-            <div className="max-w-6xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="max-w-6xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start gap-4">
                 <Breadcrumb items={breadcrumbItems} />
-                <Text className="text-sm text-gray-500 m-0 font-medium">
+                <Text className="text-sm text-gray-500 m-0 font-medium w-24 mt-4">
                     Step 2 of 4
                 </Text>
             </div>
@@ -145,6 +159,11 @@ const DataType = () => {
                                 className="px-8"
                             />
                         </div>
+                        {error && (
+                            <div className="mt-4 text-red-600 text-center">
+                                {error}
+                            </div>
+                        )}
                     </form>
                 </div>
             </div>

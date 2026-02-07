@@ -9,6 +9,7 @@ from kafka.admin import NewTopic
 from kafka.errors import TopicAlreadyExistsError
 from rapidfuzz import fuzz, process
 from ..canonical_message import create_message, VALID_TABLES
+from .api_validation import validate_api_data, get_expected_format_example
 
 KAFKA_BOOTSTRAP = "10.5.0.7:9092"
 POLL_INTERVAL = 10
@@ -83,11 +84,22 @@ def create_producer(bootstrap: str) -> KafkaProducer:
 
 
 def fetch_data(api_url: str) -> Optional[Dict]:
-    """Fetch data from API"""
+    """Fetch and validate data from API"""
     try:
         response = requests.get(api_url, timeout=10)
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+        
+        # Validate data format
+        try:
+            validated_data = validate_api_data(data)
+            # Convert back to dict for processing
+            return validated_data.model_dump()
+        except ValueError as e:
+            print(f"API data validation error: {e}")
+            print(f"Expected format: {json.dumps(get_expected_format_example(), indent=2)}")
+            return None
+            
     except Exception as e:
         print(f"API error: {e}")
         return None
@@ -95,8 +107,10 @@ def fetch_data(api_url: str) -> Optional[Dict]:
 
 def process_table(producer: KafkaProducer, table_data: Dict, api_url: str) -> int:
     """Process and send table data to Kafka, return row count"""
-    name = table_data.get("name")
+    # Use table_name (validated by pydantic)
+    name = table_data.get("table_name")
     if not name:
+        print("Warning: table_name missing in table data")
         return 0
 
     canonical = map_table_name(name)

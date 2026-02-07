@@ -281,7 +281,7 @@ async def google_callback(code: str, state: str, db=Depends(get_db)):
         session_id = session_service.create_session(user_id, google_email, username)
 
         # 5. Redirect to Frontend Dashboard
-        redirect_url = f"{settings.frontend_url}/analytics"
+        redirect_url = f"{settings.frontend_url}/analytics{'/' + business[0] if business else ''}"
         
         response = RedirectResponse(url=redirect_url)
         

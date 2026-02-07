@@ -25,6 +25,8 @@ mysql-connector-python
 pyodbc
 
 redis
+aioredis
+pycountry
 
 pydantic
 pydantic-settings
@@ -45,3 +47,6 @@ google-generativeai
 python-dotenv
 fastparquet
 pyarrow
+hdbscan
+scikit-learn
+scikit-learn-extra

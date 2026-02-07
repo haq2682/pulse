@@ -1,4 +1,5 @@
 import os
+import sys
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when, concat_ws, length, regexp_replace, lower, trim, lit
 from pyspark.ml.feature import (
@@ -14,11 +15,23 @@ import findspark
 
 findspark.init()
 
-# Configuration
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_reviews.parquet"
-MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/review_sentiment"
-MIN_LABELED_RECORDS = 100
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils.multi_bucket_loader import (
+    load_data_from_all_buckets,
+    validate_training_data,
+    get_general_model_output_path,
+    get_training_window,
+    GENERAL_MODEL_BUCKET
+)
+
+# Configuration - General models output to pulse-bucket-1
+MODEL_NAME = "review_sentiment"
+INPUT_RELATIVE_PATH = "transformed/agg_reviews.parquet"
+MODEL_OUTPUT_DIR = get_general_model_output_path("classification", MODEL_NAME)
+
+# Training record window (min, max records for training)
+MIN_RECORDS, MAX_RECORDS = get_training_window(MODEL_NAME)
 
 TARGET_COLUMN = "review_sentiment"
 
@@ -438,6 +451,9 @@ def main():
     print("=" * 60)
     print("Review Sentiment Classification - Training Pipeline")
     print("=" * 60)
+    print(f"Training window: {MIN_RECORDS} - {MAX_RECORDS} records")
+    print(f"Model output: {MODEL_OUTPUT_DIR}")
+    print("=" * 60)
     
     # CONFIGURATION: Set to True to add label noise for more realistic training
     ADD_LABEL_NOISE = True  # <-- Set to True to fix 100% accuracy issue
@@ -445,17 +461,36 @@ def main():
     
     spark = create_spark_session()
     
-    # Load data (single table - no joins needed)
-    df = load_data(spark, INPUT_PATH)
+    # Load data from all buckets
+    print("\nStep 1: Loading data from all MinIO buckets...")
+    df, record_count = load_data_from_all_buckets(
+        spark,
+        INPUT_RELATIVE_PATH,
+        required_columns=["review_id", "review_title", "review_desc", "rating"],
+        filter_nulls=False
+    )
+    
     if df is None:
-        print("✗ Training stopped: Failed to load data")
+        print("⚠️  No data available. Skipping training.")
+        spark.stop()
+        return
+    
+    # Validate training data window
+    is_valid, df = validate_training_data(
+        df, record_count, MIN_RECORDS, MAX_RECORDS, MODEL_NAME
+    )
+    
+    if not is_valid:
+        print("⚠️  Training skipped due to insufficient data.")
+        spark.stop()
         return
     
     # Validate basic columns exist
     basic_required_cols = ["review_id", "review_title", "review_desc", "rating"]
     is_valid, message = validate_dataset(df, basic_required_cols)
     if not is_valid:
-        print(f"✗ Training stopped: {message}")
+        print(f"⚠️  Training skipped: {message}")
+        spark.stop()
         return
     
     # Generate labels if not present
@@ -478,8 +513,9 @@ def main():
     
     # Check minimum labeled records
     labeled_count = df.filter(col(TARGET_COLUMN).isNotNull()).count()
-    if labeled_count < MIN_LABELED_RECORDS:
-        print(f"✗ Training stopped: Insufficient labeled data ({labeled_count} < {MIN_LABELED_RECORDS})")
+    if labeled_count < MIN_RECORDS:
+        print(f"⚠️  Training skipped: Insufficient labeled data ({labeled_count} < {MIN_RECORDS})")
+        spark.stop()
         return
     
     print(f"✓ Dataset validated: {labeled_count} labeled reviews")

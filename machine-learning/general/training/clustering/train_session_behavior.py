@@ -4,9 +4,19 @@ Clusters sessions by user behavior patterns with stability validation
 """
 
 import os
+import sys
 import findspark
 
 findspark.init()
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils.multi_bucket_loader import (
+    load_data_from_all_buckets,
+    validate_training_data,
+    get_general_model_output_path,
+    get_training_window,
+    GENERAL_MODEL_BUCKET
+)
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when, lit, coalesce, log1p, expr, count
@@ -20,9 +30,10 @@ from sklearn.metrics import adjusted_rand_score
 import hdbscan
 
 # Environment configuration
-BUCKET = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
+MODEL_NAME = "session_behavior"
+INPUT_RELATIVE_PATH = "transformed/agg_customer_sessions.parquet"
+MODEL_OUTPUT_DIR = get_general_model_output_path("clustering", MODEL_NAME)
+MIN_RECORDS, MAX_RECORDS = get_training_window(MODEL_NAME)
 LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
 
 # Numeric features for session behavior
@@ -67,18 +78,31 @@ def create_spark_session():
 
 
 def load_and_validate_data(spark):
-    """Load session data"""
-    try:
-        sessions_path = f"{INPUT_PATH}agg_customer_sessions.parquet"
-        print(f"Loading sessions from: {sessions_path}")
-        df = spark.read.parquet(sessions_path)
-        
-        print(f"Loaded {df.count()} sessions")
-        return df
+    """Load session data using multi-bucket loader"""
+    df, record_count = load_data_from_all_buckets(
+        spark,
+        INPUT_RELATIVE_PATH,
+        required_columns=["session_id", "session_duration_minutes", "pages_viewed", 
+                         "products_viewed", "items_added_to_cart", "conversion_flag"],
+        filter_nulls=False
+    )
 
-    except Exception as e:
-        print(f"ERROR: Failed to load data: {str(e)}")
+    if df is None:
+        print("⚠️  No data available. Skipping training.")
         return None
+
+    print(f"Loaded {record_count} sessions from all buckets")
+
+    # Validate training data
+    is_valid, df = validate_training_data(
+        df, record_count, MIN_RECORDS, MAX_RECORDS, MODEL_NAME
+    )
+
+    if not is_valid:
+        print("⚠️  Training skipped due to insufficient data.")
+        return None
+
+    return df
 
 
 def prepare_features(df):
@@ -496,7 +520,7 @@ def save_enhanced_metrics(all_metrics, cluster_profiles, spark):
     
     metrics_df = spark.createDataFrame([metrics_data])
     metrics_df.coalesce(1).write.mode("overwrite").json(
-        f"{MODEL_OUTPUT_PATH}session_behavior_metrics.json"
+        f"{MODEL_OUTPUT_DIR}/session_behavior_metrics.json"
     )
     
     print(f"✅ Saved enhanced metrics to MinIO")
@@ -511,11 +535,13 @@ def main():
 
     df = load_and_validate_data(spark)
     if df is None:
+        print("⚠️  Training skipped due to data validation failure")
         spark.stop()
         return
 
     df = prepare_features(df)
     if df is None:
+        print("⚠️  Training skipped due to insufficient data")
         spark.stop()
         return
 
@@ -561,9 +587,9 @@ def main():
 
     # Save models
     print("\nSaving models...")
-    scaler_model.write().overwrite().save(f"{MODEL_OUTPUT_PATH}session_behavior_scaler")
-    pca_model.write().overwrite().save(f"{MODEL_OUTPUT_PATH}session_behavior_pca")
-    best_model["model"].write().overwrite().save(f"{MODEL_OUTPUT_PATH}session_behavior_kmeans")
+    scaler_model.write().overwrite().save(f"{MODEL_OUTPUT_DIR}/session_behavior_scaler")
+    pca_model.write().overwrite().save(f"{MODEL_OUTPUT_DIR}/session_behavior_pca")
+    best_model["model"].write().overwrite().save(f"{MODEL_OUTPUT_DIR}/session_behavior_kmeans")
     
     save_enhanced_metrics(all_metrics, cluster_profiles, spark)
 

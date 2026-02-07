@@ -46,7 +46,7 @@ fi
 
 echo ""
 echo "Creating ecommerce topics..."
-topics=("ecom.addresses" "ecom.categories" "ecom.customer_sessions" "ecom.customers" "ecom.inventory" "ecom.marketing_campaigns" "ecom.order_items" "ecom.orders" "ecom.payments" "ecom.products" "ecom.reviews" "ecom.shopping_cart" "ecom.suppliers" "ecom.wishlist")
+topics=("ecom.addresses" "ecom.categories" "ecom.customer_sessions" "ecom.customers" "ecom.inventory" "ecom.marketing_campaigns" "ecom.order_items" "ecom.orders" "ecom.payments" "ecom.products" "ecom.reviews" "ecom.shopping_cart" "ecom.cart_items" "ecom.suppliers" "ecom.wishlist")
 for topic in "${topics[@]}"; do
     if docker exec kafka kafka-topics --create --topic "$topic" --bootstrap-server 10.5.0.7:9092 --partitions 1 --replication-factor 1 2>&1 | grep -q "already exists"; then
         echo "✓ $topic exists"
