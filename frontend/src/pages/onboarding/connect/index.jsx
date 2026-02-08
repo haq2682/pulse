@@ -9,6 +9,9 @@ import CustomLink from '@/components/global/Typography/CustomLink';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import axiosInstance from '@/services/api/axiosInstance';
 import { useAuth } from '@/context/AuthContext';
+import { ProgressSpinner } from 'primereact/progressspinner';
+import { Dialog } from 'primereact/dialog';
+import { Message } from 'primereact/message';
 
 const CHUNK_SIZE = 5 * 1024 * 1024;
 // const NIFI_UPLOAD_URL = import.meta.env.VITE_NIFI_UPLOAD_URL || 'http://10.5.0.12:8082/upload';
@@ -23,6 +26,7 @@ const Connect = () => {
     const [uploadedFiles, setUploadedFiles] = useState([]);
     const [uploadProgress, setUploadProgress] = useState({});
     const [loading, setLoading] = useState(false);
+    const [mappingLoading, setMappingLoading] = useState(false);
     const [ingestionTypeLoading, setIngestionTypeLoading] = useState(true);
     const [ingestionType, setIngestionType] = useState('');
     const [errors, setErrors] = useState({db: '', api: '', form: ''});
@@ -432,264 +436,290 @@ const Connect = () => {
     const isFormValid = uploadedFiles.length > 0 || databaseUri.trim() !== '' || apiEndpoint.trim() !== '';
 
     return (
-        <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
-            <div className="max-w-6xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start gap-4">
-                <Breadcrumb items={breadcrumbItems} />
-                <Text className="text-sm text-gray-500 m-0 font-medium w-24 mt-4">
-                    Step 3 of 4
-                </Text>
-            </div>
+        <>
+            <Dialog visible={mappingLoading} modal closable={false}
+                style={{ width: '50vw' }} breakpoints={{ '960px': '75vw', '641px': '100vw' }}>
+                <div className="flex items-center justify-center flex-col my-20">
+                    <ProgressSpinner />
+                    <Text className="text-xl text-black font-medium m-0 mt-4 z-10">We are mapping your data to our database. Please wait...</Text>
+                </div>
+            </Dialog>
+            <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
+                <div className="max-w-6xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start gap-4">
+                    <Breadcrumb items={breadcrumbItems} />
+                    <Text className="text-sm text-gray-500 m-0 font-medium w-24 mt-4">
+                        Step 3 of 4
+                    </Text>
+                </div>
 
-            <div className="max-w-6xl mx-auto">
-                <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 lg:p-10">
-                    {
-                        ingestionTypeLoading ? (
-                            <div className="mb-6">
-                                <Text className="text-base text-gray-600 m-0 text-center">
-                                    Loading...
-                                </Text>
-                            </div>
-                        ) : ( 
-                            <>                        
+                <div className="max-w-6xl mx-auto">
+                    <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 lg:p-10">
+                        {
+                            ingestionTypeLoading ? (
                                 <div className="mb-6">
-                                    <Heading level={2} gradient={false} className="text-2xl md:text-3xl mb-2">
-                                        Connect your data
-                                    </Heading>
-                                    <Text className="text-sm md:text-base text-gray-600 m-0">
-                                        Follow the guidelines and submit to validate your data.
-                                    </Text>
+                                    <ProgressSpinner />
                                 </div>
+                            ) : ( 
+                                <>                        
+                                    <div className="mb-6">
+                                        <Heading level={2} gradient={false} className="text-2xl md:text-3xl mb-2">
+                                            Connect your data
+                                        </Heading>
+                                        <Text className="text-sm md:text-base text-gray-600 m-0">
+                                            Follow the guidelines and submit to validate your data.
+                                        </Text>
+                                    </div>
 
-                                <div className="mb-8 bg-gray-50 rounded-lg p-6">
-                                    <Heading level={3} black={true} className="text-lg font-bold mb-4" gradient={false}>
-                                        Guidelines:
-                                    </Heading>
-                                    <ul className="space-y-3">
-                                        <li className="flex items-start gap-2">
-                                            <Text className="text-sm text-gray-700 m-0 flex-1">
-                                                • The data you provide will determine the scope of analytics, forecasts, and predictions generated by the system. You can upload any finite number of files.
-                                            </Text>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <Text className="text-sm text-gray-700 m-0 flex-1">
-                                                • A set of generalized data attributes is defined for the system.
-                                            </Text>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <Text className="text-sm text-gray-700 m-0 flex-1">
-                                                • If your dataset contains all of these attributes, regardless of their exact names, the system will perform all analytics it is programmed for.
-                                            </Text>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <Text className="text-sm text-gray-700 m-0 flex-1">
-                                                • The system will first attempt to automatically identify the names of data attributes.
-                                            </Text>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <Text className="text-sm text-gray-700 m-0 flex-1">
-                                                • If a specific data field is not detected, the system will request its mapping in the next section.
-                                            </Text>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <Text className="text-sm text-gray-700 m-0 flex-1">
-                                                • If you skip the mapping of any field, the system will proceed with analytics, insights, and forecasts based on the available data attributes.
-                                            </Text>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <Text className="text-sm text-gray-700 m-0 flex-1">
-                                                • Any analytics or forecasts requiring unmapped or missing attributes will be omitted.
-                                            </Text>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <Text className="text-sm text-gray-700 m-0 flex-1">
-                                                • The generalized data attributes can be downloaded from{' '}
-                                                <CustomLink href="#" gradient={true}>
-                                                    here
-                                                </CustomLink>
-                                            </Text>
-                                        </li>
-                                    </ul>
-                                </div>
+                                    <div className="mb-8 bg-gray-50 rounded-lg p-6">
+                                        <Heading level={3} black={true} className="text-lg font-bold mb-4" gradient={false}>
+                                            Guidelines:
+                                        </Heading>
+                                        <ul className="space-y-3">
+                                            <li className="flex items-start gap-2">
+                                                <Text className="text-sm text-gray-700 m-0 flex-1">
+                                                    • The data you provide will determine the scope of analytics, forecasts, and predictions generated by the system. You can upload any finite number of files, each of max 5 GB.
+                                                </Text>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <Text className="text-sm text-gray-700 m-0 flex-1">
+                                                    • A set of generalized data attributes is defined for the system.
+                                                </Text>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <Text className="text-sm text-gray-700 m-0 flex-1">
+                                                    • If your dataset contains all of these attributes, regardless of their exact names, the system will perform all analytics it is programmed for.
+                                                </Text>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <Text className="text-sm text-gray-700 m-0 flex-1">
+                                                    • The system will first attempt to automatically identify the names of data attributes.
+                                                </Text>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <Text className="text-sm text-gray-700 m-0 flex-1">
+                                                    • If a specific data field is not detected, the system will request its mapping in the next section.
+                                                </Text>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <Text className="text-sm text-gray-700 m-0 flex-1">
+                                                    • If you skip the mapping of any field, the system will proceed with analytics, insights, and forecasts based on the available data attributes.
+                                                </Text>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <Text className="text-sm text-gray-700 m-0 flex-1">
+                                                    • Any analytics or forecasts requiring unmapped or missing attributes will be omitted.
+                                                </Text>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <Text className="text-sm text-gray-700 m-0 flex-1">
+                                                    • The guidelines on data preparation can be found from{' '}
+                                                    <CustomLink href="#" gradient={true}>
+                                                        here
+                                                    </CustomLink>
+                                                </Text>
+                                            </li>
+                                            <li className="flex items-start gap-2 mt-5">
+                                                <Message
+                                                    style={{
+                                                        border: 'solid #00C597',
+                                                        borderWidth: '0 0 0 6px',
+                                                        color: '#00C597'
+                                                    }}
+                                                    className="w-full text-left flex justify-start items-start gap-3"
+                                                    severity="success"
+                                                    content={
+                                                        <>
+                                                            <div className="font-bold text-left my-4">
+                                                                <div className="ml-2">NOTE: Please make sure you thoroughly read the guidelines before you proceed.</div>
+                                                            </div>
+                                                        </>
+                                                    }
+                                                />
+                                            </li>
+                                        </ul>
+                                    </div>
 
-                                <form onSubmit={handleContinue} className="space-y-6">
-                                    {
-                                        ingestionType === 'batch' && (
-                                            <>
-                                                <div className="space-y-4">
-                                                    <input
-                                                        ref={fileInputRef}
-                                                        type="file"
-                                                        multiple
-                                                        accept=".csv,.xlsx,.xls,.parquet,.json"
-                                                        onChange={handleFileInputChange}
-                                                        className="hidden"
-                                                    />
-                                                    
-                                                    <div
-                                                        onClick={handleClickUploadArea}
-                                                        onDragOver={handleDragOver}
-                                                        onDragLeave={handleDragLeave}
-                                                        onDrop={handleDrop}
-                                                        className={`border-2 border-dashed rounded-xl p-8 md:p-12 text-center transition-colors cursor-pointer ${
-                                                            isDragging 
-                                                                ? 'border-[var(--color-g2)] bg-blue-50' 
-                                                                : 'border-gray-300 hover:border-[var(--color-g2)]'
-                                                        }`}
-                                                    >
-                                                        <div className="flex flex-col items-center gap-3">
-                                                            <i className="pi pi-cloud-upload text-4xl text-gray-400"></i>
-                                                            <Text className="text-gray-500 m-0">
-                                                                Click to Browse or Drag and Drop Files Here
-                                                            </Text>
-                                                            <Text className="text-xs text-gray-400 m-0">
-                                                                Supported formats: CSV, XLSX, XLS, Parquet, JSON
-                                                            </Text>
+                                    <form onSubmit={handleContinue} className="space-y-6">
+                                        {
+                                            ingestionType === 'batch' && (
+                                                <>
+                                                    <div className="space-y-4">
+                                                        <input
+                                                            ref={fileInputRef}
+                                                            type="file"
+                                                            multiple
+                                                            accept=".csv,.xlsx,.xls,.parquet,.json"
+                                                            onChange={handleFileInputChange}
+                                                            className="hidden"
+                                                        />
+                                                        
+                                                        <div
+                                                            onClick={handleClickUploadArea}
+                                                            onDragOver={handleDragOver}
+                                                            onDragLeave={handleDragLeave}
+                                                            onDrop={handleDrop}
+                                                            className={`border-2 border-dashed rounded-xl p-8 md:p-12 text-center transition-colors cursor-pointer ${
+                                                                isDragging 
+                                                                    ? 'border-[var(--color-g2)] bg-blue-50' 
+                                                                    : 'border-gray-300 hover:border-[var(--color-g2)]'
+                                                            }`}
+                                                        >
+                                                            <div className="flex flex-col items-center gap-3">
+                                                                <i className="pi pi-cloud-upload text-4xl text-gray-400"></i>
+                                                                <Text className="text-gray-500 m-0">
+                                                                    Click to Browse or Drag and Drop Files Here
+                                                                </Text>
+                                                                <Text className="text-xs text-gray-400 m-0">
+                                                                    Supported formats: CSV, XLSX, XLS, Parquet, JSON <br/>
+                                                                    Max file size: 5 GB
+                                                                </Text>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                    
-                                                    {uploadedFiles.length > 0 && (
-                                                        <div className="flex flex-wrap gap-6 py-4">
-                                                            {uploadedFiles.map((file) => {
-                                                                const progress = uploadProgress[file.fileId];
-                                                                const isUploading = progress !== undefined && progress < 100;
+                                                        
+                                                        {uploadedFiles.length > 0 && (
+                                                            <div className="flex flex-wrap gap-6 py-4">
+                                                                {uploadedFiles.map((file) => {
+                                                                    const progress = uploadProgress[file.fileId];
+                                                                    const isUploading = progress !== undefined && progress < 100;
 
-                                                                return (
-                                                                    <div
-                                                                        key={file.fileId}
-                                                                        className="flex flex-col items-center gap-2 relative group w-32"
-                                                                    >
-                                                                        {!isUploading && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => handleFileRemove(file)}
-                                                                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                                                                                title="Remove file"
-                                                                            >
-                                                                                <i className="pi pi-times text-xs"></i>
-                                                                            </button>
-                                                                        )}
-                                                                        <div className="relative">
-                                                                            <i className={`pi pi-file text-3xl ${isUploading ? 'text-gray-400' : 'text-[var(--color-g2)]'}`}></i>
+                                                                    return (
+                                                                        <div
+                                                                            key={file.fileId}
+                                                                            className="flex flex-col items-center gap-2 relative group w-32"
+                                                                        >
+                                                                            {!isUploading && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleFileRemove(file)}
+                                                                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                                                                    title="Remove file"
+                                                                                >
+                                                                                    <i className="pi pi-times text-xs"></i>
+                                                                                </button>
+                                                                            )}
+                                                                            <div className="relative">
+                                                                                <i className={`pi pi-file text-3xl ${isUploading ? 'text-gray-400' : 'text-[var(--color-g2)]'}`}></i>
+                                                                                {isUploading && (
+                                                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                                                        <i className="pi pi-spin pi-spinner text-[var(--color-g2)]"></i>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                            <Text className="text-sm text-gray-700 m-0 text-center max-w-[120px] truncate">
+                                                                                {file.name}
+                                                                            </Text>
+                                                                            <Text className="text-xs text-gray-500 m-0">
+                                                                                {(file.size / 1024).toFixed(2)} KB
+                                                                            </Text>
+                                                                            
                                                                             {isUploading && (
-                                                                                <div className="absolute inset-0 flex items-center justify-center">
-                                                                                    <i className="pi pi-spin pi-spinner text-[var(--color-g2)]"></i>
+                                                                                <div className="w-full">
+                                                                                    <ProgressBar 
+                                                                                        value={progress} 
+                                                                                        style={{ height: '6px' }}
+                                                                                        showValue={false}
+                                                                                    />
+                                                                                    <Text className="text-xs text-[var(--color-g2)] m-0 text-center mt-1">
+                                                                                        {progress}%
+                                                                                    </Text>
+                                                                                </div>
+                                                                            )}
+                                                                            
+                                                                            {progress === 100 && (
+                                                                                <div className="absolute top-0 right-0 bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                                                                                    <i className="pi pi-check text-xs"></i>
                                                                                 </div>
                                                                             )}
                                                                         </div>
-                                                                        <Text className="text-sm text-gray-700 m-0 text-center max-w-[120px] truncate">
-                                                                            {file.name}
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </>
+                                            )
+                                        }
+                                        {
+                                            (ingestionType === 'db' || ingestionType === 'api') && (
+                                                <>
+                                                    <div className="space-y-2">
+                                                        <label
+                                                            htmlFor="databaseUri"
+                                                            className="block text-sm font-medium text-[var(--color-text-primary)]"
+                                                        >
+                                                            {ingestionType === 'db' ? 'Database URI' : 'API Endpoint'}
+                                                        </label>
+                                                        {
+                                                            ingestionType === 'db' ? (
+                                                                <>
+                                                                    <InputText
+                                                                        id="databaseUri"
+                                                                        value={databaseUri}
+                                                                        onChange={(e) => setDatabaseUri(e.target.value)}
+                                                                        placeholder="Enter your Database URI here"
+                                                                        className="w-full"
+                                                                        disabled={loading}
+                                                                        invalid={errors.db ? true : false}
+                                                                    />
+                                                                    {errors.db && (<>
+                                                                        <Text className="text-red-500 text-sm">
+                                                                            {errors.db}
                                                                         </Text>
-                                                                        <Text className="text-xs text-gray-500 m-0">
-                                                                            {(file.size / 1024).toFixed(2)} KB
+                                                                    </>)}
+                                                                    <Text className="text-gray-500 text-sm">
+                                                                        URI Format: <Text className="font-mono">postgres://username:password@host:port/database</Text><br />
+                                                                        <Text className="text-xs">Port is optional.</Text>
+                                                                    </Text>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <InputText
+                                                                        id="apiEndpoint"
+                                                                        value={apiEndpoint}
+                                                                        onChange={(e) => setApiEndpoint(e.target.value)}
+                                                                        placeholder="Enter your API Endpoint here"
+                                                                        className="w-full"
+                                                                        disabled={loading}
+                                                                        invalid={errors.api ? true : false}
+                                                                    />
+                                                                    {errors.api && (<>
+                                                                        <Text className="text-red-500 text-sm">
+                                                                            {errors.api}
                                                                         </Text>
-                                                                        
-                                                                        {isUploading && (
-                                                                            <div className="w-full">
-                                                                                <ProgressBar 
-                                                                                    value={progress} 
-                                                                                    style={{ height: '6px' }}
-                                                                                    showValue={false}
-                                                                                />
-                                                                                <Text className="text-xs text-[var(--color-g2)] m-0 text-center mt-1">
-                                                                                    {progress}%
-                                                                                </Text>
-                                                                            </div>
-                                                                        )}
-                                                                        
-                                                                        {progress === 100 && (
-                                                                            <div className="absolute top-0 right-0 bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
-                                                                                <i className="pi pi-check text-xs"></i>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </>
-                                        )
-                                    }
-                                    {
-                                        (ingestionType === 'db' || ingestionType === 'api') && (
-                                            <>
-                                                <div className="space-y-2">
-                                                    <label
-                                                        htmlFor="databaseUri"
-                                                        className="block text-sm font-medium text-[var(--color-text-primary)]"
-                                                    >
-                                                        {ingestionType === 'db' ? 'Database URI' : 'API Endpoint'}
-                                                    </label>
-                                                    {
-                                                        ingestionType === 'db' ? (
-                                                            <>
-                                                                <InputText
-                                                                    id="databaseUri"
-                                                                    value={databaseUri}
-                                                                    onChange={(e) => setDatabaseUri(e.target.value)}
-                                                                    placeholder="Enter your Database URI here"
-                                                                    className="w-full"
-                                                                    disabled={loading}
-                                                                    invalid={errors.db ? true : false}
-                                                                />
-                                                                {errors.db && (<>
-                                                                    <Text className="text-red-500 text-sm">
-                                                                        {errors.db}
+                                                                    </>)}
+                                                                    <Text className="text-gray-500 text-sm">
+                                                                        API Format: <Text className="font-mono">https://api.example.com:port/path</Text><br />
+                                                                        <Text className="text-xs">Port and path are optional. "http" or "https" are required.</Text>
                                                                     </Text>
-                                                                </>)}
-                                                                <Text className="text-gray-500 text-sm">
-                                                                    URI Format: <Text className="font-mono">postgres://username:password@host:port/database</Text><br />
-                                                                    <Text className="text-xs">Port is optional.</Text>
-                                                                </Text>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <InputText
-                                                                    id="apiEndpoint"
-                                                                    value={apiEndpoint}
-                                                                    onChange={(e) => setApiEndpoint(e.target.value)}
-                                                                    placeholder="Enter your API Endpoint here"
-                                                                    className="w-full"
-                                                                    disabled={loading}
-                                                                    invalid={errors.api ? true : false}
-                                                                />
-                                                                {errors.api && (<>
-                                                                    <Text className="text-red-500 text-sm">
-                                                                        {errors.api}
-                                                                    </Text>
-                                                                </>)}
-                                                                <Text className="text-gray-500 text-sm">
-                                                                    API Format: <Text className="font-mono">https://api.example.com:port/path</Text><br />
-                                                                    <Text className="text-xs">Port and path are optional. "http" or "https" are required.</Text>
-                                                                </Text>
-                                                            </>
-                                                        )
-                                                    }
-                                                </div>
-                                            </>
-                                        )
-                                    }
-                                    <div className="flex justify-end pt-4">
-                                        <PrimaryButton
-                                            label="Continue"
-                                            onClick={handleContinue}
-                                            loading={loading}
-                                            disabled={loading || !isFormValid}
-                                            className="px-8"
-                                        />
-                                    </div>
-                                    {errors.form && (
-                                        <Text className="text-red-500 text-sm mt-2 text-center">
-                                            {errors.form}
-                                        </Text>
-                                    )}
-                                </form>
-                            </>
-                        )
-                    }
+                                                                </>
+                                                            )
+                                                        }
+                                                    </div>
+                                                </>
+                                            )
+                                        }
+                                        <div className="flex justify-end pt-4">
+                                            <PrimaryButton
+                                                label="Continue"
+                                                onClick={handleContinue}
+                                                loading={loading}
+                                                disabled={loading || !isFormValid}
+                                                className="px-8"
+                                            />
+                                        </div>
+                                        {errors.form && (
+                                            <Text className="text-red-500 text-sm mt-2 text-center">
+                                                {errors.form}
+                                            </Text>
+                                        )}
+                                    </form>
+                                </>
+                            )
+                        }
+                    </div>
                 </div>
             </div>
-        </div>
+        </>
     );
 };
 

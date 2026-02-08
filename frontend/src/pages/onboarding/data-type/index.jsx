@@ -8,6 +8,7 @@ import Text from '@/components/global/Typography/Text';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import { useAuth } from '@/context/AuthContext';
 import axiosInstance from '@/services/api/axiosInstance';
+import { Message } from 'primereact/message';
 
 const DataType = () => {
     const navigate = useNavigate();
@@ -43,8 +44,8 @@ const DataType = () => {
     const dataSourceOptions = [
         {
             id: 'batch',
-            title: 'Files (CSV/Excel/Parquet)',
-            description: 'Upload transaction, customer, product, inventory files.',
+            title: 'Files (CSV/Excel/Parquet/JSON)',
+            description: 'Upload your E-Commerce Business data in bulk via files.',
             icon: 'pi-file'
         },
         {
@@ -134,6 +135,22 @@ const DataType = () => {
                         <Text className="text-sm md:text-base text-gray-600 m-0">
                             Bring data via files, a database connection, or a REST API.
                         </Text>
+                        <Message
+                            style={{
+                                border: 'solid #00C597',
+                                borderWidth: '0 0 0 6px',
+                                color: '#00C597'
+                            }}
+                            className="w-full text-left flex justify-start items-start gap-3 mt-4"
+                            severity="success"
+                            content={
+                                <>
+                                    <div className="font-bold text-left my-4">
+                                        <div className="ml-2">NOTE: Batch Processing can process files up to 5 GB. If you have even larger data, then consider either API or Database URI option</div>
+                                    </div>
+                                </>
+                            }
+                        />
                     </div>
 
                     {/* Data Source Options */}
