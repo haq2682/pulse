@@ -248,7 +248,10 @@ services:
     command: redis-server --appendonly yes
 
   nifi:
-    image: apache/nifi:latest
+    build:
+      context: .
+      dockerfile: .docker/nifi/Dockerfile
+    image: nifi:latest
     container_name: nifi
     depends_on:
       - kafka
@@ -261,6 +264,15 @@ services:
       - "10000:10000" # Site-to-Site protocol port (optional)
       - "8443:8443" # HTTPS port (optional)
     environment:
+      NIFI_JVM_HEAP_INIT: 8g
+      NIFI_JVM_HEAP_MAX: 16g
+      JAVA_OPTS: >-
+        -Xms8g
+        -Xmx16g
+        -XX:+UseG1GC
+        -XX:MaxGCPauseMillis=500
+        -XX:InitiatingHeapOccupancyPercent=45
+        -XX:G1HeapRegionSize=16m
       NIFI_WEB_HTTP_PORT: 8080
       NIFI_WEB_HTTP_HOST: 0.0.0.0
       NIFI_WEB_HTTPS_PORT: 8443
@@ -284,6 +296,33 @@ services:
     networks:
       spark-network:
         ipv4_address: 10.5.0.12
+    restart: always
+
+  nginx:
+    build:
+      context: .
+      dockerfile: .docker/nginx/Dockerfile
+    image: nginx:latest
+    container_name: nginx
+    env_file:
+      - .env
+    environment:
+      - NGINX_MODE=${NGINX_MODE:-development}
+      - NGINX_DOMAIN=${NGINX_DOMAIN:-localhost}
+      - NGINX_HTTP_PORT=${NGINX_HTTP_PORT:-8082}
+      - NGINX_HTTPS_PORT=${NGINX_HTTPS_PORT:-9443}
+    ports:
+      - "${NGINX_HTTP_PORT:-8082}:80"      # HTTP (dev) or redirect (prod)
+      - "${NGINX_HTTPS_PORT:-9443}:443"    # HTTPS (prod) or unused (dev)
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.13
+    depends_on:
+      - nifi
     restart: always
 
 networks:

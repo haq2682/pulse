@@ -316,6 +316,19 @@ async def cancel_onboarding(request: Request, db=Depends(get_db)):
         return {"status": 200}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+@router.get("/get-current-step")
+async def get_current_step(userId: str, db=Depends(get_db)):
+    try:
+        if not userId:
+            raise HTTPException(status_code=400, detail="Authenticated User is required")
+        onboarding = db.execute(text("SELECT current_step FROM onboarding WHERE user_id = :user_id"), {"user_id": userId})
+        onboarding_record = onboarding.fetchone()
+        if not onboarding_record:
+            raise HTTPException(status_code=404, detail="Onboarding record not found")
+        return {"status": 200, "currentStep": onboarding_record[0]}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/api/currencies")
 async def currencies(query: str = Query("")):

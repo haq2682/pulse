@@ -63,6 +63,26 @@ CREATE TABLE uploaded_files (
     FOREIGN KEY (business_id) REFERENCES businesses(business_id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS nifi_schemas (
+    schema_name VARCHAR(255) PRIMARY KEY,
+    schema_text TEXT NOT NULL,
+    version INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert default schema for pulse data
+INSERT INTO nifi_schemas (schema_name, schema_text) VALUES
+('pulse_schema', '{
+  "type": "record",
+  "name": "PulseData",
+  "fields": [
+    {"name": "id", "type": ["null", "string"], "default": null},
+    {"name": "timestamp", "type": ["null", "long"], "default": null}
+  ]
+}')
+ON CONFLICT (schema_name) DO NOTHING;
+
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN

@@ -43,6 +43,37 @@ const Mapping = () => {
         },
     ];
 
+    const fetchCurrentStep = async () => {
+        try {
+            const response = await axiosInstance.get(`/onboarding/get-current-step?userId=${user.user_id}`);
+            const currentStep = response.data.currentStep;
+
+            if (currentStep === 'business') {
+                navigate(`/onboarding/business/${pathname.split('/')[3]}`);
+            }
+            else if (currentStep === 'data-type') {
+                navigate(`/onboarding/data-type/${pathname.split('/')[3]}`);
+            }
+            else if (currentStep === 'connect') {
+                navigate(`/onboarding/connect/${pathname.split('/')[3]}`);
+            }
+            else if (currentStep === 'mapping') {
+                return;
+            }
+            else {
+                navigate(`/onboarding/connect/${pathname.split('/')[3]}`);
+            }
+        }
+
+        catch (e) {
+            setError(e.message || 'An error occurred while fetching onboarding status. Please try again.');
+        }
+    }
+
+    useEffect(() => {
+        fetchCurrentStep();
+    }, []);
+
     const fetchMappingData = async () => {
         setDataLoading(true);
 

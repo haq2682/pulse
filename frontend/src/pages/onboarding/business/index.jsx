@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { InputText } from 'primereact/inputtext';
 import { Dropdown } from 'primereact/dropdown';
 import Breadcrumb from '../Breadcrumb';
@@ -50,6 +50,37 @@ const AddBusiness = () => {
         },
     ];
 
+    const fetchCurrentStep = async () => {
+        try {
+            const response = await axiosInstance.get(`/onboarding/get-current-step?userId=${user.user_id}`);
+            const currentStep = response.data.currentStep;
+
+            if (currentStep === 'business') {
+                return;
+            }
+            else if (currentStep === 'data-type') {
+                navigate(`/onboarding/data-type/${pathname.split('/')[3]}`);
+            }
+            else if (currentStep === 'connect') {
+                navigate(`/onboarding/connect/${pathname.split('/')[3]}`);
+            }
+            else if (currentStep === 'mapping') {
+                navigate(`/onboarding/mapping/${pathname.split('/')[3]}`);
+            }
+            else {
+                navigate(`/onboarding/business/${pathname.split('/')[3]}`);
+            }
+        }
+
+        catch (e) {
+            setErrors((prev) => ({ ...prev, form: e.message || 'An error occurred while fetching onboarding status. Please try again.' }));
+        }
+    }
+
+    useEffect(() => {
+        fetchCurrentStep();
+    }, []);
+
     const handleContinue = async (e) => {
         e.preventDefault();
         setErrors({form: '', businessName: '', businessCurrency: '', businessRegion: ''});
@@ -84,7 +115,7 @@ const AddBusiness = () => {
         }
 
         try {
-            const response = await axiosInstance.post('/onboarding/create-business', {
+            await axiosInstance.post('/onboarding/create-business', {
                 userId: user.user_id,
                 businessName,
                 businessCurrency: currency,

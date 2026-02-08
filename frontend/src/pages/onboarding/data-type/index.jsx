@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useLocation } from 'react-router-dom';
 import { RadioButton } from 'primereact/radiobutton';
@@ -60,6 +60,37 @@ const DataType = () => {
             icon: 'pi-cloud'
         }
     ];
+
+    const fetchCurrentStep = async () => {
+        try {
+            const response = await axiosInstance.get(`/onboarding/get-current-step?userId=${user.user_id}`);
+            const currentStep = response.data.currentStep;
+
+            if (currentStep === 'business') {
+                navigate(`/onboarding/business/${pathname.split('/')[3]}`);
+            }
+            else if (currentStep === 'data-type') {
+                return;
+            }
+            else if (currentStep === 'connect') {
+                navigate(`/onboarding/connect/${pathname.split('/')[3]}`);
+            }
+            else if (currentStep === 'mapping') {
+                navigate(`/onboarding/mapping/${pathname.split('/')[3]}`);
+            }
+            else {
+                navigate(`/onboarding/data-type/${pathname.split('/')[3]}`);
+            }
+        }
+
+        catch (e) {
+            setError(e.message || 'An error occurred while fetching onboarding status. Please try again.');
+        }
+    }
+
+    useEffect(() => {
+        fetchCurrentStep();
+    }, []);
 
     const handleContinue = async (e) => {
         e.preventDefault();

@@ -11,11 +11,14 @@ import axiosInstance from '@/services/api/axiosInstance';
 import { useAuth } from '@/context/AuthContext';
 
 const CHUNK_SIZE = 5 * 1024 * 1024;
+// const NIFI_UPLOAD_URL = import.meta.env.VITE_NIFI_UPLOAD_URL || 'http://10.5.0.12:8082/upload';
+const NIFI_UPLOAD_URL = 'http://localhost:8082/upload';
 
 const Connect = () => {
     const navigate = useNavigate();
     const [databaseUri, setDatabaseUri] = useState('');
     const [apiEndpoint, setApiEndpoint] = useState('');
+    const [businessId, setBusinessId] = useState('');
     const { user } = useAuth();
     const [uploadedFiles, setUploadedFiles] = useState([]);
     const [uploadProgress, setUploadProgress] = useState({});
@@ -49,7 +52,35 @@ const Connect = () => {
         },
     ];
 
+    const fetchCurrentStep = async () => {
+        try {
+            const response = await axiosInstance.get(`/onboarding/get-current-step?userId=${user.user_id}`);
+            const currentStep = response.data.currentStep;
+
+            if (currentStep === 'business') {
+                navigate(`/onboarding/business/${pathname.split('/')[3]}`);
+            }
+            else if (currentStep === 'data-type') {
+                navigate(`/onboarding/data-type/${pathname.split('/')[3]}`);
+            }
+            else if (currentStep === 'connect') {
+                return;
+            }
+            else if (currentStep === 'mapping') {
+                navigate(`/onboarding/mapping/${pathname.split('/')[3]}`);
+            }
+            else {
+                navigate(`/onboarding/connect/${pathname.split('/')[3]}`);
+            }
+        }
+
+        catch (e) {
+            setError(e.message || 'An error occurred while fetching onboarding status. Please try again.');
+        }
+    }
+
     useEffect(() => {
+        fetchCurrentStep();
         fetchIngestionType();
         fetchUploadedFiles();
     }, []);
@@ -74,45 +105,97 @@ const Connect = () => {
         }
     };
 
-    const uploadFileInChunks = async (file, fileId) => {
-        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    // const uploadFileInChunks = async (file, fileId) => {
+    //     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+    //     try {
+    //         for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+    //             const start = chunkIndex * CHUNK_SIZE;
+    //             const end = Math.min(start + CHUNK_SIZE, file.size);
+    //             const chunk = file.slice(start, end);
+
+    //             const formData = new FormData();
+    //             formData.append('chunk', chunk);
+    //             formData.append('chunkIndex', chunkIndex);
+    //             formData.append('totalChunks', totalChunks);
+    //             formData.append('fileId', fileId);
+    //             formData.append('fileName', file.name);
+    //             formData.append('fileSize', file.size);
+    //             formData.append('fileType', file.type);
+    //             formData.append('userId', user.user_id);
+
+    //             await axiosInstance.post('/onboarding/upload-chunk', formData, {
+    //                 headers: { 'Content-Type': 'multipart/form-data' }
+    //             });
+
+    //             const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+    //             setUploadProgress(prev => ({ ...prev, [fileId]: progress }));
+    //         }
+
+    //         setUploadedFiles(prev => prev.map(f => 
+    //             f.fileId === fileId ? { ...f, persisted: true } : f
+    //         ));
+
+    //         setTimeout(() => {
+    //             setUploadProgress(prev => {
+    //                 const newProgress = { ...prev };
+    //                 delete newProgress[fileId];
+    //                 return newProgress;
+    //             });
+    //         }, 1000);
+
+    //     } catch (error) {
+    //         console.error('Upload error:', error);
+    //         setUploadedFiles(prev => prev.filter(f => f.fileId !== fileId));
+    //         setUploadProgress(prev => {
+    //             const newProgress = { ...prev };
+    //             delete newProgress[fileId];
+    //             return newProgress;
+    //         });
+    //         throw error;
+    //     }
+    // };
+
+    const uploadFileToNiFi = async (file, fileId) => {
+        const formData = new FormData();
+        formData.append('file', file);  // Only send the file
 
         try {
-            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-                const start = chunkIndex * CHUNK_SIZE;
-                const end = Math.min(start + CHUNK_SIZE, file.size);
-                const chunk = file.slice(start, end);
+            const response = await axiosInstance.post(NIFI_UPLOAD_URL, formData, {
+                headers: { 
+                    'Content-Type': 'multipart/form-data',
+                    'Accept': 'application/json',
+                    // ✅ Send metadata as HTTP headers
+                    'X-File-Id': fileId,
+                    'X-User-Id': user.user_id,
+                    'X-Business-Id': businessId
+                },
+                baseURL: '',
+                withCredentials: false,
+                onUploadProgress: (progressEvent) => {
+                    if (progressEvent.total) {
+                        const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                        setUploadProgress(prev => ({ ...prev, [fileId]: progress }));
+                    }
+                },
+                timeout: 1800000,
+            });
 
-                const formData = new FormData();
-                formData.append('chunk', chunk);
-                formData.append('chunkIndex', chunkIndex);
-                formData.append('totalChunks', totalChunks);
-                formData.append('fileId', fileId);
-                formData.append('fileName', file.name);
-                formData.append('fileSize', file.size);
-                formData.append('fileType', file.type);
-                formData.append('userId', user.user_id);
+            if (response.status === 200 || response.status === 202) {
+                setUploadedFiles(prev => prev.map(f =>
+                    f.fileId === fileId ? { ...f, persisted: true } : f
+                ));
 
-                await axiosInstance.post('/onboarding/upload-chunk', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
+                setTimeout(() => {
+                    setUploadProgress(prev => {
+                        const newProgress = { ...prev };
+                        delete newProgress[fileId];
+                        return newProgress;
+                    });
+                }, 1000);
 
-                const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
-                setUploadProgress(prev => ({ ...prev, [fileId]: progress }));
+                return response.data;
             }
-
-            setUploadedFiles(prev => prev.map(f => 
-                f.fileId === fileId ? { ...f, persisted: true } : f
-            ));
-
-            setTimeout(() => {
-                setUploadProgress(prev => {
-                    const newProgress = { ...prev };
-                    delete newProgress[fileId];
-                    return newProgress;
-                });
-            }, 1000);
-
         } catch (error) {
             console.error('Upload error:', error);
             setUploadedFiles(prev => prev.filter(f => f.fileId !== fileId));
@@ -121,10 +204,9 @@ const Connect = () => {
                 delete newProgress[fileId];
                 return newProgress;
             });
-            throw error;
+            throw new Error(error.response?.data?.message || error.message || 'Upload failed');
         }
     };
-
     const validateFile = (file) => {
         const allowedExtensions = ['csv', 'xlsx', 'xls', 'parquet', 'json'];
         const fileName = file.name.toLowerCase();
@@ -132,9 +214,54 @@ const Connect = () => {
         return allowedExtensions.includes(fileExtension);
     };
 
+    // const handleFileSelect = async (files) => {
+    //     const fileArray = Array.isArray(files) ? files : Array.from(files);
+        
+    //     const validFiles = fileArray.filter(file => {
+    //         if (!validateFile(file)) {
+    //             console.warn(`File ${file.name} has invalid format`);
+    //             return false;
+    //         }
+    //         return true;
+    //     });
+
+    //     if (validFiles.length === 0) {
+    //         setErrors(prev => ({ ...prev, form: 'Please select valid file formats (CSV, XLSX, XLS, Parquet, JSON)' }));
+    //         return;
+    //     }
+
+    //     const newFiles = validFiles.filter(file => {
+    //         return !uploadedFiles.some(f => f.name === file.name && f.size === file.size);
+    //     });
+
+    //     for (const file of newFiles) {
+    //         const fileId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${file.name}`;
+    //         const fileObj = {
+    //             fileId,
+    //             name: file.name,
+    //             size: file.size,
+    //             type: file.type,
+    //             persisted: false
+    //         };
+            
+    //         setUploadedFiles(prev => [...prev, fileObj]);
+    //         setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
+            
+    //         uploadFileInChunks(file, fileId).catch(err => {
+    //             setErrors(prev => ({ ...prev, form: `Failed to upload ${file.name}` }));
+    //         });
+    //     }
+
+    //     setErrors(prev => ({ ...prev, form: '' }));
+        
+    //     if (fileInputRef.current) {
+    //         fileInputRef.current.value = '';
+    //     }
+    // };
+
     const handleFileSelect = async (files) => {
         const fileArray = Array.isArray(files) ? files : Array.from(files);
-        
+
         const validFiles = fileArray.filter(file => {
             if (!validateFile(file)) {
                 console.warn(`File ${file.name} has invalid format`);
@@ -161,17 +288,18 @@ const Connect = () => {
                 type: file.type,
                 persisted: false
             };
-            
+
             setUploadedFiles(prev => [...prev, fileObj]);
             setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
-            
-            uploadFileInChunks(file, fileId).catch(err => {
-                setErrors(prev => ({ ...prev, form: `Failed to upload ${file.name}` }));
+
+            // Use NiFi upload instead of chunked upload
+            uploadFileToNiFi(file, fileId).catch(err => {
+                setErrors(prev => ({ ...prev, form: `Failed to upload ${file.name}: ${err.message}` }));
             });
         }
 
         setErrors(prev => ({ ...prev, form: '' }));
-        
+
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -289,6 +417,7 @@ const Connect = () => {
             const response = await axiosInstance.get('/onboarding/get-data-type', { params: { userId: user.user_id } });
             if (response.status === 200) {
                 setIngestionType(response.data.dataType);
+                setBusinessId(response.data.businessId || '');
             }
         }
         catch (e) {
