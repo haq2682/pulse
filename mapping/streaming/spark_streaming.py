@@ -53,17 +53,62 @@ def create_spark_session() -> SparkSession:
 
 def get_canonical_schema() -> StructType:
     """
-    Define canonical message schema with optional CDC operation field.
+    Schema supporting both canonical and Debezium message formats.
     The operation field is used for database ingestion with CDC support.
     """
     return StructType([
-        StructField("source_type", StringType()),
-        StructField("vendor", StringType()),
-        StructField("table", StringType()),
-        StructField("schema_version", StringType()),
-        StructField("operation", StringType(), True),  # CDC operation: 'c', 'u', 'd', 'r' (optional, nullable)
-        StructField("payload", MapType(StringType(), StringType()))
+        # Canonical format fields
+        StructField("source_type", StringType(), True),
+        StructField("vendor", StringType(), True),
+        StructField("table", StringType(), True),
+        StructField("schema_version", StringType(), True),
+        StructField("operation", StringType(), True),
+        StructField("payload", MapType(StringType(), StringType()), True),
+
+        # Debezium format fields
+        StructField("op", StringType(), True),
+        StructField("before", MapType(StringType(), StringType()), True),
+        StructField("after", MapType(StringType(), StringType()), True),
+        StructField("source", MapType(StringType(), StringType()), True),
     ])
+
+
+def normalize_message_row(row):
+    """
+    Normalize row to canonical format.
+    Handles both canonical and Debezium formats.
+    """
+    if row is None:
+        return None
+
+    # Check if Debezium format (has 'op' field)
+    if row.get("op") is not None:
+        # Debezium format - transform it
+        op_map = {"c": "c", "u": "u", "d": "d", "r": "r"}
+
+        source = row.get("source", {})
+        if isinstance(source, str):
+            import json
+            source = json.loads(source)
+
+        return {
+            "source_type": "db",
+            "vendor": "debezium",
+            "table": source.get("table"),
+            "schema_version": "v1",
+            "operation": op_map.get(row.get("op"), "c"),
+            "payload": row.get("after") or row.get("before") or {}
+        }
+    else:
+        # Already canonical format
+        return {
+            "source_type": row.get("source_type"),
+            "vendor": row.get("vendor"),
+            "table": row.get("table"),
+            "schema_version": row.get("schema_version"),
+            "operation": row.get("operation", "c"),
+            "payload": row.get("payload", {})
+        }
 
 
 def read_kafka_stream(spark: SparkSession) -> DataFrame:
@@ -95,37 +140,54 @@ def read_kafka_stream(spark: SparkSession) -> DataFrame:
 def extract_table_dataframes(batch_df: DataFrame) -> tuple:
     """
     Extract DataFrames per table from batch with CDC operation info.
-    
+    Handles both canonical and Debezium message formats.
+
     Returns:
         tuple: (all_dataframes dict, operation dict mapping table to CDC operation)
     """
     if batch_df.rdd.isEmpty():
         return {}, {}
-    
-    table_names = [row["table"] for row in batch_df.select("table").distinct().collect()]
+
+    # Normalize messages to canonical format
+    normalized_rdd = batch_df.rdd.map(lambda row: normalize_message_row(row.asDict()))
+
+    # Convert to DataFrame
+    normalized_schema = StructType([
+        StructField("source_type", StringType()),
+        StructField("vendor", StringType()),
+        StructField("table", StringType()),
+        StructField("schema_version", StringType()),
+        StructField("operation", StringType()),
+        StructField("payload", MapType(StringType(), StringType()))
+    ])
+
+    normalized_df = batch_df.sparkSession.createDataFrame(normalized_rdd, normalized_schema)
+
+    table_names = [row["table"] for row in normalized_df.select("table").distinct().collect()]
     all_dataframes = {}
     operations = {}
-    
+
     for table_name in table_names:
-        table_df = batch_df.filter(col("table") == table_name)
-        
+        table_df = normalized_df.filter(col("table") == table_name)
+
         # Get payload keys and operation from first row
         sample = table_df.select("payload", "operation").limit(1).collect()
+
         if not sample:
             continue
-        
+
         payload_keys = list(sample[0]["payload"].keys())
-        operation = sample[0]["operation"] if sample[0]["operation"] else "c"  # Default to create
-        
+        operation = sample[0]["operation"] if sample[0]["operation"] else "c"
+
         # Extract payload columns
         select_exprs = [col("payload").getItem(k).alias(k) for k in payload_keys]
         payload_df = table_df.select(*select_exprs)
-        
+
         # Use naming convention expected by map.py
         df_name = f"{table_name}_df"
         all_dataframes[df_name] = payload_df
         operations[table_name] = operation
-    
+
     return all_dataframes, operations
 
 

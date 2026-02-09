@@ -1,7 +1,19 @@
 """
-Database ingestion service: DB URI → Kafka
-Auto-discovers tables, maps to canonical schema, creates topics dynamically.
-Frontend will provide database URI - for now using dummy variable.
+DEPRECATED: Polling-based ingestion - use Debezium for real-time CDC
+
+This service polls the database every 10 seconds which:
+- Has 10-30 second latency
+- Cannot detect DELETE operations
+- Cannot distinguish CREATE from UPDATE
+- The operation="c" parameter is hardcoded and meaningless
+
+For real-time CDC with accurate operations, use Debezium instead.
+See: streaming/ingestion/debezium_connector_manager.py
+
+Keep this service only for:
+1. Non-critical tables where 10s lag is acceptable
+2. Databases that don't support CDC
+3. Initial bulk loading before switching to CDC
 
 IMPORTANT: Before using this service with an external database, the database
 administrator must complete the prerequisites outlined in mapping/README.md,
