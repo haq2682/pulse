@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-Unified entry point for the mapping phase with 4 modes:
+Unified entry point for the mapping phase with 3 modes:
 1. batch: Load from MinIO ingested folder -> map -> save to mapped folder
-2. db: Ingest from database URI (polling) -> map -> save to mapped folder
+2. db: Ingest from database URI via Debezium CDC -> map -> save to mapped folder
 3. api: Ingest from API endpoint -> map -> save to mapped folder
-4. debezium: True real-time CDC via Debezium -> map -> save to mapped folder
 
 Configuration:
     Edit the CONFIG section below to set the mode and parameters.
@@ -26,15 +25,21 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # For now, edit these values directly in the code
 
 CONFIG = {
-    # Mode: "batch", "db", "api", or "debezium"
+    # Mode: "batch", "db", or "api"
     "mode": "batch",
 
     # Common settings
     "bucket_name": "pulse-bucket-1",  # MinIO bucket name
 
     # DB mode settings (only used when mode="db")
-    "db_uri": "postgresql://user:pass@localhost:5432/ecommerce",  # Database connection URI
-    "db_poll_interval": 10,  # Polling interval in seconds
+    # Uses Debezium CDC for true real-time ingestion from database transaction log
+    "db_host": "localhost",
+    "db_port": 5432,
+    "db_name": "ecommerce",
+    "db_user": "debezium_user",
+    "db_password": "debezium_pass",
+    "db_type": "postgres",  # "postgres" or "mysql"
+    "db_tables": ["orders", "payments", "inventory", "shopping_cart", "cart_items"],
 
     # API mode settings (only used when mode="api")
     "api_url": "http://localhost:5000/api/data",  # API endpoint URL
@@ -42,15 +47,6 @@ CONFIG = {
 
     # Optional: Kafka bootstrap servers (defaults to env var if None)
     "kafka_bootstrap": None,  # e.g., "10.5.0.7:9092" or None to use env var
-
-    # Debezium mode settings (only used when mode="debezium")
-    "debezium_db_host": "localhost",
-    "debezium_db_port": 5432,
-    "debezium_db_name": "ecommerce",
-    "debezium_db_user": "debezium_user",
-    "debezium_db_password": "debezium_pass",
-    "debezium_db_type": "postgres",  # or "mysql"
-    "debezium_tables": ["orders", "payments", "inventory", "shopping_cart", "cart_items"],
 }
 
 # ============================================================================
@@ -113,85 +109,74 @@ def run_batch_mode(bucket_name: str):
         sys.exit(1)
 
 
-def run_db_mode(db_uri: str, bucket_name: str, poll_interval: int = 10, kafka_bootstrap: Optional[str] = None):
+def run_db_mode(config: dict):
     """
-    DB mode: Ingest from database URI -> Kafka -> Spark Streaming -> mapped folder.
-    
-    This mode runs two processes:
-    1. DB ingestion service (ingests DB changes to Kafka)
-    2. Spark streaming consumer (consumes from Kafka, maps, saves to MinIO)
-    
+    DB mode: Deploy Debezium CDC connector, stream real-time changes to Kafka,
+    consume via Spark Streaming -> mapped folder.
+
+    Uses Debezium to capture database changes directly from the transaction log
+    (WAL for PostgreSQL, binlog for MySQL), providing true real-time CDC with
+    accurate operation types (create, update, delete).
+
     Args:
-        db_uri: Database connection URI
-        bucket_name: Name of the MinIO bucket
-        poll_interval: Polling interval in seconds
-        kafka_bootstrap: Kafka bootstrap servers (defaults to env var)
+        config: Configuration dictionary with db_* settings
     """
+    from streaming.ingestion.debezium_connector_manager import DebeziumConnectorManager
+    from streaming.spark_streaming import run_streaming
+
+    bucket_name = config["bucket_name"]
+
     print(f"\n{'='*60}")
-    print(f"DB MODE: Ingesting from database")
+    print(f"DB MODE: Real-time CDC via Debezium")
     print(f"{'='*60}")
-    print(f"Database URI: {db_uri[:30]}...")
-    print(f"Bucket: {bucket_name}")
-    print(f"Poll interval: {poll_interval}s\n")
-    
-    # Get Kafka bootstrap from env if not provided
-    if kafka_bootstrap is None:
-        from dotenv import load_dotenv, find_dotenv
-        load_dotenv(find_dotenv())
-        kafka_bootstrap = os.getenv("KAFKA_BOOTSTRAP", "10.5.0.7:9092")
-    
-    print(f"Using Kafka: {kafka_bootstrap}\n")
-    
-    # Import the necessary modules
-    try:
-        from streaming.ingestion.db_ingest_service import ingest_from_uri
-        from streaming.spark_streaming import run_streaming
-        
-        # Function to run DB ingestion in a separate process
-        def run_db_ingestion():
-            print("Starting DB ingestion service...")
-            ingest_from_uri(
-                db_uri=db_uri,
-                poll_interval=poll_interval,
-                kafka_bootstrap=kafka_bootstrap
-            )
-        
-        # Function to run Spark streaming in a separate process
-        def run_spark_consumer():
-            print("Starting Spark streaming consumer...")
-            # Update the output bucket in environment
-            os.environ["OUTPUT_BUCKET"] = bucket_name
-            run_streaming()
-        
-        # Run both processes
-        print("Starting parallel processes:")
-        print("  1. DB ingestion -> Kafka")
-        print("  2. Spark streaming -> MinIO mapped/\n")
-        
-        db_process = multiprocessing.Process(target=run_db_ingestion)
-        spark_process = multiprocessing.Process(target=run_spark_consumer)
-        
-        db_process.start()
-        spark_process.start()
-        
-        print("Both processes started. Press Ctrl+C to stop.\n")
-        
-        try:
-            db_process.join()
-            spark_process.join()
-        except KeyboardInterrupt:
-            print("\n\nStopping processes...")
-            db_process.terminate()
-            spark_process.terminate()
-            db_process.join()
-            spark_process.join()
-            print("✅ DB MODE STOPPED\n")
-            
-    except Exception as e:
-        print(f"❌ Error in db mode: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    print(f"  Host: {config['db_host']}:{config['db_port']}")
+    print(f"  Database: {config['db_name']}")
+    print(f"  Type: {config['db_type']}")
+    print(f"  Tables: {config['db_tables']}")
+    print(f"  Bucket: {bucket_name}")
+    print(f"{'='*60}\n")
+
+    manager = DebeziumConnectorManager()
+
+    if not manager.wait_for_connect():
+        print("Kafka Connect not available")
+        return
+
+    # Create connector config based on database type
+    if config["db_type"] == "postgres":
+        connector_config = manager.create_postgres_config(
+            connector_name="pulse-cdc-connector",
+            db_host=config["db_host"],
+            db_port=config["db_port"],
+            db_name=config["db_name"],
+            db_user=config["db_user"],
+            db_password=config["db_password"],
+            tables=config["db_tables"],
+        )
+    elif config["db_type"] == "mysql":
+        connector_config = manager.create_mysql_config(
+            connector_name="pulse-cdc-connector",
+            db_host=config["db_host"],
+            db_port=config["db_port"],
+            db_name=config["db_name"],
+            db_user=config["db_user"],
+            db_password=config["db_password"],
+            tables=config["db_tables"],
+        )
+    else:
+        print(f"Unsupported DB type: {config['db_type']}")
+        return
+
+    # Deploy connector and start streaming
+    if manager.deploy_connector(connector_config):
+        print("\nDebezium connector deployed")
+        print("   Starting Spark streaming...\n")
+
+        # Update the output bucket in environment
+        os.environ["OUTPUT_BUCKET"] = bucket_name
+        run_streaming()
+    else:
+        print("Failed to deploy connector")
 
 
 def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_bootstrap: Optional[str] = None):
@@ -275,67 +260,6 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_
         sys.exit(1)
 
 
-def run_debezium_mode(config: dict):
-    """
-    Debezium mode: Deploy CDC connector, stream real-time changes to Kafka.
-
-    This mode uses Debezium to capture database changes directly from the
-    transaction log (WAL/binlog), providing true real-time CDC with accurate
-    operation types (create, update, delete).
-
-    Args:
-        config: Configuration dictionary with debezium_* settings
-    """
-    from streaming.ingestion.debezium_connector_manager import DebeziumConnectorManager
-    from streaming.spark_streaming import run_streaming
-
-    print(f"\n{'='*60}")
-    print(f"DEBEZIUM MODE: Real-time CDC")
-    print(f"{'='*60}\n")
-
-    manager = DebeziumConnectorManager()
-
-    if not manager.wait_for_connect():
-        print("Kafka Connect not available")
-        return
-
-    # Create connector config based on database type
-    if config["debezium_db_type"] == "postgres":
-        connector_config = manager.create_postgres_config(
-            connector_name="pulse-cdc-connector",
-            db_host=config["debezium_db_host"],
-            db_port=config["debezium_db_port"],
-            db_name=config["debezium_db_name"],
-            db_user=config["debezium_db_user"],
-            db_password=config["debezium_db_password"],
-            tables=config["debezium_tables"],
-        )
-    elif config["debezium_db_type"] == "mysql":
-        connector_config = manager.create_mysql_config(
-            connector_name="pulse-cdc-connector",
-            db_host=config["debezium_db_host"],
-            db_port=config["debezium_db_port"],
-            db_name=config["debezium_db_name"],
-            db_user=config["debezium_db_user"],
-            db_password=config["debezium_db_password"],
-            tables=config["debezium_tables"],
-        )
-    else:
-        print(f"Unsupported DB type: {config['debezium_db_type']}")
-        return
-
-    # Deploy connector and start streaming
-    if manager.deploy_connector(connector_config):
-        print("\nDebezium connector deployed")
-        print("   Starting Spark streaming...\n")
-
-        # Update the output bucket in environment
-        os.environ["OUTPUT_BUCKET"] = config["bucket_name"]
-        run_streaming()
-    else:
-        print("Failed to deploy connector")
-
-
 def main():
     """
     Main entry point that reads configuration and executes the appropriate mode.
@@ -357,18 +281,13 @@ def main():
         run_batch_mode(bucket_name)
         
     elif mode == "db":
-        db_uri = CONFIG["db_uri"]
-        poll_interval = CONFIG["db_poll_interval"]
-        kafka_bootstrap = CONFIG["kafka_bootstrap"]
-        
-        # Mask password in URI for display
-        display_uri = db_uri.split("@")[-1] if "@" in db_uri else db_uri
-        print(f"  Database: {display_uri}")
-        print(f"  Poll interval: {poll_interval}s")
+        print(f"  Database: {CONFIG['db_host']}:{CONFIG['db_port']}/{CONFIG['db_name']}")
+        print(f"  DB Type: {CONFIG['db_type']}")
+        print(f"  Tables: {CONFIG['db_tables']}")
         print(f"{'='*60}\n")
-        
-        run_db_mode(db_uri, bucket_name, poll_interval, kafka_bootstrap)
-        
+
+        run_db_mode(CONFIG)
+
     elif mode == "api":
         api_url = CONFIG["api_url"]
         poll_interval = CONFIG["api_poll_interval"]
@@ -380,17 +299,9 @@ def main():
         
         run_api_mode(api_url, bucket_name, poll_interval, kafka_bootstrap)
 
-    elif mode == "debezium":
-        print(f"  Database: {CONFIG['debezium_db_host']}:{CONFIG['debezium_db_port']}/{CONFIG['debezium_db_name']}")
-        print(f"  DB Type: {CONFIG['debezium_db_type']}")
-        print(f"  Tables: {CONFIG['debezium_tables']}")
-        print(f"{'='*60}\n")
-
-        run_debezium_mode(CONFIG)
-
     else:
         print(f"\n❌ ERROR: Invalid mode '{mode}'")
-        print(f"   Valid modes: batch, db, api, debezium")
+        print(f"   Valid modes: batch, db, api")
         print(f"   Edit CONFIG in run_mapping.py to change mode\n")
         sys.exit(1)
 
