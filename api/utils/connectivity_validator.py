@@ -15,13 +15,30 @@ Supports all Debezium-compatible databases:
 - Informix
 """
 
-import requests
+import socket
+import ipaddress
 from urllib.parse import urlparse
 from typing import Tuple
-import pymysql
+
+# Core dependencies (should always be available)
 import psycopg2
 from pymongo import MongoClient
-import pymssql
+
+# Optional dependencies - import conditionally
+try:
+    import pymysql
+except ImportError:
+    pymysql = None  # type: ignore[assignment]
+
+try:
+    import pymssql
+except ImportError:
+    pymssql = None  # type: ignore[assignment]
+
+try:
+    import requests
+except ImportError:
+    requests = None  # type: ignore[assignment]
 
 
 def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, str]:
@@ -81,6 +98,8 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                     
         # MySQL
         elif db_type == 'mysql':
+            if pymysql is None:
+                return True, f"MySQL database at {hostname} will be validated by Debezium connector. Install pymysql library for pre-validation."
             port = port or 3306
             if not database:
                 return False, "Invalid MySQL URI: database name not found"
@@ -108,6 +127,8 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
         
         # MariaDB (similar to MySQL but distinct)
         elif db_type == 'mariadb':
+            if pymysql is None:
+                return True, f"MariaDB database at {hostname} will be validated by Debezium connector. Install pymysql library for pre-validation."
             port = port or 3306
             if not database:
                 return False, "Invalid MariaDB URI: database name not found"
@@ -167,6 +188,8 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                     
         # SQL Server
         elif db_type in ['mssql', 'sqlserver']:
+            if pymssql is None:
+                return True, f"SQL Server database at {hostname} will be validated by Debezium connector. Install pymssql library for pre-validation."
             port = port or 1433
             if not database:
                 return False, "Invalid SQL Server URI: database name not found"
@@ -292,9 +315,66 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
         return False, f"Error validating database connection: {str(e)}"
 
 
+def _is_safe_url(url: str) -> Tuple[bool, str]:
+    """
+    Check if URL is safe from SSRF attacks.
+    Blocks private, loopback, and link-local IP addresses.
+    
+    Args:
+        url: URL to validate
+        
+    Returns:
+        Tuple of (is_safe: bool, error_message: str)
+    """
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+        
+        if not hostname:
+            return False, "Invalid URL: no hostname found"
+        
+        # Try to resolve hostname to IP address
+        try:
+            ip_address = socket.gethostbyname(hostname)
+            ip_obj = ipaddress.ip_address(ip_address)
+            
+            # Block private IP ranges (RFC 1918)
+            if ip_obj.is_private:
+                return False, f"Access to private IP addresses is not allowed for security reasons"
+            
+            # Block loopback addresses
+            if ip_obj.is_loopback:
+                return False, f"Access to loopback addresses is not allowed for security reasons"
+            
+            # Block link-local addresses  
+            if ip_obj.is_link_local:
+                return False, f"Access to link-local addresses is not allowed for security reasons"
+            
+            # Block multicast addresses
+            if ip_obj.is_multicast:
+                return False, f"Access to multicast addresses is not allowed for security reasons"
+            
+            # Block reserved addresses
+            if ip_obj.is_reserved:
+                return False, f"Access to reserved IP addresses is not allowed for security reasons"
+                
+        except socket.gaierror:
+            # Hostname resolution failed - this is okay, let the request fail naturally
+            pass
+        except ValueError:
+            # Invalid IP address format - this is okay
+            pass
+            
+        return True, ""
+        
+    except Exception as e:
+        return False, f"Error validating URL safety: {str(e)}"
+
+
 def validate_api_endpoint(api_url: str, timeout: int = 10) -> Tuple[bool, str]:
     """
     Test API endpoint connectivity and validate response format.
+    Includes SSRF protection to prevent access to internal services.
     
     The API must return data in this format:
     {
@@ -313,6 +393,9 @@ def validate_api_endpoint(api_url: str, timeout: int = 10) -> Tuple[bool, str]:
     Returns:
         Tuple of (success: bool, message: str)
     """
+    if requests is None:
+        return False, "requests library is not installed. Install it to validate API endpoints."
+    
     try:
         # Validate URL format
         parsed = urlparse(api_url)
@@ -322,9 +405,14 @@ def validate_api_endpoint(api_url: str, timeout: int = 10) -> Tuple[bool, str]:
         if not parsed.netloc:
             return False, "Invalid API URL: hostname not found"
         
-        # Make test request
+        # SSRF Protection: Check if URL is safe before making request
+        is_safe, safety_error = _is_safe_url(api_url)
+        if not is_safe:
+            return False, f"Security error: {safety_error}"
+        
+        # Make test request with redirects disabled for SSRF protection
         try:
-            response = requests.get(api_url, timeout=timeout)
+            response = requests.get(api_url, timeout=timeout, allow_redirects=False)
             
             if response.status_code == 200:
                 # Validate response format
