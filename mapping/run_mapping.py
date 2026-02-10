@@ -74,6 +74,7 @@ def run_batch_mode(bucket_name: str):
             COLUMNS_INFO,
         )
         import List as mapping_list
+        import redis
         
         print(f"Loading files from {bucket_name}/ingested...")
         all_dataframes = load_all_files_from_minio(minio_client, bucket_name, spark)
@@ -89,6 +90,45 @@ def run_batch_mode(bucket_name: str):
             mapping_list,
             mode="batch"
         )
+        
+        # Collect mapping results (missing_cols and extra_cols)
+        mapping_results = {
+            "missing_cols": [],
+            "extra_cols": []
+        }
+        
+        for key, result in results.items():
+            table_name = result.get("table_name", "")
+            missing_cols = result.get("missing_cols", [])
+            extra_cols = result.get("extra_cols", [])
+            
+            # Add table name to each column for frontend display
+            for col in missing_cols:
+                mapping_results["missing_cols"].append({
+                    "column": col,
+                    "table": table_name
+                })
+            
+            for col in extra_cols:
+                mapping_results["extra_cols"].append({
+                    "column": col,
+                    "table": table_name
+                })
+        
+        # Save mapping results to Redis for the API to retrieve
+        try:
+            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+            import json
+            redis_client.setex(
+                f"mapping_results:{bucket_name}",
+                86400,  # 24 hours
+                json.dumps(mapping_results)
+            )
+            print(f"\n✅ Mapping results saved to Redis")
+            print(f"   Missing columns: {len(mapping_results['missing_cols'])}")
+            print(f"   Extra columns: {len(mapping_results['extra_cols'])}")
+        except Exception as redis_error:
+            print(f"⚠️  Warning: Could not save mapping results to Redis: {redis_error}")
         
         print(f"\nSaving results to {bucket_name}/mapped...")
         save_dataframes_to_minio(results, minio_client, bucket_name)
@@ -106,6 +146,7 @@ def run_batch_mode(bucket_name: str):
         import traceback
         traceback.print_exc()
         sys.exit(1)
+
 
 
 def run_db_mode(config: dict):
