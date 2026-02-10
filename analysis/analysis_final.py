@@ -7781,9 +7781,28 @@ def main():
     for key in supplier_analysis.keys():
         count+=1
     print(count)
-    
+
 
     print("\n✅ Analysis Complete.")
+
+    # Export all analytics to MinIO
+    print("\n" + "="*60)
+    print("📤 EXPORTING ANALYTICS TO MINIO")
+    print("="*60)
+
+    export_result = export_analytics_to_minio(
+        analysis=analysis,
+        product_analysis=product_analysis,
+        supplier_analysis=supplier_analysis,
+        business_id=None,  # Uses default bucket from env
+        file_format="parquet",  # Can be changed to "csv" or "json"
+        parallel=True,
+        max_workers=8
+    )
+
+    print(f"\n✅ Export completed: {export_result['stats']['successful']} analytics exported successfully")
+    print(f"   Bucket: {export_result['bucket']}")
+    print(f"   Format: {export_result['format']}")
 
 if __name__ == "__main__":
     main()
