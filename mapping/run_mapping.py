@@ -360,8 +360,8 @@ def main():
     elif mode == "db":
         # Use command-line args if provided, otherwise use CONFIG
         db_uri = args.db_uri if args.db_uri else CONFIG["db_uri"]
-        # Handle empty string for db_tables
-        if args.db_tables:
+        # Handle db_tables: distinguish between omitted (None) and explicitly provided (including empty string)
+        if args.db_tables is not None:
             db_tables = [t.strip() for t in args.db_tables.split(',') if t.strip()]
         else:
             db_tables = CONFIG["db_tables"]
