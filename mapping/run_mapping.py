@@ -179,18 +179,30 @@ def run_db_mode(config: dict):
     from streaming.spark_streaming import run_streaming
 
     db_uri = config["db_uri"]
-    tables = config["db_tables"]
+    tables = config.get("db_tables", [])
     bucket_name = config["bucket_name"]
 
     print(f"\n{'='*60}")
     print(f"DB MODE: Real-time CDC via Debezium")
     print(f"{'='*60}\n")
+    
+    # Try to retrieve manual mappings from Redis
+    manual_mappings = None
+    try:
+        redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+        manual_mappings_str = redis_client.get(f"manual_mappings:{bucket_name}")
+        if manual_mappings_str:
+            manual_mappings = json.loads(manual_mappings_str)
+            print(f"\n✅ Retrieved manual mappings from Redis")
+            print(f"   Tables with manual mappings: {list(manual_mappings.keys())}")
+    except Exception as redis_error:
+        print(f"⚠️  Warning: Could not retrieve manual mappings from Redis: {redis_error}")
 
     manager = DebeziumConnectorManager()
 
     if not manager.wait_for_connect():
         print("Kafka Connect not available")
-        return
+        sys.exit(1)
 
     # Auto-detect database type from URI and build connector config
     connector_config = manager.create_connector_config(
@@ -203,10 +215,16 @@ def run_db_mode(config: dict):
         print("\nDebezium connector deployed")
         print("   Starting Spark streaming...\n")
 
+        # Pass bucket name and manual mappings to streaming
         os.environ["OUTPUT_BUCKET"] = bucket_name
+        os.environ["BUSINESS_ID"] = bucket_name  # For saving mapping results
+        if manual_mappings:
+            os.environ["MANUAL_MAPPINGS"] = json.dumps(manual_mappings)
+        
         run_streaming()
     else:
         print("Failed to deploy connector")
+        sys.exit(1)
 
 
 def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_bootstrap: Optional[str] = None):
@@ -229,6 +247,18 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_
     print(f"API URL: {api_url}")
     print(f"Bucket: {bucket_name}")
     print(f"Poll interval: {poll_interval}s\n")
+    
+    # Try to retrieve manual mappings from Redis
+    manual_mappings = None
+    try:
+        redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+        manual_mappings_str = redis_client.get(f"manual_mappings:{bucket_name}")
+        if manual_mappings_str:
+            manual_mappings = json.loads(manual_mappings_str)
+            print(f"\n✅ Retrieved manual mappings from Redis")
+            print(f"   Tables with manual mappings: {list(manual_mappings.keys())}")
+    except Exception as redis_error:
+        print(f"⚠️  Warning: Could not retrieve manual mappings from Redis: {redis_error}")
     
     # Get Kafka bootstrap from env if not provided
     if kafka_bootstrap is None:
@@ -257,6 +287,9 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_
             print("Starting Spark streaming consumer...")
             # Update the output bucket in environment
             os.environ["OUTPUT_BUCKET"] = bucket_name
+            os.environ["BUSINESS_ID"] = bucket_name  # For saving mapping results
+            if manual_mappings:
+                os.environ["MANUAL_MAPPINGS"] = json.dumps(manual_mappings)
             run_streaming()
         
         # Run both processes
