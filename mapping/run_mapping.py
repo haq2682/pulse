@@ -76,6 +76,19 @@ def run_batch_mode(bucket_name: str):
         import List as mapping_list
         import redis
         
+        # Try to retrieve manual mappings from Redis
+        manual_mappings = None
+        try:
+            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+            manual_mappings_str = redis_client.get(f"manual_mappings:{bucket_name}")
+            if manual_mappings_str:
+                import json
+                manual_mappings = json.loads(manual_mappings_str)
+                print(f"\n✅ Retrieved manual mappings from Redis")
+                print(f"   Tables with manual mappings: {list(manual_mappings.keys())}")
+        except Exception as redis_error:
+            print(f"⚠️  Warning: Could not retrieve manual mappings from Redis: {redis_error}")
+        
         print(f"Loading files from {bucket_name}/ingested...")
         all_dataframes = load_all_files_from_minio(minio_client, bucket_name, spark)
         
@@ -88,7 +101,8 @@ def run_batch_mode(bucket_name: str):
             all_dataframes, 
             COLUMNS_INFO, 
             mapping_list,
-            mode="batch"
+            mode="batch",
+            manual_mappings=manual_mappings
         )
         
         # Collect mapping results (missing_cols and extra_cols)
