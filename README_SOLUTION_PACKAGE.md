@@ -44,8 +44,8 @@ Phase 2: Streaming Pipeline (3-4 weeks)
 Phase 3: WebSocket Frontend (1-2 weeks)
 └→ Result: Auto-updating dashboard ✅
 
-Phase 4: Speed Layer (optional, 6-8 weeks)
-└→ Result: 10-20 min → 5-30 sec (98% faster) ✅
+~~Phase 4: Speed Layer with Flink~~ ❌ SKIP THIS
+└→ Not needed: Spark micro-batches are sufficient (30-40 sec is excellent for analytics)
 ```
 
 ### Expected Outcome
