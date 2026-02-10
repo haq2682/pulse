@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import { InputText } from 'primereact/inputtext';
 import { ProgressBar } from 'primereact/progressbar';
 import Breadcrumb from '../Breadcrumb';
@@ -19,6 +19,8 @@ const NIFI_UPLOAD_URL = 'http://localhost:8082/upload';
 
 const Connect = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const pathname = location.pathname;
     const [databaseUri, setDatabaseUri] = useState('');
     const [apiEndpoint, setApiEndpoint] = useState('');
     const [businessId, setBusinessId] = useState('');
@@ -27,11 +29,13 @@ const Connect = () => {
     const [uploadProgress, setUploadProgress] = useState({});
     const [loading, setLoading] = useState(false);
     const [mappingLoading, setMappingLoading] = useState(false);
+    const [mappingStatus, setMappingStatus] = useState(null);
     const [ingestionTypeLoading, setIngestionTypeLoading] = useState(true);
     const [ingestionType, setIngestionType] = useState('');
     const [errors, setErrors] = useState({db: '', api: '', form: ''});
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef(null);
+    const mappingCheckIntervalRef = useRef(null);
 
     const breadcrumbItems = [
         {
@@ -87,6 +91,14 @@ const Connect = () => {
         fetchCurrentStep();
         fetchIngestionType();
         fetchUploadedFiles();
+        checkMappingStatus(); // Check mapping status on mount
+        
+        // Clean up interval on unmount
+        return () => {
+            if (mappingCheckIntervalRef.current) {
+                clearInterval(mappingCheckIntervalRef.current);
+            }
+        };
     }, []);
 
     const fetchUploadedFiles = async () => {
@@ -382,6 +394,10 @@ const Connect = () => {
                 setLoading(false);
                 return;
             }
+            
+            // Start the mapping pipeline for batch mode
+            await startMapping();
+            return;
         }
 
         if (ingestionType === 'db') {
@@ -432,6 +448,91 @@ const Connect = () => {
             setIngestionTypeLoading(false);
         }
     }
+
+    const checkMappingStatus = async () => {
+        try {
+            const response = await axiosInstance.get('/onboarding/mapping-status', {
+                params: { userId: user.user_id }
+            });
+            
+            if (response.status === 200) {
+                const { current_step, mapping_status } = response.data;
+                setMappingStatus(mapping_status);
+                
+                // If mapping is in progress, show the loader and start polling
+                if (mapping_status === 'running' || current_step === 'mapping_in_progress') {
+                    setMappingLoading(true);
+                    
+                    // Start polling every 3 seconds if not already polling
+                    if (!mappingCheckIntervalRef.current) {
+                        mappingCheckIntervalRef.current = setInterval(async () => {
+                            try {
+                                const statusResponse = await axiosInstance.get('/onboarding/mapping-status', {
+                                    params: { userId: user.user_id }
+                                });
+                                
+                                if (statusResponse.status === 200) {
+                                    const { mapping_status: status, current_step: step } = statusResponse.data;
+                                    setMappingStatus(status);
+                                    
+                                    // If mapping is completed or failed, stop polling and hide loader
+                                    if (status === 'completed') {
+                                        clearInterval(mappingCheckIntervalRef.current);
+                                        mappingCheckIntervalRef.current = null;
+                                        setMappingLoading(false);
+                                        // Navigate to mapping page
+                                        navigate(`/onboarding/mapping/${pathname.split('/')[3]}`);
+                                    } else if (status === 'failed') {
+                                        clearInterval(mappingCheckIntervalRef.current);
+                                        mappingCheckIntervalRef.current = null;
+                                        setMappingLoading(false);
+                                        setErrors((prev) => ({ 
+                                            ...prev, 
+                                            form: statusResponse.data.mapping_error || 'Mapping failed. Please try again.' 
+                                        }));
+                                    }
+                                }
+                            } catch (err) {
+                                console.error('Error checking mapping status:', err);
+                            }
+                        }, 3000);
+                    }
+                } else if (mapping_status === 'completed') {
+                    // If mapping is already completed, navigate to mapping page
+                    navigate(`/onboarding/mapping/${pathname.split('/')[3]}`);
+                } else {
+                    setMappingLoading(false);
+                }
+            }
+        } catch (e) {
+            console.error('Error checking mapping status:', e);
+        }
+    };
+
+    const startMapping = async () => {
+        try {
+            setLoading(true);
+            setErrors({ db: '', api: '', form: '' });
+            
+            const response = await axiosInstance.post('/onboarding/start-mapping', {
+                userId: user.user_id,
+                mode: ingestionType // Use the ingestion type as the mode
+            });
+            
+            if (response.status === 200) {
+                setMappingLoading(true);
+                setLoading(false);
+                // Start polling for status
+                checkMappingStatus();
+            }
+        } catch (e) {
+            setLoading(false);
+            setErrors((prev) => ({ 
+                ...prev, 
+                form: e.response?.data?.detail || e.message || 'Failed to start mapping pipeline' 
+            }));
+        }
+    };
 
     const isFormValid = uploadedFiles.length > 0 || databaseUri.trim() !== '' || apiEndpoint.trim() !== '';
 

@@ -10,6 +10,8 @@ import json
 import boto3
 from botocore.client import Config
 from typing import List
+import subprocess
+from datetime import datetime
 
 redis = aioredis.from_url("redis://redis:6379", decode_responses=True)
 
@@ -337,3 +339,211 @@ async def currencies(query: str = Query("")):
 @router.get("/api/regions")
 async def regions(query: str = Query("")):
     return await get_or_set_cache(f"regions:{query}", lambda: get_region_suggestions(query))
+
+@router.post("/start-mapping")
+async def start_mapping(request: Request, db=Depends(get_db)):
+    """
+    Start the mapping pipeline in background using subprocess.Popen.
+    Saves the pipeline state in PostgreSQL onboarding table.
+    """
+    try:
+        body = await request.json()
+        user_id = body.get("userId")
+        mode = body.get("mode", "batch")  # Default to batch mode
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="userId is required")
+        
+        # Get the onboarding record
+        onboarding = db.execute(
+            text("SELECT onboarding_id, business_id, current_step, mapping_status FROM onboarding WHERE user_id = :user_id"),
+            {"user_id": user_id}
+        )
+        onboarding_record = onboarding.fetchone()
+        
+        if not onboarding_record:
+            raise HTTPException(status_code=404, detail="Onboarding record not found")
+        
+        onboarding_id, business_id, current_step, mapping_status = onboarding_record
+        
+        if not business_id:
+            raise HTTPException(status_code=400, detail="Business ID not found")
+        
+        # Check if mapping is already running
+        if mapping_status == "running":
+            return {"status": 200, "message": "Mapping pipeline is already running", "mapping_status": "running"}
+        
+        # Update the onboarding record to indicate mapping is in progress
+        db.execute(
+            text("""
+                UPDATE onboarding 
+                SET current_step = :current_step,
+                    mapping_status = :mapping_status,
+                    mapping_started_at = :started_at,
+                    mapping_error = NULL,
+                    mapping_completed_at = NULL
+                WHERE user_id = :user_id
+            """),
+            {
+                "current_step": "mapping_in_progress",
+                "mapping_status": "running",
+                "started_at": datetime.utcnow(),
+                "user_id": user_id
+            }
+        )
+        db.commit()
+        
+        # Get the path to the mapping script
+        # In docker, the mapping folder is mounted at /app/mapping
+        script_path = "/app/mapping/run_mapping.py"
+        
+        # Build the command to run the mapping pipeline
+        cmd = [
+            "python3",
+            script_path,
+            "--mode", mode,
+            "--business-id", business_id
+        ]
+        
+        # Start the mapping pipeline in background using subprocess.Popen
+        # Use stdout and stderr redirection to avoid blocking
+        log_file_path = f"/tmp/mapping_{business_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.log"
+        with open(log_file_path, 'w') as log_file:
+            process = subprocess.Popen(
+                cmd,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                cwd="/app/mapping"
+            )
+        
+        # Store the process ID in Redis for tracking
+        await redis.set(f"mapping_process:{business_id}", str(process.pid), ex=86400)
+        await redis.set(f"mapping_log:{business_id}", log_file_path, ex=86400)
+        
+        return {
+            "status": 200,
+            "message": "Mapping pipeline started successfully",
+            "mapping_status": "running",
+            "process_id": process.pid
+        }
+        
+    except Exception as e:
+        # Update the onboarding record to indicate mapping failed
+        if 'user_id' in locals():
+            try:
+                db.execute(
+                    text("""
+                        UPDATE onboarding 
+                        SET mapping_status = :mapping_status,
+                            mapping_error = :error
+                        WHERE user_id = :user_id
+                    """),
+                    {
+                        "mapping_status": "failed",
+                        "error": str(e),
+                        "user_id": user_id
+                    }
+                )
+                db.commit()
+            except:
+                pass
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/mapping-status")
+async def get_mapping_status(userId: str, db=Depends(get_db)):
+    """
+    Get the current status of the mapping pipeline.
+    Returns the status from the PostgreSQL onboarding table.
+    """
+    try:
+        if not userId:
+            raise HTTPException(status_code=400, detail="userId is required")
+        
+        # Get the onboarding record
+        onboarding = db.execute(
+            text("""
+                SELECT 
+                    current_step,
+                    mapping_status,
+                    mapping_error,
+                    mapping_started_at,
+                    mapping_completed_at,
+                    business_id
+                FROM onboarding 
+                WHERE user_id = :user_id
+            """),
+            {"user_id": userId}
+        )
+        onboarding_record = onboarding.fetchone()
+        
+        if not onboarding_record:
+            raise HTTPException(status_code=404, detail="Onboarding record not found")
+        
+        current_step, mapping_status, mapping_error, mapping_started_at, mapping_completed_at, business_id = onboarding_record
+        
+        # If mapping is running, check if the process is still alive
+        if mapping_status == "running" and business_id:
+            process_id_str = await redis.get(f"mapping_process:{business_id}")
+            if process_id_str:
+                try:
+                    process_id = int(process_id_str)
+                    # Check if process is still running
+                    os.kill(process_id, 0)  # This will raise an exception if process doesn't exist
+                except (OSError, ValueError):
+                    # Process is not running anymore, check if it completed successfully
+                    # by looking at the MinIO bucket for mapped files
+                    try:
+                        # List objects in the mapped folder
+                        response = s3.list_objects_v2(Bucket=business_id, Prefix="mapped/")
+                        if response.get('KeyCount', 0) > 0:
+                            # Files exist in mapped folder, consider it completed
+                            db.execute(
+                                text("""
+                                    UPDATE onboarding 
+                                    SET mapping_status = :mapping_status,
+                                        mapping_completed_at = :completed_at,
+                                        current_step = :current_step
+                                    WHERE user_id = :user_id
+                                """),
+                                {
+                                    "mapping_status": "completed",
+                                    "completed_at": datetime.utcnow(),
+                                    "current_step": "mapping",
+                                    "user_id": userId
+                                }
+                            )
+                            db.commit()
+                            mapping_status = "completed"
+                            current_step = "mapping"
+                        else:
+                            # No files in mapped folder, consider it failed
+                            db.execute(
+                                text("""
+                                    UPDATE onboarding 
+                                    SET mapping_status = :mapping_status,
+                                        mapping_error = :error
+                                    WHERE user_id = :user_id
+                                """),
+                                {
+                                    "mapping_status": "failed",
+                                    "error": "Mapping process terminated without producing output",
+                                    "user_id": userId
+                                }
+                            )
+                            db.commit()
+                            mapping_status = "failed"
+                            mapping_error = "Mapping process terminated without producing output"
+                    except Exception as e:
+                        print(f"Error checking MinIO bucket: {e}")
+        
+        return {
+            "status": 200,
+            "current_step": current_step,
+            "mapping_status": mapping_status,
+            "mapping_error": mapping_error,
+            "mapping_started_at": mapping_started_at.isoformat() if mapping_started_at else None,
+            "mapping_completed_at": mapping_completed_at.isoformat() if mapping_completed_at else None
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

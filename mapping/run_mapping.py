@@ -239,10 +239,24 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_
 def main():
     """
     Main entry point that reads configuration and executes the appropriate mode.
-    In production, CONFIG values will be provided by the React frontend.
+    In production, CONFIG values will be provided by the React frontend via command-line args.
     """
-    mode = CONFIG["mode"]
-    bucket_name = CONFIG["bucket_name"]
+    import argparse
+    
+    # Parse command-line arguments if provided
+    parser = argparse.ArgumentParser(description='Run mapping pipeline')
+    parser.add_argument('--mode', type=str, help='Mode: batch, db, or api')
+    parser.add_argument('--business-id', type=str, help='Business ID (used as bucket name)')
+    parser.add_argument('--db-uri', type=str, help='Database URI (for db mode)')
+    parser.add_argument('--db-tables', type=str, help='Comma-separated list of database tables (for db mode)')
+    parser.add_argument('--api-url', type=str, help='API endpoint URL (for api mode)')
+    parser.add_argument('--api-poll-interval', type=int, help='API polling interval in seconds (for api mode)')
+    
+    args = parser.parse_args()
+    
+    # Use command-line args if provided, otherwise use CONFIG
+    mode = args.mode if args.mode else CONFIG["mode"]
+    bucket_name = args.business_id if args.business_id else CONFIG["bucket_name"]
     
     print(f"\n{'='*60}")
     print(f"PULSE MAPPING - Starting in {mode.upper()} mode")
@@ -257,18 +271,25 @@ def main():
         run_batch_mode(bucket_name)
         
     elif mode == "db":
+        # Use command-line args if provided, otherwise use CONFIG
+        db_uri = args.db_uri if args.db_uri else CONFIG["db_uri"]
+        db_tables = args.db_tables.split(',') if args.db_tables else CONFIG["db_tables"]
+        
         # Mask credentials in URI for display
-        db_uri = CONFIG["db_uri"]
         display_uri = db_uri.split("@")[-1] if "@" in db_uri else db_uri
         print(f"  Database: {display_uri}")
-        print(f"  Tables: {CONFIG['db_tables']}")
+        print(f"  Tables: {db_tables}")
         print(f"{'='*60}\n")
 
-        run_db_mode(CONFIG)
+        run_db_mode({
+            "db_uri": db_uri,
+            "db_tables": db_tables,
+            "bucket_name": bucket_name
+        })
 
     elif mode == "api":
-        api_url = CONFIG["api_url"]
-        poll_interval = CONFIG["api_poll_interval"]
+        api_url = args.api_url if args.api_url else CONFIG["api_url"]
+        poll_interval = args.api_poll_interval if args.api_poll_interval else CONFIG["api_poll_interval"]
         kafka_bootstrap = CONFIG["kafka_bootstrap"]
         
         print(f"  API URL: {api_url}")
