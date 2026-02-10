@@ -2,7 +2,7 @@
 """
 Unified entry point for the mapping phase with 3 modes:
 1. batch: Load from MinIO ingested folder -> map -> save to mapped folder
-2. db: Ingest from database URI -> map -> save to mapped folder  
+2. db: Ingest from database URI via Debezium CDC -> map -> save to mapped folder
 3. api: Ingest from API endpoint -> map -> save to mapped folder
 
 Configuration:
@@ -27,18 +27,23 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 CONFIG = {
     # Mode: "batch", "db", or "api"
     "mode": "batch",
-    
+
     # Common settings
     "bucket_name": "pulse-bucket-1",  # MinIO bucket name
-    
+
     # DB mode settings (only used when mode="db")
-    "db_uri": "postgresql://user:pass@localhost:5432/ecommerce",  # Database connection URI
-    "db_poll_interval": 10,  # Polling interval in seconds
-    
+    # Uses Debezium CDC for true real-time ingestion from database transaction log.
+    # The database type is auto-detected from the URI scheme.
+    # Supported: postgresql, mysql, mariadb, mongodb, mssql/sqlserver,
+    #            oracle, db2, vitess, spanner, informix, cassandra
+    # See mapping/CDC_SETUP_GUIDE.md for database setup instructions.
+    "db_uri": "postgresql://debezium_user:debezium_pass@localhost:5432/ecommerce",
+    "db_tables": ["orders", "payments", "inventory", "shopping_cart", "cart_items"],
+
     # API mode settings (only used when mode="api")
     "api_url": "http://localhost:5000/api/data",  # API endpoint URL
     "api_poll_interval": 10,  # Polling interval in seconds
-    
+
     # Optional: Kafka bootstrap servers (defaults to env var if None)
     "kafka_bootstrap": None,  # e.g., "10.5.0.7:9092" or None to use env var
 }
@@ -103,85 +108,51 @@ def run_batch_mode(bucket_name: str):
         sys.exit(1)
 
 
-def run_db_mode(db_uri: str, bucket_name: str, poll_interval: int = 10, kafka_bootstrap: Optional[str] = None):
+def run_db_mode(config: dict):
     """
-    DB mode: Ingest from database URI -> Kafka -> Spark Streaming -> mapped folder.
-    
-    This mode runs two processes:
-    1. DB ingestion service (ingests DB changes to Kafka)
-    2. Spark streaming consumer (consumes from Kafka, maps, saves to MinIO)
-    
+    DB mode: Deploy Debezium CDC connector, stream real-time changes to Kafka,
+    consume via Spark Streaming -> mapped folder.
+
+    Auto-detects the database type from the URI scheme and builds the correct
+    Debezium connector configuration. Supports all Debezium source connectors:
+    PostgreSQL, MySQL, MariaDB, MongoDB, SQL Server, Oracle, Db2,
+    Vitess, Spanner, Informix, Cassandra.
+
     Args:
-        db_uri: Database connection URI
-        bucket_name: Name of the MinIO bucket
-        poll_interval: Polling interval in seconds
-        kafka_bootstrap: Kafka bootstrap servers (defaults to env var)
+        config: Configuration dictionary with db_uri and db_tables
     """
+    from streaming.ingestion.debezium_connector_manager import DebeziumConnectorManager
+    from streaming.spark_streaming import run_streaming
+
+    db_uri = config["db_uri"]
+    tables = config["db_tables"]
+    bucket_name = config["bucket_name"]
+
     print(f"\n{'='*60}")
-    print(f"DB MODE: Ingesting from database")
-    print(f"{'='*60}")
-    print(f"Database URI: {db_uri[:30]}...")
-    print(f"Bucket: {bucket_name}")
-    print(f"Poll interval: {poll_interval}s\n")
-    
-    # Get Kafka bootstrap from env if not provided
-    if kafka_bootstrap is None:
-        from dotenv import load_dotenv, find_dotenv
-        load_dotenv(find_dotenv())
-        kafka_bootstrap = os.getenv("KAFKA_BOOTSTRAP", "10.5.0.7:9092")
-    
-    print(f"Using Kafka: {kafka_bootstrap}\n")
-    
-    # Import the necessary modules
-    try:
-        from streaming.ingestion.db_ingest_service import ingest_from_uri
-        from streaming.spark_streaming import run_streaming
-        
-        # Function to run DB ingestion in a separate process
-        def run_db_ingestion():
-            print("Starting DB ingestion service...")
-            ingest_from_uri(
-                db_uri=db_uri,
-                poll_interval=poll_interval,
-                kafka_bootstrap=kafka_bootstrap
-            )
-        
-        # Function to run Spark streaming in a separate process
-        def run_spark_consumer():
-            print("Starting Spark streaming consumer...")
-            # Update the output bucket in environment
-            os.environ["OUTPUT_BUCKET"] = bucket_name
-            run_streaming()
-        
-        # Run both processes
-        print("Starting parallel processes:")
-        print("  1. DB ingestion -> Kafka")
-        print("  2. Spark streaming -> MinIO mapped/\n")
-        
-        db_process = multiprocessing.Process(target=run_db_ingestion)
-        spark_process = multiprocessing.Process(target=run_spark_consumer)
-        
-        db_process.start()
-        spark_process.start()
-        
-        print("Both processes started. Press Ctrl+C to stop.\n")
-        
-        try:
-            db_process.join()
-            spark_process.join()
-        except KeyboardInterrupt:
-            print("\n\nStopping processes...")
-            db_process.terminate()
-            spark_process.terminate()
-            db_process.join()
-            spark_process.join()
-            print("✅ DB MODE STOPPED\n")
-            
-    except Exception as e:
-        print(f"❌ Error in db mode: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    print(f"DB MODE: Real-time CDC via Debezium")
+    print(f"{'='*60}\n")
+
+    manager = DebeziumConnectorManager()
+
+    if not manager.wait_for_connect():
+        print("Kafka Connect not available")
+        return
+
+    # Auto-detect database type from URI and build connector config
+    connector_config = manager.create_connector_config(
+        db_uri=db_uri,
+        tables=tables,
+    )
+
+    # Deploy connector and start streaming
+    if manager.deploy_connector(connector_config):
+        print("\nDebezium connector deployed")
+        print("   Starting Spark streaming...\n")
+
+        os.environ["OUTPUT_BUCKET"] = bucket_name
+        run_streaming()
+    else:
+        print("Failed to deploy connector")
 
 
 def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_bootstrap: Optional[str] = None):
@@ -286,18 +257,15 @@ def main():
         run_batch_mode(bucket_name)
         
     elif mode == "db":
+        # Mask credentials in URI for display
         db_uri = CONFIG["db_uri"]
-        poll_interval = CONFIG["db_poll_interval"]
-        kafka_bootstrap = CONFIG["kafka_bootstrap"]
-        
-        # Mask password in URI for display
         display_uri = db_uri.split("@")[-1] if "@" in db_uri else db_uri
         print(f"  Database: {display_uri}")
-        print(f"  Poll interval: {poll_interval}s")
+        print(f"  Tables: {CONFIG['db_tables']}")
         print(f"{'='*60}\n")
-        
-        run_db_mode(db_uri, bucket_name, poll_interval, kafka_bootstrap)
-        
+
+        run_db_mode(CONFIG)
+
     elif mode == "api":
         api_url = CONFIG["api_url"]
         poll_interval = CONFIG["api_poll_interval"]
@@ -308,7 +276,7 @@ def main():
         print(f"{'='*60}\n")
         
         run_api_mode(api_url, bucket_name, poll_interval, kafka_bootstrap)
-        
+
     else:
         print(f"\n❌ ERROR: Invalid mode '{mode}'")
         print(f"   Valid modes: batch, db, api")
