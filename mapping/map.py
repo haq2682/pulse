@@ -440,7 +440,7 @@ def mapping(df, column_variants, mapped):
     return new_df, extra_df, extra_cols, missing_cols, mapped_cols
 
 
-def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="batch"):
+def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="batch", manual_mappings=None):
     """
     Unified processor for schema mapping.
 
@@ -459,6 +459,9 @@ def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="bat
         Object containing mapping_dict_<table> for each table.
     mode : str
         "batch" for files (single or multiple), "stream" for streaming.
+    manual_mappings : dict, optional
+        Dictionary of manual column mappings provided by user.
+        Format: {table_name: {canonical_col: source_col}}
 
     Returns
     -------
@@ -507,6 +510,41 @@ def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="bat
             final_df, extra_df, extra_cols, missing_cols, mapped_cols = mapping(
                 sub_df, mapping_dict, mapped
             )
+
+            # Apply manual mappings if provided
+            if manual_mappings and table_name in manual_mappings:
+                print(f"\n📝 Applying manual mappings for {table_name}...")
+                table_manual_mappings = manual_mappings[table_name]
+                
+                for canonical_col, source_col in table_manual_mappings.items():
+                    if canonical_col in missing_cols:
+                        # Check if the source column exists in extra_cols or original dataframe
+                        if source_col in extra_cols or source_col in sub_df.columns:
+                            try:
+                                # Rename the source column to canonical column
+                                if source_col in final_df.columns:
+                                    # Column already in final_df (from extra_df)
+                                    final_df = final_df.withColumnRenamed(source_col, canonical_col)
+                                elif source_col in extra_df.columns:
+                                    # Column is in extra_df, add it to final_df
+                                    final_df = final_df.withColumn(canonical_col, extra_df[source_col])
+                                else:
+                                    # Column is in original dataframe
+                                    final_df = final_df.withColumn(canonical_col, sub_df[source_col])
+                                
+                                # Update lists
+                                missing_cols.remove(canonical_col)
+                                if source_col in extra_cols:
+                                    extra_cols.remove(source_col)
+                                mapped_cols.append(canonical_col)
+                                
+                                print(f"   ✅ Mapped {source_col} → {canonical_col}")
+                            except Exception as map_error:
+                                print(f"   ⚠️  Could not map {source_col} → {canonical_col}: {map_error}")
+                        else:
+                            print(f"   ⚠️  Source column {source_col} not found for mapping to {canonical_col}")
+                
+                print(f"   After manual mapping: {len(missing_cols)} missing columns")
 
             # Sanitize lists before putting them into results
             results[f"{df_name}__{table_name}"] = {
