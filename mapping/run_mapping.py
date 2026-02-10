@@ -32,13 +32,12 @@ CONFIG = {
     "bucket_name": "pulse-bucket-1",  # MinIO bucket name
 
     # DB mode settings (only used when mode="db")
-    # Uses Debezium CDC for true real-time ingestion from database transaction log
-    "db_host": "localhost",
-    "db_port": 5432,
-    "db_name": "ecommerce",
-    "db_user": "debezium_user",
-    "db_password": "debezium_pass",
-    "db_type": "postgres",  # "postgres" or "mysql"
+    # Uses Debezium CDC for true real-time ingestion from database transaction log.
+    # The database type is auto-detected from the URI scheme.
+    # Supported: postgresql, mysql, mariadb, mongodb, mssql/sqlserver,
+    #            oracle, db2, vitess, spanner, informix, cassandra
+    # See mapping/CDC_SETUP_GUIDE.md for database setup instructions.
+    "db_uri": "postgresql://debezium_user:debezium_pass@localhost:5432/ecommerce",
     "db_tables": ["orders", "payments", "inventory", "shopping_cart", "cart_items"],
 
     # API mode settings (only used when mode="api")
@@ -114,26 +113,23 @@ def run_db_mode(config: dict):
     DB mode: Deploy Debezium CDC connector, stream real-time changes to Kafka,
     consume via Spark Streaming -> mapped folder.
 
-    Uses Debezium to capture database changes directly from the transaction log
-    (WAL for PostgreSQL, binlog for MySQL), providing true real-time CDC with
-    accurate operation types (create, update, delete).
+    Auto-detects the database type from the URI scheme and builds the correct
+    Debezium connector configuration. Supports all Debezium source connectors:
+    PostgreSQL, MySQL, MariaDB, MongoDB, SQL Server, Oracle, Db2,
+    Vitess, Spanner, Informix, Cassandra.
 
     Args:
-        config: Configuration dictionary with db_* settings
+        config: Configuration dictionary with db_uri and db_tables
     """
     from streaming.ingestion.debezium_connector_manager import DebeziumConnectorManager
     from streaming.spark_streaming import run_streaming
 
+    db_uri = config["db_uri"]
+    tables = config["db_tables"]
     bucket_name = config["bucket_name"]
 
     print(f"\n{'='*60}")
     print(f"DB MODE: Real-time CDC via Debezium")
-    print(f"{'='*60}")
-    print(f"  Host: {config['db_host']}:{config['db_port']}")
-    print(f"  Database: {config['db_name']}")
-    print(f"  Type: {config['db_type']}")
-    print(f"  Tables: {config['db_tables']}")
-    print(f"  Bucket: {bucket_name}")
     print(f"{'='*60}\n")
 
     manager = DebeziumConnectorManager()
@@ -142,37 +138,17 @@ def run_db_mode(config: dict):
         print("Kafka Connect not available")
         return
 
-    # Create connector config based on database type
-    if config["db_type"] == "postgres":
-        connector_config = manager.create_postgres_config(
-            connector_name="pulse-cdc-connector",
-            db_host=config["db_host"],
-            db_port=config["db_port"],
-            db_name=config["db_name"],
-            db_user=config["db_user"],
-            db_password=config["db_password"],
-            tables=config["db_tables"],
-        )
-    elif config["db_type"] == "mysql":
-        connector_config = manager.create_mysql_config(
-            connector_name="pulse-cdc-connector",
-            db_host=config["db_host"],
-            db_port=config["db_port"],
-            db_name=config["db_name"],
-            db_user=config["db_user"],
-            db_password=config["db_password"],
-            tables=config["db_tables"],
-        )
-    else:
-        print(f"Unsupported DB type: {config['db_type']}")
-        return
+    # Auto-detect database type from URI and build connector config
+    connector_config = manager.create_connector_config(
+        db_uri=db_uri,
+        tables=tables,
+    )
 
     # Deploy connector and start streaming
     if manager.deploy_connector(connector_config):
         print("\nDebezium connector deployed")
         print("   Starting Spark streaming...\n")
 
-        # Update the output bucket in environment
         os.environ["OUTPUT_BUCKET"] = bucket_name
         run_streaming()
     else:
@@ -281,8 +257,10 @@ def main():
         run_batch_mode(bucket_name)
         
     elif mode == "db":
-        print(f"  Database: {CONFIG['db_host']}:{CONFIG['db_port']}/{CONFIG['db_name']}")
-        print(f"  DB Type: {CONFIG['db_type']}")
+        # Mask credentials in URI for display
+        db_uri = CONFIG["db_uri"]
+        display_uri = db_uri.split("@")[-1] if "@" in db_uri else db_uri
+        print(f"  Database: {display_uri}")
         print(f"  Tables: {CONFIG['db_tables']}")
         print(f"{'='*60}\n")
 
