@@ -43,7 +43,6 @@ const Mapping = () => {
     const [dataLoading, setDataLoading] = useState(true);
     const [error, setError] = useState('');
     const [mappingInProgress, setMappingInProgress] = useState(false);  // Track if mapping is still running
-    const [mappingStatus, setMappingStatus] = useState(null);
     
     // Dialog state
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);

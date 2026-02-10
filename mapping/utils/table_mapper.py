@@ -4,7 +4,7 @@ Provides fuzzy matching and synonym mapping for table names across all ingestion
 """
 
 from typing import Optional
-from fuzzywuzzy import fuzz, process
+from rapidfuzz import fuzz, process
 
 
 # Canonical tables in the e-commerce schema
