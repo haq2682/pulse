@@ -42,6 +42,8 @@ const Mapping = () => {
     const [loading, setLoading] = useState(false);
     const [dataLoading, setDataLoading] = useState(true);
     const [error, setError] = useState('');
+    const [mappingInProgress, setMappingInProgress] = useState(false);  // Track if mapping is still running
+    const [mappingStatus, setMappingStatus] = useState(null);
     
     // Dialog state
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -113,6 +115,30 @@ const Mapping = () => {
         setError('');
         
         try {
+            // First check mapping status
+            const statusResponse = await axiosInstance.get('/onboarding/mapping-status', {
+                params: { userId: user.user_id }
+            });
+            
+            const { mapping_status } = statusResponse.data;
+            setMappingStatus(mapping_status);
+            
+            // If mapping is still running, show spinner and don't fetch results yet
+            if (mapping_status === 'running') {
+                setMappingInProgress(true);
+                setDataLoading(false);
+                // Poll status every 3 seconds
+                setTimeout(() => {
+                    if (user?.user_id) {
+                        fetchMappingData();
+                    }
+                }, 3000);
+                return;
+            }
+            
+            setMappingInProgress(false);
+            
+            // Fetch mapping results if completed or failed
             const response = await axiosInstance.get('/onboarding/mapping-results', {
                 params: { userId: user.user_id }
             });
@@ -136,6 +162,7 @@ const Mapping = () => {
         } catch (e) {
             console.error('Error fetching mapping data:', e);
             setError(e.response?.data?.detail || e.message || 'Failed to fetch mapping data');
+            setMappingInProgress(false);
         } finally {
             setDataLoading(false);
         }
@@ -257,6 +284,25 @@ const Mapping = () => {
                 <div className="text-center">
                     <ProgressSpinner />
                     <Text className="text-gray-600 mt-4">Loading mapping data...</Text>
+                </div>
+            </div>
+        );
+    }
+    
+    // Mapping in progress state
+    if (mappingInProgress) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center max-w-md mx-auto p-8">
+                    <ProgressSpinner />
+                    <Heading level={3} className="text-gray-800 mt-6 mb-4">Mapping Pipeline Running</Heading>
+                    <Text className="text-gray-600">
+                        The system is currently processing and mapping your data to the canonical schema.
+                        This may take a few minutes depending on the size of your dataset.
+                    </Text>
+                    <Text className="text-gray-500 mt-4 text-sm">
+                        This page will automatically update when mapping is complete.
+                    </Text>
                 </div>
             </div>
         );
