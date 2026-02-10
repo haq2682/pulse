@@ -413,7 +413,7 @@ async def start_mapping(request: Request, db=Depends(get_db)):
                 WHERE user_id = :user_id
             """),
             {
-                "current_step": "mapping_in_progress",
+                "current_step": "mapping-in-progress",
                 "mapping_status": "running",
                 "started_at": datetime.utcnow(),
                 "user_id": user_id
@@ -459,15 +459,17 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         
         log_file_path = os.path.join(MAPPING_LOG_DIR, f"mapping_{mode}_{business_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.log")
         try:
-            with open(log_file_path, 'w') as log_file:
-                # Inherit environment variables from parent process
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=log_file,
-                    stderr=subprocess.STDOUT,
-                    cwd="/app/mapping",
-                    env=os.environ.copy()  # Pass all environment variables
-                )
+            # Open log file without 'with' block to keep it open for subprocess
+            log_file = open(log_file_path, 'w')
+            # Inherit environment variables from parent process
+            process = subprocess.Popen(
+                cmd,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                cwd="/app/mapping",
+                env=os.environ.copy()  # Pass all environment variables
+            )
+            # Note: log_file will remain open for the subprocess to write to
         except (IOError, OSError) as file_error:
             raise HTTPException(
                 status_code=500,
@@ -486,6 +488,9 @@ async def start_mapping(request: Request, db=Depends(get_db)):
             "mode": mode
         }
         
+    except HTTPException:
+        # Re-raise HTTPExceptions without modification (validation errors, etc.)
+        raise
     except Exception as e:
         # Update the onboarding record to indicate mapping failed
         # Set current_step back to "connect" so user can retry
@@ -553,8 +558,10 @@ async def get_mapping_status(userId: str, db=Depends(get_db)):
                     # os.kill with signal 0 doesn't kill the process, just checks if it exists
                     os.kill(process_id, 0)
                 except (OSError, ValueError, PermissionError):
-                    # Process is not running anymore (OSError), invalid PID (ValueError), 
-                    # or permission denied (PermissionError - could mean process exists but owned by different user)
+                    # Process is not running anymore:
+                    # - OSError: Process doesn't exist or already terminated
+                    # - ValueError: Invalid PID
+                    # - PermissionError: Process exists but owned by different user (not accessible)
                     # Check if it completed successfully by looking at the MinIO bucket for mapped files
                     try:
                         # List objects in the mapped folder
@@ -686,7 +693,7 @@ async def get_mapping_results(userId: str, db=Depends(get_db)):
                             WHERE user_id = :user_id
                         """),
                         {
-                            "mapping_results": json.dumps(mapping_results),
+                            "mapping_results": mapping_results,  # SQLAlchemy handles JSONB conversion
                             "user_id": userId
                         }
                     )
@@ -750,7 +757,7 @@ async def save_manual_mappings(request: Request, db=Depends(get_db)):
                 WHERE user_id = :user_id
             """),
             {
-                "manual_mappings": json.dumps(manual_mappings),
+                "manual_mappings": manual_mappings,  # SQLAlchemy handles JSONB conversion
                 "current_step": "mapping",
                 "is_completed": True,
                 "user_id": user_id

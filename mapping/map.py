@@ -532,8 +532,9 @@ def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="bat
                                     # Column is in original dataframe
                                     final_df = final_df.withColumn(canonical_col, sub_df[source_col])
                                 
-                                # Update lists
-                                missing_cols.remove(canonical_col)
+                                # Update lists - check existence before removing
+                                if canonical_col in missing_cols:
+                                    missing_cols.remove(canonical_col)
                                 if source_col in extra_cols:
                                     extra_cols.remove(source_col)
                                 mapped_cols.append(canonical_col)

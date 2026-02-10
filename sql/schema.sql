@@ -40,7 +40,7 @@ CREATE TABLE onboarding (
     onboarding_id VARCHAR(50) PRIMARY KEY,
     user_id VARCHAR(50) NOT NULL,
     business_id VARCHAR(50) NULL,
-    current_step VARCHAR(100) NOT NULL DEFAULT 'business' CHECK (current_step IN ('business', 'data-type', 'connect', 'mapping', 'mapping_in_progress')),
+    current_step VARCHAR(100) NOT NULL DEFAULT 'business' CHECK (current_step IN ('business', 'data-type', 'connect', 'mapping', 'mapping-in-progress')),
     ingestion_type VARCHAR(50) NULL CHECK (ingestion_type IN ('batch', 'db', 'api')),
     is_completed BOOLEAN DEFAULT FALSE,
     mapping_status VARCHAR(50) NULL CHECK (mapping_status IN ('pending', 'running', 'completed', 'failed')),
