@@ -36,6 +36,7 @@ const Connect = () => {
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef(null);
     const mappingCheckIntervalRef = useRef(null);
+    const isCheckingMappingRef = useRef(false); // Prevent duplicate interval creation
 
     const breadcrumbItems = [
         {
@@ -88,10 +89,15 @@ const Connect = () => {
     }
 
     useEffect(() => {
-        fetchCurrentStep();
-        fetchIngestionType();
-        fetchUploadedFiles();
-        checkMappingStatus(); // Check mapping status on mount
+        const initializeData = async () => {
+            await fetchCurrentStep();
+            await fetchIngestionType();
+            await fetchUploadedFiles();
+            // Check mapping status after data is loaded
+            await checkMappingStatus();
+        };
+        
+        initializeData();
         
         // Clean up interval on unmount
         return () => {
@@ -450,7 +456,13 @@ const Connect = () => {
     }
 
     const checkMappingStatus = async () => {
+        // Prevent duplicate checks
+        if (isCheckingMappingRef.current) {
+            return;
+        }
+        
         try {
+            isCheckingMappingRef.current = true;
             const response = await axiosInstance.get('/onboarding/mapping-status', {
                 params: { userId: user.user_id }
             });
@@ -479,12 +491,14 @@ const Connect = () => {
                                     if (status === 'completed') {
                                         clearInterval(mappingCheckIntervalRef.current);
                                         mappingCheckIntervalRef.current = null;
+                                        isCheckingMappingRef.current = false;
                                         setMappingLoading(false);
                                         // Navigate to mapping page
                                         navigate(`/onboarding/mapping/${pathname.split('/')[3]}`);
                                     } else if (status === 'failed') {
                                         clearInterval(mappingCheckIntervalRef.current);
                                         mappingCheckIntervalRef.current = null;
+                                        isCheckingMappingRef.current = false;
                                         setMappingLoading(false);
                                         setErrors((prev) => ({ 
                                             ...prev, 
@@ -502,10 +516,12 @@ const Connect = () => {
                     navigate(`/onboarding/mapping/${pathname.split('/')[3]}`);
                 } else {
                     setMappingLoading(false);
+                    isCheckingMappingRef.current = false;
                 }
             }
         } catch (e) {
             console.error('Error checking mapping status:', e);
+            isCheckingMappingRef.current = false;
         }
     };
 
