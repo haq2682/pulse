@@ -273,7 +273,11 @@ def main():
     elif mode == "db":
         # Use command-line args if provided, otherwise use CONFIG
         db_uri = args.db_uri if args.db_uri else CONFIG["db_uri"]
-        db_tables = args.db_tables.split(',') if args.db_tables else CONFIG["db_tables"]
+        # Handle empty string for db_tables
+        if args.db_tables:
+            db_tables = [t.strip() for t in args.db_tables.split(',') if t.strip()]
+        else:
+            db_tables = CONFIG["db_tables"]
         
         # Mask credentials in URI for display
         display_uri = db_uri.split("@")[-1] if "@" in db_uri else db_uri

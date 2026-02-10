@@ -18,6 +18,7 @@ redis = aioredis.from_url("redis://redis:6379", decode_responses=True)
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://localhost:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+MAPPING_LOG_DIR = os.getenv("MAPPING_LOG_DIR", "/tmp")
 
 s3 = boto3.client(
     "s3",
@@ -411,7 +412,7 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         
         # Start the mapping pipeline in background using subprocess.Popen
         # Use stdout and stderr redirection to avoid blocking
-        log_file_path = f"/tmp/mapping_{business_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.log"
+        log_file_path = os.path.join(MAPPING_LOG_DIR, f"mapping_{business_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.log")
         with open(log_file_path, 'w') as log_file:
             # Inherit environment variables from parent process
             process = subprocess.Popen(
@@ -451,8 +452,8 @@ async def start_mapping(request: Request, db=Depends(get_db)):
                     }
                 )
                 db.commit()
-            except:
-                pass
+            except Exception as db_error:
+                print(f"Error updating database after failure: {db_error}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/mapping-status")
@@ -494,10 +495,12 @@ async def get_mapping_status(userId: str, db=Depends(get_db)):
                 try:
                     process_id = int(process_id_str)
                     # Check if process is still running
-                    os.kill(process_id, 0)  # This will raise an exception if process doesn't exist
-                except (OSError, ValueError):
-                    # Process is not running anymore, check if it completed successfully
-                    # by looking at the MinIO bucket for mapped files
+                    # os.kill with signal 0 doesn't kill the process, just checks if it exists
+                    os.kill(process_id, 0)
+                except (OSError, ValueError, PermissionError) as process_error:
+                    # Process is not running anymore (OSError), invalid PID (ValueError), 
+                    # or permission denied (PermissionError)
+                    # Check if it completed successfully by looking at the MinIO bucket for mapped files
                     try:
                         # List objects in the mapped folder
                         response = s3.list_objects_v2(Bucket=business_id, Prefix="mapped/")
