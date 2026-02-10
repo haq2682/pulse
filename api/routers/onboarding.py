@@ -397,6 +397,10 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         # In docker, the mapping folder is mounted at /app/mapping
         script_path = "/app/mapping/run_mapping.py"
         
+        # Check if script exists
+        if not os.path.exists(script_path):
+            raise HTTPException(status_code=500, detail=f"Mapping script not found at {script_path}")
+        
         # Build the command to run the mapping pipeline
         cmd = [
             "python3",
@@ -409,11 +413,13 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         # Use stdout and stderr redirection to avoid blocking
         log_file_path = f"/tmp/mapping_{business_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.log"
         with open(log_file_path, 'w') as log_file:
+            # Inherit environment variables from parent process
             process = subprocess.Popen(
                 cmd,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
-                cwd="/app/mapping"
+                cwd="/app/mapping",
+                env=os.environ.copy()  # Pass all environment variables
             )
         
         # Store the process ID in Redis for tracking
