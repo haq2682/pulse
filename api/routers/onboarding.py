@@ -19,6 +19,7 @@ MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://localhost:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MAPPING_LOG_DIR = os.getenv("MAPPING_LOG_DIR", "/tmp")
+MAPPING_PROCESS_TTL = 86400  # 24 hours in seconds
 
 s3 = boto3.client(
     "s3",
@@ -412,20 +413,36 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         
         # Start the mapping pipeline in background using subprocess.Popen
         # Use stdout and stderr redirection to avoid blocking
+        # Ensure log directory exists
+        if not os.path.exists(MAPPING_LOG_DIR):
+            try:
+                os.makedirs(MAPPING_LOG_DIR, exist_ok=True)
+            except Exception as dir_error:
+                raise HTTPException(
+                    status_code=500, 
+                    detail=f"Failed to create log directory: {str(dir_error)}"
+                )
+        
         log_file_path = os.path.join(MAPPING_LOG_DIR, f"mapping_{business_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.log")
-        with open(log_file_path, 'w') as log_file:
-            # Inherit environment variables from parent process
-            process = subprocess.Popen(
-                cmd,
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                cwd="/app/mapping",
-                env=os.environ.copy()  # Pass all environment variables
+        try:
+            with open(log_file_path, 'w') as log_file:
+                # Inherit environment variables from parent process
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=log_file,
+                    stderr=subprocess.STDOUT,
+                    cwd="/app/mapping",
+                    env=os.environ.copy()  # Pass all environment variables
+                )
+        except (IOError, OSError) as file_error:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create log file: {str(file_error)}"
             )
         
         # Store the process ID in Redis for tracking
-        await redis.set(f"mapping_process:{business_id}", str(process.pid), ex=86400)
-        await redis.set(f"mapping_log:{business_id}", log_file_path, ex=86400)
+        await redis.set(f"mapping_process:{business_id}", str(process.pid), ex=MAPPING_PROCESS_TTL)
+        await redis.set(f"mapping_log:{business_id}", log_file_path, ex=MAPPING_PROCESS_TTL)
         
         return {
             "status": 200,
@@ -497,9 +514,9 @@ async def get_mapping_status(userId: str, db=Depends(get_db)):
                     # Check if process is still running
                     # os.kill with signal 0 doesn't kill the process, just checks if it exists
                     os.kill(process_id, 0)
-                except (OSError, ValueError, PermissionError) as process_error:
+                except (OSError, ValueError, PermissionError):
                     # Process is not running anymore (OSError), invalid PID (ValueError), 
-                    # or permission denied (PermissionError)
+                    # or permission denied (PermissionError - could mean process exists but owned by different user)
                     # Check if it completed successfully by looking at the MinIO bucket for mapped files
                     try:
                         # List objects in the mapped folder
