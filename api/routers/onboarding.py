@@ -453,18 +453,21 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         
     except Exception as e:
         # Update the onboarding record to indicate mapping failed
+        # Set current_step back to "connect" so user can retry
         if 'user_id' in locals():
             try:
                 db.execute(
                     text("""
                         UPDATE onboarding 
                         SET mapping_status = :mapping_status,
-                            mapping_error = :error
+                            mapping_error = :error,
+                            current_step = :current_step
                         WHERE user_id = :user_id
                     """),
                     {
                         "mapping_status": "failed",
                         "error": str(e),
+                        "current_step": "connect",
                         "user_id": user_id
                     }
                 )
@@ -543,21 +546,25 @@ async def get_mapping_status(userId: str, db=Depends(get_db)):
                             current_step = "mapping"
                         else:
                             # No files in mapped folder, consider it failed
+                            # Set current_step back to "connect" so user can retry
                             db.execute(
                                 text("""
                                     UPDATE onboarding 
                                     SET mapping_status = :mapping_status,
-                                        mapping_error = :error
+                                        mapping_error = :error,
+                                        current_step = :current_step
                                     WHERE user_id = :user_id
                                 """),
                                 {
                                     "mapping_status": "failed",
                                     "error": "Mapping process terminated without producing output",
+                                    "current_step": "connect",
                                     "user_id": userId
                                 }
                             )
                             db.commit()
                             mapping_status = "failed"
+                            current_step = "connect"
                             mapping_error = "Mapping process terminated without producing output"
                     except Exception as e:
                         print(f"Error checking MinIO bucket: {e}")
@@ -572,4 +579,159 @@ async def get_mapping_status(userId: str, db=Depends(get_db)):
         }
         
     except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+@router.get("/mapping-results")
+async def get_mapping_results(userId: str, db=Depends(get_db)):
+    """
+    Get the mapping results (missing_cols and extra_cols) from the database.
+    Returns formatted mapping data for the frontend.
+    """
+    try:
+        if not userId:
+            raise HTTPException(status_code=400, detail="userId is required")
+        
+        # Get the mapping results from database
+        onboarding = db.execute(
+            text("""
+                SELECT 
+                    business_id,
+                    mapping_results,
+                    mapping_status
+                FROM onboarding 
+                WHERE user_id = :user_id
+            """),
+            {"user_id": userId}
+        )
+        onboarding_record = onboarding.fetchone()
+        
+        if not onboarding_record:
+            raise HTTPException(status_code=404, detail="Onboarding record not found")
+        
+        business_id, mapping_results, mapping_status = onboarding_record
+        
+        # If mapping is not completed yet, return appropriate status
+        if mapping_status != "completed":
+            return {
+                "status": 200,
+                "mapping_status": mapping_status,
+                "missing_cols": [],
+                "extra_cols": [],
+                "all_fields_identified": False
+            }
+        
+        # Parse mapping results from JSONB
+        if mapping_results:
+            missing_cols = mapping_results.get("missing_cols", [])
+            extra_cols = mapping_results.get("extra_cols", [])
+            
+            # Check if all fields are identified
+            all_fields_identified = len(missing_cols) == 0
+            
+            return {
+                "status": 200,
+                "mapping_status": mapping_status,
+                "missing_cols": missing_cols,
+                "extra_cols": extra_cols,
+                "all_fields_identified": all_fields_identified
+            }
+        else:
+            # No mapping results yet, check Redis for cached results
+            if business_id:
+                mapping_results_str = await redis.get(f"mapping_results:{business_id}")
+                if mapping_results_str:
+                    mapping_results = json.loads(mapping_results_str)
+                    missing_cols = mapping_results.get("missing_cols", [])
+                    extra_cols = mapping_results.get("extra_cols", [])
+                    
+                    # Save to database for persistence
+                    db.execute(
+                        text("""
+                            UPDATE onboarding 
+                            SET mapping_results = :mapping_results
+                            WHERE user_id = :user_id
+                        """),
+                        {
+                            "mapping_results": json.dumps(mapping_results),
+                            "user_id": userId
+                        }
+                    )
+                    db.commit()
+                    
+                    all_fields_identified = len(missing_cols) == 0
+                    
+                    return {
+                        "status": 200,
+                        "mapping_status": mapping_status,
+                        "missing_cols": missing_cols,
+                        "extra_cols": extra_cols,
+                        "all_fields_identified": all_fields_identified
+                    }
+            
+            # No results available
+            return {
+                "status": 200,
+                "mapping_status": mapping_status,
+                "missing_cols": [],
+                "extra_cols": [],
+                "all_fields_identified": False
+            }
+        
+    except Exception as e:
+        print(f"Error getting mapping results: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/save-manual-mappings")
+async def save_manual_mappings(request: Request, db=Depends(get_db)):
+    """
+    Save manual column mappings provided by the user.
+    """
+    try:
+        body = await request.json()
+        user_id = body.get("userId")
+        manual_mappings = body.get("manualMappings", {})
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="userId is required")
+        
+        # Get the onboarding record
+        onboarding = db.execute(
+            text("SELECT business_id FROM onboarding WHERE user_id = :user_id"),
+            {"user_id": user_id}
+        )
+        onboarding_record = onboarding.fetchone()
+        
+        if not onboarding_record:
+            raise HTTPException(status_code=404, detail="Onboarding record not found")
+        
+        business_id = onboarding_record[0]
+        
+        # Save manual mappings to database
+        db.execute(
+            text("""
+                UPDATE onboarding 
+                SET manual_mappings = :manual_mappings,
+                    current_step = :current_step,
+                    is_completed = :is_completed
+                WHERE user_id = :user_id
+            """),
+            {
+                "manual_mappings": json.dumps(manual_mappings),
+                "current_step": "mapping",
+                "is_completed": True,
+                "user_id": user_id
+            }
+        )
+        db.commit()
+        
+        # Store in Redis for the mapping pipeline to use
+        if business_id:
+            await redis.set(f"manual_mappings:{business_id}", json.dumps(manual_mappings), ex=MAPPING_PROCESS_TTL)
+        
+        return {
+            "status": 200,
+            "message": "Manual mappings saved successfully"
+        }
+        
+    except Exception as e:
+        print(f"Error saving manual mappings: {e}")
         raise HTTPException(status_code=400, detail=str(e))

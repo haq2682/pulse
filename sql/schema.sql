@@ -47,6 +47,8 @@ CREATE TABLE onboarding (
     mapping_error TEXT NULL,
     mapping_started_at TIMESTAMP NULL,
     mapping_completed_at TIMESTAMP NULL,
+    mapping_results JSONB NULL,
+    manual_mappings JSONB NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id),
