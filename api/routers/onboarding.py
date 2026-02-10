@@ -1,5 +1,6 @@
 import os
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, Query, UploadFile, File
+from fastapi.concurrency import run_in_threadpool
 from database import get_db
 from sqlalchemy import text
 import aioredis
@@ -351,14 +352,23 @@ async def start_mapping(request: Request, db=Depends(get_db)):
     """
     try:
         body = await request.json()
-        user_id = body.get("userId")
+        
+        # Get authenticated user from middleware
+        authenticated_user_id = getattr(request.state, "user_id", None)
+        if not authenticated_user_id:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
+        # Get userId from body and verify it matches authenticated user
+        body_user_id = body.get("userId")
+        if body_user_id is not None and str(body_user_id) != str(authenticated_user_id):
+            raise HTTPException(status_code=403, detail="Cannot start mapping for another user")
+        
+        # Use authenticated user ID
+        user_id = authenticated_user_id
         mode = body.get("mode", "batch")  # Default to batch mode
         db_uri = body.get("dbUri")  # For db mode
         api_url = body.get("apiUrl")  # For api mode
         db_tables = body.get("dbTables", [])  # For db mode
-        
-        if not user_id:
-            raise HTTPException(status_code=400, detail="userId is required")
         
         # Validate required parameters for each mode
         if mode == "db" and not db_uri:
@@ -367,17 +377,17 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         if mode == "api" and not api_url:
             raise HTTPException(status_code=400, detail="API URL is required for api mode")
         
-        # Validate connectivity for db and api modes
+        # Validate connectivity for db and api modes (run in threadpool to avoid blocking)
         if mode == "db":
             from utils.connectivity_validator import validate_database_connection
-            success, message = validate_database_connection(db_uri, timeout=10)
+            success, message = await run_in_threadpool(validate_database_connection, db_uri, 10)
             if not success:
                 raise HTTPException(status_code=400, detail=message)
             print(f"Database connectivity validated: {message}")
             
         elif mode == "api":
             from utils.connectivity_validator import validate_api_endpoint
-            success, message = validate_api_endpoint(api_url, timeout=10)
+            success, message = await run_in_threadpool(validate_api_endpoint, api_url, 10)
             if not success:
                 raise HTTPException(status_code=400, detail=message)
             print(f"API endpoint connectivity validated: {message}")
@@ -520,14 +530,20 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/mapping-status")
-async def get_mapping_status(userId: str, db=Depends(get_db)):
+async def get_mapping_status(request: Request, userId: str, db=Depends(get_db)):
     """
     Get the current status of the mapping pipeline.
     Returns the status from the PostgreSQL onboarding table.
     """
     try:
-        if not userId:
-            raise HTTPException(status_code=400, detail="userId is required")
+        # Get authenticated user from middleware
+        authenticated_user_id = getattr(request.state, "user_id", None)
+        if not authenticated_user_id:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
+        # Verify userId matches authenticated user
+        if str(userId) != str(authenticated_user_id):
+            raise HTTPException(status_code=403, detail="Cannot access another user's mapping status")
         
         # Get the onboarding record
         onboarding = db.execute(
@@ -567,10 +583,26 @@ async def get_mapping_status(userId: str, db=Depends(get_db)):
                     # - PermissionError: Process exists but owned by different user (not accessible)
                     # Check if it completed successfully by looking at the MinIO bucket for mapped files
                     try:
-                        # List objects in the mapped folder
-                        response = s3.list_objects_v2(Bucket=business_id, Prefix="mapped/")
+                        # List objects in the mapped folder with timestamp checking
+                        # Run in threadpool to avoid blocking async event loop
+                        response = await run_in_threadpool(
+                            s3.list_objects_v2,
+                            Bucket=business_id,
+                            Prefix="mapped/"
+                        )
+                        
+                        # Check if files exist AND were created after mapping started
+                        has_recent_files = False
                         if response.get('KeyCount', 0) > 0:
-                            # Files exist in mapped folder, consider it completed
+                            for obj in response.get('Contents', []):
+                                last_modified = obj.get('LastModified')
+                                # Ensure files were created after mapping started
+                                if mapping_started_at and last_modified and last_modified >= mapping_started_at:
+                                    has_recent_files = True
+                                    break
+                        
+                        if has_recent_files:
+                            # Files exist in mapped folder and were created after mapping started
                             db.execute(
                                 text("""
                                     UPDATE onboarding 
@@ -590,7 +622,7 @@ async def get_mapping_status(userId: str, db=Depends(get_db)):
                             mapping_status = "completed"
                             current_step = "mapping"
                         else:
-                            # No files in mapped folder, consider it failed
+                            # No files in mapped folder or files are stale, consider it failed
                             # Set current_step back to "connect" so user can retry
                             db.execute(
                                 text("""
@@ -626,14 +658,20 @@ async def get_mapping_status(userId: str, db=Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 @router.get("/mapping-results")
-async def get_mapping_results(userId: str, db=Depends(get_db)):
+async def get_mapping_results(request: Request, userId: str, db=Depends(get_db)):
     """
     Get the mapping results (missing_cols and extra_cols) from the database.
     Returns formatted mapping data for the frontend.
     """
     try:
-        if not userId:
-            raise HTTPException(status_code=400, detail="userId is required")
+        # Get authenticated user from middleware
+        authenticated_user_id = getattr(request.state, "user_id", None)
+        if not authenticated_user_id:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
+        # Verify userId matches authenticated user
+        if str(userId) != str(authenticated_user_id):
+            raise HTTPException(status_code=403, detail="Cannot access another user's mapping results")
         
         # Get the mapping results from database
         onboarding = db.execute(
@@ -732,11 +770,20 @@ async def save_manual_mappings(request: Request, db=Depends(get_db)):
     """
     try:
         body = await request.json()
-        user_id = body.get("userId")
-        manual_mappings = body.get("manualMappings", {})
         
-        if not user_id:
-            raise HTTPException(status_code=400, detail="userId is required")
+        # Get authenticated user from middleware
+        authenticated_user_id = getattr(request.state, "user_id", None)
+        if not authenticated_user_id:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
+        # Get userId from body and verify it matches authenticated user
+        body_user_id = body.get("userId")
+        if body_user_id is not None and str(body_user_id) != str(authenticated_user_id):
+            raise HTTPException(status_code=403, detail="Cannot save mappings for another user")
+        
+        # Use authenticated user ID
+        user_id = authenticated_user_id
+        manual_mappings = body.get("manualMappings", {})
         
         # Get the onboarding record
         onboarding = db.execute(
