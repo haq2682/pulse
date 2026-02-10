@@ -17,7 +17,7 @@ Supports all Debezium-compatible databases:
 
 import requests
 from urllib.parse import urlparse
-from typing import Dict, Tuple
+from typing import Tuple
 import pymysql
 import psycopg2
 from pymongo import MongoClient
@@ -254,7 +254,7 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                         cluster = Cluster([hostname], port=port, auth_provider=auth_provider, connect_timeout=timeout)
                     else:
                         cluster = Cluster([hostname], port=port, connect_timeout=timeout)
-                    session = cluster.connect()
+                    cluster.connect()  # Test connection
                     cluster.shutdown()
                     return True, f"Successfully connected to Cassandra database at {hostname}:{port}"
                 except Exception as e:

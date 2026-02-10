@@ -97,7 +97,7 @@ const Mapping = () => {
                 navigate(`/onboarding/data-type/${onboardingId}`);
             } else if (currentStep === 'connect') {
                 navigate(`/onboarding/connect/${onboardingId}`);
-            } else if (currentStep === 'mapping' || currentStep === 'mapping_in_progress') {
+            } else if (currentStep === 'mapping' || currentStep === 'mapping-in-progress') {
                 return;
             } else {
                 navigate(`/onboarding/connect/${onboardingId}`);

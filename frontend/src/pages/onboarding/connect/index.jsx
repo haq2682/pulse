@@ -30,7 +30,6 @@ const Connect = () => {
     const [uploadProgress, setUploadProgress] = useState({});
     const [loading, setLoading] = useState(false);
     const [mappingLoading, setMappingLoading] = useState(false);
-    const [mappingStatus, setMappingStatus] = useState(null);
     const [ingestionTypeLoading, setIngestionTypeLoading] = useState(true);
     const [ingestionType, setIngestionType] = useState('');
     const [errors, setErrors] = useState({db: '', api: '', form: ''});
@@ -83,7 +82,7 @@ const Connect = () => {
             else if (currentStep === 'connect') {
                 return;
             }
-            else if (currentStep === 'mapping') {
+            else if (currentStep === 'mapping' || currentStep === 'mapping-in-progress') {
                 navigate(`/onboarding/mapping/${onboardingId}`);
             }
             else {
@@ -97,6 +96,8 @@ const Connect = () => {
     }
 
     useEffect(() => {
+        if (!user?.user_id) return;
+        
         const initializeData = async () => {
             await fetchCurrentStep();
             await fetchIngestionType();
@@ -113,7 +114,7 @@ const Connect = () => {
                 clearInterval(mappingCheckIntervalRef.current);
             }
         };
-    }, []);
+    }, [user?.user_id]);
 
     const fetchUploadedFiles = async () => {
         try {
@@ -485,14 +486,16 @@ const Connect = () => {
             
             if (response.status === 200) {
                 const { current_step, mapping_status } = response.data;
-                setMappingStatus(mapping_status);
                 
                 // If mapping is in progress, show the loader and start polling
-                if (mapping_status === 'running' || current_step === 'mapping_in_progress') {
+                if (mapping_status === 'running' || current_step === 'mapping-in-progress') {
                     setMappingLoading(true);
                     
                     // Start polling every 3 seconds if not already polling
                     if (!mappingCheckIntervalRef.current) {
+                        // Reset the flag after initial setup to allow future calls
+                        isCheckingMappingRef.current = false;
+                        
                         mappingCheckIntervalRef.current = setInterval(async () => {
                             try {
                                 const statusResponse = await axiosInstance.get('/onboarding/mapping-status', {
@@ -500,14 +503,12 @@ const Connect = () => {
                                 });
                                 
                                 if (statusResponse.status === 200) {
-                                    const { mapping_status: status, current_step: step } = statusResponse.data;
-                                    setMappingStatus(status);
+                                    const { mapping_status: status } = statusResponse.data;
                                     
                                     // If mapping is completed or failed, stop polling and hide loader
                                     if (status === 'completed') {
                                         clearInterval(mappingCheckIntervalRef.current);
                                         mappingCheckIntervalRef.current = null;
-                                        isCheckingMappingRef.current = false;
                                         setMappingLoading(false);
                                         // Navigate to mapping page
                                         const onboardingId = getOnboardingIdFromPath();
@@ -515,7 +516,6 @@ const Connect = () => {
                                     } else if (status === 'failed') {
                                         clearInterval(mappingCheckIntervalRef.current);
                                         mappingCheckIntervalRef.current = null;
-                                        isCheckingMappingRef.current = false;
                                         setMappingLoading(false);
                                         setErrors((prev) => ({ 
                                             ...prev, 
@@ -525,11 +525,25 @@ const Connect = () => {
                                 }
                             } catch (err) {
                                 console.error('Error checking mapping status:', err);
+                                // Stop polling on error to avoid infinite polling with a stuck state
+                                if (mappingCheckIntervalRef.current) {
+                                    clearInterval(mappingCheckIntervalRef.current);
+                                    mappingCheckIntervalRef.current = null;
+                                }
+                                setMappingLoading(false);
+                                setErrors((prev) => ({
+                                    ...prev,
+                                    form: prev.form || 'An error occurred while checking mapping status. Please try again.'
+                                }));
                             }
                         }, MAPPING_STATUS_POLL_INTERVAL);
+                    } else {
+                        // Interval already exists, just reset the flag
+                        isCheckingMappingRef.current = false;
                     }
                 } else if (mapping_status === 'completed') {
                     // If mapping is already completed, navigate to mapping page
+                    isCheckingMappingRef.current = false;
                     const onboardingId = getOnboardingIdFromPath();
                     navigate(`/onboarding/mapping/${onboardingId}`);
                 } else {
