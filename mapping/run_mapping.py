@@ -14,6 +14,8 @@ import sys
 import os
 import multiprocessing
 from typing import Optional
+import redis
+import json
 
 # Add current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -75,6 +77,18 @@ def run_batch_mode(bucket_name: str):
         )
         import List as mapping_list
         
+        # Try to retrieve manual mappings from Redis
+        manual_mappings = None
+        try:
+            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+            manual_mappings_str = redis_client.get(f"manual_mappings:{bucket_name}")
+            if manual_mappings_str:
+                manual_mappings = json.loads(manual_mappings_str)
+                print(f"\n✅ Retrieved manual mappings from Redis")
+                print(f"   Tables with manual mappings: {list(manual_mappings.keys())}")
+        except Exception as redis_error:
+            print(f"⚠️  Warning: Could not retrieve manual mappings from Redis: {redis_error}")
+        
         print(f"Loading files from {bucket_name}/ingested...")
         all_dataframes = load_all_files_from_minio(minio_client, bucket_name, spark)
         
@@ -87,8 +101,47 @@ def run_batch_mode(bucket_name: str):
             all_dataframes, 
             COLUMNS_INFO, 
             mapping_list,
-            mode="batch"
+            mode="batch",
+            manual_mappings=manual_mappings
         )
+        
+        # Collect mapping results (missing_cols and extra_cols)
+        mapping_results = {
+            "missing_cols": [],
+            "extra_cols": []
+        }
+        
+        for key, result in results.items():
+            table_name = result.get("table_name", "")
+            missing_cols = result.get("missing_cols", [])
+            extra_cols = result.get("extra_cols", [])
+            
+            # Add table name to each column for frontend display
+            for col in missing_cols:
+                mapping_results["missing_cols"].append({
+                    "column": col,
+                    "table": table_name
+                })
+            
+            for col in extra_cols:
+                mapping_results["extra_cols"].append({
+                    "column": col,
+                    "table": table_name
+                })
+        
+        # Save mapping results to Redis for the API to retrieve
+        try:
+            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+            redis_client.setex(
+                f"mapping_results:{bucket_name}",
+                86400,  # 24 hours
+                json.dumps(mapping_results)
+            )
+            print(f"\n✅ Mapping results saved to Redis")
+            print(f"   Missing columns: {len(mapping_results['missing_cols'])}")
+            print(f"   Extra columns: {len(mapping_results['extra_cols'])}")
+        except Exception as redis_error:
+            print(f"⚠️  Warning: Could not save mapping results to Redis: {redis_error}")
         
         print(f"\nSaving results to {bucket_name}/mapped...")
         save_dataframes_to_minio(results, minio_client, bucket_name)
@@ -108,6 +161,7 @@ def run_batch_mode(bucket_name: str):
         sys.exit(1)
 
 
+
 def run_db_mode(config: dict):
     """
     DB mode: Deploy Debezium CDC connector, stream real-time changes to Kafka,
@@ -125,18 +179,30 @@ def run_db_mode(config: dict):
     from streaming.spark_streaming import run_streaming
 
     db_uri = config["db_uri"]
-    tables = config["db_tables"]
+    tables = config.get("db_tables", [])
     bucket_name = config["bucket_name"]
 
     print(f"\n{'='*60}")
     print(f"DB MODE: Real-time CDC via Debezium")
     print(f"{'='*60}\n")
+    
+    # Try to retrieve manual mappings from Redis
+    manual_mappings = None
+    try:
+        redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+        manual_mappings_str = redis_client.get(f"manual_mappings:{bucket_name}")
+        if manual_mappings_str:
+            manual_mappings = json.loads(manual_mappings_str)
+            print(f"\n✅ Retrieved manual mappings from Redis")
+            print(f"   Tables with manual mappings: {list(manual_mappings.keys())}")
+    except Exception as redis_error:
+        print(f"⚠️  Warning: Could not retrieve manual mappings from Redis: {redis_error}")
 
     manager = DebeziumConnectorManager()
 
     if not manager.wait_for_connect():
         print("Kafka Connect not available")
-        return
+        sys.exit(1)
 
     # Auto-detect database type from URI and build connector config
     connector_config = manager.create_connector_config(
@@ -149,10 +215,16 @@ def run_db_mode(config: dict):
         print("\nDebezium connector deployed")
         print("   Starting Spark streaming...\n")
 
+        # Pass bucket name and manual mappings to streaming
         os.environ["OUTPUT_BUCKET"] = bucket_name
+        os.environ["BUSINESS_ID"] = bucket_name  # For saving mapping results
+        if manual_mappings:
+            os.environ["MANUAL_MAPPINGS"] = json.dumps(manual_mappings)
+        
         run_streaming()
     else:
         print("Failed to deploy connector")
+        sys.exit(1)
 
 
 def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_bootstrap: Optional[str] = None):
@@ -175,6 +247,18 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_
     print(f"API URL: {api_url}")
     print(f"Bucket: {bucket_name}")
     print(f"Poll interval: {poll_interval}s\n")
+    
+    # Try to retrieve manual mappings from Redis
+    manual_mappings = None
+    try:
+        redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+        manual_mappings_str = redis_client.get(f"manual_mappings:{bucket_name}")
+        if manual_mappings_str:
+            manual_mappings = json.loads(manual_mappings_str)
+            print(f"\n✅ Retrieved manual mappings from Redis")
+            print(f"   Tables with manual mappings: {list(manual_mappings.keys())}")
+    except Exception as redis_error:
+        print(f"⚠️  Warning: Could not retrieve manual mappings from Redis: {redis_error}")
     
     # Get Kafka bootstrap from env if not provided
     if kafka_bootstrap is None:
@@ -203,6 +287,9 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_
             print("Starting Spark streaming consumer...")
             # Update the output bucket in environment
             os.environ["OUTPUT_BUCKET"] = bucket_name
+            os.environ["BUSINESS_ID"] = bucket_name  # For saving mapping results
+            if manual_mappings:
+                os.environ["MANUAL_MAPPINGS"] = json.dumps(manual_mappings)
             run_streaming()
         
         # Run both processes
@@ -239,10 +326,24 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_
 def main():
     """
     Main entry point that reads configuration and executes the appropriate mode.
-    In production, CONFIG values will be provided by the React frontend.
+    In production, CONFIG values will be provided by the React frontend via command-line args.
     """
-    mode = CONFIG["mode"]
-    bucket_name = CONFIG["bucket_name"]
+    import argparse
+    
+    # Parse command-line arguments if provided
+    parser = argparse.ArgumentParser(description='Run mapping pipeline')
+    parser.add_argument('--mode', type=str, help='Mode: batch, db, or api')
+    parser.add_argument('--business-id', type=str, help='Business ID (used as bucket name)')
+    parser.add_argument('--db-uri', type=str, help='Database URI (for db mode)')
+    parser.add_argument('--db-tables', type=str, help='Comma-separated list of database tables (for db mode)')
+    parser.add_argument('--api-url', type=str, help='API endpoint URL (for api mode)')
+    parser.add_argument('--api-poll-interval', type=int, help='API polling interval in seconds (for api mode)')
+    
+    args = parser.parse_args()
+    
+    # Use command-line args if provided, otherwise use CONFIG
+    mode = args.mode if args.mode else CONFIG["mode"]
+    bucket_name = args.business_id if args.business_id else CONFIG["bucket_name"]
     
     print(f"\n{'='*60}")
     print(f"PULSE MAPPING - Starting in {mode.upper()} mode")
@@ -257,18 +358,29 @@ def main():
         run_batch_mode(bucket_name)
         
     elif mode == "db":
+        # Use command-line args if provided, otherwise use CONFIG
+        db_uri = args.db_uri if args.db_uri else CONFIG["db_uri"]
+        # Handle db_tables: distinguish between omitted (None) and explicitly provided (including empty string)
+        if args.db_tables is not None:
+            db_tables = [t.strip() for t in args.db_tables.split(',') if t.strip()]
+        else:
+            db_tables = CONFIG["db_tables"]
+        
         # Mask credentials in URI for display
-        db_uri = CONFIG["db_uri"]
         display_uri = db_uri.split("@")[-1] if "@" in db_uri else db_uri
         print(f"  Database: {display_uri}")
-        print(f"  Tables: {CONFIG['db_tables']}")
+        print(f"  Tables: {db_tables}")
         print(f"{'='*60}\n")
 
-        run_db_mode(CONFIG)
+        run_db_mode({
+            "db_uri": db_uri,
+            "db_tables": db_tables,
+            "bucket_name": bucket_name
+        })
 
     elif mode == "api":
-        api_url = CONFIG["api_url"]
-        poll_interval = CONFIG["api_poll_interval"]
+        api_url = args.api_url if args.api_url else CONFIG["api_url"]
+        poll_interval = args.api_poll_interval if args.api_poll_interval else CONFIG["api_poll_interval"]
         kafka_bootstrap = CONFIG["kafka_bootstrap"]
         
         print(f"  API URL: {api_url}")
