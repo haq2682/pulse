@@ -1,6 +1,18 @@
 """
 Connectivity validation utilities for database and API endpoints.
 Used to test connections before starting mapping pipelines.
+
+Supports all Debezium-compatible databases:
+- PostgreSQL
+- MySQL/MariaDB
+- MongoDB
+- SQL Server
+- Oracle
+- DB2
+- Cassandra
+- Vitess
+- Spanner
+- Informix
 """
 
 import requests
@@ -15,6 +27,9 @@ import pymssql
 def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, str]:
     """
     Test database connectivity and return status with error message.
+    
+    Supports all Debezium-compatible databases with appropriate connection testing.
+    For databases without direct Python drivers, returns guidance message.
     
     Args:
         db_uri: Database connection URI
@@ -37,12 +52,11 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
         if not hostname:
             return False, "Invalid database URI: hostname not found"
         
-        if not database:
-            return False, "Invalid database URI: database name not found"
-        
-        # Test connection based on database type
+        # PostgreSQL
         if db_type in ['postgresql', 'postgres']:
             port = port or 5432
+            if not database:
+                return False, "Invalid PostgreSQL URI: database name not found"
             try:
                 conn = psycopg2.connect(
                     host=hostname,
@@ -65,8 +79,11 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                 else:
                     return False, f"PostgreSQL connection error: {error_msg}"
                     
-        elif db_type in ['mysql', 'mariadb']:
+        # MySQL
+        elif db_type == 'mysql':
             port = port or 3306
+            if not database:
+                return False, "Invalid MySQL URI: database name not found"
             try:
                 conn = pymysql.connect(
                     host=hostname,
@@ -77,7 +94,7 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                     connect_timeout=timeout
                 )
                 conn.close()
-                return True, f"Successfully connected to MySQL/MariaDB database at {hostname}:{port}"
+                return True, f"Successfully connected to MySQL database at {hostname}:{port}"
             except pymysql.OperationalError as e:
                 error_msg = str(e)
                 if "access denied" in error_msg.lower():
@@ -88,15 +105,51 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                     return False, f"Database '{database}' does not exist on MySQL server at {hostname}:{port}."
                 else:
                     return False, f"MySQL connection error: {error_msg}"
+        
+        # MariaDB (similar to MySQL but distinct)
+        elif db_type == 'mariadb':
+            port = port or 3306
+            if not database:
+                return False, "Invalid MariaDB URI: database name not found"
+            try:
+                conn = pymysql.connect(
+                    host=hostname,
+                    port=port,
+                    user=username,
+                    password=password,
+                    database=database,
+                    connect_timeout=timeout
+                )
+                conn.close()
+                return True, f"Successfully connected to MariaDB database at {hostname}:{port}"
+            except pymysql.OperationalError as e:
+                error_msg = str(e)
+                if "access denied" in error_msg.lower():
+                    return False, f"Authentication failed for MariaDB at {hostname}:{port}. Check username and password."
+                elif "can't connect" in error_msg.lower() or "connection refused" in error_msg.lower():
+                    return False, f"Cannot connect to MariaDB at {hostname}:{port}. Server may be down or unreachable."
+                elif "unknown database" in error_msg.lower():
+                    return False, f"Database '{database}' does not exist on MariaDB server at {hostname}:{port}."
+                else:
+                    return False, f"MariaDB connection error: {error_msg}"
                     
+        # MongoDB
         elif db_type in ['mongodb', 'mongodb+srv']:
             port = port or 27017
             try:
                 # For MongoDB, construct connection string differently
-                if username and password:
-                    mongo_uri = f"mongodb://{username}:{password}@{hostname}:{port}/{database}"
+                if db_type == 'mongodb+srv':
+                    # SRV connection string
+                    if username and password:
+                        mongo_uri = f"mongodb+srv://{username}:{password}@{hostname}/{database if database else ''}"
+                    else:
+                        mongo_uri = f"mongodb+srv://{hostname}/{database if database else ''}"
                 else:
-                    mongo_uri = f"mongodb://{hostname}:{port}/{database}"
+                    # Standard connection
+                    if username and password:
+                        mongo_uri = f"mongodb://{username}:{password}@{hostname}:{port}/{database if database else ''}"
+                    else:
+                        mongo_uri = f"mongodb://{hostname}:{port}/{database if database else ''}"
                     
                 client = MongoClient(mongo_uri, serverSelectionTimeoutMS=timeout * 1000)
                 # Test connection by listing databases
@@ -112,8 +165,11 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                 else:
                     return False, f"MongoDB connection error: {error_msg}"
                     
+        # SQL Server
         elif db_type in ['mssql', 'sqlserver']:
             port = port or 1433
+            if not database:
+                return False, "Invalid SQL Server URI: database name not found"
             try:
                 conn = pymssql.connect(
                     server=hostname,
@@ -133,9 +189,104 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                     return False, f"Cannot connect to SQL Server at {hostname}:{port}. Server may be down or unreachable."
                 else:
                     return False, f"SQL Server connection error: {error_msg}"
+        
+        # Oracle
+        elif db_type == 'oracle':
+            port = port or 1521
+            # Oracle requires cx_Oracle or oracledb library
+            # We'll provide a helpful message since it requires specific setup
+            try:
+                import cx_Oracle
+                if not database:
+                    return False, "Invalid Oracle URI: service name or SID not found"
+                try:
+                    dsn = cx_Oracle.makedsn(hostname, port, service_name=database)
+                    conn = cx_Oracle.connect(user=username, password=password, dsn=dsn)
+                    conn.close()
+                    return True, f"Successfully connected to Oracle database at {hostname}:{port}"
+                except cx_Oracle.DatabaseError as e:
+                    error_obj, = e.args
+                    if "ORA-01017" in str(error_obj):
+                        return False, f"Authentication failed for Oracle at {hostname}:{port}. Check username and password."
+                    elif "ORA-12541" in str(error_obj) or "ORA-12170" in str(error_obj):
+                        return False, f"Cannot connect to Oracle at {hostname}:{port}. Server may be down or unreachable."
+                    else:
+                        return False, f"Oracle connection error: {error_obj}"
+            except ImportError:
+                # cx_Oracle not installed, provide helpful message
+                return True, f"Oracle database at {hostname}:{port} will be validated by Debezium connector. Install cx_Oracle library for pre-validation."
+        
+        # DB2
+        elif db_type == 'db2':
+            port = port or 50000
+            # DB2 requires ibm_db library
+            try:
+                import ibm_db
+                if not database:
+                    return False, "Invalid DB2 URI: database name not found"
+                try:
+                    conn_str = f"DATABASE={database};HOSTNAME={hostname};PORT={port};PROTOCOL=TCPIP;UID={username};PWD={password};"
+                    conn = ibm_db.connect(conn_str, "", "")
+                    ibm_db.close(conn)
+                    return True, f"Successfully connected to DB2 database at {hostname}:{port}"
+                except Exception as e:
+                    error_msg = str(e)
+                    if "authorization" in error_msg.lower() or "authentication" in error_msg.lower():
+                        return False, f"Authentication failed for DB2 at {hostname}:{port}. Check username and password."
+                    elif "communication" in error_msg.lower() or "connection refused" in error_msg.lower():
+                        return False, f"Cannot connect to DB2 at {hostname}:{port}. Server may be down or unreachable."
+                    else:
+                        return False, f"DB2 connection error: {error_msg}"
+            except ImportError:
+                # ibm_db not installed, provide helpful message
+                return True, f"DB2 database at {hostname}:{port} will be validated by Debezium connector. Install ibm_db library for pre-validation."
+        
+        # Cassandra
+        elif db_type == 'cassandra':
+            port = port or 9042
+            # Cassandra requires cassandra-driver library
+            try:
+                from cassandra.cluster import Cluster
+                from cassandra.auth import PlainTextAuthProvider
+                try:
+                    if username and password:
+                        auth_provider = PlainTextAuthProvider(username=username, password=password)
+                        cluster = Cluster([hostname], port=port, auth_provider=auth_provider, connect_timeout=timeout)
+                    else:
+                        cluster = Cluster([hostname], port=port, connect_timeout=timeout)
+                    session = cluster.connect()
+                    cluster.shutdown()
+                    return True, f"Successfully connected to Cassandra database at {hostname}:{port}"
+                except Exception as e:
+                    error_msg = str(e)
+                    if "authentication" in error_msg.lower() or "credentials" in error_msg.lower():
+                        return False, f"Authentication failed for Cassandra at {hostname}:{port}. Check username and password."
+                    elif "unable to connect" in error_msg.lower() or "connection refused" in error_msg.lower():
+                        return False, f"Cannot connect to Cassandra at {hostname}:{port}. Server may be down or unreachable."
+                    else:
+                        return False, f"Cassandra connection error: {error_msg}"
+            except ImportError:
+                # cassandra-driver not installed, provide helpful message
+                return True, f"Cassandra database at {hostname}:{port} will be validated by Debezium connector. Install cassandra-driver library for pre-validation."
+        
+        # Vitess (MySQL-compatible)
+        elif db_type == 'vitess':
+            port = port or 15991
+            return True, f"Vitess database at {hostname}:{port} will be validated by Debezium connector during deployment."
+        
+        # Google Cloud Spanner
+        elif db_type == 'spanner':
+            return True, f"Google Cloud Spanner database will be validated by Debezium connector during deployment. Ensure GCP credentials are configured."
+        
+        # Informix
+        elif db_type == 'informix':
+            port = port or 9088
+            # Informix requires specific ODBC setup
+            return True, f"Informix database at {hostname}:{port} will be validated by Debezium connector. Ensure Informix ODBC driver is installed."
+        
         else:
-            # For other database types, just return a generic message
-            return True, f"Database type '{db_type}' will be validated by Debezium connector"
+            # Unknown database type
+            return False, f"Unsupported database type '{db_type}'. Supported types: postgresql, mysql, mariadb, mongodb, sqlserver, oracle, db2, cassandra, vitess, spanner, informix"
             
     except Exception as e:
         return False, f"Error validating database connection: {str(e)}"
@@ -143,7 +294,17 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
 
 def validate_api_endpoint(api_url: str, timeout: int = 10) -> Tuple[bool, str]:
     """
-    Test API endpoint connectivity and return status with error message.
+    Test API endpoint connectivity and validate response format.
+    
+    The API must return data in this format:
+    {
+        "tables": [
+            {
+                "table_name": "users",
+                "data": [{"id": 1, "name": "Alice"}]
+            }
+        ]
+    }
     
     Args:
         api_url: API endpoint URL
@@ -166,7 +327,54 @@ def validate_api_endpoint(api_url: str, timeout: int = 10) -> Tuple[bool, str]:
             response = requests.get(api_url, timeout=timeout)
             
             if response.status_code == 200:
-                return True, f"Successfully connected to API endpoint at {api_url}"
+                # Validate response format
+                try:
+                    data = response.json()
+                    
+                    # Check if 'tables' key exists
+                    if 'tables' not in data:
+                        return False, (
+                            f"API endpoint response format error: Missing 'tables' key. "
+                            f"Expected format: {{'tables': [{{'table_name': 'users', 'data': [...]}}]}}"
+                        )
+                    
+                    # Check if 'tables' is a list
+                    if not isinstance(data['tables'], list):
+                        return False, (
+                            f"API endpoint response format error: 'tables' must be an array. "
+                            f"Expected format: {{'tables': [{{'table_name': 'users', 'data': [...]}}]}}"
+                        )
+                    
+                    # Check if at least one table exists
+                    if len(data['tables']) == 0:
+                        return False, (
+                            f"API endpoint response format error: 'tables' array is empty. "
+                            f"At least one table must be present."
+                        )
+                    
+                    # Validate each table structure
+                    for idx, table in enumerate(data['tables']):
+                        if not isinstance(table, dict):
+                            return False, f"API endpoint response format error: tables[{idx}] must be an object with 'table_name' and 'data' fields."
+                        
+                        if 'table_name' not in table:
+                            return False, f"API endpoint response format error: tables[{idx}] is missing 'table_name' field."
+                        
+                        if 'data' not in table:
+                            return False, f"API endpoint response format error: tables[{idx}] is missing 'data' field."
+                        
+                        if not isinstance(table['data'], list):
+                            return False, f"API endpoint response format error: tables[{idx}].data must be an array of records."
+                        
+                        # Validate table_name is not empty
+                        if not table['table_name'] or not str(table['table_name']).strip():
+                            return False, f"API endpoint response format error: tables[{idx}].table_name cannot be empty."
+                    
+                    return True, f"Successfully connected to API endpoint at {api_url} and validated response format."
+                    
+                except ValueError as e:
+                    return False, f"API endpoint response error: Response is not valid JSON. {str(e)}"
+                    
             elif response.status_code == 401:
                 return False, f"API endpoint requires authentication (401 Unauthorized). Please provide valid credentials."
             elif response.status_code == 403:
