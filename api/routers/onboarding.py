@@ -468,7 +468,7 @@ async def start_mapping(request: Request, db=Depends(get_db)):
                 stderr=subprocess.STDOUT,
                 cwd="/app/mapping",
                 env=os.environ.copy(),  # Pass all environment variables
-                close_fds=False  # Keep file descriptors open for subprocess
+                close_fds=True  # Close all file descriptors except stdio (prevents descriptor leaks)
             )
             # Close file descriptor in parent process - subprocess has its own copy
             # This prevents resource leak in parent while subprocess can still write

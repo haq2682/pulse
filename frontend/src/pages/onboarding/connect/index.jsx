@@ -91,7 +91,10 @@ const Connect = () => {
         }
 
         catch (e) {
-            setError(e.message || 'An error occurred while fetching onboarding status. Please try again.');
+            setErrors((prev) => ({
+                ...prev,
+                form: e.message || 'An error occurred while fetching onboarding status. Please try again.'
+            }));
         }
     }
 
