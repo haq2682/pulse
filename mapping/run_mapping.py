@@ -14,6 +14,8 @@ import sys
 import os
 import multiprocessing
 from typing import Optional
+import redis
+import json
 
 # Add current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -74,7 +76,6 @@ def run_batch_mode(bucket_name: str):
             COLUMNS_INFO,
         )
         import List as mapping_list
-        import redis
         
         # Try to retrieve manual mappings from Redis
         manual_mappings = None
@@ -82,7 +83,6 @@ def run_batch_mode(bucket_name: str):
             redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
             manual_mappings_str = redis_client.get(f"manual_mappings:{bucket_name}")
             if manual_mappings_str:
-                import json
                 manual_mappings = json.loads(manual_mappings_str)
                 print(f"\n✅ Retrieved manual mappings from Redis")
                 print(f"   Tables with manual mappings: {list(manual_mappings.keys())}")
@@ -132,7 +132,6 @@ def run_batch_mode(bucket_name: str):
         # Save mapping results to Redis for the API to retrieve
         try:
             redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
-            import json
             redis_client.setex(
                 f"mapping_results:{bucket_name}",
                 86400,  # 24 hours

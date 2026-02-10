@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { AutoComplete } from 'primereact/autocomplete';
 import { Dialog } from 'primereact/dialog';
@@ -125,9 +125,10 @@ const Mapping = () => {
                 setAllFieldsIdentified(all_fields_identified || false);
                 
                 // Initialize mappings object with null values for each missing column
+                // Use :: as separator to avoid conflicts with table/column names containing underscores
                 const initialMappings = {};
                 (missing_cols || []).forEach((item) => {
-                    const key = `${item.column}_${item.table}`;
+                    const key = `${item.column}::${item.table}`;
                     initialMappings[key] = null;
                 });
                 setMappings(initialMappings);
@@ -189,9 +190,7 @@ const Mapping = () => {
         if (unmappedFields.length > 0) {
             // Show confirmation dialog
             const skipped = unmappedFields.map(key => {
-                const parts = key.split('_');
-                const table = parts[parts.length - 1];
-                const column = parts.slice(0, -1).join('_');
+                const [column, table] = key.split('::');
                 return formatColumnWithTable(column, table);
             });
             setSkippedColumns(skipped);
@@ -211,9 +210,7 @@ const Mapping = () => {
             const manualMappings = {};
             Object.keys(mappings).forEach(key => {
                 if (mappings[key]) {
-                    const parts = key.split('_');
-                    const table = parts[parts.length - 1];
-                    const column = parts.slice(0, -1).join('_');
+                    const [column, table] = key.split('::');
                     
                     if (!manualMappings[table]) {
                         manualMappings[table] = {};
@@ -376,7 +373,7 @@ const Mapping = () => {
                             {missingCols.length > 0 && (
                                 <div className="grid grid-cols-1 gap-y-6">
                                     {missingCols.map((item, idx) => {
-                                        const fieldKey = `${item.column}_${item.table}`;
+                                        const fieldKey = `${item.column}::${item.table}`;
                                         const displayLabel = formatColumnWithTable(item.column, item.table);
                                         
                                         return (
