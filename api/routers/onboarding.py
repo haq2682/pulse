@@ -409,7 +409,46 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         
         # Check if mapping is already running
         if mapping_status == "running":
-            return {"status": 200, "message": "Mapping pipeline is already running", "mapping_status": "running"}
+            # Verify that the tracked mapping process is actually still alive
+            # This avoids getting stuck in a permanent "running" state if the
+            # subprocess crashed or the Redis PID key expired
+            pid_key = f"mapping_pid:{onboarding_id}"
+            mapping_pid = await redis.get(pid_key)
+            
+            process_still_running = False
+            if mapping_pid:
+                try:
+                    os.kill(int(mapping_pid), 0)
+                    process_still_running = True
+                except OSError:
+                    process_still_running = False
+            
+            if process_still_running:
+                return {
+                    "status": 200,
+                    "message": "Mapping pipeline is already running",
+                    "mapping_status": "running",
+                }
+            
+            # The mapping was marked as running, but no live process is associated
+            # with it anymore. Reset the stale status to allow a new run
+            db.execute(
+                text("""
+                    UPDATE onboarding
+                    SET mapping_status = :mapping_status,
+                        mapping_error = :mapping_error,
+                        mapping_completed_at = :completed_at
+                    WHERE user_id = :user_id
+                """),
+                {
+                    "mapping_status": "failed",
+                    "mapping_error": "Previous mapping process was not running but status was 'running'. Status reset to allow retry.",
+                    "completed_at": datetime.utcnow(),
+                    "user_id": user_id
+                }
+            )
+            db.commit()
+            # Continue to start a new mapping run
         
         # Update the onboarding record to indicate mapping is in progress
         db.execute(
@@ -596,8 +635,12 @@ async def get_mapping_status(request: Request, userId: str, db=Depends(get_db)):
                         if response.get('KeyCount', 0) > 0:
                             for obj in response.get('Contents', []):
                                 last_modified = obj.get('LastModified')
+                                # Convert timezone-aware LastModified to naive UTC for comparison
+                                # mapping_started_at from DB is typically naive UTC
+                                if last_modified:
+                                    last_modified_naive = last_modified.replace(tzinfo=None)
                                 # Ensure files were created after mapping started
-                                if mapping_started_at and last_modified and last_modified >= mapping_started_at:
+                                if mapping_started_at and last_modified and last_modified_naive >= mapping_started_at:
                                     has_recent_files = True
                                     break
                         
@@ -758,7 +801,10 @@ async def get_mapping_results(request: Request, userId: str, db=Depends(get_db))
                 "extra_cols": [],
                 "all_fields_identified": False
             }
-        
+    
+    except HTTPException:
+        # Re-raise HTTPExceptions (401, 403, 404) without modification
+        raise
     except Exception as e:
         print(f"Error getting mapping results: {e}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -823,7 +869,10 @@ async def save_manual_mappings(request: Request, db=Depends(get_db)):
             "status": 200,
             "message": "Manual mappings saved successfully"
         }
-        
+    
+    except HTTPException:
+        # Re-raise HTTPExceptions (401, 403, 404) without modification
+        raise
     except Exception as e:
         print(f"Error saving manual mappings: {e}")
         raise HTTPException(status_code=400, detail=str(e))

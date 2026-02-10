@@ -18,7 +18,7 @@ from utils.helpers import (
     detect_table,
     split_unified_dataframe,
 )
-from utils.table_mapper import map_table_name, get_all_canonical_tables
+from utils.table_mapper import map_table_name
 import os
 
 import findspark
