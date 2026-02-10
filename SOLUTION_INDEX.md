@@ -2,7 +2,21 @@
 
 **Problem:** Batch processing takes 10-20 minutes (cleaning → transformation → analysis)  
 **Goal:** Reduce to seconds so frontend updates near real-time  
-**Assumption:** CDC is already implemented (ingestion is fast)
+**Assumption:** CDC is already implemented (ingestion is fast)  
+**Technology:** **Spark Structured Streaming (micro-batches)** ✅ | Flink NOT needed ❌
+
+---
+
+## ⚡ Spark vs Flink? Use Spark!
+
+**Quick Answer:** Use **Spark Structured Streaming** with micro-batches. Skip Flink entirely.
+
+- ✅ Spark achieves 30-40 second latency (excellent for analytics)
+- ✅ Team already has Spark expertise
+- ✅ Simpler to operate, lower cost
+- ❌ Flink is overkill for analytics use case
+
+**See:** [SPARK_VS_FLINK_QUICK_ANSWER.md](SPARK_VS_FLINK_QUICK_ANSWER.md) or [SPARK_VS_FLINK_CLARIFICATION.md](SPARK_VS_FLINK_CLARIFICATION.md)
 
 ---
 
@@ -14,7 +28,7 @@
 **Length:** 12KB (15-minute read)
 
 **What's Inside:**
-- ✅ Copy-paste code for all phases
+- ✅ Copy-paste code for all phases (using Spark)
 - ✅ Step-by-step instructions
 - ✅ Test procedures
 - ✅ Troubleshooting guide
@@ -31,18 +45,51 @@
 
 **What's Inside:**
 - ✅ Detailed architecture analysis
-- ✅ 5 implementation phases
-- ✅ Complete code examples
+- ✅ Implementation phases (Phases 1-3 with Spark)
+- ✅ Complete code examples (Spark Structured Streaming)
 - ✅ Architecture diagrams
 - ✅ Risk mitigation strategies
 - ✅ Performance benchmarks
 - ✅ Timeline and roadmap
 
+**Note:** Phase 4 (Flink) is optional and not recommended for this use case.
+
 **Use When:** You need full technical understanding
 
 ---
 
-### 3. **Supporting Context Documents**
+### 3. **SPARK_VS_FLINK_QUICK_ANSWER.md** ⚡ NEW
+**Purpose:** Quick answer to "Should we use Flink?"  
+**Audience:** Decision makers, developers  
+**Length:** 4KB (5-minute read)
+
+**What's Inside:**
+- ✅ Quick comparison: Spark vs Flink
+- ✅ Why Spark is better for analytics
+- ✅ When you would need Flink (not this case)
+- ✅ Code examples with Spark
+
+**Use When:** You're wondering about Flink
+
+---
+
+### 4. **SPARK_VS_FLINK_CLARIFICATION.md**
+**Purpose:** Detailed analysis and decision rationale  
+**Audience:** Architects, technical leads  
+**Length:** 15KB (20-minute read)
+
+**What's Inside:**
+- ✅ Comprehensive Spark vs Flink comparison
+- ✅ Performance characteristics
+- ✅ Cost-benefit analysis
+- ✅ FAQs and decision matrix
+- ✅ Complete code examples
+
+**Use When:** You need detailed justification for skipping Flink
+
+---
+
+### 5. **Supporting Context Documents**
 
 These provide background on why this solution is needed:
 
@@ -135,19 +182,26 @@ These provide background on why this solution is needed:
 
 ---
 
-### Phase 4: Speed Layer (Optional)
+### ~~Phase 4: Flink Speed Layer~~ ❌ SKIP THIS - NOT NEEDED
 **Time:** 6-8 weeks  
 **Improvement:** 98% (14-25 min → 5-30 sec)  
-**Complexity:** High
+**Complexity:** High  
+**Recommendation:** **Skip - Overkill for analytics**
 
-**What to do:**
-1. Deploy Apache Flink cluster
-2. Implement ultra-low latency aggregations
-3. Create hybrid serving layer (batch + speed)
+**Why Skip:**
+- Spark micro-batches (30-40 sec) are sufficient for analytics
+- Team doesn't have Flink expertise
+- More complex to operate
+- Not worth the effort for 25-30 seconds improvement
 
-**Result:** Sub-5-second updates for critical metrics
+**When You Would Need It:**
+- Real-time fraud detection (<1 sec required)
+- High-frequency trading (millisecond latency)
+- Live bidding systems (sub-second updates)
 
-**See:** REAL_TIME_PIPELINE_SOLUTION.md → Phase 3
+**Your Use Case:** Analytics dashboards (30-40 sec is excellent ✅)
+
+**See:** SPARK_VS_FLINK_QUICK_ANSWER.md for why Spark is enough
 
 ---
 

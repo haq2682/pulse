@@ -2,16 +2,29 @@
 
 **Goal:** Reduce 10-20 minute batch delay to seconds  
 **Assumption:** CDC is already implemented  
-**Time to First Results:** 1-2 weeks (Phase 1)
+**Time to First Results:** 1-2 weeks (Phase 1)  
+**Technology:** **Spark Structured Streaming** ✅ | Flink NOT needed ❌
+
+---
+
+## ⚡ Quick Answer: Use Spark, Skip Flink
+
+**Question:** Should we use Flink for lower latency?  
+**Answer:** **NO.** Use Spark Structured Streaming with micro-batches.
+
+- ✅ Spark: 30-40 second latency (excellent for analytics)
+- ❌ Flink: 2-5 second latency (overkill, not worth complexity)
+
+See [SPARK_VS_FLINK_QUICK_ANSWER.md](SPARK_VS_FLINK_QUICK_ANSWER.md) for details.
 
 ---
 
 ## TL;DR - What to Do
 
 1. **Week 1-2:** Implement incremental cleaning → 85% faster
-2. **Week 3-4:** Add streaming transformations → 95% faster  
+2. **Week 3-4:** Add Spark streaming transformations → 95% faster  
 3. **Week 2-3 (parallel):** Add WebSocket frontend → Live updates
-4. **Later (optional):** Speed layer with Flink → 98% faster
+4. ~~**Later (optional):** Speed layer with Flink~~ ❌ **SKIP - Not needed**
 
 ---
 
