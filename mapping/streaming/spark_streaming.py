@@ -191,7 +191,7 @@ def extract_table_dataframes(batch_df: DataFrame) -> tuple:
     return all_dataframes, operations
 
 
-def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_client):
+def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_client, manual_mappings=None, business_id=None):
     """Process each micro-batch with CDC operation support"""
     print(f"\n{'='*60}")
     print(f"Processing batch {batch_id}")
@@ -206,13 +206,56 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
     print(f"Tables in batch: {list(all_dataframes.keys())}")
     print(f"Operations: {operations}")
     
-    # Call existing mapping function with mode="stream"
+    # Call existing mapping function with mode="stream" and manual_mappings
     results = process_all_dataframes(
         all_dataframes,
         columns_info,
         mapping_list,
-        mode="stream"
+        mode="stream",
+        manual_mappings=manual_mappings
     )
+    
+    # Save mapping results to Redis on first batch (batch_id == 0)
+    if batch_id == 0 and business_id:
+        try:
+            import redis
+            import json
+            
+            mapping_results = {
+                "missing_cols": [],
+                "extra_cols": []
+            }
+            
+            for key, result in results.items():
+                table_name = result.get("table_name", "")
+                missing_cols = result.get("missing_cols", [])
+                extra_cols = result.get("extra_cols", [])
+                
+                # Add table name to each column for frontend display
+                for col in missing_cols:
+                    mapping_results["missing_cols"].append({
+                        "column": col,
+                        "table": table_name
+                    })
+                
+                for col in extra_cols:
+                    mapping_results["extra_cols"].append({
+                        "column": col,
+                        "table": table_name
+                    })
+            
+            # Save to Redis
+            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+            redis_client.setex(
+                f"mapping_results:{business_id}",
+                86400,  # 24 hours
+                json.dumps(mapping_results)
+            )
+            print(f"\n✅ Mapping results saved to Redis")
+            print(f"   Missing columns: {len(mapping_results['missing_cols'])}")
+            print(f"   Extra columns: {len(mapping_results['extra_cols'])}")
+        except Exception as redis_error:
+            print(f"⚠️  Warning: Could not save mapping results to Redis: {redis_error}")
     
     # Save results using existing function with CDC operation
     # Determine the operation for each result
@@ -235,6 +278,20 @@ def run_streaming():
     print(f"Kafka: {KAFKA_BOOTSTRAP}")
     print(f"Checkpoint: {CHECKPOINT_LOCATION}")
     print(f"Output bucket: {OUTPUT_BUCKET}\n")
+    
+    # Retrieve manual mappings from environment variable
+    manual_mappings = None
+    business_id = os.getenv("BUSINESS_ID")
+    
+    manual_mappings_str = os.getenv("MANUAL_MAPPINGS")
+    if manual_mappings_str:
+        try:
+            import json
+            manual_mappings = json.loads(manual_mappings_str)
+            print(f"✅ Loaded manual mappings from environment")
+            print(f"   Tables with manual mappings: {list(manual_mappings.keys())}\n")
+        except Exception as e:
+            print(f"⚠️  Warning: Could not parse manual mappings: {e}\n")
     
     # Initialize
     spark = create_spark_session()
@@ -262,7 +319,7 @@ def run_streaming():
     # Process with foreachBatch
     query = (
         json_stream.writeStream
-        .foreachBatch(lambda df, id: process_microbatch(df, id, columns_info, minio_client))
+        .foreachBatch(lambda df, id: process_microbatch(df, id, columns_info, minio_client, manual_mappings, business_id))
         .outputMode("append")
         .option("checkpointLocation", CHECKPOINT_LOCATION)
         .start()
