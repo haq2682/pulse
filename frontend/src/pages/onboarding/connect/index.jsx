@@ -426,6 +426,10 @@ const Connect = () => {
                 setLoading(false);
                 return;
             }
+            
+            // Start the mapping pipeline for db mode
+            await startMapping();
+            return;
         }
 
         if (ingestionType === 'api') {
@@ -440,6 +444,10 @@ const Connect = () => {
                 setLoading(false);
                 return;
             }
+            
+            // Start the mapping pipeline for api mode
+            await startMapping();
+            return;
         }
         
         setLoading(false);
@@ -540,10 +548,21 @@ const Connect = () => {
             setLoading(true);
             setErrors({ db: '', api: '', form: '' });
             
-            const response = await axiosInstance.post('/onboarding/start-mapping', {
+            const requestBody = {
                 userId: user.user_id,
                 mode: ingestionType // Use the ingestion type as the mode
-            });
+            };
+            
+            // Add mode-specific parameters
+            if (ingestionType === 'db') {
+                requestBody.dbUri = databaseUri;
+                // You can add db_tables here if needed
+                // requestBody.dbTables = ['table1', 'table2'];
+            } else if (ingestionType === 'api') {
+                requestBody.apiUrl = apiEndpoint;
+            }
+            
+            const response = await axiosInstance.post('/onboarding/start-mapping', requestBody);
             
             if (response.status === 200) {
                 setMappingLoading(true);
@@ -553,10 +572,16 @@ const Connect = () => {
             }
         } catch (e) {
             setLoading(false);
-            setErrors((prev) => ({ 
-                ...prev, 
-                form: e.response?.data?.detail || e.message || 'Failed to start mapping pipeline' 
-            }));
+            const errorMessage = e.response?.data?.detail || e.message || 'Failed to start mapping pipeline';
+            
+            // Set error in appropriate field based on mode
+            if (ingestionType === 'db') {
+                setErrors((prev) => ({ ...prev, db: errorMessage }));
+            } else if (ingestionType === 'api') {
+                setErrors((prev) => ({ ...prev, api: errorMessage }));
+            } else {
+                setErrors((prev) => ({ ...prev, form: errorMessage }));
+            }
         }
     };
 

@@ -346,15 +346,41 @@ async def regions(query: str = Query("")):
 async def start_mapping(request: Request, db=Depends(get_db)):
     """
     Start the mapping pipeline in background using subprocess.Popen.
+    Supports batch, db, and api modes with connectivity validation.
     Saves the pipeline state in PostgreSQL onboarding table.
     """
     try:
         body = await request.json()
         user_id = body.get("userId")
         mode = body.get("mode", "batch")  # Default to batch mode
+        db_uri = body.get("dbUri")  # For db mode
+        api_url = body.get("apiUrl")  # For api mode
+        db_tables = body.get("dbTables", [])  # For db mode
         
         if not user_id:
             raise HTTPException(status_code=400, detail="userId is required")
+        
+        # Validate required parameters for each mode
+        if mode == "db" and not db_uri:
+            raise HTTPException(status_code=400, detail="Database URI is required for db mode")
+        
+        if mode == "api" and not api_url:
+            raise HTTPException(status_code=400, detail="API URL is required for api mode")
+        
+        # Validate connectivity for db and api modes
+        if mode == "db":
+            from utils.connectivity_validator import validate_database_connection
+            success, message = validate_database_connection(db_uri, timeout=10)
+            if not success:
+                raise HTTPException(status_code=400, detail=message)
+            print(f"Database connectivity validated: {message}")
+            
+        elif mode == "api":
+            from utils.connectivity_validator import validate_api_endpoint
+            success, message = validate_api_endpoint(api_url, timeout=10)
+            if not success:
+                raise HTTPException(status_code=400, detail=message)
+            print(f"API endpoint connectivity validated: {message}")
         
         # Get the onboarding record
         onboarding = db.execute(
@@ -411,6 +437,14 @@ async def start_mapping(request: Request, db=Depends(get_db)):
             "--business-id", business_id
         ]
         
+        # Add mode-specific parameters
+        if mode == "db":
+            cmd.extend(["--db-uri", db_uri])
+            if db_tables:
+                cmd.extend(["--db-tables", ",".join(db_tables)])
+        elif mode == "api":
+            cmd.extend(["--api-url", api_url])
+        
         # Start the mapping pipeline in background using subprocess.Popen
         # Use stdout and stderr redirection to avoid blocking
         # Ensure log directory exists
@@ -423,7 +457,7 @@ async def start_mapping(request: Request, db=Depends(get_db)):
                     detail=f"Failed to create log directory: {str(dir_error)}"
                 )
         
-        log_file_path = os.path.join(MAPPING_LOG_DIR, f"mapping_{business_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.log")
+        log_file_path = os.path.join(MAPPING_LOG_DIR, f"mapping_{mode}_{business_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.log")
         try:
             with open(log_file_path, 'w') as log_file:
                 # Inherit environment variables from parent process
@@ -446,9 +480,10 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         
         return {
             "status": 200,
-            "message": "Mapping pipeline started successfully",
+            "message": f"Mapping pipeline started successfully in {mode} mode",
             "mapping_status": "running",
-            "process_id": process.pid
+            "process_id": process.pid,
+            "mode": mode
         }
         
     except Exception as e:
