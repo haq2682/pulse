@@ -459,17 +459,20 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         
         log_file_path = os.path.join(MAPPING_LOG_DIR, f"mapping_{mode}_{business_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.log")
         try:
-            # Open log file without 'with' block to keep it open for subprocess
-            log_file = open(log_file_path, 'w')
+            # Open log file for subprocess stdout/stderr
+            log_file = open(log_file_path, 'w', buffering=1)  # Line buffered
             # Inherit environment variables from parent process
             process = subprocess.Popen(
                 cmd,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
                 cwd="/app/mapping",
-                env=os.environ.copy()  # Pass all environment variables
+                env=os.environ.copy(),  # Pass all environment variables
+                close_fds=False  # Keep file descriptors open for subprocess
             )
-            # Note: log_file will remain open for the subprocess to write to
+            # Close file descriptor in parent process - subprocess has its own copy
+            # This prevents resource leak in parent while subprocess can still write
+            log_file.close()
         except (IOError, OSError) as file_error:
             raise HTTPException(
                 status_code=500,
