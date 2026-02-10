@@ -14,6 +14,7 @@ import { Dialog } from 'primereact/dialog';
 import { Message } from 'primereact/message';
 
 const CHUNK_SIZE = 5 * 1024 * 1024;
+const MAPPING_STATUS_POLL_INTERVAL = 3000; // 3 seconds
 // const NIFI_UPLOAD_URL = import.meta.env.VITE_NIFI_UPLOAD_URL || 'http://10.5.0.12:8082/upload';
 const NIFI_UPLOAD_URL = 'http://localhost:8082/upload';
 
@@ -37,6 +38,12 @@ const Connect = () => {
     const fileInputRef = useRef(null);
     const mappingCheckIntervalRef = useRef(null);
     const isCheckingMappingRef = useRef(false); // Prevent duplicate interval creation
+
+    // Helper function to safely extract onboarding ID from pathname
+    const getOnboardingIdFromPath = () => {
+        const pathSegments = pathname.split('/');
+        return pathSegments.length > 3 ? pathSegments[3] : '';
+    };
 
     const breadcrumbItems = [
         {
@@ -65,21 +72,22 @@ const Connect = () => {
         try {
             const response = await axiosInstance.get(`/onboarding/get-current-step?userId=${user.user_id}`);
             const currentStep = response.data.currentStep;
+            const onboardingId = getOnboardingIdFromPath();
 
             if (currentStep === 'business') {
-                navigate(`/onboarding/business/${pathname.split('/')[3]}`);
+                navigate(`/onboarding/business/${onboardingId}`);
             }
             else if (currentStep === 'data-type') {
-                navigate(`/onboarding/data-type/${pathname.split('/')[3]}`);
+                navigate(`/onboarding/data-type/${onboardingId}`);
             }
             else if (currentStep === 'connect') {
                 return;
             }
             else if (currentStep === 'mapping') {
-                navigate(`/onboarding/mapping/${pathname.split('/')[3]}`);
+                navigate(`/onboarding/mapping/${onboardingId}`);
             }
             else {
-                navigate(`/onboarding/connect/${pathname.split('/')[3]}`);
+                navigate(`/onboarding/connect/${onboardingId}`);
             }
         }
 
@@ -494,7 +502,8 @@ const Connect = () => {
                                         isCheckingMappingRef.current = false;
                                         setMappingLoading(false);
                                         // Navigate to mapping page
-                                        navigate(`/onboarding/mapping/${pathname.split('/')[3]}`);
+                                        const onboardingId = getOnboardingIdFromPath();
+                                        navigate(`/onboarding/mapping/${onboardingId}`);
                                     } else if (status === 'failed') {
                                         clearInterval(mappingCheckIntervalRef.current);
                                         mappingCheckIntervalRef.current = null;
@@ -509,11 +518,12 @@ const Connect = () => {
                             } catch (err) {
                                 console.error('Error checking mapping status:', err);
                             }
-                        }, 3000);
+                        }, MAPPING_STATUS_POLL_INTERVAL);
                     }
                 } else if (mapping_status === 'completed') {
                     // If mapping is already completed, navigate to mapping page
-                    navigate(`/onboarding/mapping/${pathname.split('/')[3]}`);
+                    const onboardingId = getOnboardingIdFromPath();
+                    navigate(`/onboarding/mapping/${onboardingId}`);
                 } else {
                     setMappingLoading(false);
                     isCheckingMappingRef.current = false;
