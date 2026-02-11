@@ -17,7 +17,7 @@ from typing import Optional
 import redis
 import json
 import psycopg2
-from datetime import datetime
+from datetime import datetime, timezone
 import traceback
 
 # Add current directory to Python path for imports
@@ -71,45 +71,41 @@ def update_mapping_status(business_id: str, status: str, error_message: Optional
         db_user = os.getenv("POSTGRES_USER", "postgres")
         db_password = os.getenv("POSTGRES_PASSWORD", "postgres")
         
-        # Connect to database
-        conn = psycopg2.connect(
+        # Use context manager to ensure connection is properly closed
+        with psycopg2.connect(
             host=db_host,
             database=db_name,
             user=db_user,
             password=db_password
-        )
-        
-        cursor = conn.cursor()
-        
-        # Update the onboarding table
-        if status == "failed":
-            cursor.execute("""
-                UPDATE onboarding 
-                SET mapping_status = %s,
-                    mapping_error = %s,
-                    mapping_completed_at = %s,
-                    current_step = 'connect'
-                WHERE business_id = %s
-            """, (status, error_message, datetime.utcnow(), business_id))
-        elif status == "completed":
-            cursor.execute("""
-                UPDATE onboarding 
-                SET mapping_status = %s,
-                    mapping_completed_at = %s,
-                    mapping_error = NULL,
-                    current_step = 'mapping'
-                WHERE business_id = %s
-            """, (status, datetime.utcnow(), business_id))
-        else:
-            cursor.execute("""
-                UPDATE onboarding 
-                SET mapping_status = %s
-                WHERE business_id = %s
-            """, (status, business_id))
-        
-        conn.commit()
-        cursor.close()
-        conn.close()
+        ) as conn:
+            with conn.cursor() as cursor:
+                # Update the onboarding table
+                if status == "failed":
+                    cursor.execute("""
+                        UPDATE onboarding 
+                        SET mapping_status = %s,
+                            mapping_error = %s,
+                            mapping_completed_at = %s,
+                            current_step = 'connect'
+                        WHERE business_id = %s
+                    """, (status, error_message, datetime.now(timezone.utc), business_id))
+                elif status == "completed":
+                    cursor.execute("""
+                        UPDATE onboarding 
+                        SET mapping_status = %s,
+                            mapping_completed_at = %s,
+                            mapping_error = NULL,
+                            current_step = 'mapping'
+                        WHERE business_id = %s
+                    """, (status, datetime.now(timezone.utc), business_id))
+                else:
+                    cursor.execute("""
+                        UPDATE onboarding 
+                        SET mapping_status = %s
+                        WHERE business_id = %s
+                    """, (status, business_id))
+                
+                conn.commit()
         
         print(f"✅ Database updated: status={status}, business_id={business_id}", flush=True)
         if error_message:
@@ -222,7 +218,7 @@ def run_batch_mode(bucket_name: str):
         spark.stop()
         
     except Exception as e:
-        error_msg = f"Error in batch mode: {str(e)}"
+        error_msg = f"Batch mode: Failed during data processing - {str(e)}"
         print(f"❌ {error_msg}", flush=True)
         traceback.print_exc()
         
