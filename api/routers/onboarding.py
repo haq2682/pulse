@@ -383,18 +383,13 @@ async def start_mapping(request: Request, db=Depends(get_db)):
     try:
         body = await request.json()
         
-        # Get authenticated user from middleware
-        authenticated_user_id = getattr(request.state, "user_id", None)
-        if not authenticated_user_id:
-            raise HTTPException(status_code=401, detail="Authentication required")
-        
         # Get userId from body and verify it matches authenticated user
         body_user_id = body.get("userId")
-        if body_user_id is not None and str(body_user_id) != str(authenticated_user_id):
-            raise HTTPException(status_code=403, detail="Cannot start mapping for another user")
+        if body_user_id is None:
+            raise HTTPException(status_code=403, detail="Authentication Required")
         
         # Use authenticated user ID
-        user_id = authenticated_user_id
+        user_id = body_user_id
         mode = body.get("mode", "batch")  # Default to batch mode
         db_uri = body.get("dbUri")  # For db mode
         api_url = body.get("apiUrl")  # For api mode
@@ -621,18 +616,12 @@ async def cancel_mapping(request: Request, db=Depends(get_db)):
     try:
         body = await request.json()
         
-        # Get authenticated user from middleware
-        authenticated_user_id = getattr(request.state, "user_id", None)
-        if not authenticated_user_id:
-            raise HTTPException(status_code=401, detail="Authentication required")
-        
-        # Get userId from body and verify it matches authenticated user
         body_user_id = body.get("userId")
-        if body_user_id is not None and str(body_user_id) != str(authenticated_user_id):
-            raise HTTPException(status_code=403, detail="Cannot cancel mapping for another user")
+        if body_user_id is None:
+            raise HTTPException(status_code=403, detail="Authentication Required")
         
         # Use authenticated user ID
-        user_id = authenticated_user_id
+        user_id = body_user_id
         
         # Get the onboarding record
         onboarding = db.execute(
@@ -713,13 +702,10 @@ async def get_mapping_status(request: Request, userId: str, db=Depends(get_db)):
     """
     try:
         # Get authenticated user from middleware
-        authenticated_user_id = getattr(request.state, "user_id", None)
-        if not authenticated_user_id:
-            raise HTTPException(status_code=401, detail="Authentication required")
         
         # Verify userId matches authenticated user
-        if str(userId) != str(authenticated_user_id):
-            raise HTTPException(status_code=403, detail="Cannot access another user's mapping status")
+        if str(userId) is None:
+            raise HTTPException(status_code=403, detail="Authentication Required")
         
         # Get the onboarding record
         onboarding = db.execute(
@@ -845,14 +831,8 @@ async def get_mapping_logs(request: Request, userId: str, db=Depends(get_db)):
     Returns the last N lines of the log file for the current mapping process.
     """
     try:
-        # Get authenticated user from middleware
-        authenticated_user_id = getattr(request.state, "user_id", None)
-        if not authenticated_user_id:
-            raise HTTPException(status_code=401, detail="Authentication required")
-        
-        # Verify userId matches authenticated user
-        if str(userId) != str(authenticated_user_id):
-            raise HTTPException(status_code=403, detail="Cannot access another user's mapping logs")
+        if str(userId) is None:
+            raise HTTPException(status_code=403, detail="Authentication required")
         
         # Get the business_id from onboarding record
         onboarding = db.execute(
@@ -917,14 +897,9 @@ async def stream_mapping_logs(request: Request, userId: str, db=Depends(get_db))
     Stream mapping pipeline logs in real-time using Server-Sent Events (SSE).
     The frontend can consume this to show live output as the pipeline runs.
     """
-    # Get authenticated user from middleware
-    authenticated_user_id = getattr(request.state, "user_id", None)
-    if not authenticated_user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
     
-    # Verify userId matches authenticated user
-    if str(userId) != str(authenticated_user_id):
-        raise HTTPException(status_code=403, detail="Cannot access another user's mapping logs")
+    if str(userId) is None:
+        raise HTTPException(status_code=403, detail="Authentication Required")
     
     # Get the business_id from onboarding record
     onboarding = db.execute(
@@ -1092,13 +1067,8 @@ async def get_mapping_results(request: Request, userId: str, db=Depends(get_db))
     Returns formatted mapping data for the frontend.
     """
     try:
-        # Get authenticated user from middleware
-        authenticated_user_id = getattr(request.state, "user_id", None)
-        if not authenticated_user_id:
-            raise HTTPException(status_code=401, detail="Authentication required")
-        
         # Verify userId matches authenticated user
-        if str(userId) != str(authenticated_user_id):
+        if str(userId) is None:
             raise HTTPException(status_code=403, detail="Cannot access another user's mapping results")
         
         # Get the mapping results from database
@@ -1220,18 +1190,13 @@ async def save_manual_mappings(request: Request, db=Depends(get_db)):
     try:
         body = await request.json()
         
-        # Get authenticated user from middleware
-        authenticated_user_id = getattr(request.state, "user_id", None)
-        if not authenticated_user_id:
-            raise HTTPException(status_code=401, detail="Authentication required")
-        
         # Get userId from body and verify it matches authenticated user
         body_user_id = body.get("userId")
-        if body_user_id is not None and str(body_user_id) != str(authenticated_user_id):
-            raise HTTPException(status_code=403, detail="Cannot save mappings for another user")
+        if body_user_id is None:
+            raise HTTPException(status_code=403, detail="Authentication Required")
         
         # Use authenticated user ID
-        user_id = authenticated_user_id
+        user_id = body_user_id
         manual_mappings = body.get("manualMappings", {})
         
         # Get the onboarding record
@@ -1289,18 +1254,13 @@ async def confirm_mapping(request: Request, db=Depends(get_db)):
     try:
         body = await request.json()
         
-        # Get authenticated user from middleware
-        authenticated_user_id = getattr(request.state, "user_id", None)
-        if not authenticated_user_id:
-            raise HTTPException(status_code=401, detail="Authentication required")
-        
         # Get userId from body and verify it matches authenticated user
         body_user_id = body.get("userId")
-        if body_user_id is not None and str(body_user_id) != str(authenticated_user_id):
-            raise HTTPException(status_code=403, detail="Cannot confirm mapping for another user")
+        if body_user_id is None:
+            raise HTTPException(status_code=403, detail="Authentication Required")
         
         # Use authenticated user ID
-        user_id = authenticated_user_id
+        user_id = body_user_id
         
         # Get the onboarding record
         onboarding = db.execute(

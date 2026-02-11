@@ -1,3 +1,13 @@
+button:focus, button:focus-visible, button:active {
+    outline: 0 none;
+    outline-offset: 0;
+    border: 0 none;
+}
+
+button:focus:not(:focus-visible) {
+    outline: none;
+}
+
 /* Gradient Text Utilities */
 .gradient-text {
     background: radial-gradient(circle, var(--color-g2) 0%, var(--color-g1) 100%);
