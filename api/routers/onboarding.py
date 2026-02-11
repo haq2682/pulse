@@ -21,6 +21,7 @@ MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MAPPING_LOG_DIR = os.getenv("MAPPING_LOG_DIR", "/tmp")
 MAPPING_PROCESS_TTL = 86400  # 24 hours in seconds
+MAPPING_LOG_MAX_LINES = 500  # Maximum number of log lines to return to avoid large responses
 
 s3 = boto3.client(
     "s3",
@@ -759,12 +760,12 @@ async def get_mapping_logs(request: Request, userId: str, db=Depends(get_db)):
                 "message": f"Log file does not exist at {log_file_path}"
             }
         
-        # Read the log file (last 500 lines to avoid large responses)
+        # Read the log file (last N lines to avoid large responses)
         try:
             with open(log_file_path, 'r') as f:
                 lines = f.readlines()
-                # Get last 500 lines
-                last_lines = lines[-500:] if len(lines) > 500 else lines
+                # Get last MAPPING_LOG_MAX_LINES lines
+                last_lines = lines[-MAPPING_LOG_MAX_LINES:] if len(lines) > MAPPING_LOG_MAX_LINES else lines
                 log_content = ''.join(last_lines)
                 
             return {
