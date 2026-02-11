@@ -41,8 +41,12 @@ const Dashboard = () => {
     const handleAddBusiness = async () => {
         setIsAddBusinessLoading(true);
         const response = await axiosInstance.post('/onboarding/create', {userId: user.user_id});
+        let current_step = response.data.current_step;
+        if(current_step === 'mapping-in-progress') {
+            current_step = 'connect';
+        }
         if(response.data.status === 200) {
-            navigate(`/onboarding/${response.data.current_step}/${response.data.onboarding_id}`);
+            navigate(`/onboarding/${current_step}/${response.data.onboarding_id}`);
         }
         setIsAddBusinessLoading(false);
     };
