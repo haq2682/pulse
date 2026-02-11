@@ -1,6 +1,7 @@
 import os
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, Query, UploadFile, File
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import StreamingResponse
 from database import get_db
 from sqlalchemy import text
 import aioredis
@@ -13,6 +14,8 @@ from botocore.client import Config
 from typing import List
 import subprocess
 from datetime import datetime
+import asyncio
+import time
 
 redis = aioredis.from_url("redis://redis:6379", decode_responses=True)
 
@@ -786,6 +789,128 @@ async def get_mapping_logs(request: Request, userId: str, db=Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/mapping-logs-stream")
+async def stream_mapping_logs(request: Request, userId: str, db=Depends(get_db)):
+    """
+    Stream mapping pipeline logs in real-time using Server-Sent Events (SSE).
+    The frontend can consume this to show live output as the pipeline runs.
+    """
+    # Get authenticated user from middleware
+    authenticated_user_id = getattr(request.state, "user_id", None)
+    if not authenticated_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    # Verify userId matches authenticated user
+    if str(userId) != str(authenticated_user_id):
+        raise HTTPException(status_code=403, detail="Cannot access another user's mapping logs")
+    
+    # Get the business_id from onboarding record
+    onboarding = db.execute(
+        text("SELECT business_id FROM onboarding WHERE user_id = :user_id"),
+        {"user_id": userId}
+    )
+    onboarding_record = onboarding.fetchone()
+    
+    if not onboarding_record or not onboarding_record[0]:
+        raise HTTPException(status_code=404, detail="Onboarding record or business ID not found")
+    
+    business_id = onboarding_record[0]
+    
+    async def event_stream():
+        """Generator function to stream log file content in real-time."""
+        try:
+            # Get the log file path from Redis
+            log_file_path = await redis.get(f"mapping_log:{business_id}")
+            
+            if not log_file_path:
+                yield f"data: {{\"type\": \"error\", \"message\": \"No active mapping process\"}}\n\n"
+                return
+            
+            # Wait for log file to be created (max 5 seconds)
+            wait_time = 0
+            while not os.path.exists(log_file_path) and wait_time < 5:
+                await asyncio.sleep(0.5)
+                wait_time += 0.5
+            
+            if not os.path.exists(log_file_path):
+                yield f"data: {{\"type\": \"error\", \"message\": \"Log file not found\"}}\n\n"
+                return
+            
+            # Send start event
+            yield f"data: {{\"type\": \"start\", \"message\": \"Connected to log stream\"}}\n\n"
+            
+            # Track the last position in the file
+            last_position = 0
+            no_update_count = 0
+            max_no_updates = 60  # Stop after 60 iterations with no updates (about 30 seconds)
+            
+            # Keep reading until process completes or no more updates
+            while no_update_count < max_no_updates:
+                try:
+                    with open(log_file_path, 'r') as f:
+                        # Seek to last known position
+                        f.seek(last_position)
+                        
+                        # Read new lines
+                        new_lines = f.readlines()
+                        
+                        if new_lines:
+                            # Reset no-update counter
+                            no_update_count = 0
+                            
+                            # Send each new line as an SSE message
+                            for line in new_lines:
+                                # Escape special characters for JSON
+                                line_safe = json.dumps(line.rstrip('\n'))
+                                yield f"data: {{\"type\": \"log\", \"line\": {line_safe}}}\n\n"
+                            
+                            # Update position
+                            last_position = f.tell()
+                        else:
+                            # No new lines, increment counter
+                            no_update_count += 1
+                        
+                        # Check if process is still running
+                        process_id_str = await redis.get(f"mapping_process:{business_id}")
+                        if process_id_str:
+                            try:
+                                process_id = int(process_id_str)
+                                os.kill(process_id, 0)  # Check if process exists
+                                # Process is running, continue monitoring
+                            except (OSError, ValueError):
+                                # Process is done, read any remaining output and exit
+                                f.seek(last_position)
+                                remaining_lines = f.readlines()
+                                for line in remaining_lines:
+                                    line_safe = json.dumps(line.rstrip('\n'))
+                                    yield f"data: {{\"type\": \"log\", \"line\": {line_safe}}}\n\n"
+                                yield f"data: {{\"type\": \"complete\", \"message\": \"Process completed\"}}\n\n"
+                                break
+                    
+                    # Small delay before checking for more output
+                    await asyncio.sleep(0.5)
+                    
+                except Exception as read_error:
+                    yield f"data: {{\"type\": \"error\", \"message\": \"Error reading log: {str(read_error)}\"}}\n\n"
+                    break
+            
+            # Send completion event if we timed out
+            if no_update_count >= max_no_updates:
+                yield f"data: {{\"type\": \"timeout\", \"message\": \"No updates for 30 seconds, closing stream\"}}\n\n"
+                
+        except Exception as e:
+            yield f"data: {{\"type\": \"error\", \"message\": \"Stream error: {str(e)}\"}}\n\n"
+    
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable nginx buffering
+        }
+    )
 
 @router.get("/mapping-results")
 async def get_mapping_results(request: Request, userId: str, db=Depends(get_db)):
