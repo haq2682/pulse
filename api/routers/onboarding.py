@@ -584,6 +584,99 @@ async def start_mapping(request: Request, db=Depends(get_db)):
                 print(f"Error updating database after failure: {db_error}")
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.post("/cancel-mapping")
+async def cancel_mapping(request: Request, db=Depends(get_db)):
+    """
+    Cancel the running mapping pipeline.
+    Stops the subprocess, updates the database status, and clears Redis keys.
+    """
+    try:
+        body = await request.json()
+        
+        # Get authenticated user from middleware
+        authenticated_user_id = getattr(request.state, "user_id", None)
+        if not authenticated_user_id:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
+        # Get userId from body and verify it matches authenticated user
+        body_user_id = body.get("userId")
+        if body_user_id is not None and str(body_user_id) != str(authenticated_user_id):
+            raise HTTPException(status_code=403, detail="Cannot cancel mapping for another user")
+        
+        # Use authenticated user ID
+        user_id = authenticated_user_id
+        
+        # Get the onboarding record
+        onboarding = db.execute(
+            text("SELECT onboarding_id, business_id, mapping_status FROM onboarding WHERE user_id = :user_id"),
+            {"user_id": user_id}
+        )
+        onboarding_record = onboarding.fetchone()
+        
+        if not onboarding_record:
+            raise HTTPException(status_code=404, detail="Onboarding record not found")
+        
+        onboarding_id, business_id, mapping_status = onboarding_record
+        
+        if not business_id:
+            raise HTTPException(status_code=400, detail="Business ID not found")
+        
+        # Get the process ID from Redis
+        process_id_str = await redis.get(f"mapping_process:{business_id}")
+        
+        if process_id_str:
+            try:
+                process_id = int(process_id_str)
+                # Try to kill the process
+                try:
+                    os.kill(process_id, 15)  # SIGTERM for graceful shutdown
+                    # Wait a bit and force kill if still alive
+                    await asyncio.sleep(1)
+                    try:
+                        os.kill(process_id, 0)  # Check if still alive
+                        os.kill(process_id, 9)  # SIGKILL if still running
+                    except OSError:
+                        pass  # Process already terminated
+                except OSError as e:
+                    # Process may have already terminated
+                    print(f"Process {process_id} may have already terminated: {e}")
+            except ValueError:
+                print(f"Invalid process ID: {process_id_str}")
+        
+        # Update the database to indicate mapping was cancelled
+        db.execute(
+            text("""
+                UPDATE onboarding 
+                SET mapping_status = :mapping_status,
+                    mapping_error = :error,
+                    mapping_completed_at = :completed_at,
+                    current_step = :current_step
+                WHERE user_id = :user_id
+            """),
+            {
+                "mapping_status": "cancelled",
+                "error": "Mapping was cancelled by user",
+                "completed_at": datetime.utcnow(),
+                "current_step": "connect",
+                "user_id": user_id
+            }
+        )
+        db.commit()
+        
+        # Clear Redis keys
+        await redis.delete(f"mapping_process:{business_id}")
+        await redis.delete(f"mapping_log:{business_id}")
+        
+        return {
+            "status": 200,
+            "message": "Mapping pipeline cancelled successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @router.get("/mapping-status")
 async def get_mapping_status(request: Request, userId: str, db=Depends(get_db)):
     """
@@ -844,9 +937,9 @@ async def stream_mapping_logs(request: Request, userId: str, db=Depends(get_db))
             last_position = 0
             
             # Timeout configuration: stop after no updates for this duration
-            STREAM_TIMEOUT_SECONDS = 30
+            STREAM_TIMEOUT_SECONDS = 600  # 10 minutes
             POLL_INTERVAL_SECONDS = 0.5
-            max_no_updates = int(STREAM_TIMEOUT_SECONDS / POLL_INTERVAL_SECONDS)  # 60 iterations
+            max_no_updates = int(STREAM_TIMEOUT_SECONDS / POLL_INTERVAL_SECONDS)  # 1200 iterations
             no_update_count = 0
             
             # Keep reading until process completes or no more updates
@@ -903,7 +996,59 @@ async def stream_mapping_logs(request: Request, userId: str, db=Depends(get_db))
             
             # Send completion event if we timed out
             if no_update_count >= max_no_updates:
-                yield f"data: {{\"type\": \"timeout\", \"message\": \"No updates for {STREAM_TIMEOUT_SECONDS} seconds, closing stream\"}}\n\n"
+                # Kill the process if it's still running
+                process_id_str = await redis.get(f"mapping_process:{business_id}")
+                if process_id_str:
+                    try:
+                        process_id = int(process_id_str)
+                        # Try to kill the process
+                        try:
+                            os.kill(process_id, 15)  # SIGTERM for graceful shutdown
+                            await asyncio.sleep(1)
+                            try:
+                                os.kill(process_id, 0)  # Check if still alive
+                                os.kill(process_id, 9)  # SIGKILL if still running
+                            except OSError:
+                                pass  # Process already terminated
+                        except OSError:
+                            pass  # Process may have already terminated
+                    except ValueError:
+                        pass  # Invalid PID
+                
+                # Update database to indicate timeout
+                try:
+                    # Get database connection for updating status
+                    from database import SessionLocal
+                    db_session = SessionLocal()
+                    try:
+                        db_session.execute(
+                            text("""
+                                UPDATE onboarding 
+                                SET mapping_status = :mapping_status,
+                                    mapping_error = :error,
+                                    mapping_completed_at = :completed_at,
+                                    current_step = :current_step
+                                WHERE business_id = :business_id
+                            """),
+                            {
+                                "mapping_status": "failed",
+                                "error": "Timeout occurred while mapping your data, please try again.",
+                                "completed_at": datetime.utcnow(),
+                                "current_step": "connect",
+                                "business_id": business_id
+                            }
+                        )
+                        db_session.commit()
+                    finally:
+                        db_session.close()
+                except Exception as db_error:
+                    print(f"Error updating database after timeout: {db_error}")
+                
+                # Clear Redis keys
+                await redis.delete(f"mapping_process:{business_id}")
+                await redis.delete(f"mapping_log:{business_id}")
+                
+                yield f"data: {{\"type\": \"timeout\", \"message\": \"Timeout occurred while mapping your data, please try again.\"}}\n\n"
                 
         except Exception as e:
             yield f"data: {{\"type\": \"error\", \"message\": \"Stream error: {str(e)}\"}}\n\n"

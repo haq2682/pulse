@@ -12,6 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ProgressSpinner } from 'primereact/progressspinner';
 import { Dialog } from 'primereact/dialog';
 import { Message } from 'primereact/message';
+import { Button } from 'primereact/button';
 
 const CHUNK_SIZE = 5 * 1024 * 1024;
 const MAPPING_STATUS_POLL_INTERVAL = 3000; // 3 seconds
@@ -30,8 +31,7 @@ const Connect = () => {
     const [uploadProgress, setUploadProgress] = useState({});
     const [loading, setLoading] = useState(false);
     const [mappingLoading, setMappingLoading] = useState(false);
-    const [mappingLogs, setMappingLogs] = useState([]); // Store real-time logs
-    const [showLogsDialog, setShowLogsDialog] = useState(false); // Control logs dialog
+    const [cancellingMapping, setCancellingMapping] = useState(false);
     const [ingestionTypeLoading, setIngestionTypeLoading] = useState(true);
     const [ingestionType, setIngestionType] = useState('');
     const [errors, setErrors] = useState({db: '', api: '', form: ''});
@@ -39,7 +39,6 @@ const Connect = () => {
     const fileInputRef = useRef(null);
     const mappingCheckIntervalRef = useRef(null);
     const isCheckingMappingRef = useRef(false); // Prevent duplicate interval creation
-    const eventSourceRef = useRef(null); // Store SSE connection
 
     // Helper function to safely extract onboarding ID from pathname
     const getOnboardingIdFromPath = () => {
@@ -115,13 +114,10 @@ const Connect = () => {
         
         initializeData();
         
-        // Clean up interval and SSE connection on unmount
+        // Clean up interval on unmount
         return () => {
             if (mappingCheckIntervalRef.current) {
                 clearInterval(mappingCheckIntervalRef.current);
-            }
-            if (eventSourceRef.current) {
-                eventSourceRef.current.close();
             }
         };
     }, [user?.user_id]);
@@ -571,7 +567,6 @@ const Connect = () => {
         try {
             setLoading(true);
             setErrors({ db: '', api: '', form: '' });
-            setMappingLogs([]); // Clear previous logs
             
             const requestBody = {
                 userId: user.user_id,
@@ -591,11 +586,7 @@ const Connect = () => {
             
             if (response.status === 200) {
                 setMappingLoading(true);
-                setShowLogsDialog(true); // Show logs dialog
                 setLoading(false);
-                
-                // Start real-time log streaming via SSE
-                startLogStreaming();
                 
                 // Start polling for status
                 checkMappingStatus();
@@ -615,99 +606,57 @@ const Connect = () => {
         }
     };
 
-    const startLogStreaming = () => {
-        // Close existing connection if any
-        if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-        }
-
-        // Get the API base URL
-        const apiBaseUrl = axiosInstance.defaults.baseURL || window.location.origin;
-        const sseUrl = `${apiBaseUrl}/onboarding/mapping-logs-stream?userId=${user.user_id}`;
-
-        // Create SSE connection
-        const eventSource = new EventSource(sseUrl);
-        eventSourceRef.current = eventSource;
-
-        eventSource.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                
-                if (data.type === 'log') {
-                    // Add log line to the array
-                    setMappingLogs((prev) => [...prev, data.line]);
-                } else if (data.type === 'complete') {
-                    // Process completed
-                    eventSource.close();
-                    eventSourceRef.current = null;
-                } else if (data.type === 'error') {
-                    // Error occurred
-                    setMappingLogs((prev) => [...prev, `❌ Error: ${data.message}`]);
-                } else if (data.type === 'timeout') {
-                    // Timeout
-                    setMappingLogs((prev) => [...prev, `⏱️ ${data.message}`]);
-                    eventSource.close();
-                    eventSourceRef.current = null;
+    const cancelMapping = async () => {
+        try {
+            setCancellingMapping(true);
+            const response = await axiosInstance.post('/onboarding/cancel-mapping', {
+                userId: user.user_id
+            });
+            
+            if (response.status === 200) {
+                // Stop polling
+                if (mappingCheckIntervalRef.current) {
+                    clearInterval(mappingCheckIntervalRef.current);
+                    mappingCheckIntervalRef.current = null;
                 }
-            } catch (err) {
-                console.error('Error parsing SSE message:', err);
+                isCheckingMappingRef.current = false;
+                
+                // Update UI
+                setMappingLoading(false);
+                setCancellingMapping(false);
+                
+                // Show success message (you can add a toast notification here)
+                console.log('Mapping cancelled successfully');
             }
-        };
-
-        eventSource.onerror = (error) => {
-            console.error('SSE connection error:', error);
-            setMappingLogs((prev) => [...prev, '⚠️ Log streaming connection closed']);
-            eventSource.close();
-            eventSourceRef.current = null;
-        };
+        } catch (e) {
+            setCancellingMapping(false);
+            console.error('Error cancelling mapping:', e);
+            const errorMessage = e.response?.data?.detail || e.message || 'Failed to cancel mapping';
+            setErrors((prev) => ({ ...prev, form: errorMessage }));
+        }
     };
 
     const isFormValid = uploadedFiles.length > 0 || databaseUri.trim() !== '' || apiEndpoint.trim() !== '';
 
     return (
         <>
-            {/* Real-time Mapping Logs Dialog */}
-            <Dialog 
-                visible={showLogsDialog} 
-                modal 
-                closable={false}
-                style={{ width: '70vw', maxHeight: '80vh' }} 
-                breakpoints={{ '960px': '85vw', '641px': '95vw' }}
-                header="Mapping Pipeline Progress"
-            >
-                <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-3">
-                        <ProgressSpinner style={{ width: '32px', height: '32px' }} />
-                        <Text className="text-lg font-medium m-0">
-                            Processing your data...
-                        </Text>
-                    </div>
-                    
-                    {/* Real-time log display */}
-                    <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-y-auto" 
-                         style={{ maxHeight: '400px', minHeight: '200px' }}>
-                        {mappingLogs.length === 0 ? (
-                            <div className="text-gray-500">Waiting for logs...</div>
-                        ) : (
-                            mappingLogs.map((log, index) => (
-                                <div key={index} className="mb-1">{log}</div>
-                            ))
-                        )}
-                    </div>
-                    
-                    <Text className="text-sm text-gray-600 m-0">
-                        This may take a few minutes depending on your data size.
-                        You will be automatically redirected when complete.
-                    </Text>
-                </div>
-            </Dialog>
-
-            {/* Fallback Loading Dialog (if logs not available) */}
-            <Dialog visible={mappingLoading && !showLogsDialog} modal closable={false}
+            {/* Mapping Loading Dialog */}
+            <Dialog visible={mappingLoading} modal closable={false}
                 style={{ width: '50vw' }} breakpoints={{ '960px': '75vw', '641px': '100vw' }}>
-                <div className="flex items-center justify-center flex-col my-20">
+                <div className="flex items-center justify-center flex-col my-8">
                     <ProgressSpinner />
-                    <Text className="text-xl text-black font-medium m-0 mt-4 z-10">We are mapping your data to our database. Please wait...</Text>
+                    <Text className="text-xl text-black font-medium m-0 mt-4 mb-6 z-10">
+                        We are mapping your data to our database. Please wait...
+                    </Text>
+                    <Button 
+                        label="Cancel" 
+                        severity="danger"
+                        outlined
+                        onClick={cancelMapping} 
+                        disabled={cancellingMapping}
+                        loading={cancellingMapping}
+                        className="mt-4"
+                    />
                 </div>
             </Dialog>
             <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
