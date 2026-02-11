@@ -213,7 +213,12 @@ def run_batch_mode(bucket_name: str):
         print(f"✅ BATCH MODE COMPLETE", flush=True)
         print(f"   Processed {len(results)} tables", flush=True)
         print(f"   Results saved to {bucket_name}/mapped/", flush=True)
+        print(f"   User can review missing/extra columns before continuing", flush=True)
         print(f"{'='*60}\n", flush=True)
+        
+        # Update database with success status
+        # Set current_step to 'mapping' so user can review results before continuing
+        update_mapping_status(bucket_name, "completed")
         
         spark.stop()
         
