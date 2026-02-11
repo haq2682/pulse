@@ -43,6 +43,7 @@ const Mapping = () => {
     const [dataLoading, setDataLoading] = useState(true);
     const [error, setError] = useState('');
     const [mappingInProgress, setMappingInProgress] = useState(false);  // Track if mapping is still running
+    const [successMessage, setSuccessMessage] = useState(''); // Store success/warning message from API
     
     // Dialog state
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -113,6 +114,7 @@ const Mapping = () => {
     const fetchMappingData = async () => {
         setDataLoading(true);
         setError('');
+        setSuccessMessage('');
         
         try {
             // First check mapping status
@@ -143,11 +145,12 @@ const Mapping = () => {
             });
             
             if (response.status === 200) {
-                const { missing_cols, extra_cols, all_fields_identified } = response.data;
+                const { missing_cols, extra_cols, all_fields_identified, message } = response.data;
                 
                 setMissingCols(missing_cols || []);
                 setExtraCols(extra_cols || []);
                 setAllFieldsIdentified(all_fields_identified || false);
+                setSuccessMessage(message || ''); // Store the message from API
                 
                 // Initialize mappings object with null values for each missing column
                 // Use :: as separator to avoid conflicts with table/column names containing underscores
@@ -250,9 +253,17 @@ const Mapping = () => {
                 }
             });
             
-            const response = await axiosInstance.post('/onboarding/save-manual-mappings', {
-                userId: user.user_id,
-                manualMappings: manualMappings
+            // Save manual mappings if any
+            if (Object.keys(manualMappings).length > 0) {
+                await axiosInstance.post('/onboarding/save-manual-mappings', {
+                    userId: user.user_id,
+                    manualMappings: manualMappings
+                });
+            }
+            
+            // Call confirm-mapping endpoint to mark as complete
+            const response = await axiosInstance.post('/onboarding/confirm-mapping', {
+                userId: user.user_id
             });
             
             if (response.status === 200) {
@@ -381,6 +392,23 @@ const Mapping = () => {
                             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                                 <Text className="text-red-600 m-0">
                                     {error}
+                                </Text>
+                            </div>
+                        )}
+
+                        {/* Success/Warning Message from API */}
+                        {successMessage && (
+                            <div className={`mb-6 p-4 rounded-lg border ${
+                                allFieldsIdentified 
+                                    ? 'bg-green-50 border-green-200' 
+                                    : 'bg-yellow-50 border-yellow-200'
+                            }`}>
+                                <Text className={`font-medium m-0 ${
+                                    allFieldsIdentified 
+                                        ? 'text-green-700' 
+                                        : 'text-yellow-700'
+                                }`}>
+                                    {successMessage}
                                 </Text>
                             </div>
                         )}
