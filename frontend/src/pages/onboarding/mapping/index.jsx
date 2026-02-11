@@ -96,9 +96,10 @@ const Mapping = () => {
                 navigate(`/onboarding/business/${onboardingId}`);
             } else if (currentStep === 'data-type') {
                 navigate(`/onboarding/data-type/${onboardingId}`);
-            } else if (currentStep === 'connect') {
+            } else if (currentStep === 'connect' || currentStep === 'mapping-in-progress') {
+                // Redirect to connect page if mapping is still in progress
                 navigate(`/onboarding/connect/${onboardingId}`);
-            } else if (currentStep === 'mapping' || currentStep === 'mapping-in-progress') {
+            } else if (currentStep === 'mapping') {
                 return;
             } else {
                 navigate(`/onboarding/connect/${onboardingId}`);
@@ -120,7 +121,6 @@ const Mapping = () => {
             });
             
             const { mapping_status } = statusResponse.data;
-            setMappingStatus(mapping_status);
             
             // If mapping is still running, show spinner and don't fetch results yet
             if (mapping_status === 'running') {

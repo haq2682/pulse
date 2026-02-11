@@ -21,6 +21,7 @@ MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MAPPING_LOG_DIR = os.getenv("MAPPING_LOG_DIR", "/tmp")
 MAPPING_PROCESS_TTL = 86400  # 24 hours in seconds
+MAPPING_LOG_MAX_LINES = 500  # Maximum number of log lines to return to avoid large responses
 
 s3 = boto3.client(
     "s3",
@@ -481,6 +482,7 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         # Build the command to run the mapping pipeline
         cmd = [
             "python3",
+            "-u",  # Unbuffered output for real-time logging
             script_path,
             "--mode", mode,
             "--business-id", business_id
@@ -508,8 +510,8 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         
         log_file_path = os.path.join(MAPPING_LOG_DIR, f"mapping_{mode}_{business_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.log")
         try:
-            # Open log file for subprocess stdout/stderr
-            log_file = open(log_file_path, 'w', buffering=1)  # Line buffered
+            # Open log file for subprocess stdout/stderr with line buffering for real-time logs
+            log_file = open(log_file_path, 'w', buffering=1)  # Line buffered for immediate writes
             # Inherit environment variables from parent process
             process = subprocess.Popen(
                 cmd,
@@ -532,11 +534,22 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         await redis.set(f"mapping_process:{business_id}", str(process.pid), ex=MAPPING_PROCESS_TTL)
         await redis.set(f"mapping_log:{business_id}", log_file_path, ex=MAPPING_PROCESS_TTL)
         
+        # Print to API logs for visibility
+        print(f"=" * 80)
+        print(f"Mapping pipeline started:")
+        print(f"  Mode: {mode}")
+        print(f"  Business ID: {business_id}")
+        print(f"  Process ID: {process.pid}")
+        print(f"  Log file: {log_file_path}")
+        print(f"  Command: {' '.join(cmd)}")
+        print(f"=" * 80)
+        
         return {
             "status": 200,
             "message": f"Mapping pipeline started successfully in {mode} mode",
             "mapping_status": "running",
             "process_id": process.pid,
+            "log_file": log_file_path,
             "mode": mode
         }
         
@@ -700,6 +713,80 @@ async def get_mapping_status(request: Request, userId: str, db=Depends(get_db)):
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/mapping-logs")
+async def get_mapping_logs(request: Request, userId: str, db=Depends(get_db)):
+    """
+    Get the logs from the mapping pipeline subprocess.
+    Returns the last N lines of the log file for the current mapping process.
+    """
+    try:
+        # Get authenticated user from middleware
+        authenticated_user_id = getattr(request.state, "user_id", None)
+        if not authenticated_user_id:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
+        # Verify userId matches authenticated user
+        if str(userId) != str(authenticated_user_id):
+            raise HTTPException(status_code=403, detail="Cannot access another user's mapping logs")
+        
+        # Get the business_id from onboarding record
+        onboarding = db.execute(
+            text("SELECT business_id FROM onboarding WHERE user_id = :user_id"),
+            {"user_id": userId}
+        )
+        onboarding_record = onboarding.fetchone()
+        
+        if not onboarding_record or not onboarding_record[0]:
+            raise HTTPException(status_code=404, detail="Onboarding record or business ID not found")
+        
+        business_id = onboarding_record[0]
+        
+        # Get the log file path from Redis
+        log_file_path = await redis.get(f"mapping_log:{business_id}")
+        
+        if not log_file_path:
+            return {
+                "status": 200,
+                "logs": "",
+                "message": "No active mapping process or log file not found"
+            }
+        
+        # Check if log file exists
+        if not os.path.exists(log_file_path):
+            return {
+                "status": 200,
+                "logs": "",
+                "message": f"Log file does not exist at {log_file_path}"
+            }
+        
+        # Read the log file (last N lines to avoid large responses)
+        try:
+            with open(log_file_path, 'r') as f:
+                lines = f.readlines()
+                # Get last MAPPING_LOG_MAX_LINES lines
+                last_lines = lines[-MAPPING_LOG_MAX_LINES:] if len(lines) > MAPPING_LOG_MAX_LINES else lines
+                log_content = ''.join(last_lines)
+                
+            return {
+                "status": 200,
+                "logs": log_content,
+                "log_file": log_file_path,
+                "total_lines": len(lines),
+                "returned_lines": len(last_lines)
+            }
+        except Exception as read_error:
+            return {
+                "status": 200,
+                "logs": "",
+                "message": f"Error reading log file: {str(read_error)}"
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @router.get("/mapping-results")
 async def get_mapping_results(request: Request, userId: str, db=Depends(get_db)):
     """

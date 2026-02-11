@@ -79,10 +79,11 @@ const Connect = () => {
             else if (currentStep === 'data-type') {
                 navigate(`/onboarding/data-type/${onboardingId}`);
             }
-            else if (currentStep === 'connect') {
+            else if (currentStep === 'connect' || currentStep === 'mapping-in-progress') {
+                // Stay on connect page if mapping is in progress
                 return;
             }
-            else if (currentStep === 'mapping' || currentStep === 'mapping-in-progress') {
+            else if (currentStep === 'mapping') {
                 navigate(`/onboarding/mapping/${onboardingId}`);
             }
             else {
