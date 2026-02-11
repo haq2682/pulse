@@ -61,9 +61,9 @@ def run_batch_mode(bucket_name: str):
     Args:
         bucket_name: Name of the MinIO bucket
     """
-    print(f"\n{'='*60}")
-    print(f"BATCH MODE: Processing files from bucket '{bucket_name}/ingested'")
-    print(f"{'='*60}\n")
+    print(f"\n{'='*60}", flush=True)
+    print(f"BATCH MODE: Processing files from bucket '{bucket_name}/ingested'", flush=True)
+    print(f"{'='*60}\n", flush=True)
     
     # Import and run the batch processing
     try:
@@ -84,19 +84,19 @@ def run_batch_mode(bucket_name: str):
             manual_mappings_str = redis_client.get(f"manual_mappings:{bucket_name}")
             if manual_mappings_str:
                 manual_mappings = json.loads(manual_mappings_str)
-                print(f"\n✅ Retrieved manual mappings from Redis")
-                print(f"   Tables with manual mappings: {list(manual_mappings.keys())}")
+                print(f"\n✅ Retrieved manual mappings from Redis", flush=True)
+                print(f"   Tables with manual mappings: {list(manual_mappings.keys())}", flush=True)
         except Exception as redis_error:
-            print(f"⚠️  Warning: Could not retrieve manual mappings from Redis: {redis_error}")
+            print(f"⚠️  Warning: Could not retrieve manual mappings from Redis: {redis_error}", flush=True)
         
-        print(f"Loading files from {bucket_name}/ingested...")
+        print(f"Loading files from {bucket_name}/ingested...", flush=True)
         all_dataframes = load_all_files_from_minio(minio_client, bucket_name, spark)
         
         if not all_dataframes:
-            print("⚠️  No files found in ingested folder")
+            print("⚠️  No files found in ingested folder", flush=True)
             return
         
-        print(f"\nProcessing {len(all_dataframes)} dataframes through mapping pipeline...")
+        print(f"\nProcessing {len(all_dataframes)} dataframes through mapping pipeline...", flush=True)
         results = process_all_dataframes(
             all_dataframes, 
             COLUMNS_INFO, 
@@ -137,25 +137,25 @@ def run_batch_mode(bucket_name: str):
                 86400,  # 24 hours
                 json.dumps(mapping_results)
             )
-            print(f"\n✅ Mapping results saved to Redis")
-            print(f"   Missing columns: {len(mapping_results['missing_cols'])}")
-            print(f"   Extra columns: {len(mapping_results['extra_cols'])}")
+            print(f"\n✅ Mapping results saved to Redis", flush=True)
+            print(f"   Missing columns: {len(mapping_results['missing_cols'])}", flush=True)
+            print(f"   Extra columns: {len(mapping_results['extra_cols'])}", flush=True)
         except Exception as redis_error:
-            print(f"⚠️  Warning: Could not save mapping results to Redis: {redis_error}")
+            print(f"⚠️  Warning: Could not save mapping results to Redis: {redis_error}", flush=True)
         
-        print(f"\nSaving results to {bucket_name}/mapped...")
+        print(f"\nSaving results to {bucket_name}/mapped...", flush=True)
         save_dataframes_to_minio(results, minio_client, bucket_name)
         
-        print(f"\n{'='*60}")
-        print(f"✅ BATCH MODE COMPLETE")
-        print(f"   Processed {len(results)} tables")
-        print(f"   Results saved to {bucket_name}/mapped/")
-        print(f"{'='*60}\n")
+        print(f"\n{'='*60}", flush=True)
+        print(f"✅ BATCH MODE COMPLETE", flush=True)
+        print(f"   Processed {len(results)} tables", flush=True)
+        print(f"   Results saved to {bucket_name}/mapped/", flush=True)
+        print(f"{'='*60}\n", flush=True)
         
         spark.stop()
         
     except Exception as e:
-        print(f"❌ Error in batch mode: {e}")
+        print(f"❌ Error in batch mode: {e}", flush=True)
         import traceback
         traceback.print_exc()
         sys.exit(1)
@@ -345,16 +345,16 @@ def main():
     mode = args.mode if args.mode else CONFIG["mode"]
     bucket_name = args.business_id if args.business_id else CONFIG["bucket_name"]
     
-    print(f"\n{'='*60}")
-    print(f"PULSE MAPPING - Starting in {mode.upper()} mode")
-    print(f"{'='*60}")
-    print(f"Configuration:")
-    print(f"  Mode: {mode}")
-    print(f"  Bucket: {bucket_name}")
+    print(f"\n{'='*60}", flush=True)
+    print(f"PULSE MAPPING - Starting in {mode.upper()} mode", flush=True)
+    print(f"{'='*60}", flush=True)
+    print(f"Configuration:", flush=True)
+    print(f"  Mode: {mode}", flush=True)
+    print(f"  Bucket: {bucket_name}", flush=True)
     
     # Validate and execute the appropriate mode
     if mode == "batch":
-        print(f"{'='*60}\n")
+        print(f"{'='*60}\n", flush=True)
         run_batch_mode(bucket_name)
         
     elif mode == "db":
@@ -368,9 +368,9 @@ def main():
         
         # Mask credentials in URI for display
         display_uri = db_uri.split("@")[-1] if "@" in db_uri else db_uri
-        print(f"  Database: {display_uri}")
-        print(f"  Tables: {db_tables}")
-        print(f"{'='*60}\n")
+        print(f"  Database: {display_uri}", flush=True)
+        print(f"  Tables: {db_tables}", flush=True)
+        print(f"{'='*60}\n", flush=True)
 
         run_db_mode({
             "db_uri": db_uri,
@@ -383,16 +383,16 @@ def main():
         poll_interval = args.api_poll_interval if args.api_poll_interval else CONFIG["api_poll_interval"]
         kafka_bootstrap = CONFIG["kafka_bootstrap"]
         
-        print(f"  API URL: {api_url}")
-        print(f"  Poll interval: {poll_interval}s")
-        print(f"{'='*60}\n")
+        print(f"  API URL: {api_url}", flush=True)
+        print(f"  Poll interval: {poll_interval}s", flush=True)
+        print(f"{'='*60}\n", flush=True)
         
         run_api_mode(api_url, bucket_name, poll_interval, kafka_bootstrap)
 
     else:
-        print(f"\n❌ ERROR: Invalid mode '{mode}'")
-        print(f"   Valid modes: batch, db, api")
-        print(f"   Edit CONFIG in run_mapping.py to change mode\n")
+        print(f"\n❌ ERROR: Invalid mode '{mode}'", flush=True)
+        print(f"   Valid modes: batch, db, api", flush=True)
+        print(f"   Edit CONFIG in run_mapping.py to change mode\n", flush=True)
         sys.exit(1)
 
 
