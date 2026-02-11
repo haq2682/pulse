@@ -960,7 +960,8 @@ async def get_mapping_results(request: Request, userId: str, db=Depends(get_db))
                 "mapping_status": mapping_status,
                 "missing_cols": [],
                 "extra_cols": [],
-                "all_fields_identified": False
+                "all_fields_identified": False,
+                "message": "Mapping in progress..."
             }
         
         # Parse mapping results from JSONB
@@ -971,12 +972,20 @@ async def get_mapping_results(request: Request, userId: str, db=Depends(get_db))
             # Check if all fields are identified
             all_fields_identified = len(missing_cols) == 0
             
+            # Generate appropriate message based on results
+            if all_fields_identified:
+                message = "✅ All required columns have been successfully mapped!"
+            else:
+                missing_count = len(missing_cols)
+                message = f"⚠️ {missing_count} required column{'s' if missing_count != 1 else ''} missing. Please review and map manually if needed."
+            
             return {
                 "status": 200,
                 "mapping_status": mapping_status,
                 "missing_cols": missing_cols,
                 "extra_cols": extra_cols,
-                "all_fields_identified": all_fields_identified
+                "all_fields_identified": all_fields_identified,
+                "message": message
             }
         else:
             # No mapping results yet, check Redis for cached results
@@ -1003,12 +1012,20 @@ async def get_mapping_results(request: Request, userId: str, db=Depends(get_db))
                     
                     all_fields_identified = len(missing_cols) == 0
                     
+                    # Generate appropriate message based on results
+                    if all_fields_identified:
+                        message = "✅ All required columns have been successfully mapped!"
+                    else:
+                        missing_count = len(missing_cols)
+                        message = f"⚠️ {missing_count} required column{'s' if missing_count != 1 else ''} missing. Please review and map manually if needed."
+                    
                     return {
                         "status": 200,
                         "mapping_status": mapping_status,
                         "missing_cols": missing_cols,
                         "extra_cols": extra_cols,
-                        "all_fields_identified": all_fields_identified
+                        "all_fields_identified": all_fields_identified,
+                        "message": message
                     }
             
             # No results available
@@ -1017,7 +1034,8 @@ async def get_mapping_results(request: Request, userId: str, db=Depends(get_db))
                 "mapping_status": mapping_status,
                 "missing_cols": [],
                 "extra_cols": [],
-                "all_fields_identified": False
+                "all_fields_identified": False,
+                "message": "No mapping results available yet."
             }
     
     except HTTPException:

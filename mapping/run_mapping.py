@@ -203,6 +203,15 @@ def run_batch_mode(bucket_name: str):
             print(f"\n✅ Mapping results saved to Redis", flush=True)
             print(f"   Missing columns: {len(mapping_results['missing_cols'])}", flush=True)
             print(f"   Extra columns: {len(mapping_results['extra_cols'])}", flush=True)
+            
+            # Provide clear feedback about mapping completeness
+            if len(mapping_results['missing_cols']) == 0:
+                print(f"\n🎉 SUCCESS: All required columns have been successfully mapped!", flush=True)
+                print(f"   No missing columns detected.", flush=True)
+            else:
+                print(f"\n⚠️  WARNING: {len(mapping_results['missing_cols'])} required column(s) are missing.", flush=True)
+                print(f"   These will need to be mapped manually.", flush=True)
+                
         except Exception as redis_error:
             print(f"⚠️  Warning: Could not save mapping results to Redis: {redis_error}", flush=True)
         
