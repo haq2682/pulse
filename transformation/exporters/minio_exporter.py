@@ -33,10 +33,11 @@ def parse_minio_endpoint(endpoint_url):
         endpoint_url = endpoint_url.split("://", 1)[1]
     
     # Validate that we have a non-empty endpoint after parsing
-    if not endpoint_url or not endpoint_url.strip():
+    endpoint_url = endpoint_url.strip()
+    if not endpoint_url:
         raise ValueError("MINIO_ENDPOINT is invalid after removing protocol")
     
-    return endpoint_url.strip()
+    return endpoint_url
 
 
 # Mapping from dataframe names to output file names (aligned with agg_schema.sql)
