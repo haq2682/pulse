@@ -17,6 +17,7 @@ from utils.helpers import (
     safe_serialize,
     detect_table,
     split_unified_dataframe,
+    parse_minio_endpoint,
 )
 from utils.table_mapper import map_table_name
 import os
@@ -181,8 +182,11 @@ COLUMNS_INFO = [
     ("customer_sessions", "cart_abandonment_flag", "boolean"),
 ]
 
+# Parse MINIO_ENDPOINT to strip protocol prefix if present
+minio_endpoint = parse_minio_endpoint(os.getenv("MINIO_ENDPOINT", "localhost:9000"))
+
 minio_client = Minio(
-    os.getenv("MINIO_ENDPOINT"),
+    minio_endpoint,
     access_key=os.getenv("MINIO_ACCESS_KEY"),
     secret_key=os.getenv("MINIO_SECRET_KEY"),
     secure=False,
