@@ -842,8 +842,12 @@ async def stream_mapping_logs(request: Request, userId: str, db=Depends(get_db))
             
             # Track the last position in the file
             last_position = 0
+            
+            # Timeout configuration: stop after no updates for this duration
+            STREAM_TIMEOUT_SECONDS = 30
+            POLL_INTERVAL_SECONDS = 0.5
+            max_no_updates = int(STREAM_TIMEOUT_SECONDS / POLL_INTERVAL_SECONDS)  # 60 iterations
             no_update_count = 0
-            max_no_updates = 60  # Stop after 60 iterations with no updates (about 30 seconds)
             
             # Keep reading until process completes or no more updates
             while no_update_count < max_no_updates:
@@ -876,7 +880,9 @@ async def stream_mapping_logs(request: Request, userId: str, db=Depends(get_db))
                         if process_id_str:
                             try:
                                 process_id = int(process_id_str)
-                                os.kill(process_id, 0)  # Check if process exists
+                                # Check if process exists using signal 0 (Unix-specific)
+                                # This doesn't kill the process, just tests if it exists
+                                os.kill(process_id, 0)
                                 # Process is running, continue monitoring
                             except (OSError, ValueError):
                                 # Process is done, read any remaining output and exit
@@ -889,7 +895,7 @@ async def stream_mapping_logs(request: Request, userId: str, db=Depends(get_db))
                                 break
                     
                     # Small delay before checking for more output
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(POLL_INTERVAL_SECONDS)
                     
                 except Exception as read_error:
                     yield f"data: {{\"type\": \"error\", \"message\": \"Error reading log: {str(read_error)}\"}}\n\n"
@@ -897,7 +903,7 @@ async def stream_mapping_logs(request: Request, userId: str, db=Depends(get_db))
             
             # Send completion event if we timed out
             if no_update_count >= max_no_updates:
-                yield f"data: {{\"type\": \"timeout\", \"message\": \"No updates for 30 seconds, closing stream\"}}\n\n"
+                yield f"data: {{\"type\": \"timeout\", \"message\": \"No updates for {STREAM_TIMEOUT_SECONDS} seconds, closing stream\"}}\n\n"
                 
         except Exception as e:
             yield f"data: {{\"type\": \"error\", \"message\": \"Stream error: {str(e)}\"}}\n\n"
