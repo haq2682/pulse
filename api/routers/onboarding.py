@@ -608,7 +608,9 @@ async def start_mapping(request: Request, db=Depends(get_db)):
                 db.commit()
             except Exception as db_error:
                 print(f"Error updating database after failure: {db_error}")
-        raise HTTPException(status_code=400, detail=str(e))
+        # Generic error message to avoid leaking internal details
+        print(f"Error starting mapping: {e}")
+        raise HTTPException(status_code=500, detail="Failed to start mapping pipeline")
 
 @router.post("/cancel-mapping")
 async def cancel_mapping(request: Request, db=Depends(get_db)):
@@ -659,28 +661,37 @@ async def cancel_mapping(request: Request, db=Depends(get_db)):
                 print(f"Invalid process ID: {process_id_str}")
         
         # Update the database to indicate mapping was cancelled
-        db.execute(
-            text("""
-                UPDATE onboarding 
-                SET mapping_status = :mapping_status,
-                    mapping_error = :error,
-                    mapping_completed_at = :completed_at,
-                    current_step = :current_step
-                WHERE user_id = :user_id
-            """),
-            {
-                "mapping_status": "cancelled",
-                "error": "Mapping was cancelled by user",
-                "completed_at": datetime.utcnow(),
-                "current_step": "connect",
-                "user_id": user_id
-            }
-        )
-        db.commit()
-        
-        # Clear Redis keys
-        await redis.delete(f"mapping_process:{business_id}")
-        await redis.delete(f"mapping_log:{business_id}")
+        try:
+            db.execute(
+                text("""
+                    UPDATE onboarding 
+                    SET mapping_status = :mapping_status,
+                        mapping_error = :error,
+                        mapping_completed_at = :completed_at,
+                        current_step = :current_step
+                    WHERE user_id = :user_id
+                """),
+                {
+                    "mapping_status": "cancelled",
+                    "error": "Mapping was cancelled by user",
+                    "completed_at": datetime.utcnow(),
+                    "current_step": "connect",
+                    "user_id": user_id
+                }
+            )
+            db.commit()
+            
+            # Clear Redis keys only after successful database commit
+            await redis.delete(f"mapping_process:{business_id}")
+            await redis.delete(f"mapping_log:{business_id}")
+            
+        except Exception as db_error:
+            db.rollback()
+            print(f"Error updating database during cancellation: {db_error}")
+            raise HTTPException(
+                status_code=500, 
+                detail="Failed to update database during cancellation"
+            )
         
         return {
             "status": 200,
@@ -690,7 +701,9 @@ async def cancel_mapping(request: Request, db=Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # Generic error message to avoid leaking internal details
+        print(f"Error cancelling mapping: {e}")
+        raise HTTPException(status_code=500, detail="Failed to cancel mapping pipeline")
 
 @router.get("/mapping-status")
 async def get_mapping_status(request: Request, userId: str, db=Depends(get_db)):
