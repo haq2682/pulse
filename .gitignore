@@ -34,7 +34,7 @@ api/__pycache__/*
 */**/.env
 /.pnp
 .pnp.js
-*.pyc
+*/**/*.pyc
 
 # testing
 frontend/coverage

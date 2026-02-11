@@ -1141,7 +1141,7 @@ async def get_mapping_results(request: Request, userId: str, db=Depends(get_db))
                             WHERE user_id = :user_id
                         """),
                         {
-                            "mapping_results": mapping_results,  # SQLAlchemy handles JSONB conversion
+                            "mapping_results": json.dumps(mapping_results),  # ← SOLUTION: convert to JSON string
                             "user_id": userId
                         }
                     )
@@ -1221,7 +1221,7 @@ async def save_manual_mappings(request: Request, db=Depends(get_db)):
                 WHERE user_id = :user_id
             """),
             {
-                "manual_mappings": manual_mappings,  # SQLAlchemy handles JSONB conversion
+                "manual_mappings": json.dumps(manual_mappings),  # ← SOLUTION: convert to JSON string
                 "current_step": "mapping",
                 "is_completed": True,
                 "user_id": user_id

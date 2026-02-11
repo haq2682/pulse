@@ -47,6 +47,9 @@ services:
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
       - KAFKA_BOOTSTRAP=${KAFKA_BOOTSTRAP}
       - KAFKA_BOOTSTRAP_EXTERNAL=${KAFKA_BOOTSTRAP_EXTERNAL}
+      - SPARK_MASTER_URL=spark://10.5.0.3:7077
+      - PYSPARK_PYTHON=python3.10
+      - PYSPARK_DRIVER_PYTHON=python3.10
     depends_on:
       - postgresql
       - python
