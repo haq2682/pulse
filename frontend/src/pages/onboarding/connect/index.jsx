@@ -625,7 +625,6 @@ const Connect = () => {
                 setMappingLoading(false);
                 setCancellingMapping(false);
                 
-                // Show success message (you can add a toast notification here)
                 console.log('Mapping cancelled successfully');
             }
         } catch (e) {
