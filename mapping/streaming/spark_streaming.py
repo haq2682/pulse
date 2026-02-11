@@ -19,6 +19,7 @@ if mapping_dir not in sys.path:
 
 from map import process_all_dataframes, save_dataframes_to_minio, COLUMNS_INFO
 import List as mapping_list
+from utils.helpers import parse_minio_endpoint
 
 load_dotenv(find_dotenv())
 
@@ -301,10 +302,8 @@ def run_streaming():
     columns_info = COLUMNS_INFO
     print(f"Loaded {len(columns_info)} columns from canonical schema")
     
-    # Strip protocol prefix from MINIO_ENDPOINT if present (Minio client expects hostname:port only)
-    minio_endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
-    if "://" in minio_endpoint:
-        minio_endpoint = minio_endpoint.split("://", 1)[1]
+    # Parse MINIO_ENDPOINT to strip protocol prefix if present
+    minio_endpoint = parse_minio_endpoint(os.getenv("MINIO_ENDPOINT", "localhost:9000"))
     
     minio_client = Minio(
         minio_endpoint,

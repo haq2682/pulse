@@ -17,6 +17,7 @@ from utils.helpers import (
     safe_serialize,
     detect_table,
     split_unified_dataframe,
+    parse_minio_endpoint,
 )
 from utils.table_mapper import map_table_name
 import os
@@ -181,10 +182,8 @@ COLUMNS_INFO = [
     ("customer_sessions", "cart_abandonment_flag", "boolean"),
 ]
 
-# Strip protocol prefix from MINIO_ENDPOINT if present (Minio client expects hostname:port only)
-minio_endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
-if "://" in minio_endpoint:
-    minio_endpoint = minio_endpoint.split("://", 1)[1]
+# Parse MINIO_ENDPOINT to strip protocol prefix if present
+minio_endpoint = parse_minio_endpoint(os.getenv("MINIO_ENDPOINT", "localhost:9000"))
 
 minio_client = Minio(
     minio_endpoint,
