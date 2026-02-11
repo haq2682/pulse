@@ -16,6 +16,9 @@ import multiprocessing
 from typing import Optional
 import redis
 import json
+import psycopg2
+from datetime import datetime
+import traceback
 
 # Add current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -51,6 +54,70 @@ CONFIG = {
 }
 
 # ============================================================================
+
+def update_mapping_status(business_id: str, status: str, error_message: Optional[str] = None):
+    """
+    Update the mapping status in the database for error reporting to frontend.
+    
+    Args:
+        business_id: Business ID (bucket name)
+        status: Status to set ('running', 'completed', 'failed')
+        error_message: Optional error message (required when status='failed')
+    """
+    try:
+        # Get database connection details from environment
+        db_host = os.getenv("POSTGRES_SERVER", "postgresql")
+        db_name = os.getenv("POSTGRES_DATABASE_NAME", "pulse")
+        db_user = os.getenv("POSTGRES_USER", "postgres")
+        db_password = os.getenv("POSTGRES_PASSWORD", "postgres")
+        
+        # Connect to database
+        conn = psycopg2.connect(
+            host=db_host,
+            database=db_name,
+            user=db_user,
+            password=db_password
+        )
+        
+        cursor = conn.cursor()
+        
+        # Update the onboarding table
+        if status == "failed":
+            cursor.execute("""
+                UPDATE onboarding 
+                SET mapping_status = %s,
+                    mapping_error = %s,
+                    mapping_completed_at = %s,
+                    current_step = 'connect'
+                WHERE business_id = %s
+            """, (status, error_message, datetime.utcnow(), business_id))
+        elif status == "completed":
+            cursor.execute("""
+                UPDATE onboarding 
+                SET mapping_status = %s,
+                    mapping_completed_at = %s,
+                    mapping_error = NULL,
+                    current_step = 'mapping'
+                WHERE business_id = %s
+            """, (status, datetime.utcnow(), business_id))
+        else:
+            cursor.execute("""
+                UPDATE onboarding 
+                SET mapping_status = %s
+                WHERE business_id = %s
+            """, (status, business_id))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        print(f"✅ Database updated: status={status}, business_id={business_id}", flush=True)
+        if error_message:
+            print(f"   Error: {error_message}", flush=True)
+            
+    except Exception as db_error:
+        print(f"⚠️  Failed to update database status: {db_error}", flush=True)
+        # Don't re-raise - we want the original error to be the main one
 
 
 def run_batch_mode(bucket_name: str):
@@ -155,9 +222,13 @@ def run_batch_mode(bucket_name: str):
         spark.stop()
         
     except Exception as e:
-        print(f"❌ Error in batch mode: {e}", flush=True)
-        import traceback
+        error_msg = f"Error in batch mode: {str(e)}"
+        print(f"❌ {error_msg}", flush=True)
         traceback.print_exc()
+        
+        # Update database with error status so frontend can display it
+        update_mapping_status(bucket_name, "failed", error_msg)
+        
         sys.exit(1)
 
 
@@ -201,14 +272,23 @@ def run_db_mode(config: dict):
     manager = DebeziumConnectorManager()
 
     if not manager.wait_for_connect():
-        print("Kafka Connect not available")
+        error_msg = "DB mode error: Kafka Connect not available"
+        print(f"❌ {error_msg}")
+        update_mapping_status(bucket_name, "failed", error_msg)
         sys.exit(1)
 
     # Auto-detect database type from URI and build connector config
-    connector_config = manager.create_connector_config(
-        db_uri=db_uri,
-        tables=tables,
-    )
+    try:
+        connector_config = manager.create_connector_config(
+            db_uri=db_uri,
+            tables=tables,
+        )
+    except Exception as e:
+        error_msg = f"DB mode error: Failed to create connector config: {str(e)}"
+        print(f"❌ {error_msg}")
+        traceback.print_exc()
+        update_mapping_status(bucket_name, "failed", error_msg)
+        sys.exit(1)
 
     # Deploy connector and start streaming
     if manager.deploy_connector(connector_config):
@@ -221,9 +301,18 @@ def run_db_mode(config: dict):
         if manual_mappings:
             os.environ["MANUAL_MAPPINGS"] = json.dumps(manual_mappings)
         
-        run_streaming()
+        try:
+            run_streaming()
+        except Exception as e:
+            error_msg = f"DB mode error: Streaming failed: {str(e)}"
+            print(f"❌ {error_msg}")
+            traceback.print_exc()
+            update_mapping_status(bucket_name, "failed", error_msg)
+            sys.exit(1)
     else:
-        print("Failed to deploy connector")
+        error_msg = "DB mode error: Failed to deploy Debezium connector"
+        print(f"❌ {error_msg}")
+        update_mapping_status(bucket_name, "failed", error_msg)
         sys.exit(1)
 
 
@@ -317,9 +406,10 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_
             print("✅ API MODE STOPPED\n")
             
     except Exception as e:
-        print(f"❌ Error in api mode: {e}")
-        import traceback
+        error_msg = f"API mode error: {str(e)}"
+        print(f"❌ {error_msg}")
         traceback.print_exc()
+        update_mapping_status(bucket_name, "failed", error_msg)
         sys.exit(1)
 
 
@@ -345,54 +435,64 @@ def main():
     mode = args.mode if args.mode else CONFIG["mode"]
     bucket_name = args.business_id if args.business_id else CONFIG["bucket_name"]
     
-    print(f"\n{'='*60}", flush=True)
-    print(f"PULSE MAPPING - Starting in {mode.upper()} mode", flush=True)
-    print(f"{'='*60}", flush=True)
-    print(f"Configuration:", flush=True)
-    print(f"  Mode: {mode}", flush=True)
-    print(f"  Bucket: {bucket_name}", flush=True)
-    
-    # Validate and execute the appropriate mode
-    if mode == "batch":
-        print(f"{'='*60}\n", flush=True)
-        run_batch_mode(bucket_name)
+    # Wrap execution in try-except to catch any uncaught errors
+    try:
+        print(f"\n{'='*60}", flush=True)
+        print(f"PULSE MAPPING - Starting in {mode.upper()} mode", flush=True)
+        print(f"{'='*60}", flush=True)
+        print(f"Configuration:", flush=True)
+        print(f"  Mode: {mode}", flush=True)
+        print(f"  Bucket: {bucket_name}", flush=True)
         
-    elif mode == "db":
-        # Use command-line args if provided, otherwise use CONFIG
-        db_uri = args.db_uri if args.db_uri else CONFIG["db_uri"]
-        # Handle db_tables: distinguish between omitted (None) and explicitly provided (including empty string)
-        if args.db_tables is not None:
-            db_tables = [t.strip() for t in args.db_tables.split(',') if t.strip()]
+        # Validate and execute the appropriate mode
+        if mode == "batch":
+            print(f"{'='*60}\n", flush=True)
+            run_batch_mode(bucket_name)
+            
+        elif mode == "db":
+            # Use command-line args if provided, otherwise use CONFIG
+            db_uri = args.db_uri if args.db_uri else CONFIG["db_uri"]
+            # Handle db_tables: distinguish between omitted (None) and explicitly provided (including empty string)
+            if args.db_tables is not None:
+                db_tables = [t.strip() for t in args.db_tables.split(',') if t.strip()]
+            else:
+                db_tables = CONFIG["db_tables"]
+            
+            # Mask credentials in URI for display
+            display_uri = db_uri.split("@")[-1] if "@" in db_uri else db_uri
+            print(f"  Database: {display_uri}", flush=True)
+            print(f"  Tables: {db_tables}", flush=True)
+            print(f"{'='*60}\n", flush=True)
+
+            run_db_mode({
+                "db_uri": db_uri,
+                "db_tables": db_tables,
+                "bucket_name": bucket_name
+            })
+
+        elif mode == "api":
+            api_url = args.api_url if args.api_url else CONFIG["api_url"]
+            poll_interval = args.api_poll_interval if args.api_poll_interval else CONFIG["api_poll_interval"]
+            kafka_bootstrap = CONFIG["kafka_bootstrap"]
+            
+            print(f"  API URL: {api_url}", flush=True)
+            print(f"  Poll interval: {poll_interval}s", flush=True)
+            print(f"{'='*60}\n", flush=True)
+            
+            run_api_mode(api_url, bucket_name, poll_interval, kafka_bootstrap)
+
         else:
-            db_tables = CONFIG["db_tables"]
-        
-        # Mask credentials in URI for display
-        display_uri = db_uri.split("@")[-1] if "@" in db_uri else db_uri
-        print(f"  Database: {display_uri}", flush=True)
-        print(f"  Tables: {db_tables}", flush=True)
-        print(f"{'='*60}\n", flush=True)
-
-        run_db_mode({
-            "db_uri": db_uri,
-            "db_tables": db_tables,
-            "bucket_name": bucket_name
-        })
-
-    elif mode == "api":
-        api_url = args.api_url if args.api_url else CONFIG["api_url"]
-        poll_interval = args.api_poll_interval if args.api_poll_interval else CONFIG["api_poll_interval"]
-        kafka_bootstrap = CONFIG["kafka_bootstrap"]
-        
-        print(f"  API URL: {api_url}", flush=True)
-        print(f"  Poll interval: {poll_interval}s", flush=True)
-        print(f"{'='*60}\n", flush=True)
-        
-        run_api_mode(api_url, bucket_name, poll_interval, kafka_bootstrap)
-
-    else:
-        print(f"\n❌ ERROR: Invalid mode '{mode}'", flush=True)
-        print(f"   Valid modes: batch, db, api", flush=True)
-        print(f"   Edit CONFIG in run_mapping.py to change mode\n", flush=True)
+            error_msg = f"Invalid mode '{mode}'. Valid modes: batch, db, api"
+            print(f"\n❌ ERROR: {error_msg}", flush=True)
+            update_mapping_status(bucket_name, "failed", error_msg)
+            sys.exit(1)
+            
+    except Exception as e:
+        # Catch any uncaught errors from the main execution
+        error_msg = f"Unexpected error in mapping pipeline: {str(e)}"
+        print(f"\n❌ {error_msg}", flush=True)
+        traceback.print_exc()
+        update_mapping_status(bucket_name, "failed", error_msg)
         sys.exit(1)
 
 
