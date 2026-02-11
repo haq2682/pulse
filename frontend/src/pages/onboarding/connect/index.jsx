@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router';
+import { useNavigate } from 'react-router';
 import { InputText } from 'primereact/inputtext';
 import { ProgressBar } from 'primereact/progressbar';
 import Breadcrumb from '../Breadcrumb';
@@ -14,14 +14,11 @@ import { Dialog } from 'primereact/dialog';
 import { Message } from 'primereact/message';
 
 const CHUNK_SIZE = 5 * 1024 * 1024;
-const MAPPING_STATUS_POLL_INTERVAL = 3000; // 3 seconds
 // const NIFI_UPLOAD_URL = import.meta.env.VITE_NIFI_UPLOAD_URL || 'http://10.5.0.12:8082/upload';
 const NIFI_UPLOAD_URL = 'http://localhost:8082/upload';
 
 const Connect = () => {
     const navigate = useNavigate();
-    const location = useLocation();
-    const pathname = location.pathname;
     const [databaseUri, setDatabaseUri] = useState('');
     const [apiEndpoint, setApiEndpoint] = useState('');
     const [businessId, setBusinessId] = useState('');
@@ -35,14 +32,6 @@ const Connect = () => {
     const [errors, setErrors] = useState({db: '', api: '', form: ''});
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef(null);
-    const mappingCheckIntervalRef = useRef(null);
-    const isCheckingMappingRef = useRef(false); // Prevent duplicate interval creation
-
-    // Helper function to safely extract onboarding ID from pathname
-    const getOnboardingIdFromPath = () => {
-        const pathSegments = pathname.split('/');
-        return pathSegments.length > 3 ? pathSegments[3] : '';
-    };
 
     const breadcrumbItems = [
         {
@@ -71,53 +60,34 @@ const Connect = () => {
         try {
             const response = await axiosInstance.get(`/onboarding/get-current-step?userId=${user.user_id}`);
             const currentStep = response.data.currentStep;
-            const onboardingId = getOnboardingIdFromPath();
 
             if (currentStep === 'business') {
-                navigate(`/onboarding/business/${onboardingId}`);
+                navigate(`/onboarding/business/${pathname.split('/')[3]}`);
             }
             else if (currentStep === 'data-type') {
-                navigate(`/onboarding/data-type/${onboardingId}`);
+                navigate(`/onboarding/data-type/${pathname.split('/')[3]}`);
             }
             else if (currentStep === 'connect') {
                 return;
             }
-            else if (currentStep === 'mapping' || currentStep === 'mapping-in-progress') {
-                navigate(`/onboarding/mapping/${onboardingId}`);
+            else if (currentStep === 'mapping') {
+                navigate(`/onboarding/mapping/${pathname.split('/')[3]}`);
             }
             else {
-                navigate(`/onboarding/connect/${onboardingId}`);
+                navigate(`/onboarding/connect/${pathname.split('/')[3]}`);
             }
         }
 
         catch (e) {
-            setErrors((prev) => ({
-                ...prev,
-                form: e.message || 'An error occurred while fetching onboarding status. Please try again.'
-            }));
+            setError(e.message || 'An error occurred while fetching onboarding status. Please try again.');
         }
     }
 
     useEffect(() => {
-        if (!user?.user_id) return;
-        
-        const initializeData = async () => {
-            await fetchCurrentStep();
-            await fetchIngestionType();
-            await fetchUploadedFiles();
-            // Check mapping status after data is loaded
-            await checkMappingStatus();
-        };
-        
-        initializeData();
-        
-        // Clean up interval on unmount
-        return () => {
-            if (mappingCheckIntervalRef.current) {
-                clearInterval(mappingCheckIntervalRef.current);
-            }
-        };
-    }, [user?.user_id]);
+        fetchCurrentStep();
+        fetchIngestionType();
+        fetchUploadedFiles();
+    }, []);
 
     const fetchUploadedFiles = async () => {
         try {
@@ -412,10 +382,6 @@ const Connect = () => {
                 setLoading(false);
                 return;
             }
-            
-            // Start the mapping pipeline for batch mode
-            await startMapping();
-            return;
         }
 
         if (ingestionType === 'db') {
@@ -430,10 +396,6 @@ const Connect = () => {
                 setLoading(false);
                 return;
             }
-            
-            // Start the mapping pipeline for db mode
-            await startMapping();
-            return;
         }
 
         if (ingestionType === 'api') {
@@ -448,10 +410,6 @@ const Connect = () => {
                 setLoading(false);
                 return;
             }
-            
-            // Start the mapping pipeline for api mode
-            await startMapping();
-            return;
         }
         
         setLoading(false);
@@ -474,133 +432,6 @@ const Connect = () => {
             setIngestionTypeLoading(false);
         }
     }
-
-    const checkMappingStatus = async () => {
-        // Prevent duplicate checks
-        if (isCheckingMappingRef.current) {
-            return;
-        }
-        
-        try {
-            isCheckingMappingRef.current = true;
-            const response = await axiosInstance.get('/onboarding/mapping-status', {
-                params: { userId: user.user_id }
-            });
-            
-            if (response.status === 200) {
-                const { current_step, mapping_status } = response.data;
-                
-                // If mapping is in progress, show the loader and start polling
-                if (mapping_status === 'running' || current_step === 'mapping-in-progress') {
-                    setMappingLoading(true);
-                    
-                    // Start polling every 3 seconds if not already polling
-                    if (!mappingCheckIntervalRef.current) {
-                        // Reset the flag after initial setup to allow future calls
-                        isCheckingMappingRef.current = false;
-                        
-                        mappingCheckIntervalRef.current = setInterval(async () => {
-                            try {
-                                const statusResponse = await axiosInstance.get('/onboarding/mapping-status', {
-                                    params: { userId: user.user_id }
-                                });
-                                
-                                if (statusResponse.status === 200) {
-                                    const { mapping_status: status } = statusResponse.data;
-                                    
-                                    // If mapping is completed or failed, stop polling and hide loader
-                                    if (status === 'completed') {
-                                        clearInterval(mappingCheckIntervalRef.current);
-                                        mappingCheckIntervalRef.current = null;
-                                        setMappingLoading(false);
-                                        // Navigate to mapping page
-                                        const onboardingId = getOnboardingIdFromPath();
-                                        navigate(`/onboarding/mapping/${onboardingId}`);
-                                    } else if (status === 'failed') {
-                                        clearInterval(mappingCheckIntervalRef.current);
-                                        mappingCheckIntervalRef.current = null;
-                                        setMappingLoading(false);
-                                        setErrors((prev) => ({ 
-                                            ...prev, 
-                                            form: statusResponse.data.mapping_error || 'Mapping failed. Please try again.' 
-                                        }));
-                                    }
-                                }
-                            } catch (err) {
-                                console.error('Error checking mapping status:', err);
-                                // Stop polling on error to avoid infinite polling with a stuck state
-                                if (mappingCheckIntervalRef.current) {
-                                    clearInterval(mappingCheckIntervalRef.current);
-                                    mappingCheckIntervalRef.current = null;
-                                }
-                                setMappingLoading(false);
-                                setErrors((prev) => ({
-                                    ...prev,
-                                    form: prev.form || 'An error occurred while checking mapping status. Please try again.'
-                                }));
-                            }
-                        }, MAPPING_STATUS_POLL_INTERVAL);
-                    } else {
-                        // Interval already exists, just reset the flag
-                        isCheckingMappingRef.current = false;
-                    }
-                } else if (mapping_status === 'completed') {
-                    // If mapping is already completed, navigate to mapping page
-                    isCheckingMappingRef.current = false;
-                    const onboardingId = getOnboardingIdFromPath();
-                    navigate(`/onboarding/mapping/${onboardingId}`);
-                } else {
-                    setMappingLoading(false);
-                    isCheckingMappingRef.current = false;
-                }
-            }
-        } catch (e) {
-            console.error('Error checking mapping status:', e);
-            isCheckingMappingRef.current = false;
-        }
-    };
-
-    const startMapping = async () => {
-        try {
-            setLoading(true);
-            setErrors({ db: '', api: '', form: '' });
-            
-            const requestBody = {
-                userId: user.user_id,
-                mode: ingestionType // Use the ingestion type as the mode
-            };
-            
-            // Add mode-specific parameters
-            if (ingestionType === 'db') {
-                requestBody.dbUri = databaseUri;
-                // You can add db_tables here if needed
-                // requestBody.dbTables = ['table1', 'table2'];
-            } else if (ingestionType === 'api') {
-                requestBody.apiUrl = apiEndpoint;
-            }
-            
-            const response = await axiosInstance.post('/onboarding/start-mapping', requestBody);
-            
-            if (response.status === 200) {
-                setMappingLoading(true);
-                setLoading(false);
-                // Start polling for status
-                checkMappingStatus();
-            }
-        } catch (e) {
-            setLoading(false);
-            const errorMessage = e.response?.data?.detail || e.message || 'Failed to start mapping pipeline';
-            
-            // Set error in appropriate field based on mode
-            if (ingestionType === 'db') {
-                setErrors((prev) => ({ ...prev, db: errorMessage }));
-            } else if (ingestionType === 'api') {
-                setErrors((prev) => ({ ...prev, api: errorMessage }));
-            } else {
-                setErrors((prev) => ({ ...prev, form: errorMessage }));
-            }
-        }
-    };
 
     const isFormValid = uploadedFiles.length > 0 || databaseUri.trim() !== '' || apiEndpoint.trim() !== '';
 
