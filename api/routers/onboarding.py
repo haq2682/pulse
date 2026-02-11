@@ -1,4 +1,5 @@
 import os
+import signal
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, Query, UploadFile, File
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
@@ -39,6 +40,31 @@ router = APIRouter(
     prefix="/onboarding",
     tags=["onboarding"],
 )
+
+async def terminate_mapping_process(process_id: int):
+    """
+    Helper function to gracefully terminate a mapping process.
+    First tries SIGTERM for graceful shutdown, then SIGKILL if needed.
+    
+    Args:
+        process_id: The process ID to terminate
+    """
+    try:
+        # Try graceful shutdown with SIGTERM
+        os.kill(process_id, signal.SIGTERM)
+        # Wait a bit for graceful shutdown
+        await asyncio.sleep(1)
+        try:
+            # Check if still alive using signal 0 (doesn't kill, just checks existence)
+            os.kill(process_id, 0)
+            # Process still running, force kill with SIGKILL
+            os.kill(process_id, signal.SIGKILL)
+        except OSError:
+            # Process already terminated, which is good
+            pass
+    except OSError as e:
+        # Process may have already terminated
+        print(f"Process {process_id} may have already terminated: {e}")
 
 async def get_or_set_cache(key, func, expire=3600):
     cached = await redis.get(key)
@@ -627,19 +653,8 @@ async def cancel_mapping(request: Request, db=Depends(get_db)):
         if process_id_str:
             try:
                 process_id = int(process_id_str)
-                # Try to kill the process
-                try:
-                    os.kill(process_id, 15)  # SIGTERM for graceful shutdown
-                    # Wait a bit and force kill if still alive
-                    await asyncio.sleep(1)
-                    try:
-                        os.kill(process_id, 0)  # Check if still alive
-                        os.kill(process_id, 9)  # SIGKILL if still running
-                    except OSError:
-                        pass  # Process already terminated
-                except OSError as e:
-                    # Process may have already terminated
-                    print(f"Process {process_id} may have already terminated: {e}")
+                # Use helper function to terminate the process
+                await terminate_mapping_process(process_id)
             except ValueError:
                 print(f"Invalid process ID: {process_id_str}")
         
@@ -1001,23 +1016,14 @@ async def stream_mapping_logs(request: Request, userId: str, db=Depends(get_db))
                 if process_id_str:
                     try:
                         process_id = int(process_id_str)
-                        # Try to kill the process
-                        try:
-                            os.kill(process_id, 15)  # SIGTERM for graceful shutdown
-                            await asyncio.sleep(1)
-                            try:
-                                os.kill(process_id, 0)  # Check if still alive
-                                os.kill(process_id, 9)  # SIGKILL if still running
-                            except OSError:
-                                pass  # Process already terminated
-                        except OSError:
-                            pass  # Process may have already terminated
+                        # Use helper function to terminate the process
+                        await terminate_mapping_process(process_id)
                     except ValueError:
                         pass  # Invalid PID
                 
                 # Update database to indicate timeout
+                # Note: Using SessionLocal here as we're in a streaming context and need a separate session
                 try:
-                    # Get database connection for updating status
                     from database import SessionLocal
                     db_session = SessionLocal()
                     try:
@@ -1039,6 +1045,9 @@ async def stream_mapping_logs(request: Request, userId: str, db=Depends(get_db))
                             }
                         )
                         db_session.commit()
+                    except Exception as commit_error:
+                        db_session.rollback()
+                        print(f"Error committing database changes after timeout: {commit_error}")
                     finally:
                         db_session.close()
                 except Exception as db_error:
