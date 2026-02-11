@@ -12,7 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ProgressSpinner } from 'primereact/progressspinner';
 import { Dialog } from 'primereact/dialog';
 import { Message } from 'primereact/message';
-import { Button } from 'primereact/button';
+import { SecondaryButton } from '@/components/global/Button';
 
 const CHUNK_SIZE = 5 * 1024 * 1024;
 const MAPPING_STATUS_POLL_INTERVAL = 3000; // 3 seconds
@@ -647,10 +647,9 @@ const Connect = () => {
                     <Text className="text-xl text-black font-medium m-0 mt-4 mb-6 z-10">
                         We are mapping your data to our database. Please wait...
                     </Text>
-                    <Button 
-                        label="Cancel" 
-                        severity="danger"
-                        outlined
+                    <SecondaryButton 
+                        label="Cancel"
+                        danger
                         onClick={cancelMapping} 
                         disabled={cancellingMapping}
                         loading={cancellingMapping}
