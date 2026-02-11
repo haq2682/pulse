@@ -6,8 +6,13 @@ from minio import Minio
 
 def get_minio_client():
     """Create and return a MinIO client instance."""
+    # Strip protocol prefix from MINIO_ENDPOINT if present (Minio client expects hostname:port only)
+    minio_endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+    if "://" in minio_endpoint:
+        minio_endpoint = minio_endpoint.split("://", 1)[1]
+    
     return Minio(
-        os.getenv("MINIO_ENDPOINT"),
+        minio_endpoint,
         access_key=os.getenv("MINIO_ACCESS_KEY"),
         secret_key=os.getenv("MINIO_SECRET_KEY"),
         secure=False,

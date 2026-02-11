@@ -301,8 +301,13 @@ def run_streaming():
     columns_info = COLUMNS_INFO
     print(f"Loaded {len(columns_info)} columns from canonical schema")
     
+    # Strip protocol prefix from MINIO_ENDPOINT if present (Minio client expects hostname:port only)
+    minio_endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+    if "://" in minio_endpoint:
+        minio_endpoint = minio_endpoint.split("://", 1)[1]
+    
     minio_client = Minio(
-        os.getenv("MINIO_ENDPOINT"),
+        minio_endpoint,
         access_key=os.getenv("MINIO_ACCESS_KEY"),
         secret_key=os.getenv("MINIO_SECRET_KEY"),
         secure=False,
