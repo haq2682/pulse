@@ -1088,3 +1088,75 @@ async def save_manual_mappings(request: Request, db=Depends(get_db)):
     except Exception as e:
         print(f"Error saving manual mappings: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/confirm-mapping")
+async def confirm_mapping(request: Request, db=Depends(get_db)):
+    """
+    Confirm that user has reviewed the mapping results and accepts them.
+    This marks the onboarding as complete.
+    """
+    try:
+        body = await request.json()
+        
+        # Get authenticated user from middleware
+        authenticated_user_id = getattr(request.state, "user_id", None)
+        if not authenticated_user_id:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
+        # Get userId from body and verify it matches authenticated user
+        body_user_id = body.get("userId")
+        if body_user_id is not None and str(body_user_id) != str(authenticated_user_id):
+            raise HTTPException(status_code=403, detail="Cannot confirm mapping for another user")
+        
+        # Use authenticated user ID
+        user_id = authenticated_user_id
+        
+        # Get the onboarding record
+        onboarding = db.execute(
+            text("SELECT business_id, mapping_status, current_step FROM onboarding WHERE user_id = :user_id"),
+            {"user_id": user_id}
+        )
+        onboarding_record = onboarding.fetchone()
+        
+        if not onboarding_record:
+            raise HTTPException(status_code=404, detail="Onboarding record not found")
+        
+        business_id, mapping_status, current_step = onboarding_record
+        
+        # Verify mapping is completed
+        if mapping_status != "completed":
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot confirm mapping - status is '{mapping_status}', must be 'completed'"
+            )
+        
+        # Update onboarding to mark as complete
+        db.execute(
+            text("""
+                UPDATE onboarding 
+                SET is_completed = :is_completed,
+                    current_step = :current_step
+                WHERE user_id = :user_id
+            """),
+            {
+                "is_completed": True,
+                "current_step": "mapping",  # Keep on mapping step but mark as complete
+                "user_id": user_id
+            }
+        )
+        db.commit()
+        
+        print(f"User {user_id} confirmed mapping for business {business_id}")
+        
+        return {
+            "status": 200,
+            "message": "Mapping confirmed and onboarding completed successfully",
+            "is_completed": True
+        }
+    
+    except HTTPException:
+        # Re-raise HTTPExceptions (401, 403, 404) without modification
+        raise
+    except Exception as e:
+        print(f"Error confirming mapping: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
