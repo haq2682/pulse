@@ -30,6 +30,8 @@ const Connect = () => {
     const [uploadProgress, setUploadProgress] = useState({});
     const [loading, setLoading] = useState(false);
     const [mappingLoading, setMappingLoading] = useState(false);
+    const [mappingLogs, setMappingLogs] = useState([]); // Store real-time logs
+    const [showLogsDialog, setShowLogsDialog] = useState(false); // Control logs dialog
     const [ingestionTypeLoading, setIngestionTypeLoading] = useState(true);
     const [ingestionType, setIngestionType] = useState('');
     const [errors, setErrors] = useState({db: '', api: '', form: ''});
@@ -37,6 +39,7 @@ const Connect = () => {
     const fileInputRef = useRef(null);
     const mappingCheckIntervalRef = useRef(null);
     const isCheckingMappingRef = useRef(false); // Prevent duplicate interval creation
+    const eventSourceRef = useRef(null); // Store SSE connection
 
     // Helper function to safely extract onboarding ID from pathname
     const getOnboardingIdFromPath = () => {
@@ -112,10 +115,13 @@ const Connect = () => {
         
         initializeData();
         
-        // Clean up interval on unmount
+        // Clean up interval and SSE connection on unmount
         return () => {
             if (mappingCheckIntervalRef.current) {
                 clearInterval(mappingCheckIntervalRef.current);
+            }
+            if (eventSourceRef.current) {
+                eventSourceRef.current.close();
             }
         };
     }, [user?.user_id]);
@@ -565,6 +571,7 @@ const Connect = () => {
         try {
             setLoading(true);
             setErrors({ db: '', api: '', form: '' });
+            setMappingLogs([]); // Clear previous logs
             
             const requestBody = {
                 userId: user.user_id,
@@ -584,7 +591,12 @@ const Connect = () => {
             
             if (response.status === 200) {
                 setMappingLoading(true);
+                setShowLogsDialog(true); // Show logs dialog
                 setLoading(false);
+                
+                // Start real-time log streaming via SSE
+                startLogStreaming();
+                
                 // Start polling for status
                 checkMappingStatus();
             }
@@ -603,11 +615,95 @@ const Connect = () => {
         }
     };
 
+    const startLogStreaming = () => {
+        // Close existing connection if any
+        if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+        }
+
+        // Get the API base URL
+        const apiBaseUrl = axiosInstance.defaults.baseURL || window.location.origin;
+        const sseUrl = `${apiBaseUrl}/onboarding/mapping-logs-stream?userId=${user.user_id}`;
+
+        // Create SSE connection
+        const eventSource = new EventSource(sseUrl);
+        eventSourceRef.current = eventSource;
+
+        eventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'log') {
+                    // Add log line to the array
+                    setMappingLogs((prev) => [...prev, data.line]);
+                } else if (data.type === 'complete') {
+                    // Process completed
+                    eventSource.close();
+                    eventSourceRef.current = null;
+                } else if (data.type === 'error') {
+                    // Error occurred
+                    setMappingLogs((prev) => [...prev, `❌ Error: ${data.message}`]);
+                } else if (data.type === 'timeout') {
+                    // Timeout
+                    setMappingLogs((prev) => [...prev, `⏱️ ${data.message}`]);
+                    eventSource.close();
+                    eventSourceRef.current = null;
+                }
+            } catch (err) {
+                console.error('Error parsing SSE message:', err);
+            }
+        };
+
+        eventSource.onerror = (error) => {
+            console.error('SSE connection error:', error);
+            setMappingLogs((prev) => [...prev, '⚠️ Log streaming connection closed']);
+            eventSource.close();
+            eventSourceRef.current = null;
+        };
+    };
+
     const isFormValid = uploadedFiles.length > 0 || databaseUri.trim() !== '' || apiEndpoint.trim() !== '';
 
     return (
         <>
-            <Dialog visible={mappingLoading} modal closable={false}
+            {/* Real-time Mapping Logs Dialog */}
+            <Dialog 
+                visible={showLogsDialog} 
+                modal 
+                closable={false}
+                style={{ width: '70vw', maxHeight: '80vh' }} 
+                breakpoints={{ '960px': '85vw', '641px': '95vw' }}
+                header="Mapping Pipeline Progress"
+            >
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-3">
+                        <ProgressSpinner style={{ width: '32px', height: '32px' }} />
+                        <Text className="text-lg font-medium m-0">
+                            Processing your data...
+                        </Text>
+                    </div>
+                    
+                    {/* Real-time log display */}
+                    <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-y-auto" 
+                         style={{ maxHeight: '400px', minHeight: '200px' }}>
+                        {mappingLogs.length === 0 ? (
+                            <div className="text-gray-500">Waiting for logs...</div>
+                        ) : (
+                            mappingLogs.map((log, index) => (
+                                <div key={index} className="mb-1">{log}</div>
+                            ))
+                        )}
+                    </div>
+                    
+                    <Text className="text-sm text-gray-600 m-0">
+                        This may take a few minutes depending on your data size.
+                        You will be automatically redirected when complete.
+                    </Text>
+                </div>
+            </Dialog>
+
+            {/* Fallback Loading Dialog (if logs not available) */}
+            <Dialog visible={mappingLoading && !showLogsDialog} modal closable={false}
                 style={{ width: '50vw' }} breakpoints={{ '960px': '75vw', '641px': '100vw' }}>
                 <div className="flex items-center justify-center flex-col my-20">
                     <ProgressSpinner />
