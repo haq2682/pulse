@@ -267,34 +267,26 @@ const Mapping = () => {
                 }
             });
             
-            // If there are manual mappings, we need to re-run the pipeline
+            // Check if there are manual mappings
             const hasManualMappings = Object.keys(manualMappings).length > 0;
             
             if (hasManualMappings) {
-                // Save manual mappings
-                await axiosInstance.post('/onboarding/save-manual-mappings', {
+                // Apply manual mappings to the already-mapped files in mapped-temp folder
+                // This does NOT re-run the entire mapping pipeline
+                const applyResponse = await axiosInstance.post('/onboarding/apply-manual-mappings', {
                     userId: user.user_id,
                     manualMappings: manualMappings
                 });
                 
-                // Get the ingestion type from the onboarding record
-                const dataTypeResponse = await axiosInstance.get('/onboarding/get-data-type', {
-                    params: { userId: user.user_id }
-                });
-                const ingestionMode = dataTypeResponse.data.dataType || 'batch';
-                
-                // Start the mapping pipeline with manual mappings
-                const startMappingPayload = {
-                    userId: user.user_id,
-                    mode: ingestionMode
-                };
-                
-                // Start the mapping pipeline
-                const startResponse = await axiosInstance.post('/onboarding/start-mapping', startMappingPayload);
-                
-                if (startResponse.status === 200) {
-                    // Start polling for mapping completion
-                    startMappingStatusCheck();
+                if (applyResponse.status === 200) {
+                    console.log('Manual mappings applied successfully');
+                    
+                    // Confirm mapping and navigate to dashboard
+                    await axiosInstance.post('/onboarding/confirm-mapping', {
+                        userId: user.user_id
+                    });
+                    setMappingLoading(false);
+                    navigate('/dashboard/overview');
                 }
             } else {
                 // No manual mappings, just confirm and proceed
@@ -389,7 +381,8 @@ const Mapping = () => {
         try {
             setCancellingMapping(true);
             const response = await axiosInstance.post('/onboarding/cancel-mapping', {
-                userId: user.user_id
+                userId: user.user_id,
+                duringManualMapping: true  // Indicate we're cancelling during manual mapping
             });
             
             if (response.status === 200) {
@@ -404,7 +397,8 @@ const Mapping = () => {
                 setMappingLoading(false);
                 setCancellingMapping(false);
                 
-                setError('Mapping was cancelled. You can adjust your mappings and try again.');
+                // Show message but don't navigate away - user stays on mapping page
+                setError('Manual mapping was cancelled. You can adjust your mappings and try again.');
                 console.log('Mapping cancelled successfully');
             }
         } catch (e) {
@@ -513,7 +507,7 @@ const Mapping = () => {
                 <div className="flex items-center justify-center flex-col my-8">
                     <ProgressSpinner />
                     <Text className="text-xl text-black font-medium m-0 mt-4 mb-6 z-10">
-                        We are applying your manual mappings and processing your data. Please wait...
+                        Applying your manual mappings to the data files. Please wait...
                     </Text>
                     <SecondaryButton 
                         label="Cancel"
