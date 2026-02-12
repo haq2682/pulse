@@ -268,35 +268,47 @@ const Mapping = () => {
                 }
             });
             
-            // Save manual mappings if any
-            if (Object.keys(manualMappings).length > 0) {
+            // If there are manual mappings, we need to re-run the pipeline
+            const hasManualMappings = Object.keys(manualMappings).length > 0;
+            
+            if (hasManualMappings) {
+                // Save manual mappings
                 await axiosInstance.post('/onboarding/save-manual-mappings', {
                     userId: user.user_id,
                     manualMappings: manualMappings
                 });
-            }
-            
-            // Get the onboarding record to determine the ingestion mode
-            const onboardingResponse = await axiosInstance.get(`/onboarding/get-current-step?userId=${user.user_id}`);
-            const ingestionMode = onboardingResponse.data.ingestionType || 'batch';
-            
-            // Start the mapping pipeline with manual mappings
-            const startMappingPayload = {
-                userId: user.user_id,
-                mode: ingestionMode
-            };
-            
-            // For db or api modes, we might need additional parameters
-            // These would have been stored during the connect phase
-            const startResponse = await axiosInstance.post('/onboarding/start-mapping', startMappingPayload);
-            
-            if (startResponse.status === 200) {
-                // Start polling for mapping completion
-                startMappingStatusCheck();
+                
+                // Get the ingestion type from the onboarding record
+                const dataTypeResponse = await axiosInstance.get('/onboarding/get-data-type', {
+                    params: { userId: user.user_id }
+                });
+                const ingestionMode = dataTypeResponse.data.dataType || 'batch';
+                
+                // Start the mapping pipeline with manual mappings
+                const startMappingPayload = {
+                    userId: user.user_id,
+                    mode: ingestionMode
+                };
+                
+                // Start the mapping pipeline
+                const startResponse = await axiosInstance.post('/onboarding/start-mapping', startMappingPayload);
+                
+                if (startResponse.status === 200) {
+                    // Start polling for mapping completion
+                    startMappingStatusCheck();
+                }
+            } else {
+                // No manual mappings, just confirm and proceed
+                // This handles the case where all fields were already identified
+                await axiosInstance.post('/onboarding/confirm-mapping', {
+                    userId: user.user_id
+                });
+                setMappingLoading(false);
+                navigate('/dashboard/overview');
             }
         } catch (e) {
-            console.error('Error starting mapping with manual mappings:', e);
-            setError(e.response?.data?.detail || e.message || 'Failed to start mapping');
+            console.error('Error saving mappings:', e);
+            setError(e.response?.data?.detail || e.message || 'Failed to process mappings');
             setMappingLoading(false);
         }
     };
