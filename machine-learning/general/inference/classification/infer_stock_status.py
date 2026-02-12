@@ -14,10 +14,11 @@ findspark.init()
 
 # Configuration
 BUCKET_NAME = "pulse-bucket-1"
+GENERAL_BUCKET_NAME = "pulse-bucket-1"
 INPUT_PATH_INVENTORY_HEALTH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
 INPUT_PATH_INVENTORY = f"s3a://{BUCKET_NAME}/transformed/agg_inventory.parquet"
 OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/stock_status_predictions"
-MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/stock_status"
+MODEL_INPUT_DIR = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/classification/models/stock_status"
 
 # ⚠️ MANUAL INTERVENTION: Select model
 SELECTED_MODEL = "RandomForest"  # <-- CHANGE BASED ON TRAINING RESULTS

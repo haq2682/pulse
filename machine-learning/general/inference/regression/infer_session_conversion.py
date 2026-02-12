@@ -24,10 +24,11 @@ load_dotenv()
 
 # Constants
 BUCKET_NAME = "pulse-bucket-1"
+GENERAL_BUCKET_NAME = "pulse-bucket-1"
 INPUT_SESSIONS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customer_sessions.parquet"
 INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
 OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/session_conversion_value/"
-MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/session_conversion_value/"
+MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/session_conversion_value/"
 
 # ⚠️ MANUAL CONFIGURATION REQUIRED:
 MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"

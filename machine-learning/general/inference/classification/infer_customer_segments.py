@@ -11,10 +11,11 @@ findspark.init()
 
 # Configuration
 BUCKET_NAME = "pulse-bucket-1"
+GENERAL_BUCKET_NAME = "pulse-bucket-1"
 INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
 INPUT_PATH_RFM = f"s3a://{BUCKET_NAME}/transformed/agg_rfm_segmentation.parquet"
 OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/customer_segment_predictions"
-MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/customer_segments"
+MODEL_INPUT_DIR = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/classification/models/customer_segments"
 
 # ⚠️ MANUAL INTERVENTION REQUIRED: Select model to use for inference
 # Available options: "LogisticRegression", "RandomForest"

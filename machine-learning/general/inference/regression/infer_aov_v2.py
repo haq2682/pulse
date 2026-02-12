@@ -23,13 +23,14 @@ load_dotenv()
 
 # Constants
 BUCKET_NAME = "pulse-bucket-1"
+GENERAL_BUCKET_NAME = "pulse-bucket-1"
 INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
 INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
 INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
 INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
 OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/aov_prediction/"
-MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/aov_prediction/"
-SCALER_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/aov_prediction/scaler"
+MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/aov_prediction/"
+SCALER_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/aov_prediction/scaler"
 
 # ⚠️ MANUAL CONFIGURATION REQUIRED:
 MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"

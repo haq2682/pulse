@@ -22,9 +22,10 @@ load_dotenv()
 
 # Constants
 BUCKET_NAME = "pulse-bucket-1"
+GENERAL_BUCKET_NAME = "pulse-bucket-1"
 INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
 OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/clv_predictions/"
-MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/clv/"
+MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/clv/"
 
 # ⚠️ MANUAL CONFIGURATION REQUIRED:
 # Set MODEL_NAME to one of: "linear_regression", "random_forest", "gbt"

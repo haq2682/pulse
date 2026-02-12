@@ -20,8 +20,9 @@ import numpy as np
 
 # Environment configuration
 BUCKET = "pulse-bucket-1"
+GENERAL_BUCKET_NAME = "pulse-bucket-1"
 INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
+MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/"
 OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
 
 # MANUAL SELECTION: Choose which algorithm to use for inference
