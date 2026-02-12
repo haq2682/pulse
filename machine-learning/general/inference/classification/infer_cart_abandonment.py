@@ -17,12 +17,13 @@ findspark.init()
 
 # Configuration
 BUCKET_NAME = "pulse-bucket-1"
+GENERAL_BUCKET_NAME = "pulse-bucket-1"
 INPUT_PATH_CART = f"s3a://{BUCKET_NAME}/transformed/agg_cart_abandonment_analysis.parquet"
 INPUT_PATH_SESSIONS = f"s3a://{BUCKET_NAME}/transformed/agg_customer_sessions.parquet"
 INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
 INPUT_PATH_ORDERS = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
 OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/cart_abandonment_predictions"
-MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/cart_abandonment"
+MODEL_INPUT_DIR = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/classification/models/cart_abandonment"
 
 SELECTED_MODEL = "RandomForest"
 MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
