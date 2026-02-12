@@ -77,6 +77,23 @@ CREATE TABLE IF NOT EXISTS nifi_schemas (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Pipeline execution tracking table
+CREATE TABLE IF NOT EXISTS pipeline_executions (
+    pipeline_id VARCHAR(50) PRIMARY KEY,
+    business_id VARCHAR(50) NOT NULL,
+    user_id VARCHAR(50) NOT NULL,
+    status VARCHAR(50) DEFAULT 'running' CHECK (status IN ('running', 'completed', 'failed', 'cancelled')),
+    current_phase VARCHAR(50) CHECK (current_phase IN ('cleaning', 'transformation', 'analysis', 'machine-learning')),
+    progress_percentage INTEGER DEFAULT 0 CHECK (progress_percentage >= 0 AND progress_percentage <= 100),
+    step_description TEXT,
+    error_message TEXT NULL,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (business_id) REFERENCES businesses(business_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
 -- Insert default schema for pulse data
 INSERT INTO nifi_schemas (schema_name, schema_text) VALUES
 ('pulse_schema', '{
@@ -114,6 +131,11 @@ EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_onboarding_updated_at
 BEFORE UPDATE ON onboarding
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_pipeline_executions_updated_at
+BEFORE UPDATE ON pipeline_executions
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 

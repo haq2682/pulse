@@ -107,8 +107,9 @@ def create_minio_client():
 def get_bucket_name():
     """
     Get the default bucket name.
+    Can be overridden by BUCKET_NAME environment variable.
 
     Returns:
         str: Bucket name
     """
-    return "pulse-bucket-1"
+    return os.getenv("BUCKET_NAME", "pulse-bucket-1")

@@ -46,4 +46,4 @@ def create_minio_client():
         secure=False,
     )
 
-BUCKET_NAME = "pulse-bucket-1"
+BUCKET_NAME = os.getenv("BUCKET_NAME", "pulse-bucket-1")

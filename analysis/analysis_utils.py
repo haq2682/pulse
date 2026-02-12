@@ -65,7 +65,7 @@ def get_agg_tables(spark, db_config=None):
     """
     try:
         minio_client = get_minio_client()
-        bucket_name = os.getenv("MINIO_BUCKET", "pulse-bucket-1")
+        bucket_name = os.getenv("BUCKET_NAME", os.getenv("MINIO_BUCKET", "pulse-bucket-1"))
         
         print(f"Loading aggregated tables from MinIO bucket: {bucket_name}")
         print(f"Directory: transformed/")

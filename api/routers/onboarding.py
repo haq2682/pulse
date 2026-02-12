@@ -17,6 +17,7 @@ import subprocess
 from datetime import datetime
 import asyncio
 import time
+from services.pipeline_service import execute_pipeline
 
 redis = aioredis.from_url("redis://redis:6379", decode_responses=True)
 
@@ -1470,9 +1471,17 @@ async def confirm_mapping(request: Request, db=Depends(get_db)):
         
         print(f"User {user_id} confirmed mapping for business {business_id}")
         
+        # Start the data processing pipeline automatically
+        try:
+            asyncio.create_task(execute_pipeline(business_id, user_id, db))
+            print(f"🚀 Pipeline execution started for business {business_id}")
+        except Exception as pipeline_error:
+            print(f"⚠️ Failed to start pipeline: {pipeline_error}")
+            # Don't fail the confirmation, pipeline can be retried
+        
         return {
             "status": 200,
-            "message": "Mapping confirmed and onboarding completed successfully",
+            "message": "Mapping confirmed and onboarding completed successfully. Pipeline execution started.",
             "is_completed": True
         }
     
