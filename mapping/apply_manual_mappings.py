@@ -192,14 +192,18 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
                             
                             # Copy column data (truncate or pad as necessary)
                             min_len = min(len(df), len(source_df))
-                            df[canonical_col] = None  # Initialize with None
+                            df[canonical_col] = pd.NA  # Initialize with pd.NA for better null handling
                             df.loc[:min_len-1, canonical_col] = source_df[source_col].iloc[:min_len].values
+                            
+                            # Warn if there are unmapped rows
+                            if len(df) > min_len:
+                                print(f"        ⚠️  {len(df) - min_len} rows in {table_name} will have {canonical_col}=NA due to insufficient source data")
                             
                             print(f"     ✅ Mapped {source_col} (from {source_table}) → {canonical_col} (in {table_name})")
                             current_columns.add(canonical_col)
                         else:
                             # Column not found anywhere
-                            warning_msg = f"Source column '{source_col}' not found in table '{table_name}' or any ingested file"
+                            warning_msg = f"Source column '{source_col}' not found in mapped-temp/{table_name}.csv or any ingested files"
                             print(f"     ⚠️  {warning_msg}")
                             updated_results["failed_mappings"].append({
                                 "table": table_name,
