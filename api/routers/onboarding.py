@@ -1212,18 +1212,16 @@ async def save_manual_mappings(request: Request, db=Depends(get_db)):
         business_id = onboarding_record[0]
         
         # Save manual mappings to database
+        # Note: We don't set is_completed here because the mapping pipeline needs to run
+        # The is_completed will be set when confirm-mapping is called after successful mapping
         db.execute(
             text("""
                 UPDATE onboarding 
-                SET manual_mappings = :manual_mappings,
-                    current_step = :current_step,
-                    is_completed = :is_completed
+                SET manual_mappings = :manual_mappings
                 WHERE user_id = :user_id
             """),
             {
-                "manual_mappings": json.dumps(manual_mappings),  # ← SOLUTION: convert to JSON string
-                "current_step": "mapping",
-                "is_completed": True,
+                "manual_mappings": json.dumps(manual_mappings),
                 "user_id": user_id
             }
         )

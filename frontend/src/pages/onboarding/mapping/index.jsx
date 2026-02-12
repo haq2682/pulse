@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { AutoComplete } from 'primereact/autocomplete';
 import { Dialog } from 'primereact/dialog';
@@ -7,6 +7,7 @@ import Breadcrumb from '../Breadcrumb';
 import Heading from '@/components/global/Typography/Heading';
 import Text from '@/components/global/Typography/Text';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
+import { SecondaryButton } from '@/components/global/Button';
 import axiosInstance from '@/services/api/axiosInstance';
 import { useAuth } from '@/context/AuthContext';
 
@@ -48,6 +49,12 @@ const Mapping = () => {
     // Dialog state
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
     const [skippedColumns, setSkippedColumns] = useState([]);
+    
+    // Mapping loader state (for manual mapping processing)
+    const [mappingLoading, setMappingLoading] = useState(false);
+    const [cancellingMapping, setCancellingMapping] = useState(false);
+    const mappingCheckIntervalRef = useRef(null);
+    const isCheckingMappingRef = useRef(false);
     
     // Mapping data
     const [mappings, setMappings] = useState({});
@@ -179,6 +186,14 @@ const Mapping = () => {
         if (user?.user_id) {
             initializeData();
         }
+        
+        // Cleanup: clear interval on unmount
+        return () => {
+            if (mappingCheckIntervalRef.current) {
+                clearInterval(mappingCheckIntervalRef.current);
+                mappingCheckIntervalRef.current = null;
+            }
+        };
     }, [user?.user_id]);
 
     const handleMappingChange = (fieldKey, value) => {
@@ -231,7 +246,7 @@ const Mapping = () => {
     };
 
     const saveMappings = async () => {
-        setLoading(true);
+        setMappingLoading(true);
         setError('');
         
         try {
@@ -261,20 +276,115 @@ const Mapping = () => {
                 });
             }
             
-            // Call confirm-mapping endpoint to mark as complete
-            const response = await axiosInstance.post('/onboarding/confirm-mapping', {
+            // Get the onboarding record to determine the ingestion mode
+            const onboardingResponse = await axiosInstance.get(`/onboarding/get-current-step?userId=${user.user_id}`);
+            const ingestionMode = onboardingResponse.data.ingestionType || 'batch';
+            
+            // Start the mapping pipeline with manual mappings
+            const startMappingPayload = {
+                userId: user.user_id,
+                mode: ingestionMode
+            };
+            
+            // For db or api modes, we might need additional parameters
+            // These would have been stored during the connect phase
+            const startResponse = await axiosInstance.post('/onboarding/start-mapping', startMappingPayload);
+            
+            if (startResponse.status === 200) {
+                // Start polling for mapping completion
+                startMappingStatusCheck();
+            }
+        } catch (e) {
+            console.error('Error starting mapping with manual mappings:', e);
+            setError(e.response?.data?.detail || e.message || 'Failed to start mapping');
+            setMappingLoading(false);
+        }
+    };
+
+    const startMappingStatusCheck = () => {
+        // Prevent duplicate interval creation
+        if (isCheckingMappingRef.current) {
+            return;
+        }
+        
+        isCheckingMappingRef.current = true;
+        
+        // Poll every 3 seconds
+        mappingCheckIntervalRef.current = setInterval(async () => {
+            try {
+                const statusResponse = await axiosInstance.get('/onboarding/mapping-status', {
+                    params: { userId: user.user_id }
+                });
+                
+                const { mapping_status } = statusResponse.data;
+                
+                if (mapping_status === 'completed') {
+                    // Stop polling
+                    clearInterval(mappingCheckIntervalRef.current);
+                    mappingCheckIntervalRef.current = null;
+                    isCheckingMappingRef.current = false;
+                    
+                    // Confirm mapping and navigate to dashboard
+                    try {
+                        await axiosInstance.post('/onboarding/confirm-mapping', {
+                            userId: user.user_id
+                        });
+                        setMappingLoading(false);
+                        navigate('/dashboard/overview');
+                    } catch (confirmError) {
+                        console.error('Error confirming mapping:', confirmError);
+                        setError('Mapping completed but failed to confirm. Please try again.');
+                        setMappingLoading(false);
+                    }
+                } else if (mapping_status === 'failed' || mapping_status === 'cancelled') {
+                    // Stop polling
+                    clearInterval(mappingCheckIntervalRef.current);
+                    mappingCheckIntervalRef.current = null;
+                    isCheckingMappingRef.current = false;
+                    
+                    setMappingLoading(false);
+                    
+                    if (mapping_status === 'failed') {
+                        setError('Mapping pipeline failed. Please check your data and try again.');
+                    } else {
+                        setError('Mapping was cancelled.');
+                    }
+                }
+                // If still running, continue polling
+            } catch (statusError) {
+                console.error('Error checking mapping status:', statusError);
+                // Don't stop polling on transient errors, just log them
+            }
+        }, 3000);
+    };
+
+    const cancelMapping = async () => {
+        try {
+            setCancellingMapping(true);
+            const response = await axiosInstance.post('/onboarding/cancel-mapping', {
                 userId: user.user_id
             });
             
             if (response.status === 200) {
-                // Navigate to dashboard
-                navigate('/dashboard/overview');
+                // Stop polling
+                if (mappingCheckIntervalRef.current) {
+                    clearInterval(mappingCheckIntervalRef.current);
+                    mappingCheckIntervalRef.current = null;
+                }
+                isCheckingMappingRef.current = false;
+                
+                // Update UI
+                setMappingLoading(false);
+                setCancellingMapping(false);
+                
+                setError('Mapping was cancelled. You can adjust your mappings and try again.');
+                console.log('Mapping cancelled successfully');
             }
         } catch (e) {
-            console.error('Error saving mappings:', e);
-            setError(e.response?.data?.detail || e.message || 'Failed to save mappings');
-        } finally {
-            setLoading(false);
+            setCancellingMapping(false);
+            console.error('Error cancelling mapping:', e);
+            const errorMessage = e.response?.data?.detail || e.message || 'Failed to cancel mapping';
+            setError(errorMessage);
         }
     };
 
@@ -361,6 +471,30 @@ const Mapping = () => {
                         label="Continue Anyway"
                         onClick={handleConfirmSkip}
                         loading={loading}
+                    />
+                </div>
+            </Dialog>
+
+            {/* Mapping Loading Dialog */}
+            <Dialog 
+                visible={mappingLoading} 
+                modal 
+                closable={false}
+                style={{ width: '50vw' }} 
+                breakpoints={{ '960px': '75vw', '641px': '100vw' }}
+            >
+                <div className="flex items-center justify-center flex-col my-8">
+                    <ProgressSpinner />
+                    <Text className="text-xl text-black font-medium m-0 mt-4 mb-6 z-10">
+                        We are applying your manual mappings and processing your data. Please wait...
+                    </Text>
+                    <SecondaryButton 
+                        label="Cancel"
+                        danger
+                        onClick={cancelMapping} 
+                        disabled={cancellingMapping}
+                        loading={cancellingMapping}
+                        className="mt-4"
                     />
                 </div>
             </Dialog>
@@ -494,8 +628,8 @@ const Mapping = () => {
                                 <PrimaryButton
                                     label="Continue to Dashboard"
                                     type="submit"
-                                    loading={loading}
-                                    disabled={loading || dataLoading}
+                                    loading={loading || mappingLoading}
+                                    disabled={loading || dataLoading || mappingLoading}
                                     className="px-8"
                                 />
                             </div>
