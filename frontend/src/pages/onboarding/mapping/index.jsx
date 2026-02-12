@@ -40,7 +40,6 @@ const Mapping = () => {
     const pathname = location.pathname;
     const { user } = useAuth();
     
-    const [loading, setLoading] = useState(false);
     const [dataLoading, setDataLoading] = useState(true);
     const [error, setError] = useState('');
     const [mappingInProgress, setMappingInProgress] = useState(false);  // Track if mapping is still running
@@ -482,7 +481,7 @@ const Mapping = () => {
                     <PrimaryButton
                         label="Continue Anyway"
                         onClick={handleConfirmSkip}
-                        loading={loading}
+                        loading={mappingLoading}
                     />
                 </div>
             </Dialog>
@@ -614,7 +613,7 @@ const Mapping = () => {
                                                         placeholder="Search and select a column"
                                                         className="w-full"
                                                         inputClassName="w-full"
-                                                        disabled={loading}
+                                                        disabled={mappingLoading}
                                                         dropdown
                                                         forceSelection={false}
                                                     />
@@ -640,8 +639,8 @@ const Mapping = () => {
                                 <PrimaryButton
                                     label="Continue to Dashboard"
                                     type="submit"
-                                    loading={loading || mappingLoading}
-                                    disabled={loading || dataLoading || mappingLoading}
+                                    loading={mappingLoading}
+                                    disabled={dataLoading || mappingLoading}
                                     className="px-8"
                                 />
                             </div>
