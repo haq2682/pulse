@@ -51,7 +51,8 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
     
     updated_results = {
         "missing_cols": [],
-        "extra_cols": []
+        "extra_cols": [],
+        "failed_mappings": []  # Track mappings that failed to apply
     }
     
     # List all files in mapped-temp folder
@@ -105,7 +106,15 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
                     current_columns.discard(source_col)
                     current_columns.add(canonical_col)
                 else:
-                    print(f"     ⚠️  Source column '{source_col}' not found in dataframe")
+                    # Track failed mapping
+                    warning_msg = f"Source column '{source_col}' not found in table '{table_name}'"
+                    print(f"     ⚠️  {warning_msg}")
+                    updated_results["failed_mappings"].append({
+                        "table": table_name,
+                        "canonical_column": canonical_col,
+                        "source_column": source_col,
+                        "error": warning_msg
+                    })
         
         # Save the updated dataframe to the mapped folder
         mapped_file_name = f"mapped/{table_name}.csv"
@@ -122,13 +131,12 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
         )
         print(f"  ✅ Saved to {mapped_file_name} ({len(df)} rows)")
         csv_buffer.close()
-        
-        processed_tables.append(table_name)
     
     # Clean up: Remove files from mapped-temp folder
     print(f"\n🧹 Cleaning up temporary files...")
-    objects = minio_client.list_objects(bucket_name, prefix=temp_folder, recursive=False)
-    for obj in objects:
+    # Convert generator to list to avoid exhaustion issues
+    cleanup_objects = list(minio_client.list_objects(bucket_name, prefix=temp_folder, recursive=False))
+    for obj in cleanup_objects:
         try:
             minio_client.remove_object(bucket_name, obj.object_name)
             print(f"  Removed {obj.object_name}")

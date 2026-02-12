@@ -1345,6 +1345,8 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
         ]
         
         # Run the script synchronously (it's fast since it just renames columns)
+        # Timeout is generous to handle large datasets with many tables
+        # Each table takes ~1-2 seconds, so 300s allows for ~150-300 tables
         try:
             result = subprocess.run(
                 cmd,
@@ -1352,7 +1354,7 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
                 env=os.environ.copy(),
                 capture_output=True,
                 text=True,
-                timeout=60  # 1 minute timeout - should be plenty
+                timeout=300  # 5 minute timeout for large datasets
             )
             
             if result.returncode != 0:
@@ -1362,8 +1364,12 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
             
             print(f"Manual mapping output: {result.stdout}")
             
+            # Check for warnings in output
+            if "⚠️" in result.stdout or "failed" in result.stdout.lower():
+                print(f"⚠️  Manual mapping completed with warnings. Check output above.")
+            
         except subprocess.TimeoutExpired:
-            raise HTTPException(status_code=500, detail="Manual mapping took too long")
+            raise HTTPException(status_code=500, detail="Manual mapping took too long (timeout after 5 minutes)")
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to run manual mapping: {str(e)}")
         
@@ -1388,9 +1394,14 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
         )
         db.commit()
         
+        # Build response message
+        message = "Manual mappings applied successfully"
+        if len(mapping_results.get("missing_cols", [])) > 0:
+            message += f" ({len(mapping_results['missing_cols'])} columns still missing)"
+        
         return {
             "status": 200,
-            "message": "Manual mappings applied successfully",
+            "message": message,
             "mapping_results": mapping_results
         }
     
