@@ -5,7 +5,9 @@ from pyspark.sql.functions import (
     sum as spark_sum,
     when,
     coalesce,
+    expr,
     lit,
+    to_date,
 )
 
 
@@ -49,8 +51,17 @@ def session_aggregations(dataframes):
         )
         .filter(
             col("order_placed_at").isNotNull()
-            & (col("order_placed_at") >= col("session_start"))
-            & (col("order_placed_at") <= col("session_end"))
+            & (
+                # Match orders placed during the session window
+                (
+                    (col("order_placed_at") >= col("session_start"))
+                    & (col("order_placed_at") <= col("session_end"))
+                )
+                |
+                # Also match orders placed on the same calendar day as session
+                # (accounts for sessions/orders generated independently)
+                (to_date(col("order_placed_at")) == to_date(col("session_start")))
+            )
         )
         .groupBy("session_id")
         .agg(countDistinct("order_id").alias("orders_from_session"))
