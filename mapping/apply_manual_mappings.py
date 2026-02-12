@@ -70,7 +70,6 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
     
     processed_tables = []
     for obj in csv_objects:
-        
         # Extract table name from file path (e.g., "mapped-temp/customers.csv" -> "customers")
         table_name = obj.object_name.replace(temp_folder, '').replace('.csv', '')
         
@@ -131,6 +130,9 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
         )
         print(f"  ✅ Saved to {mapped_file_name} ({len(df)} rows)")
         csv_buffer.close()
+        
+        # Track successfully processed table
+        processed_tables.append(table_name)
     
     # Clean up: Remove files from mapped-temp folder
     print(f"\n🧹 Cleaning up temporary files...")
