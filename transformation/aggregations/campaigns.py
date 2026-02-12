@@ -1,5 +1,6 @@
 from pyspark.sql.functions import (
     col,
+    date_add,
     expr,
     sum as spark_sum,
     when,
@@ -23,12 +24,21 @@ def aggregate_campaigns(dataframes):
             print(f"⚠️ Skipping aggregate_campaigns: '{df_name}' dataframe not found")
             return
 
+    # Use effective_end_date to handle NULL end_date values
+    mc_with_end = dataframes["marketing_campaigns"].withColumn(
+        "effective_end_date",
+        coalesce(col("end_date"), date_add(col("start_date"), 30)),
+    )
+
     campaign_revenue = (
         dataframes["customer_sessions"]
         .join(
-            dataframes["marketing_campaigns"],
+            mc_with_end.select(
+                "campaign_id", "start_date",
+                col("effective_end_date").alias("eff_end_date"),
+            ),
             (col("session_start") >= col("start_date"))
-            & (col("session_start") <= col("end_date")),
+            & (col("session_start") <= col("eff_end_date")),
             "cross",
         )
         .filter(col("conversion_flag") == 1)
@@ -42,7 +52,7 @@ def aggregate_campaigns(dataframes):
         )
         .filter(
             (col("order_placed_at") >= col("start_date"))
-            & (col("order_placed_at") <= expr("date_add(end_date, 7)"))
+            & (col("order_placed_at") <= date_add(col("eff_end_date"), 7))
         )
         .dropDuplicates(["order_id", "campaign_id"])
         .groupBy("campaign_id")
@@ -155,6 +165,10 @@ def aggregate_campaigns(dataframes):
             "days_active": when(
                 col("start_date").isNotNull() & col("end_date").isNotNull(),
                 datediff(col("end_date"), col("start_date")) + lit(1),
+            ).when(
+                col("start_date").isNotNull(),
+                # Fallback: use days since start if end_date is NULL
+                datediff(current_date(), col("start_date")) + lit(1),
             ),
             # Revenue per impression
             "revenue_per_impression": when(

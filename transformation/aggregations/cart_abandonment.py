@@ -105,10 +105,21 @@ def cart_abandonment_aggregations(dataframes):
             ),
             # Cart status classification
             "cart_status_derived": when(
-                lower(col("cart_status")).isin("purchased", "completed", "ordered"),
+                lower(col("cart_status")).isin(
+                    "purchased", "completed", "ordered", "converted",
+                    "converted (ordered)", "paid", "checked_out",
+                    "fulfilled", "shipped", "delivered", "closed",
+                ),
                 "Purchased",
             )
-            .when(lower(col("cart_status")).isin("active", "in progress"), "Active")
+            .when(
+                lower(col("cart_status")).isin(
+                    "active", "in progress", "in_progress", "open",
+                    "pending", "awaiting_payment", "processing",
+                    "in_checkout", "review",
+                ),
+                "Active",
+            )
             .otherwise("Abandoned"),
             # Handle nulls for aggregated columns
             "cart_total_value": coalesce(col("cart_total_value"), lit(0.0)),
