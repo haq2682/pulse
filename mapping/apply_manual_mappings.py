@@ -56,12 +56,19 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
     
     # List all files in mapped-temp folder
     temp_folder = "mapped-temp/"
-    objects = minio_client.list_objects(bucket_name, prefix=temp_folder, recursive=False)
+    try:
+        objects = list(minio_client.list_objects(bucket_name, prefix=temp_folder, recursive=False))
+    except Exception as e:
+        raise ValueError(f"Failed to list objects in {temp_folder}: {e}")
+    
+    # Filter to CSV files only
+    csv_objects = [obj for obj in objects if obj.object_name.endswith('.csv')]
+    
+    if not csv_objects:
+        raise ValueError(f"No CSV files found in {bucket_name}/{temp_folder}. Initial mapping may not have completed or files may have already been moved.")
     
     processed_tables = []
-    for obj in objects:
-        if not obj.object_name.endswith('.csv'):
-            continue
+    for obj in csv_objects:
         
         # Extract table name from file path (e.g., "mapped-temp/customers.csv" -> "customers")
         table_name = obj.object_name.replace(temp_folder, '').replace('.csv', '')
