@@ -207,13 +207,31 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
     print(f"Tables in batch: {list(all_dataframes.keys())}")
     print(f"Operations: {operations}")
     
-    # Call existing mapping function with mode="stream" and manual_mappings
+    # Check Redis for updated manual mappings (especially important for subsequent batches)
+    # This allows new batches to use mappings applied by user after stream started
+    current_manual_mappings = manual_mappings  # Default to initial mappings
+    if business_id:
+        try:
+            import redis
+            import json
+            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+            redis_mappings_str = redis_client.get(f"manual_mappings:{business_id}")
+            if redis_mappings_str:
+                current_manual_mappings = json.loads(redis_mappings_str)
+                if batch_id > 0 and current_manual_mappings:
+                    print(f"   ✅ Retrieved updated manual mappings from Redis for batch {batch_id}")
+                    print(f"   Tables with manual mappings: {list(current_manual_mappings.keys())}")
+        except Exception as redis_error:
+            print(f"   ⚠️  Could not retrieve manual mappings from Redis: {redis_error}")
+            # Fall back to initial manual_mappings passed as parameter
+    
+    # Call existing mapping function with mode="stream" and current manual_mappings
     results = process_all_dataframes(
         all_dataframes,
         columns_info,
         mapping_list,
         mode="stream",
-        manual_mappings=manual_mappings
+        manual_mappings=current_manual_mappings
     )
     
     # Determine target folder based on batch_id and missing columns
