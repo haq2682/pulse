@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import axiosInstance from '@/services/api/axiosInstance';
 import PipelineProgress from '@/components/PipelineProgress';
 import { useNavigate, useParams } from 'react-router-dom';
+import PipelineProgress from '@/components/PipelineProgress';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
