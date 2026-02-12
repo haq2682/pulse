@@ -319,9 +319,24 @@ const Mapping = () => {
         }
         
         isCheckingMappingRef.current = true;
+        let pollAttempts = 0;
+        const MAX_POLL_ATTEMPTS = 200; // Maximum 200 attempts (200 * 5s = ~16 minutes)
+        const POLL_INTERVAL = 5000; // Poll every 5 seconds
         
-        // Poll every 3 seconds
+        // Poll every 5 seconds
         mappingCheckIntervalRef.current = setInterval(async () => {
+            pollAttempts++;
+            
+            // Check if we've exceeded max attempts
+            if (pollAttempts > MAX_POLL_ATTEMPTS) {
+                clearInterval(mappingCheckIntervalRef.current);
+                mappingCheckIntervalRef.current = null;
+                isCheckingMappingRef.current = false;
+                setMappingLoading(false);
+                setError('Mapping is taking longer than expected. Please refresh the page to check status.');
+                return;
+            }
+            
             try {
                 const statusResponse = await axiosInstance.get('/onboarding/mapping-status', {
                     params: { userId: user.user_id }
@@ -365,8 +380,9 @@ const Mapping = () => {
             } catch (statusError) {
                 console.error('Error checking mapping status:', statusError);
                 // Don't stop polling on transient errors, just log them
+                // If there are persistent errors, the MAX_POLL_ATTEMPTS will catch it
             }
-        }, 3000);
+        }, POLL_INTERVAL);
     };
 
     const cancelMapping = async () => {
