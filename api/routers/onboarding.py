@@ -26,6 +26,7 @@ MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MAPPING_LOG_DIR = os.getenv("MAPPING_LOG_DIR", "/tmp")
 MAPPING_PROCESS_TTL = 86400  # 24 hours in seconds
 MAPPING_LOG_MAX_LINES = 500  # Maximum number of log lines to return to avoid large responses
+MANUAL_MAPPING_TIMEOUT_SECONDS = 300  # 5 minutes timeout for applying manual mappings
 
 s3 = boto3.client(
     "s3",
@@ -1354,7 +1355,7 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
                 env=os.environ.copy(),
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minute timeout
+                timeout=MANUAL_MAPPING_TIMEOUT_SECONDS
             )
             
             if result.returncode != 0:
@@ -1369,7 +1370,10 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
                 print(f"⚠️  Manual mapping completed with warnings. Check output above.")
             
         except subprocess.TimeoutExpired:
-            raise HTTPException(status_code=500, detail="Manual mapping took too long (timeout after 5 minutes)")
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Manual mapping took too long (timeout after {MANUAL_MAPPING_TIMEOUT_SECONDS} seconds)"
+            )
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to run manual mapping: {str(e)}")
         
