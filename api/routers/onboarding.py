@@ -1473,7 +1473,7 @@ async def confirm_mapping(request: Request, db=Depends(get_db)):
         
         # Start the data processing pipeline automatically
         try:
-            asyncio.create_task(execute_pipeline(business_id, user_id, db))
+            asyncio.create_task(execute_pipeline(business_id, user_id))
             print(f"🚀 Pipeline execution started for business {business_id}")
         except Exception as pipeline_error:
             print(f"⚠️ Failed to start pipeline: {pipeline_error}")

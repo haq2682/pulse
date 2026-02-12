@@ -8,6 +8,7 @@ import subprocess
 from datetime import datetime
 from typing import Optional, Dict
 from sqlalchemy import text
+from database import SessionLocal
 import aioredis
 import boto3
 from botocore.client import Config
@@ -153,22 +154,23 @@ async def run_pipeline_phase(
     )
     
     try:
-        # Prepare command based on phase
+        # Prepare command and environment based on phase
+        env = os.environ.copy()
+        env["BUCKET_NAME"] = business_id
+        
         if phase_name == "machine-learning":
             # ML script accepts --bucket-name argument
             cmd = ["python", script_path, "--bucket-name", business_id]
         else:
-            # Other scripts need to be modified or use environment variable
+            # Other scripts use environment variable
             cmd = ["python", script_path]
-            env = os.environ.copy()
-            env["BUCKET_NAME"] = business_id
         
         # Run subprocess
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=env if phase_name != "machine-learning" else None
+            env=env
         )
         
         # Store process ID in Redis
@@ -227,66 +229,76 @@ async def run_pipeline_phase(
         return False, error_msg
 
 
-async def execute_pipeline(business_id: str, user_id: str, db):
+async def execute_pipeline(business_id: str, user_id: str, db=None):
     """
     Execute the complete data processing pipeline.
     
     Args:
         business_id: Business ID (used as bucket name)
         user_id: User ID
-        db: Database session
+        db: Optional database session (will create new one if not provided)
         
     Returns:
         str: Pipeline execution ID
     """
-    # Create pipeline execution record
-    pipeline_id = str(uuid.uuid4())
+    # Create new database session for background task
+    if db is None:
+        db = SessionLocal()
     
-    db.execute(
-        text("""
-            INSERT INTO pipeline_executions 
-            (pipeline_id, business_id, user_id, status, progress_percentage, step_description)
-            VALUES (:pipeline_id, :business_id, :user_id, :status, :progress, :description)
-        """),
-        {
-            "pipeline_id": pipeline_id,
-            "business_id": business_id,
-            "user_id": user_id,
-            "status": "running",
-            "progress": 0,
-            "description": "Pipeline started"
-        }
-    )
-    db.commit()
-    
-    print(f"🚀 Starting pipeline execution {pipeline_id} for business {business_id}")
-    
-    # Execute each phase sequentially
-    for idx, phase_config in enumerate(PIPELINE_PHASES):
-        success, error_msg = await run_pipeline_phase(
-            phase_config,
-            business_id,
-            pipeline_id,
+    try:
+        # Create pipeline execution record
+        pipeline_id = str(uuid.uuid4())
+        
+        db.execute(
+            text("""
+                INSERT INTO pipeline_executions 
+                (pipeline_id, business_id, user_id, status, progress_percentage, step_description)
+                VALUES (:pipeline_id, :business_id, :user_id, :status, :progress, :description)
+            """),
+            {
+                "pipeline_id": pipeline_id,
+                "business_id": business_id,
+                "user_id": user_id,
+                "status": "running",
+                "progress": 0,
+                "description": "Pipeline started"
+            }
+        )
+        db.commit()
+        
+        print(f"🚀 Starting pipeline execution {pipeline_id} for business {business_id}")
+        
+        # Execute each phase sequentially
+        for idx, phase_config in enumerate(PIPELINE_PHASES):
+            success, error_msg = await run_pipeline_phase(
+                phase_config,
+                business_id,
+                pipeline_id,
+                db,
+                idx
+            )
+            
+            if not success:
+                print(f"❌ Pipeline {pipeline_id} failed at phase {phase_config['name']}")
+                return pipeline_id
+        
+        # All phases completed successfully
+        await update_pipeline_progress(
             db,
-            idx
+            pipeline_id,
+            status="completed",
+            progress_percentage=100,
+            step_description="Pipeline has completed execution"
         )
         
-        if not success:
-            print(f"❌ Pipeline {pipeline_id} failed at phase {phase_config['name']}")
-            return pipeline_id
+        print(f"✅ Pipeline {pipeline_id} completed successfully")
+        
+        return pipeline_id
     
-    # All phases completed successfully
-    await update_pipeline_progress(
-        db,
-        pipeline_id,
-        status="completed",
-        progress_percentage=100,
-        step_description="Pipeline has completed execution"
-    )
-    
-    print(f"✅ Pipeline {pipeline_id} completed successfully")
-    
-    return pipeline_id
+    finally:
+        # Close database session if we created it
+        if db:
+            db.close()
 
 
 async def cancel_pipeline(pipeline_id: str, business_id: str, db):

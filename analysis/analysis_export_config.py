@@ -117,7 +117,7 @@ def create_minio_client() -> Minio:
 def get_bucket_name(business_id: Optional[str] = None) -> str:
     if business_id: 
         return business_id
-    return os.getenv("ANALYTICS_BUCKET_NAME", "pulse-bucket-1")
+    return os.getenv("BUCKET_NAME", os.getenv("ANALYTICS_BUCKET_NAME", "pulse-bucket-1"))
 
 
 def ensure_bucket_exists(minio_client: Minio, bucket_name: str) -> bool:

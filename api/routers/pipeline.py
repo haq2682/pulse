@@ -80,7 +80,10 @@ async def start_pipeline(request: Request, db=Depends(get_db)):
             }
         
         # Start pipeline execution in background
-        asyncio.create_task(execute_pipeline(business_id, user_id, db))
+        asyncio.create_task(execute_pipeline(business_id, user_id))
+        
+        # Give it a moment to create the record
+        await asyncio.sleep(0.5)
         
         # Get the pipeline_id from the latest record
         result = db.execute(
@@ -278,7 +281,10 @@ async def retry_pipeline(request: Request, db=Depends(get_db)):
             raise HTTPException(status_code=400, detail="Pipeline is already running")
         
         # Start new pipeline execution
-        asyncio.create_task(execute_pipeline(business_id, user_id, db))
+        asyncio.create_task(execute_pipeline(business_id, user_id))
+        
+        # Give it a moment to create the record
+        await asyncio.sleep(0.5)
         
         # Get the new pipeline_id
         result = db.execute(
