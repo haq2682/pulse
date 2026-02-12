@@ -30,6 +30,59 @@ minio_client = Minio(
 )
 
 
+def load_ingested_files_cache(bucket_name: str):
+    """
+    Load all CSV files from the ingested folder and cache them.
+    
+    Args:
+        bucket_name: Name of the MinIO bucket
+    
+    Returns:
+        dict: Dictionary mapping table_name -> DataFrame for all ingested files
+    """
+    ingested_cache = {}
+    ingested_folder = "ingested/"
+    
+    try:
+        objects = list(minio_client.list_objects(bucket_name, prefix=ingested_folder, recursive=False))
+        csv_objects = [obj for obj in objects if obj.object_name.endswith('.csv')]
+        
+        for obj in csv_objects:
+            table_name = obj.object_name.replace(ingested_folder, '').replace('.csv', '')
+            try:
+                response = minio_client.get_object(bucket_name, obj.object_name)
+                csv_data = response.read().decode("utf-8")
+                df = pd.read_csv(StringIO(csv_data))
+                response.close()
+                response.release_conn()
+                ingested_cache[table_name] = df
+                print(f"  Cached {table_name} from ingested/ ({len(df)} rows)")
+            except Exception as e:
+                print(f"  ⚠️  Warning: Could not load {obj.object_name}: {e}")
+                continue
+    except Exception as e:
+        print(f"  ⚠️  Warning: Could not list ingested files: {e}")
+    
+    return ingested_cache
+
+
+def find_column_in_ingested(column_name: str, ingested_cache: dict):
+    """
+    Search for a column across all ingested files.
+    
+    Args:
+        column_name: Name of the column to find
+        ingested_cache: Dictionary of ingested DataFrames
+    
+    Returns:
+        tuple: (table_name, DataFrame) if found, else (None, None)
+    """
+    for table_name, df in ingested_cache.items():
+        if column_name in df.columns:
+            return table_name, df
+    return None, None
+
+
 def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
     """
     Apply manual mappings to files in the mapped-temp folder.
@@ -54,6 +107,11 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
         "extra_cols": [],
         "failed_mappings": []  # Track mappings that failed to apply
     }
+    
+    # Load all ingested files into cache for cross-table column lookup
+    print(f"📂 Loading ingested files for cross-table column lookup...")
+    ingested_cache = load_ingested_files_cache(bucket_name)
+    print(f"   Cached {len(ingested_cache)} ingested files\n")
     
     # List all files in mapped-temp folder
     temp_folder = "mapped-temp/"
@@ -117,16 +175,39 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
                         current_columns.discard(source_col)
                         current_columns.add(canonical_col)
                     else:
-                        # Track failed mapping
-                        warning_msg = f"Source column '{source_col}' not found in table '{table_name}'"
-                        print(f"     ⚠️  {warning_msg}")
-                        updated_results["failed_mappings"].append({
-                            "table": table_name,
-                            "canonical_column": canonical_col,
-                            "source_column": source_col,
-                            "error": warning_msg,
-                            "stage": "column_mapping"
-                        })
+                        # Source column not found in mapped-temp file
+                        # Search for it across ALL ingested files
+                        print(f"     🔍 Searching for '{source_col}' across ingested files...")
+                        source_table, source_df = find_column_in_ingested(source_col, ingested_cache)
+                        
+                        if source_table is not None:
+                            # Found the source column in another ingested file
+                            print(f"     ✅ Found '{source_col}' in ingested/{source_table}.csv")
+                            
+                            # Add the column data from source to target dataframe
+                            # Handle case where dataframes have different lengths
+                            if len(source_df) != len(df):
+                                print(f"     ⚠️  Row count mismatch: {table_name} has {len(df)} rows, {source_table} has {len(source_df)} rows")
+                                print(f"        Using first {min(len(df), len(source_df))} rows for mapping")
+                            
+                            # Copy column data (truncate or pad as necessary)
+                            min_len = min(len(df), len(source_df))
+                            df[canonical_col] = None  # Initialize with None
+                            df.loc[:min_len-1, canonical_col] = source_df[source_col].iloc[:min_len].values
+                            
+                            print(f"     ✅ Mapped {source_col} (from {source_table}) → {canonical_col} (in {table_name})")
+                            current_columns.add(canonical_col)
+                        else:
+                            # Column not found anywhere
+                            warning_msg = f"Source column '{source_col}' not found in table '{table_name}' or any ingested file"
+                            print(f"     ⚠️  {warning_msg}")
+                            updated_results["failed_mappings"].append({
+                                "table": table_name,
+                                "canonical_column": canonical_col,
+                                "source_column": source_col,
+                                "error": warning_msg,
+                                "stage": "column_mapping"
+                            })
             
             # Save the updated dataframe to the mapped folder
             try:
