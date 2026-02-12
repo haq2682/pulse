@@ -216,6 +216,10 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
         manual_mappings=manual_mappings
     )
     
+    # Determine target folder based on batch_id and missing columns
+    target_folder = "mapped"  # Default for subsequent batches
+    has_missing_columns = False
+    
     # Save mapping results to Redis on first batch (batch_id == 0)
     if batch_id == 0 and business_id:
         try:
@@ -245,6 +249,9 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
                         "table": table_name
                     })
             
+            # Check if there are missing columns
+            has_missing_columns = len(mapping_results['missing_cols']) > 0
+            
             # Save to Redis
             redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
             redis_client.setex(
@@ -252,11 +259,71 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
                 86400,  # 24 hours
                 json.dumps(mapping_results)
             )
+            
+            # Set a flag to indicate if we're using temp folder (for subsequent batches)
+            if has_missing_columns:
+                redis_client.setex(
+                    f"streaming_use_temp:{business_id}",
+                    86400,  # 24 hours
+                    "true"
+                )
+                target_folder = "mapped-temp"
+                print(f"\n⚠️  {len(mapping_results['missing_cols'])} required columns missing")
+                print(f"   Saving first batch to temporary location for review")
+            else:
+                # No missing columns, clear any temp flag and use final folder
+                redis_client.delete(f"streaming_use_temp:{business_id}")
+                print(f"\n🎉 All required columns have been successfully mapped!")
+            
             print(f"\n✅ Mapping results saved to Redis")
             print(f"   Missing columns: {len(mapping_results['missing_cols'])}")
             print(f"   Extra columns: {len(mapping_results['extra_cols'])}")
+            
+            # Update database status to 'completed' so user can review
+            if business_id:
+                try:
+                    import psycopg2
+                    from datetime import datetime, timezone
+                    
+                    db_host = os.getenv("POSTGRES_SERVER", "postgresql")
+                    db_name = os.getenv("POSTGRES_DATABASE_NAME", "pulse")
+                    db_user = os.getenv("POSTGRES_USER", "postgres")
+                    db_password = os.getenv("POSTGRES_PASSWORD", "postgres")
+                    
+                    with psycopg2.connect(
+                        host=db_host,
+                        database=db_name,
+                        user=db_user,
+                        password=db_password
+                    ) as conn:
+                        with conn.cursor() as cursor:
+                            cursor.execute("""
+                                UPDATE onboarding 
+                                SET mapping_status = %s,
+                                    mapping_completed_at = %s,
+                                    mapping_error = NULL,
+                                    current_step = 'mapping'
+                                WHERE business_id = %s
+                            """, ("completed", datetime.now(timezone.utc), business_id))
+                            conn.commit()
+                    print(f"   Database status updated to 'completed'")
+                except Exception as db_error:
+                    print(f"⚠️  Warning: Could not update database status: {db_error}")
+                    
         except Exception as redis_error:
             print(f"⚠️  Warning: Could not save mapping results to Redis: {redis_error}")
+    else:
+        # For subsequent batches (batch_id > 0), check Redis flag
+        if business_id:
+            try:
+                import redis
+                redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+                use_temp = redis_client.get(f"streaming_use_temp:{business_id}")
+                if use_temp == "true":
+                    target_folder = "mapped-temp"
+                    print(f"   Using temporary folder (awaiting manual mapping review)")
+            except Exception as redis_error:
+                print(f"⚠️  Warning: Could not check temp folder flag: {redis_error}")
     
     # Save results using existing function with CDC operation
     # Determine the operation for each result
@@ -267,10 +334,12 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
             {result_key: result_data}, 
             minio_client, 
             OUTPUT_BUCKET,
-            operation=operation
+            operation=operation,
+            folder=target_folder
         )
     
     print(f"✅ Batch {batch_id} completed: {len(results)} tables processed")
+    print(f"   Data saved to {OUTPUT_BUCKET}/{target_folder}/")
 
 
 def run_streaming():

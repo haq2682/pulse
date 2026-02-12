@@ -204,6 +204,10 @@ def load_mapping_results_from_files(bucket_name: str, manual_mappings: dict):
             json.dumps(mapping_results)
         )
         
+        # Clear the streaming temp folder flag so subsequent batches go to mapped/
+        redis_client.delete(f"streaming_use_temp:{bucket_name}")
+        print(f"   Cleared streaming temp folder flag")
+        
         print(f"\n✅ Updated mapping results in Redis")
         print(f"   Remaining missing columns: {len(updated_missing_cols)}")
         
