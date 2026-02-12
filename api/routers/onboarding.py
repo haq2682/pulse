@@ -99,7 +99,7 @@ async def create_onboarding(request: Request, db=Depends(get_db)):
     try:
         if not user_id:
             raise HTTPException(status_code=400, detail="userId is required")
-        result = db.execute(text("SELECT onboarding_id, current_step FROM onboarding WHERE user_id = :user_id"), {"user_id": user_id})
+        result = db.execute(text("SELECT onboarding_id, current_step FROM onboarding WHERE user_id = :user_id AND is_completed = false"), {"user_id": user_id})
         existing = result.fetchone()
         if existing:
             onboarding_id, current_step = existing
