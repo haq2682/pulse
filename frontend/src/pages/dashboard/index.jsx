@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import axiosInstance from '@/services/api/axiosInstance';
 import { useNavigate } from 'react-router-dom';
+import PipelineProgress from '@/components/PipelineProgress';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
@@ -55,6 +56,9 @@ const Dashboard = () => {
         <div className="flex h-screen overflow-hidden bg-gray-50">
             {/* Sidebar */}
             <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+            {/* Pipeline Progress - Global indicator */}
+            <PipelineProgress />
 
             {/* Main Content */}
             <div className="flex-1 flex flex-col overflow-hidden">
