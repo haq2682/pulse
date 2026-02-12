@@ -68,87 +68,124 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
     if not csv_objects:
         raise ValueError(f"No CSV files found in {bucket_name}/{temp_folder}. Initial mapping may not have completed or files may have already been moved.")
     
-    processed_tables = []
-    for obj in csv_objects:
-        # Extract table name from file path (e.g., "mapped-temp/customers.csv" -> "customers")
-        table_name = obj.object_name.replace(temp_folder, '').replace('.csv', '')
-        
-        print(f"Processing table: {table_name}")
-        
-        # Load the CSV file from MinIO
-        try:
-            response = minio_client.get_object(bucket_name, obj.object_name)
-            csv_data = response.read().decode("utf-8")
-            df = pd.read_csv(StringIO(csv_data))
-            response.close()
-            response.release_conn()
-            print(f"  Loaded {len(df)} rows from {obj.object_name}")
-        except Exception as e:
-            print(f"  ⚠️  Error loading {obj.object_name}: {e}")
-            continue
-        
-        # Get current columns
-        current_columns = set(df.columns)
-        
-        # Apply manual mappings for this table if provided
-        if table_name in manual_mappings:
-            print(f"  📝 Applying manual mappings for {table_name}...")
-            table_mappings = manual_mappings[table_name]
-            
-            for canonical_col, source_col in table_mappings.items():
-                if source_col in df.columns:
-                    # Rename the column
-                    df.rename(columns={source_col: canonical_col}, inplace=True)
-                    print(f"     ✅ Mapped {source_col} → {canonical_col}")
-                    
-                    # Update column sets
-                    current_columns.discard(source_col)
-                    current_columns.add(canonical_col)
-                else:
-                    # Track failed mapping
-                    warning_msg = f"Source column '{source_col}' not found in table '{table_name}'"
-                    print(f"     ⚠️  {warning_msg}")
-                    updated_results["failed_mappings"].append({
-                        "table": table_name,
-                        "canonical_column": canonical_col,
-                        "source_column": source_col,
-                        "error": warning_msg
-                    })
-        
-        # Save the updated dataframe to the mapped folder
-        mapped_file_name = f"mapped/{table_name}.csv"
-        csv_buffer = BytesIO()
-        df.to_csv(csv_buffer, index=False)
-        csv_buffer.seek(0)
-        
-        minio_client.put_object(
-            bucket_name,
-            mapped_file_name,
-            csv_buffer,
-            length=len(csv_buffer.getvalue()),
-            content_type="text/csv",
-        )
-        print(f"  ✅ Saved to {mapped_file_name} ({len(df)} rows)")
-        csv_buffer.close()
-        
-        # Track successfully processed table
-        processed_tables.append(table_name)
+    # Track successfully processed files for cleanup
+    successfully_processed_files = []
+    failed_files = []
     
-    # Clean up: Remove files from mapped-temp folder
-    print(f"\n🧹 Cleaning up temporary files...")
-    # Convert generator to list to avoid exhaustion issues
-    cleanup_objects = list(minio_client.list_objects(bucket_name, prefix=temp_folder, recursive=False))
-    for obj in cleanup_objects:
-        try:
-            minio_client.remove_object(bucket_name, obj.object_name)
-            print(f"  Removed {obj.object_name}")
-        except Exception as e:
-            print(f"  ⚠️  Error removing {obj.object_name}: {e}")
+    # Use try-finally to ensure cleanup happens even if there's an error
+    try:
+        for obj in csv_objects:
+            # Extract table name from file path (e.g., "mapped-temp/customers.csv" -> "customers")
+            table_name = obj.object_name.replace(temp_folder, '').replace('.csv', '')
+            
+            print(f"Processing table: {table_name}")
+            
+            # Load the CSV file from MinIO
+            try:
+                response = minio_client.get_object(bucket_name, obj.object_name)
+                csv_data = response.read().decode("utf-8")
+                df = pd.read_csv(StringIO(csv_data))
+                response.close()
+                response.release_conn()
+                print(f"  Loaded {len(df)} rows from {obj.object_name}")
+            except Exception as e:
+                error_msg = f"Error loading {obj.object_name}: {e}"
+                print(f"  ⚠️  {error_msg}")
+                failed_files.append(obj.object_name)
+                updated_results["failed_mappings"].append({
+                    "table": table_name,
+                    "error": error_msg,
+                    "stage": "loading"
+                })
+                continue
+            
+            # Get current columns
+            current_columns = set(df.columns)
+            
+            # Apply manual mappings for this table if provided
+            if table_name in manual_mappings:
+                print(f"  📝 Applying manual mappings for {table_name}...")
+                table_mappings = manual_mappings[table_name]
+                
+                for canonical_col, source_col in table_mappings.items():
+                    if source_col in df.columns:
+                        # Rename the column
+                        df.rename(columns={source_col: canonical_col}, inplace=True)
+                        print(f"     ✅ Mapped {source_col} → {canonical_col}")
+                        
+                        # Update column sets
+                        current_columns.discard(source_col)
+                        current_columns.add(canonical_col)
+                    else:
+                        # Track failed mapping
+                        warning_msg = f"Source column '{source_col}' not found in table '{table_name}'"
+                        print(f"     ⚠️  {warning_msg}")
+                        updated_results["failed_mappings"].append({
+                            "table": table_name,
+                            "canonical_column": canonical_col,
+                            "source_column": source_col,
+                            "error": warning_msg,
+                            "stage": "column_mapping"
+                        })
+            
+            # Save the updated dataframe to the mapped folder
+            try:
+                mapped_file_name = f"mapped/{table_name}.csv"
+                csv_buffer = BytesIO()
+                df.to_csv(csv_buffer, index=False)
+                csv_buffer.seek(0)
+                
+                minio_client.put_object(
+                    bucket_name,
+                    mapped_file_name,
+                    csv_buffer,
+                    length=len(csv_buffer.getvalue()),
+                    content_type="text/csv",
+                )
+                print(f"  ✅ Saved to {mapped_file_name} ({len(df)} rows)")
+                csv_buffer.close()
+                
+                # Track successfully processed file for cleanup
+                successfully_processed_files.append(obj.object_name)
+            except Exception as e:
+                error_msg = f"Error saving {mapped_file_name}: {e}"
+                print(f"  ⚠️  {error_msg}")
+                failed_files.append(obj.object_name)
+                updated_results["failed_mappings"].append({
+                    "table": table_name,
+                    "error": error_msg,
+                    "stage": "saving"
+                })
+                # Don't add to successfully_processed_files since save failed
+    
+    finally:
+        # Clean up: Remove ONLY successfully processed files from mapped-temp folder
+        print(f"\n🧹 Cleaning up temporary files...")
+        
+        if successfully_processed_files:
+            print(f"  Removing {len(successfully_processed_files)} successfully processed files...")
+            for file_path in successfully_processed_files:
+                try:
+                    minio_client.remove_object(bucket_name, file_path)
+                    print(f"  ✅ Removed {file_path}")
+                except Exception as e:
+                    print(f"  ⚠️  Error removing {file_path}: {e}")
+        
+        if failed_files:
+            print(f"\n  ⚠️  {len(failed_files)} files had errors and were NOT moved:")
+            for file_path in failed_files:
+                print(f"     - {file_path}")
+            print(f"  These files remain in {bucket_name}/mapped-temp/ for manual review")
     
     print(f"\n{'='*60}")
-    print(f"✅ Manual Mappings Applied Successfully")
-    print(f"   Processed {len(processed_tables)} tables")
-    print(f"   Files moved from {bucket_name}/mapped-temp/ to {bucket_name}/mapped/")
+    if len(failed_files) == 0:
+        print(f"✅ Manual Mappings Applied Successfully")
+        print(f"   Processed {len(successfully_processed_files)} tables")
+        print(f"   Files moved from {bucket_name}/mapped-temp/ to {bucket_name}/mapped/")
+    else:
+        print(f"⚠️  Manual Mappings Completed with Warnings")
+        print(f"   Successfully processed: {len(successfully_processed_files)} tables")
+        print(f"   Failed: {len(failed_files)} tables (remain in mapped-temp)")
     print(f"{'='*60}\n")
     
     return updated_results
