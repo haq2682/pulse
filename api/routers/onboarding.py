@@ -1345,8 +1345,8 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
         ]
         
         # Run the script synchronously (it's fast since it just renames columns)
-        # Timeout is generous to handle large datasets with many tables
-        # Each table takes ~1-2 seconds, so 300s allows for ~150-300 tables
+        # Generous timeout to handle large datasets with many tables
+        # Typically takes 1-2 seconds per table, timeout allows for slower I/O
         try:
             result = subprocess.run(
                 cmd,
@@ -1354,7 +1354,7 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
                 env=os.environ.copy(),
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minute timeout for large datasets
+                timeout=300  # 5 minute timeout
             )
             
             if result.returncode != 0:
