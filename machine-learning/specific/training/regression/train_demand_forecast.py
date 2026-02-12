@@ -24,20 +24,6 @@ import math
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-INPUT_CATEGORIES_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_categories.parquet"
-INPUT_MONTHLY_AGG_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_monthly_aggregations.parquet"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/demand_forecast/"
-MIN_RECORDS_THRESHOLD = 100
-
-# Feature Engineering Configuration
-USE_CROSS_VALIDATION = False  # Set to True to enable hyperparameter tuning (slower)
-LAG_MONTHS = [1, 3, 6]  # Lag periods for temporal features
-
 # Enhanced feature columns with temporal and categorical features
 FEATURE_COLUMNS = [
     # Product features
@@ -568,7 +554,18 @@ def save_model(model, model_name):
     print(f"✓ Model saved: {model_path}")
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    INPUT_CATEGORIES_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_categories.parquet"
+    INPUT_MONTHLY_AGG_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_monthly_aggregations.parquet"
+    MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/demand_forecast/"
+    MIN_RECORDS_THRESHOLD = 100
+
+    # Feature Engineering Configuration
+    USE_CROSS_VALIDATION = False  # Set to True to enable hyperparameter tuning (slower)
+    LAG_MONTHS = [1, 3, 6]  # Lag periods for temporal features
     """Main training pipeline"""
     print("\n" + "="*60)
     print("Demand Forecasting V2 - Advanced Feature Engineering")
@@ -663,4 +660,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

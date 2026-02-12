@@ -22,20 +22,6 @@ import math
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-INPUT_CATEGORIES_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_categories.parquet"
-INPUT_MONTHLY_AGG_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_monthly_aggregations.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/demand_forecast/"
-MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/demand_forecast/"
-
-# ⚠️ MANUAL CONFIGURATION REQUIRED:
-MODEL_NAME = "gbt"  # Options: "linear_regression", "random_forest", "gbt"
-
-FORECAST_HORIZON_DAYS = 30
 
 # Feature columns (must match training)
 FEATURE_COLUMNS = [
@@ -420,7 +406,19 @@ def display_sample_predictions(df, n=5):
         )
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    INPUT_CATEGORIES_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_categories.parquet"
+    INPUT_MONTHLY_AGG_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_monthly_aggregations.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/demand_forecast/"
+    MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/demand_forecast/"
+
+    # ⚠️ MANUAL CONFIGURATION REQUIRED:
+    MODEL_NAME = "gbt"  # Options: "linear_regression", "random_forest", "gbt"
+
+    FORECAST_HORIZON_DAYS = 30
     """Main inference pipeline"""
     print("\n" + "="*60)
     print("Demand Forecasting V2 - Inference")
@@ -492,4 +490,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

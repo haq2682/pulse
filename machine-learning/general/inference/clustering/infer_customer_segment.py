@@ -18,15 +18,6 @@ from datetime import datetime
 import json
 import numpy as np
 
-# Environment configuration
-BUCKET = "pulse-bucket-1"
-GENERAL_BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/"
-OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
-
-# MANUAL SELECTION: Choose which algorithm to use for inference
-SELECTED_MODEL_TYPE = "kmeans"  # Options: 'kmeans' or 'gmm'
 
 # Feature columns (must match training)
 FEATURE_COLS = [
@@ -347,7 +338,14 @@ def save_predictions(predictions, output_path):
     print(f"Saved {record_count} predictions successfully")
 
 
-def main():
+def main(BUCKET):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PATH = f"s3a://{BUCKET}/transformed/"
+    MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/"
+    OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
+
+    # MANUAL SELECTION: Choose which algorithm to use for inference
+    SELECTED_MODEL_TYPE = "kmeans"  # Options: 'kmeans' or 'gmm'
     print("=" * 80)
     print("Customer Segmentation Clustering - Inference")
     print(f"Selected Model: {SELECTED_MODEL_TYPE.upper()}")
@@ -398,4 +396,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET = 'pulse-bucket-1'
+    main(BUCKET)

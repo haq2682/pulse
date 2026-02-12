@@ -644,7 +644,7 @@ const Connect = () => {
                 style={{ width: '50vw' }} breakpoints={{ '960px': '75vw', '641px': '100vw' }}>
                 <div className="flex items-center justify-center flex-col my-8">
                     <ProgressSpinner />
-                    <Text className="text-xl text-black font-medium m-0 mt-4 mb-6 z-10">
+                    <Text className="text-xl text-black font-medium m-0 mt-4 mb-6 z-10 mx-4 sm:mx-auto">
                         We are mapping your data to our database. Please wait...
                     </Text>
                     <SecondaryButton 

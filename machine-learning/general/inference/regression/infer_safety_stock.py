@@ -21,25 +21,6 @@ import uuid
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-GENERAL_BUCKET_NAME = "pulse-bucket-1"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-INPUT_INVENTORY_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
-INPUT_SUPPLIERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_suppliers.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/safety_stock/"
-MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/safety_stock/"
-
-# ⚠️ MANUAL CONFIGURATION REQUIRED:
-MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
-
-# Configuration
-DEFAULT_SERVICE_LEVEL = 0.95
-Z_SCORE_95 = 1.65
-Z_SCORE_99 = 2.33
-MIN_DEMAND_DAYS = 30
 
 # Feature set (must match training)
 NUMERIC_FEATURES = [
@@ -523,7 +504,24 @@ def display_summary_statistics(df):
     print("="*80)
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    INPUT_INVENTORY_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
+    INPUT_SUPPLIERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_suppliers.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/safety_stock/"
+    MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/safety_stock/"
+
+    # ⚠️ MANUAL CONFIGURATION REQUIRED:
+    MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
+
+    # Configuration
+    DEFAULT_SERVICE_LEVEL = 0.95
+    Z_SCORE_95 = 1.65
+    Z_SCORE_99 = 2.33
+    MIN_DEMAND_DAYS = 30
     """Main inference pipeline"""
     print("\n" + "="*80)
     print("Safety Stock Level Prediction - Inference")
@@ -601,4 +599,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

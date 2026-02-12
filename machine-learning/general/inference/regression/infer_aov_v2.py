@@ -21,23 +21,6 @@ import json
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-GENERAL_BUCKET_NAME = "pulse-bucket-1"
-INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/aov_prediction/"
-MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/aov_prediction/"
-SCALER_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/aov_prediction/scaler"
-
-# ⚠️ MANUAL CONFIGURATION REQUIRED:
-MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
-
-# Models that require scaling (must match training)
-MODELS_REQUIRING_SCALING = ["linear_regression"]
-
 # Feature set (MUST MATCH TRAINING - reduced set)
 NUMERIC_FEATURES = [
     # Customer profile (core)
@@ -601,7 +584,21 @@ def display_sample_predictions(df, n=5):
         print()
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/aov_prediction/"
+    MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/aov_prediction/"
+    SCALER_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/aov_prediction/scaler"
+
+    # ⚠️ MANUAL CONFIGURATION REQUIRED:
+    MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
+
+    # Models that require scaling (must match training)
+    MODELS_REQUIRING_SCALING = ["linear_regression"]
     """Main inference pipeline"""
     print("\n" + "="*60)
     print("AOV Prediction - FIXED Inference Pipeline")
@@ -678,4 +675,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

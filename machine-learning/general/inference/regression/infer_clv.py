@@ -20,20 +20,6 @@ import uuid
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-GENERAL_BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/clv_predictions/"
-MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/clv/"
-
-# ⚠️ MANUAL CONFIGURATION REQUIRED:
-# Set MODEL_NAME to one of: "linear_regression", "random_forest", "gbt"
-# Based on training results, select the best performing model
-MODEL_NAME = "random_forest"  # <-- UPDATE THIS AFTER TRAINING
-
-PREDICTION_HORIZON_DAYS = 365  # Predict CLV for next 1 year
-
 # Feature columns (must match training)
 FEATURE_COLUMNS = [
     "total_orders",
@@ -219,7 +205,18 @@ def display_sample_predictions(df, n=5):
         )
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/clv_predictions/"
+    MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/clv/"
+
+    # ⚠️ MANUAL CONFIGURATION REQUIRED:
+    # Set MODEL_NAME to one of: "linear_regression", "random_forest", "gbt"
+    # Based on training results, select the best performing model
+    MODEL_NAME = "random_forest"  # <-- UPDATE THIS AFTER TRAINING
+
+    PREDICTION_HORIZON_DAYS = 365  # Predict CLV for next 1 year
     """Main inference pipeline"""
     print("\n" + "="*60)
     print("CLV Prediction Model Inference")
@@ -291,4 +288,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

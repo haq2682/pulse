@@ -19,10 +19,7 @@ from datetime import datetime
 
 # Environment configuration
 BUCKET = "pulse-bucket-1"
-GENERAL_BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/"
-OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
+
 
 # Feature columns (must match training)
 NUMERIC_FEATURES = [
@@ -433,7 +430,11 @@ def save_predictions_with_summary(predictions, output_path):
     print(f"{'='*80}\n")
 
 
-def main():
+def main(BUCKET):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PATH = f"s3a://{BUCKET}/transformed/"
+    MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/"
+    OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
     print("="*80)
     print("ENHANCED Supplier Performance Clustering - Inference")
     print("="*80)
@@ -461,4 +462,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET = "pulse-bucket-1"
+    main(BUCKET)

@@ -22,14 +22,6 @@ import json
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/price_optimization/"
-MODEL_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/price_optimization/random_forest"
-
 # Feature set (must match training)
 NUMERIC_FEATURES = [
     "current_price", "cost_price", "current_profit_margin", "price_to_cost_ratio",
@@ -558,7 +550,12 @@ def display_summary_statistics(df):
     print("="*80)
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/price_optimization/"
+    MODEL_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/price_optimization/random_forest"
     """Main inference pipeline"""
     print("\n" + "="*80)
     print("Product Price Optimization - Inference")
@@ -638,4 +635,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

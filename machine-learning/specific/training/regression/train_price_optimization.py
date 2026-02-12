@@ -26,19 +26,6 @@ from datetime import datetime
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/price_optimization/"
-MIN_RECORDS_THRESHOLD = 100
-MAX_NULL_PERCENTAGE = 95.0
-MIN_PRICE_POINTS = 2  # Need at least 2 different historical prices
-
-# Configuration
-USE_CROSS_VALIDATION = False
-
 # Required columns
 REQUIRED_PRODUCT_COLUMNS = ["product_id", "category", "cost_price", "sell_price"]
 REQUIRED_ORDER_ITEM_COLUMNS = ["product_id", "quantity", "product_price"]
@@ -663,7 +650,17 @@ def save_model(model, model_name):
     print(f"✓ Model saved: {model_path}")
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/price_optimization/"
+    MIN_RECORDS_THRESHOLD = 100
+    MAX_NULL_PERCENTAGE = 95.0
+    MIN_PRICE_POINTS = 2  # Need at least 2 different historical prices
+
+    # Configuration
+    USE_CROSS_VALIDATION = False
     """Main training pipeline"""
     print("\n" + "="*60)
     print("Product Price Optimization - Training")
@@ -760,4 +757,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

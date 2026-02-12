@@ -12,18 +12,6 @@ import findspark
 
 findspark.init()
 
-# Configuration
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH_AFFINITY = f"s3a://{BUCKET_NAME}/transformed/agg_product_affinity.parquet"
-INPUT_PATH_PRODUCTS = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/product_bundling_predictions"
-MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/product_bundling"
-
-# ⚠️ MANUAL INTERVENTION REQUIRED: Select model to use for inference
-# Available options: "LogisticRegression", "RandomForest", "DecisionTree", "MultilayerPerceptron"
-SELECTED_MODEL = "RandomForest"  # <-- CHANGE THIS BASED ON TRAINING RESULTS
-
-MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
 
 # Feature columns (must match training EXACTLY)
 NUMERICAL_FEATURES = [
@@ -390,7 +378,17 @@ def save_predictions(df, output_path):
         return False
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_PATH_AFFINITY = f"s3a://{BUCKET_NAME}/transformed/agg_product_affinity.parquet"
+    INPUT_PATH_PRODUCTS = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/product_bundling_predictions"
+    MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/product_bundling"
+
+    # ⚠️ MANUAL INTERVENTION REQUIRED: Select model to use for inference
+    # Available options: "LogisticRegression", "RandomForest", "DecisionTree", "MultilayerPerceptron"
+    SELECTED_MODEL = "RandomForest"  # <-- CHANGE THIS BASED ON TRAINING RESULTS
+
+    MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
     print("=" * 60)
     print("Product Bundling Classification - Inference Pipeline")
     print("=" * 60)
@@ -458,4 +456,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

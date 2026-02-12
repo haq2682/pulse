@@ -26,18 +26,7 @@ from datetime import datetime
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/delivery_time/"
-MIN_RECORDS_THRESHOLD = 100
-MAX_NULL_PERCENTAGE = 95.0
 
-# Configuration
-USE_CROSS_VALIDATION = False
-
-# Required columns
 REQUIRED_ORDER_COLUMNS = ["order_id", "customer_id", "order_status", "order_placed_at", "delivery_days_diff"]
 REQUIRED_CUSTOMER_COLUMNS = ["customer_id", "country", "state_province", "city"]
 
@@ -569,7 +558,16 @@ def save_model(model, model_name):
     print(f"✓ Model saved: {model_path}")
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
+    MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/delivery_time/"
+    MIN_RECORDS_THRESHOLD = 100
+    MAX_NULL_PERCENTAGE = 95.0
+
+    # Configuration
+    USE_CROSS_VALIDATION = False
+
     """Main training pipeline"""
     print("\n" + "="*60)
     print("Delivery Time Prediction - Training")
@@ -671,4 +669,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

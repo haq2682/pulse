@@ -606,7 +606,7 @@ def save_dataframes_to_minio(results, client, bucket_name, operation=None, prima
         results: Dictionary of processed results
         client: MinIO client instance
         bucket_name: Name of the bucket to save to
-        operation: Debezium CDC operation type ('c' for create, 'u' for update, 'd' for delete, 'r' for read/snapshot)
+        operation: CDC operation type ('c' for create, 'u' for update, 'd' for delete, 'r' for read/snapshot)
         primary_key_col: Primary key column name for identifying rows to update/delete
         folder: Folder name within bucket to save files (default: "mapped")
     """
@@ -651,6 +651,10 @@ def save_dataframes_to_minio(results, client, bucket_name, operation=None, prima
         # Get the primary key for this table
         pk_col = primary_key_col or table_primary_keys.get(table_name)
 
+        # Ensure primary key column has consistent data type
+        if pk_col and pk_col in new_pdf.columns:
+            new_pdf[pk_col] = new_pdf[pk_col].astype(str)
+
         # Try to load existing data if file exists
         existing_pdf = None
         try:
@@ -658,6 +662,9 @@ def save_dataframes_to_minio(results, client, bucket_name, operation=None, prima
             try:
                 existing_data = response.read().decode("utf-8")
                 existing_pdf = pd.read_csv(StringIO(existing_data))
+                # Ensure primary key column has consistent data type
+                if pk_col and pk_col in existing_pdf.columns:
+                    existing_pdf[pk_col] = existing_pdf[pk_col].astype(str)
                 print(f"  Loaded existing data: {len(existing_pdf)} rows")
             finally:
                 response.close()
@@ -667,7 +674,7 @@ def save_dataframes_to_minio(results, client, bucket_name, operation=None, prima
             existing_pdf = None
             print(f"  No existing file found, creating new...")
 
-        # Handle Debezium CDC operations
+        # Handle CDC operations
         if operation and pk_col and pk_col in new_pdf.columns:
             if operation in ("d", "delete"):
                 # Delete operation: remove rows with matching primary keys using merge

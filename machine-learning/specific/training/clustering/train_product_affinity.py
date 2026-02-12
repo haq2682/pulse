@@ -17,12 +17,6 @@ from pyspark.ml.evaluation import ClusteringEvaluator
 from datetime import datetime
 import json
 
-# Environment configuration
-BUCKET = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
-LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
-
 # Feature columns (using log-transformed versions)
 NUMERIC_FEATURES = [
     "log_sell_price",
@@ -391,7 +385,10 @@ def save_models(
     print("Saved metrics")
 
 
-def main():
+def main(BUCKET):
+    INPUT_PATH = f"s3a://{BUCKET}/transformed/"
+    MODEL_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
+    LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
     print("=" * 80)
     print("Product Affinity Clustering - Training (IMPROVED)")
     print("=" * 80)
@@ -467,4 +464,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET = "pulse-bucket-1"
+    main(BUCKET)

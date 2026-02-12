@@ -25,15 +25,7 @@ load_dotenv()
 
 # Constants
 BUCKET_NAME = "pulse-bucket-1"
-GENERAL_BUCKET_NAME = "pulse-bucket-1"
-INPUT_MONTHLY_AGG_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_monthly_aggregations.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/revenue_forecast/"
-MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/revenue_forecast/"
 
-# ⚠️ MANUAL CONFIGURATION REQUIRED:
-MODEL_NAME = "linear_regression"  # Options: "linear_regression", "random_forest", "gbt"
-
-FORECAST_HORIZON_DAYS = 30  # Forecasting next month
 
 # Feature columns (must match training)
 FEATURE_COLUMNS = [
@@ -341,7 +333,16 @@ def display_prediction(df):
     print(f"Confidence Score: {row['confidence_score']:.2%}")
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_MONTHLY_AGG_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_monthly_aggregations.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/revenue_forecast/"
+    MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/revenue_forecast/"
+
+    # ⚠️ MANUAL CONFIGURATION REQUIRED:
+    MODEL_NAME = "linear_regression"  # Options: "linear_regression", "random_forest", "gbt"
+
+    FORECAST_HORIZON_DAYS = 30  # Forecasting next month
     """Main inference pipeline"""
     print("\n" + "="*60)
     print("Revenue Forecasting - Inference")
@@ -407,4 +408,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

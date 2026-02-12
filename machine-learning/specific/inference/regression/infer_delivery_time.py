@@ -22,12 +22,6 @@ import json
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/delivery_time/"
-MODEL_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/delivery_time/random_forest"
 
 # Feature set (must match training)
 NUMERIC_FEATURES = [
@@ -494,7 +488,11 @@ def display_summary_statistics(df):
     print("="*80)
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/delivery_time/"
+    MODEL_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/delivery_time/random_forest"
     """Main inference pipeline"""
     print("\n" + "="*80)
     print("Delivery Time Prediction - Inference")
@@ -579,4 +577,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)
