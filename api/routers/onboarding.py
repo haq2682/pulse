@@ -26,6 +26,7 @@ MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MAPPING_LOG_DIR = os.getenv("MAPPING_LOG_DIR", "/tmp")
 MAPPING_PROCESS_TTL = 86400  # 24 hours in seconds
 MAPPING_LOG_MAX_LINES = 500  # Maximum number of log lines to return to avoid large responses
+MANUAL_MAPPING_TIMEOUT_SECONDS = 300  # 5 minutes timeout for applying manual mappings
 
 s3 = boto3.client(
     "s3",
@@ -610,8 +611,10 @@ async def start_mapping(request: Request, db=Depends(get_db)):
 @router.post("/cancel-mapping")
 async def cancel_mapping(request: Request, db=Depends(get_db)):
     """
-    Cancel the running mapping pipeline.
-    Stops the subprocess, updates the database status, and clears Redis keys.
+    Cancel the running mapping pipeline or manual mapping process.
+    
+    If cancelling during initial auto-mapping: reverts to connect step
+    If cancelling during manual mapping application: stays on mapping page with completed status
     """
     try:
         body = await request.json()
@@ -623,9 +626,12 @@ async def cancel_mapping(request: Request, db=Depends(get_db)):
         # Use authenticated user ID
         user_id = body_user_id
         
+        # Optional parameter to indicate if this is during manual mapping
+        during_manual_mapping = body.get("duringManualMapping", False)
+        
         # Get the onboarding record
         onboarding = db.execute(
-            text("SELECT onboarding_id, business_id, mapping_status FROM onboarding WHERE user_id = :user_id"),
+            text("SELECT onboarding_id, business_id, mapping_status, current_step FROM onboarding WHERE user_id = :user_id"),
             {"user_id": user_id}
         )
         onboarding_record = onboarding.fetchone()
@@ -633,7 +639,7 @@ async def cancel_mapping(request: Request, db=Depends(get_db)):
         if not onboarding_record:
             raise HTTPException(status_code=404, detail="Onboarding record not found")
         
-        onboarding_id, business_id, mapping_status = onboarding_record
+        onboarding_id, business_id, mapping_status, current_step = onboarding_record
         
         if not business_id:
             raise HTTPException(status_code=400, detail="Business ID not found")
@@ -649,25 +655,51 @@ async def cancel_mapping(request: Request, db=Depends(get_db)):
             except ValueError:
                 print(f"Invalid process ID: {process_id_str}")
         
+        # Determine the behavior based on context
+        # If user is on mapping page (current_step='mapping') or during_manual_mapping flag is set,
+        # this means they're cancelling manual mapping application, so we preserve the completed state
+        is_manual_mapping_cancellation = during_manual_mapping or current_step == 'mapping'
+        
         # Update the database to indicate mapping was cancelled
         try:
-            db.execute(
-                text("""
-                    UPDATE onboarding 
-                    SET mapping_status = :mapping_status,
-                        mapping_error = :error,
-                        mapping_completed_at = :completed_at,
-                        current_step = :current_step
-                    WHERE user_id = :user_id
-                """),
-                {
-                    "mapping_status": "cancelled",
-                    "error": "Mapping was cancelled by user",
-                    "completed_at": datetime.utcnow(),
-                    "current_step": "connect",
-                    "user_id": user_id
-                }
-            )
+            if is_manual_mapping_cancellation:
+                # User was on mapping page reviewing results - restore to completed state
+                # This allows them to stay on the mapping page and try again
+                db.execute(
+                    text("""
+                        UPDATE onboarding 
+                        SET mapping_status = :mapping_status,
+                            current_step = :current_step
+                        WHERE user_id = :user_id
+                    """),
+                    {
+                        "mapping_status": "completed",  # Restore to completed since initial mapping finished
+                        "current_step": "mapping",  # Keep them on mapping page
+                        "user_id": user_id
+                    }
+                )
+                message = "Manual mapping cancelled. You can adjust your mappings and try again."
+            else:
+                # User was running initial auto-mapping - revert to connect
+                db.execute(
+                    text("""
+                        UPDATE onboarding 
+                        SET mapping_status = :mapping_status,
+                            mapping_error = :error,
+                            mapping_completed_at = :completed_at,
+                            current_step = :current_step
+                        WHERE user_id = :user_id
+                    """),
+                    {
+                        "mapping_status": "cancelled",
+                        "error": "Mapping was cancelled by user",
+                        "completed_at": datetime.utcnow(),
+                        "current_step": "connect",
+                        "user_id": user_id
+                    }
+                )
+                message = "Mapping pipeline cancelled successfully"
+            
             db.commit()
             
             # Clear Redis keys only after successful database commit
@@ -684,7 +716,7 @@ async def cancel_mapping(request: Request, db=Depends(get_db)):
         
         return {
             "status": 200,
-            "message": "Mapping pipeline cancelled successfully"
+            "message": message
         }
         
     except HTTPException:
@@ -1186,6 +1218,8 @@ async def get_mapping_results(request: Request, userId: str, db=Depends(get_db))
 async def save_manual_mappings(request: Request, db=Depends(get_db)):
     """
     Save manual column mappings provided by the user.
+    This endpoint just saves the mappings without processing.
+    Use /apply-manual-mappings to actually apply them to the data.
     """
     try:
         body = await request.json()
@@ -1212,8 +1246,6 @@ async def save_manual_mappings(request: Request, db=Depends(get_db)):
         business_id = onboarding_record[0]
         
         # Save manual mappings to database
-        # Note: We don't set is_completed here because the mapping pipeline needs to run
-        # The is_completed will be set when confirm-mapping is called after successful mapping
         db.execute(
             text("""
                 UPDATE onboarding 
@@ -1242,6 +1274,147 @@ async def save_manual_mappings(request: Request, db=Depends(get_db)):
     except Exception as e:
         print(f"Error saving manual mappings: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/apply-manual-mappings")
+async def apply_manual_mappings(request: Request, db=Depends(get_db)):
+    """
+    Apply manual column mappings to files in the mapped-temp folder.
+    This moves files from mapped-temp to mapped folder after applying the mappings.
+    Does NOT re-run the entire mapping pipeline - just renames columns and moves files.
+    """
+    try:
+        body = await request.json()
+        
+        # Get userId from body and verify it matches authenticated user
+        body_user_id = body.get("userId")
+        if body_user_id is None:
+            raise HTTPException(status_code=403, detail="Authentication Required")
+        
+        # Use authenticated user ID
+        user_id = body_user_id
+        manual_mappings = body.get("manualMappings", {})
+        
+        # Get the onboarding record
+        onboarding = db.execute(
+            text("SELECT business_id, mapping_status FROM onboarding WHERE user_id = :user_id"),
+            {"user_id": user_id}
+        )
+        onboarding_record = onboarding.fetchone()
+        
+        if not onboarding_record:
+            raise HTTPException(status_code=404, detail="Onboarding record not found")
+        
+        business_id, mapping_status = onboarding_record
+        
+        if not business_id:
+            raise HTTPException(status_code=400, detail="Business ID not found")
+        
+        # Verify mapping is completed (initial mapping pipeline has finished)
+        if mapping_status != "completed":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot apply manual mappings - initial mapping status is '{mapping_status}', must be 'completed'"
+            )
+        
+        # Save manual mappings to database first
+        db.execute(
+            text("""
+                UPDATE onboarding 
+                SET manual_mappings = :manual_mappings
+                WHERE user_id = :user_id
+            """),
+            {
+                "manual_mappings": json.dumps(manual_mappings),
+                "user_id": user_id
+            }
+        )
+        db.commit()
+        
+        # Apply the manual mappings using the apply_manual_mappings.py script
+        script_path = "/app/mapping/apply_manual_mappings.py"
+        
+        # Check if script exists
+        if not os.path.exists(script_path):
+            raise HTTPException(status_code=500, detail=f"Manual mapping script not found at {script_path}")
+        
+        # Build the command to run the manual mapping script
+        cmd = [
+            "python3",
+            script_path,
+            "--bucket-name", business_id,
+            "--manual-mappings", json.dumps(manual_mappings)
+        ]
+        
+        # Run the script synchronously (it's fast since it just renames columns)
+        # Generous timeout to handle large datasets with many tables
+        # Typically takes 1-2 seconds per table, timeout allows for slower I/O
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd="/app/mapping",
+                env=os.environ.copy(),
+                capture_output=True,
+                text=True,
+                timeout=MANUAL_MAPPING_TIMEOUT_SECONDS
+            )
+            
+            if result.returncode != 0:
+                error_msg = f"Manual mapping failed: {result.stderr}"
+                print(error_msg)
+                raise HTTPException(status_code=500, detail=error_msg)
+            
+            print(f"Manual mapping output: {result.stdout}")
+            
+            # Check for warnings in output
+            if "⚠️" in result.stdout or "failed" in result.stdout.lower():
+                print(f"⚠️  Manual mapping completed with warnings. Check output above.")
+            
+        except subprocess.TimeoutExpired:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Manual mapping took too long (timeout after {MANUAL_MAPPING_TIMEOUT_SECONDS} seconds)"
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to run manual mapping: {str(e)}")
+        
+        # Get updated mapping results from Redis
+        mapping_results_str = await redis.get(f"mapping_results:{business_id}")
+        if mapping_results_str:
+            mapping_results = json.loads(mapping_results_str)
+        else:
+            mapping_results = {"missing_cols": [], "extra_cols": []}
+        
+        # Update database with new mapping results
+        db.execute(
+            text("""
+                UPDATE onboarding 
+                SET mapping_results = :mapping_results
+                WHERE user_id = :user_id
+            """),
+            {
+                "mapping_results": json.dumps(mapping_results),
+                "user_id": user_id
+            }
+        )
+        db.commit()
+        
+        # Build response message
+        message = "Manual mappings applied successfully"
+        if len(mapping_results.get("missing_cols", [])) > 0:
+            message += f" ({len(mapping_results['missing_cols'])} columns still missing)"
+        
+        return {
+            "status": 200,
+            "message": message,
+            "mapping_results": mapping_results
+        }
+    
+    except HTTPException:
+        # Re-raise HTTPExceptions (401, 403, 404) without modification
+        raise
+    except Exception as e:
+        print(f"Error applying manual mappings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/confirm-mapping")
 async def confirm_mapping(request: Request, db=Depends(get_db)):

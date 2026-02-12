@@ -217,14 +217,23 @@ def run_batch_mode(bucket_name: str):
         except Exception as redis_error:
             print(f"⚠️  Warning: Could not save mapping results to Redis: {redis_error}", flush=True)
         
-        print(f"\nSaving results to {bucket_name}/mapped...", flush=True)
-        save_dataframes_to_minio(results, minio_client, bucket_name)
+        # Determine which folder to save to based on whether manual mapping is needed
+        has_missing_columns = len(mapping_results['missing_cols']) > 0
+        target_folder = "mapped-temp" if has_missing_columns else "mapped"
+        
+        print(f"\nSaving results to {bucket_name}/{target_folder}...", flush=True)
+        if has_missing_columns:
+            print(f"   💡 Saving to temporary location for manual mapping review", flush=True)
+        save_dataframes_to_minio(results, minio_client, bucket_name, folder=target_folder)
         
         print(f"\n{'='*60}", flush=True)
         print(f"✅ BATCH MODE COMPLETE", flush=True)
         print(f"   Processed {len(results)} tables", flush=True)
-        print(f"   Results saved to {bucket_name}/mapped/", flush=True)
-        print(f"   User can review missing/extra columns before continuing", flush=True)
+        print(f"   Results saved to {bucket_name}/{target_folder}/", flush=True)
+        if has_missing_columns:
+            print(f"   📝 Awaiting manual mapping before moving to final location", flush=True)
+        else:
+            print(f"   🎉 All columns mapped - ready for use", flush=True)
         print(f"{'='*60}\n", flush=True)
         
         # Update database with success status

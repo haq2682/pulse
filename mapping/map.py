@@ -598,7 +598,7 @@ def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="bat
     return results
 
 
-def save_dataframes_to_minio(results, client, bucket_name, operation=None, primary_key_col=None):
+def save_dataframes_to_minio(results, client, bucket_name, operation=None, primary_key_col=None, folder="mapped"):
     """
     Save processed DataFrames to MinIO bucket with append logic.
 
@@ -608,6 +608,7 @@ def save_dataframes_to_minio(results, client, bucket_name, operation=None, prima
         bucket_name: Name of the bucket to save to
         operation: Debezium CDC operation type ('c' for create, 'u' for update, 'd' for delete, 'r' for read/snapshot)
         primary_key_col: Primary key column name for identifying rows to update/delete
+        folder: Folder name within bucket to save files (default: "mapped")
     """
 
     if not client.bucket_exists(bucket_name):
@@ -644,8 +645,8 @@ def save_dataframes_to_minio(results, client, bucket_name, operation=None, prima
         # Convert Spark DataFrame to Pandas
         new_pdf = final_df.toPandas()
 
-        # File path in mapped folder
-        file_name = f"mapped/{table_name}.csv"
+        # File path in specified folder
+        file_name = f"{folder}/{table_name}.csv"
 
         # Get the primary key for this table
         pk_col = primary_key_col or table_primary_keys.get(table_name)
