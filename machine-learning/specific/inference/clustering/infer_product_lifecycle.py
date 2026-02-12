@@ -12,12 +12,6 @@ from pyspark.sql.types import StringType, DoubleType
 from pyspark.ml import PipelineModel
 from pyspark.ml.linalg import DenseVector, SparseVector
 
-BUCKET = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
-METRICS_PATH = f"s3a://{BUCKET}/machine-learning/clustering/metrics/"
-OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
-LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
 
 FEATURES = ["log_age", "log_sales_velocity", "log_revenue_velocity", "log_turnover"]
 
@@ -212,7 +206,12 @@ def save_and_summarize(df, output_path):
     df.groupBy("cluster_id").count().orderBy("cluster_id").show()
 
 
-def main():
+def main(BUCKET):
+    INPUT_PATH = f"s3a://{BUCKET}/transformed/"
+    MODEL_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
+    METRICS_PATH = f"s3a://{BUCKET}/machine-learning/clustering/metrics/"
+    OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
+    LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
     spark = create_spark()
     
     df = load_data(spark)
@@ -239,4 +238,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET = "pulse-bucket-1"
+    main(BUCKET)

@@ -13,17 +13,6 @@ from pyspark.ml.clustering import KMeans
 from pyspark.ml.evaluation import ClusteringEvaluator
 from pyspark.ml import Pipeline, PipelineModel
 
-BUCKET = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
-METRICS_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/metrics/"
-LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
-
-FEATURES = ["log_age", "log_sales_velocity", "log_revenue_velocity", "log_turnover"]
-K_RANGE = [3, 4, 5, 6]
-MIN_PRODUCTS = 50
-
-
 def create_spark():
     return (
         SparkSession.builder.appName("ProductLifecycleTrain")
@@ -229,7 +218,15 @@ def save_model_and_metrics(spark, preprocess_model, kmeans_model, profiles, stat
         print(f"S3 warning: {e}")
 
 
-def main():
+def main(BUCKET):
+    INPUT_PATH = f"s3a://{BUCKET}/transformed/"
+    MODEL_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
+    METRICS_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/metrics/"
+    LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
+
+    FEATURES = ["log_age", "log_sales_velocity", "log_revenue_velocity", "log_turnover"]
+    K_RANGE = [3, 4, 5, 6]
+    MIN_PRODUCTS = 50
     spark = create_spark()
     
     df = load_data(spark)
@@ -293,4 +290,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET = "pulse-bucket-1"
+    main(BUCKET)

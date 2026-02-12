@@ -22,25 +22,6 @@ import json
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-GENERAL_BUCKET_NAME = "pulse-bucket-1"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-INPUT_INVENTORY_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
-INPUT_SUPPLIERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_suppliers.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/restock_quantity/"
-MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/restock_quantity/"
-
-# ⚠️ MANUAL CONFIGURATION REQUIRED:
-MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
-
-# Configuration
-Z_SCORE_SAFETY_STOCK = 1.65  # 95% service level
-ORDERING_COST = 50
-MIN_DEMAND_DAYS = 30
-
 # Feature set (must match training)
 NUMERIC_FEATURES = [
     "current_stock", "minimum_stock_level", "available_stock", "stock_coverage_days",
@@ -476,7 +457,23 @@ def display_summary_statistics(df):
     print("="*80)
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    INPUT_INVENTORY_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
+    INPUT_SUPPLIERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_suppliers.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/restock_quantity/"
+    MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/restock_quantity/"
+
+    # ⚠️ MANUAL CONFIGURATION REQUIRED:
+    MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
+
+    # Configuration
+    Z_SCORE_SAFETY_STOCK = 1.65  # 95% service level
+    ORDERING_COST = 50
+    MIN_DEMAND_DAYS = 30
     """Main inference pipeline"""
     print("\n" + "="*80)
     print("Inventory Restock Quantity Prediction - Inference")
@@ -554,4 +551,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

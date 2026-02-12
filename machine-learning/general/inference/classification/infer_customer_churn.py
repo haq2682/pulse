@@ -16,17 +16,7 @@ import findspark
 
 findspark.init()
 
-# Configuration
-BUCKET_NAME = "pulse-bucket-1"
-GENERAL_BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/customer_churn_predictions"
-MODEL_INPUT_DIR = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/classification/models/customer_churn"
 
-# Available options: "LogisticRegression", "RandomForest"
-SELECTED_MODEL = "RandomForest"
-
-MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
 
 # Feature columns (must match training)
 FEATURE_COLUMNS = [
@@ -232,7 +222,17 @@ def save_predictions(df, output_path):
         return False
 
 
-def main():
+def main(BUCKET_NAME):
+    # Configuration
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/customer_churn_predictions"
+    MODEL_INPUT_DIR = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/classification/models/customer_churn"
+
+    # Available options: "LogisticRegression", "RandomForest"
+    SELECTED_MODEL = "RandomForest"
+
+    MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
     print("=" * 60)
     print("Customer Churn Prediction - Inference Pipeline")
     print("=" * 60)
@@ -297,4 +297,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

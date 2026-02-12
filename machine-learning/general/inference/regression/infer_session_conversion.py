@@ -22,16 +22,6 @@ import json
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-GENERAL_BUCKET_NAME = "pulse-bucket-1"
-INPUT_SESSIONS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customer_sessions.parquet"
-INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/session_conversion_value/"
-MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/session_conversion_value/"
-
-# ⚠️ MANUAL CONFIGURATION REQUIRED:
-MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
 
 # Feature set (must match training)
 NUMERIC_FEATURES = [
@@ -455,7 +445,15 @@ def display_summary_statistics(df):
     print("="*80)
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_SESSIONS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customer_sessions.parquet"
+    INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/session_conversion_value/"
+    MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/session_conversion_value/"
+
+    # ⚠️ MANUAL CONFIGURATION REQUIRED:
+    MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
     """Main inference pipeline"""
     print("\n" + "="*80)
     print("Session Conversion Value Prediction - Inference")
@@ -525,4 +523,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

@@ -26,15 +26,6 @@ from pyspark.ml.feature import VectorAssembler, StandardScalerModel, PCAModel
 from pyspark.ml.clustering import KMeansModel, GaussianMixtureModel, BisectingKMeansModel
 from datetime import datetime
 
-# Environment configuration
-BUCKET = "pulse-bucket-1"
-GENERAL_BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/"
-OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
-
-# MANUAL SELECTION
-SELECTED_MODEL_TYPE = "kmeans"  # Options: 'kmeans', 'gmm', 'bisecting_kmeans'
 
 # Feature columns (must match training)
 NUMERIC_FEATURES = [
@@ -377,7 +368,14 @@ def save_predictions(predictions, output_path):
     print(f"Saved {predictions.count()} predictions")
 
 
-def main():
+def main(BUCKET):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PATH = f"s3a://{BUCKET}/transformed/"
+    MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/"
+    OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
+
+    # MANUAL SELECTION
+    SELECTED_MODEL_TYPE = "kmeans"  # Options: 'kmeans', 'gmm', 'bisecting_kmeans'
     print("=" * 80)
     print("Geographic Sales Clustering - Inference")
     print(f"Model: {SELECTED_MODEL_TYPE.upper()}")
@@ -411,4 +409,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET= 'pulse-bucket-1'
+    main(BUCKET)

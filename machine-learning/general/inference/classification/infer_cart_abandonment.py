@@ -15,19 +15,6 @@ import findspark
 
 findspark.init()
 
-# Configuration
-BUCKET_NAME = "pulse-bucket-1"
-GENERAL_BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH_CART = f"s3a://{BUCKET_NAME}/transformed/agg_cart_abandonment_analysis.parquet"
-INPUT_PATH_SESSIONS = f"s3a://{BUCKET_NAME}/transformed/agg_customer_sessions.parquet"
-INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-INPUT_PATH_ORDERS = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/cart_abandonment_predictions"
-MODEL_INPUT_DIR = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/classification/models/cart_abandonment"
-
-SELECTED_MODEL = "RandomForest"
-MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
-
 # Base features (MUST match training - no time_in_cart_hours)
 NUMERICAL_FEATURES = [
     "cart_total_value",
@@ -226,7 +213,17 @@ def generate_predictions(spark, df, model):
     return output_df
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PATH_CART = f"s3a://{BUCKET_NAME}/transformed/agg_cart_abandonment_analysis.parquet"
+    INPUT_PATH_SESSIONS = f"s3a://{BUCKET_NAME}/transformed/agg_customer_sessions.parquet"
+    INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
+    INPUT_PATH_ORDERS = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/cart_abandonment_predictions"
+    MODEL_INPUT_DIR = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/classification/models/cart_abandonment"
+
+    SELECTED_MODEL = "RandomForest"
+    MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
     print("=" * 60)
     print("Cart Abandonment Risk - Inference Pipeline")
     print("=" * 60)
@@ -276,4 +273,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

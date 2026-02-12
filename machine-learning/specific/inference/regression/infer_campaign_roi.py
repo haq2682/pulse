@@ -22,16 +22,6 @@ import json
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_CAMPAIGNS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_marketing_campaigns.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/campaign_roi/"
-MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/campaign_roi/"
-
-# Configuration
-MIN_CAMPAIGN_DAYS = 7
-
 # Feature set (must match training)
 NUMERIC_FEATURES = [
     "budget", "spent_amount", "budget_utilization", "remaining_budget",
@@ -517,7 +507,14 @@ def display_summary_statistics(df):
     print("="*80)
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_CAMPAIGNS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_marketing_campaigns.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/campaign_roi/"
+    MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/campaign_roi/"
+
+    # Configuration
+    MIN_CAMPAIGN_DAYS = 7
     """Main inference pipeline"""
     print("\n" + "="*80)
     print("Campaign ROI Prediction - Inference")
@@ -591,4 +588,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

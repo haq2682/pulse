@@ -21,23 +21,6 @@ import uuid
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-GENERAL_BUCKET_NAME = "pulse-bucket-1"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-INPUT_INVENTORY_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
-INPUT_SUPPLIERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_suppliers.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/stockout_probability/"
-MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/stockout_probability/"
-
-# Configuration
-MIN_DEMAND_DAYS = 30
-CRITICAL_DAYS_THRESHOLD = 3
-HIGH_RISK_THRESHOLD = 7
-MEDIUM_RISK_THRESHOLD = 14
-
 # Feature set (must match training)
 NUMERIC_FEATURES = [
     "current_stock", "available_stock", "reserved_quantity", "stock_utilization_rate",
@@ -621,7 +604,21 @@ def display_summary_statistics(df):
     print("="*80)
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    INPUT_INVENTORY_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
+    INPUT_SUPPLIERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_suppliers.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/stockout_probability/"
+    MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/stockout_probability/"
+
+    # Configuration
+    MIN_DEMAND_DAYS = 30
+    CRITICAL_DAYS_THRESHOLD = 3
+    HIGH_RISK_THRESHOLD = 7
+    MEDIUM_RISK_THRESHOLD = 14
     """Main inference pipeline"""
     print("\n" + "="*80)
     print("Stockout Probability Prediction - Inference")
@@ -698,4 +695,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

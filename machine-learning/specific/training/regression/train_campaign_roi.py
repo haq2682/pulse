@@ -25,20 +25,6 @@ from datetime import datetime
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_CAMPAIGNS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_marketing_campaigns.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/campaign_roi/"
-MIN_RECORDS_THRESHOLD = 100
-MAX_NULL_PERCENTAGE = 95.0
-MIN_CAMPAIGN_DAYS = 7  # Minimum days active for meaningful metrics
-
-# Configuration
-USE_CROSS_VALIDATION = False
-
-# Required columns
-REQUIRED_CAMPAIGN_COLUMNS = ["campaign_id", "campaign_type", "spent_amount"]
 
 # Feature set
 NUMERIC_FEATURES = [
@@ -516,7 +502,19 @@ def save_model(model, model_name):
     print(f"✓ Model saved: {model_path}")
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_CAMPAIGNS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_marketing_campaigns.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/campaign_roi/"
+    MIN_RECORDS_THRESHOLD = 100
+    MAX_NULL_PERCENTAGE = 95.0
+    MIN_CAMPAIGN_DAYS = 7  # Minimum days active for meaningful metrics
+
+    # Configuration
+    USE_CROSS_VALIDATION = False
+
+    # Required columns
+    REQUIRED_CAMPAIGN_COLUMNS = ["campaign_id", "campaign_type", "spent_amount"]
     """Main training pipeline"""
     print("\n" + "="*60)
     print("Campaign ROI Prediction - Training")
@@ -635,4 +633,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

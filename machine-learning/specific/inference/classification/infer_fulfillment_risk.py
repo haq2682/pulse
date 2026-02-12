@@ -17,21 +17,6 @@ import findspark
 
 findspark.init()
 
-# Configuration
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH_ORDERS = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_PATH_ORDER_ITEMS = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-INPUT_PATH_PRODUCTS = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-INPUT_PATH_INVENTORY = f"s3a://{BUCKET_NAME}/transformed/agg_inventory.parquet"
-INPUT_PATH_SUPPLIERS = f"s3a://{BUCKET_NAME}/transformed/agg_suppliers.parquet"
-INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/fulfillment_risk_predictions"
-MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/models/fulfillment_risk"
-
-# ⚠️ MANUAL INTERVENTION: Select model
-SELECTED_MODEL = "RandomForest"  # <-- CHANGE BASED ON TRAINING RESULTS
-
-MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
 
 # Feature columns (must match training)
 NUMERICAL_FEATURES = [
@@ -374,7 +359,20 @@ def save_predictions(df, output_path):
         return False
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_PATH_ORDERS = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_PATH_ORDER_ITEMS = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    INPUT_PATH_PRODUCTS = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    INPUT_PATH_INVENTORY = f"s3a://{BUCKET_NAME}/transformed/agg_inventory.parquet"
+    INPUT_PATH_SUPPLIERS = f"s3a://{BUCKET_NAME}/transformed/agg_suppliers.parquet"
+    INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/fulfillment_risk_predictions"
+    MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/models/fulfillment_risk"
+
+    # ⚠️ MANUAL INTERVENTION: Select model
+    SELECTED_MODEL = "RandomForest"  # <-- CHANGE BASED ON TRAINING RESULTS
+
+    MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
     print("=" * 70)
     print("Order Fulfillment Risk - Inference Pipeline")
     print("=" * 70)
@@ -433,4 +431,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

@@ -14,17 +14,6 @@ import findspark
 
 findspark.init()
 
-# Configuration
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH_ORDERS = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_PATH_ORDER_ITEMS = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-INPUT_PATH_PRODUCTS = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-INPUT_PATH_INVENTORY = f"s3a://{BUCKET_NAME}/transformed/agg_inventory.parquet"
-INPUT_PATH_SUPPLIERS = f"s3a://{BUCKET_NAME}/transformed/agg_suppliers.parquet"
-INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/models/fulfillment_risk"
-MIN_LABELED_RECORDS = 100
-
 # CRITICAL: Exclude features known only AFTER fulfillment
 NUMERICAL_FEATURES = [
     "total_quantity",
@@ -501,7 +490,15 @@ def save_models(model, preprocessors, output_dir, model_name):
     print(f"✓ Saved {model_name}")
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_PATH_ORDERS = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_PATH_ORDER_ITEMS = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    INPUT_PATH_PRODUCTS = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    INPUT_PATH_INVENTORY = f"s3a://{BUCKET_NAME}/transformed/agg_inventory.parquet"
+    INPUT_PATH_SUPPLIERS = f"s3a://{BUCKET_NAME}/transformed/agg_suppliers.parquet"
+    INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
+    MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/models/fulfillment_risk"
+    MIN_LABELED_RECORDS = 100
     print("=" * 70)
     print("Order Fulfillment Risk Classification - Training Pipeline")
     print("=" * 70)
@@ -588,4 +585,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)
