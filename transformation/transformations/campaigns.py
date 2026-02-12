@@ -3,6 +3,8 @@ from pyspark.sql.types import DoubleType
 from pyspark.sql.functions import (
     col,
     coalesce,
+    current_date,
+    date_add,
     datediff,
     expr,
     lit,
@@ -25,14 +27,24 @@ def transform_campaigns(dataframes):
             print(f"⚠️ Skipping transform_campaigns: '{df_name}' dataframe not found")
             return
     
+    # Use effective_end_date to handle NULL end_date values
+    # Fall back to start_date + 30 days when end_date is NULL
+    campaigns_with_effective_end = dataframes["marketing_campaigns"].withColumn(
+        "effective_end_date",
+        coalesce(col("end_date"), date_add(col("start_date"), 30)),
+    )
+
     dataframes["marketing_campaigns"] = (
         dataframes["marketing_campaigns"]
         .join(
             dataframes["customer_sessions"]
             .join(
-                dataframes["marketing_campaigns"],
+                campaigns_with_effective_end.select(
+                    "campaign_id", "start_date",
+                    col("effective_end_date").alias("eff_end_date"),
+                ),
                 (col("session_start") >= col("start_date"))
-                & (col("session_start") <= col("end_date")),
+                & (col("session_start") <= col("eff_end_date")),
                 "cross",
             )
             .select(
@@ -41,9 +53,13 @@ def transform_campaigns(dataframes):
                 col("conversion_flag"),
                 col("campaign_id"),
                 col("start_date").alias("campaign_start"),
-                col("end_date").alias("campaign_end"),
+                col("eff_end_date").alias("campaign_end"),
             )
-            .filter((col("conversion_flag") == lit(True)) | (col("conversion_flag") == "true"))
+            .filter(
+                (col("conversion_flag") == 1)
+                | (col("conversion_flag") == lit(True))
+                | (col("conversion_flag") == "true")
+            )
             .join(
                 dataframes["orders"].filter(
                     (col("order_status") != "cancelled")
@@ -55,7 +71,7 @@ def transform_campaigns(dataframes):
             # Add time constraint: orders must be placed during campaign or within 7 days after
             .filter(
                 (col("order_placed_at") >= col("campaign_start"))
-                & (col("order_placed_at") <= expr("date_add(campaign_end, 7)"))
+                & (col("order_placed_at") <= date_add(col("campaign_end"), 7))
             )
             # Prevent double counting - each order attributed once per campaign
             .dropDuplicates(["order_id", "campaign_id"])
