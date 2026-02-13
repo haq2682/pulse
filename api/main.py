@@ -15,7 +15,7 @@ except ImportError:
 from routers.auth import router as auth_router
 from routers.admin import router as admin_router
 from routers.onboarding import router as onboarding_router
-
+from routers.analytics import router as analytics_router
 
 origins = [
     "http://localhost:5173",
@@ -46,6 +46,7 @@ async def analytics_middleware(request, call_next):
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(onboarding_router)
+app.include_router(analytics_router)
 
 @app.get("/")
 def read_root():

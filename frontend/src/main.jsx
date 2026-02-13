@@ -67,8 +67,7 @@ createRoot(document.getElementById('root')).render(
                     <Route path="/reset-password-email" element={<GuestRoute><ResetPasswordEmail /></GuestRoute>} />
 
                     {/* USER PROTECTED ROUTES */}
-                    <Route path="/analytics/:businessId?" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                    <Route path="/analytics/:businessId?/forecasts" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                    <Route path="/analytics/:businessId?/:subpage1?/:subpage2?" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                     <Route path="/onboarding/business/:onboardingId" element={<ProtectedRoute><AddBusiness /></ProtectedRoute>} />
                     <Route path="/onboarding/data-type/:onboardingId" element={<ProtectedRoute><DataType /></ProtectedRoute>} />
                     <Route path="/onboarding/connect/:onboardingId" element={<ProtectedRoute><Connect /></ProtectedRoute>} />

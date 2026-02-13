@@ -203,8 +203,8 @@ const Sidebar = ({ isOpen, onClose }) => {
                                                 w-full flex items-center gap-3 px-4 py-3 rounded-lg
                                                 text-left font-medium transition-all duration-200
                                                 ${isParentActive(item)
-                                                    ? 'bg-gradient-to-r from-[var(--color-primary)]/10 to-[var(--color-secondary)]/10 text-[var(--color-primary)]'
-                                                    : 'text-[var(--color-g1)] hover:bg-gray-50'
+                                                    ? 'bg-gradient-primary text-white shadow-md'
+                                                                    : 'text-gray-600 hover:bg-gray-50'
                                                 }
                                             `}
                                         >

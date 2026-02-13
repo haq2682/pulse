@@ -5,27 +5,26 @@ import Text from '@/components/global/Typography/Text';
 import { InputText } from 'primereact/inputtext';
 import { Button } from 'primereact/button';
 import { Dropdown } from 'primereact/dropdown';
-// Removed 'Menu' import as we are building a custom one
 import { useAuth } from '@/context/AuthContext';
-import { useLocation } from 'react-router-dom';
 import axiosInstance from '@/services/api/axiosInstance';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
+    const [selectedBusiness, setSelectedBusiness] = useState(null);
     const navigate = useNavigate();
     const [isAddBusinessLoading, setIsAddBusinessLoading] = useState(false);
 
-    const { pathname } = useLocation();
+    const { businessId } = useParams();
     // NEW: State to toggle the custom profile menu
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     // NEW: Ref to detect clicks outside the menu to close it
     const profileRef = useRef(null);
 
     // Mock data
-    const businessItems = Array.from({ length: 100000 }).map((_, i) => ({ label: `Item #${i}`, value: i }));
+    const [businesses, setBusinesses] = useState([]);
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -50,6 +49,42 @@ const Dashboard = () => {
         }
         setIsAddBusinessLoading(false);
     };
+
+    const getBusinesses = async () => {
+        try {
+            const response = await axiosInstance.get('/analytics/get-businesses', {
+                params: { userId: user.user_id }
+            });
+            const businessList = response.data.businesses || [];
+            setBusinesses(businessList);
+
+            // Redirect to first business if URL has no business ID
+            if (!businessId && businessList.length > 0) {
+                navigate(`/analytics/${businessList[0].business_id}`);
+            }
+
+        } catch (error) {
+            console.error("Error fetching businesses:", error);
+        }
+    }
+
+    const handleBusinessChange = (e) => {
+        setSelectedBusiness(e.value);
+        navigate(`/analytics/${e.value}`);
+    }
+
+    useEffect(() => {
+        getBusinesses();
+    }, []);
+
+    useEffect(() => {
+        if (businessId && businesses.length > 0) {
+            // Only set if different
+            if (selectedBusiness !== businessId) {
+                setSelectedBusiness(businessId);
+            }
+        }
+    }, [businessId, businesses]);
 
     return (
         <div className="flex h-screen overflow-hidden bg-gray-50">
@@ -150,9 +185,9 @@ const Dashboard = () => {
                         </div>
                         <div className="w-48">
                             <Dropdown 
-                                value={selectedItem} 
-                                onChange={(e) => setSelectedItem(e.value)} 
-                                options={businessItems} 
+                                value={selectedBusiness} 
+                                onChange={handleBusinessChange} 
+                                options={businesses.map (b => ({ label: b.business_name, value: b.business_id }))}
                                 virtualScrollerOptions={{ itemSize: 38 }}
                                 placeholder="Select Business" 
                                 className="w-full" 
