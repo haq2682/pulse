@@ -109,10 +109,11 @@ async def create_onboarding(request: Request, db=Depends(get_db)):
                 "current_step": current_step,
                 "message": "Onboarding already exists."
             }
-        onboarding_id = str(uuid.uuid4())
-        db.execute(text("INSERT INTO onboarding (onboarding_id, user_id, current_step) VALUES (:onboarding_id, :user_id, :current_step)"), {"onboarding_id": onboarding_id, "user_id": user_id, "current_step": "business"})
-        db.commit()
-        return {"status": 200, "onboarding_id": onboarding_id, "current_step": "business", "message": "Onboarding created."}
+        else:
+            onboarding_id = str(uuid.uuid4())
+            db.execute(text("INSERT INTO onboarding (onboarding_id, user_id, current_step) VALUES (:onboarding_id, :user_id, :current_step)"), {"onboarding_id": onboarding_id, "user_id": user_id, "current_step": "business"})
+            db.commit()
+            return {"status": 200, "onboarding_id": onboarding_id, "current_step": "business", "message": "Onboarding created."}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -334,11 +335,11 @@ async def cancel_onboarding(request: Request, db=Depends(get_db)):
         userId = body.get("userId")
         if not userId:
             raise HTTPException(status_code=400, detail="Authenticated User is required")
-        onboarding = db.execute(text("SELECT onboarding_id, business_id FROM onboarding WHERE user_id = :user_id"), {"user_id": userId})
+        onboarding = db.execute(text("SELECT onboarding_id, business_id FROM onboarding WHERE user_id = :user_id AND is_completed = false"), {"user_id": userId})
         onboarding_record = onboarding.fetchone()
         if not onboarding_record:
             raise HTTPException(status_code=404, detail="Onboarding record not found")
-        db.execute(text("DELETE FROM onboarding WHERE user_id = :user_id"), {"user_id": userId})
+        db.execute(text("DELETE FROM onboarding WHERE user_id = :user_id AND is_completed = false"), {"user_id": userId})
         db.commit()
         if onboarding_record[1]:
             db.execute(text("DELETE FROM uploaded_files WHERE business_id = :business_id"), {"business_id": onboarding_record[1]})
@@ -358,7 +359,7 @@ async def get_current_step(userId: str, db=Depends(get_db)):
     try:
         if not userId:
             raise HTTPException(status_code=400, detail="Authenticated User is required")
-        onboarding = db.execute(text("SELECT current_step FROM onboarding WHERE user_id = :user_id"), {"user_id": userId})
+        onboarding = db.execute(text("SELECT current_step FROM onboarding WHERE user_id = :user_id AND is_completed = false"), {"user_id": userId})
         onboarding_record = onboarding.fetchone()
         if not onboarding_record:
             raise HTTPException(status_code=404, detail="Onboarding record not found")
