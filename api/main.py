@@ -17,6 +17,7 @@ from routers.admin import router as admin_router
 from routers.onboarding import router as onboarding_router
 from routers.analytics import router as analytics_router
 from routers.pipeline import router as pipeline_router
+from routers.analytics import router as analytics_router
 
 origins = [
     "http://localhost:5173",
