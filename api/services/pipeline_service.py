@@ -398,6 +398,14 @@ class PipelineService:
             True if cancelled successfully, False otherwise
         """
         try:
+            # Get process IDs before updating status
+            result = self.db.execute(
+                text("SELECT process_ids FROM pipeline_status WHERE pipeline_id = :pipeline_id"),
+                {"pipeline_id": pipeline_id}
+            ).fetchone()
+            
+            process_ids_json = result[0] if result else None
+            
             # Update status to cancelled
             self.db.execute(
                 text("""
@@ -422,8 +430,28 @@ class PipelineService:
                 "progress": 0
             })
             
-            # TODO: Terminate running processes if needed
-            # This would require storing and tracking process PIDs
+            # Terminate running processes if we have process IDs
+            if process_ids_json:
+                try:
+                    import json
+                    import signal
+                    
+                    process_ids = json.loads(process_ids_json)
+                    print(f"Attempting to terminate processes: {process_ids}")
+                    
+                    for phase_name, pid in process_ids.items():
+                        try:
+                            # Send SIGTERM to gracefully terminate
+                            os.kill(pid, signal.SIGTERM)
+                            print(f"Sent SIGTERM to {phase_name} process (PID: {pid})")
+                        except ProcessLookupError:
+                            # Process already terminated
+                            print(f"Process {pid} ({phase_name}) already terminated")
+                        except Exception as e:
+                            print(f"Error terminating process {pid} ({phase_name}): {e}")
+                            
+                except Exception as e:
+                    print(f"Error parsing or terminating processes: {e}")
             
             return True
             

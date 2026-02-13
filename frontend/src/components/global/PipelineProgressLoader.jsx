@@ -20,6 +20,7 @@ const PipelineProgressLoader = ({ businessId, visible = false }) => {
     const [showCancelConfirm, setShowCancelConfirm] = React.useState(false);
     const [isCancelling, setIsCancelling] = React.useState(false);
     const [isRetrying, setIsRetrying] = React.useState(false);
+    const [errorMessage, setErrorMessage] = React.useState(null);
     
     // Connect WebSocket when business changes
     useEffect(() => {
@@ -66,6 +67,7 @@ const PipelineProgressLoader = ({ businessId, visible = false }) => {
         if (!pipelineStatus?.pipeline_id) return;
         
         setIsCancelling(true);
+        setErrorMessage(null);
         try {
             const result = await cancelPipeline(
                 pipelineStatus.pipeline_id,
@@ -78,11 +80,11 @@ const PipelineProgressLoader = ({ businessId, visible = false }) => {
                 // Status will be updated via WebSocket
             } else {
                 console.error('Failed to cancel pipeline:', result.error);
-                alert('Failed to cancel pipeline: ' + result.error);
+                setErrorMessage('Failed to cancel pipeline: ' + result.error);
             }
         } catch (err) {
             console.error('Error cancelling pipeline:', err);
-            alert('Error cancelling pipeline');
+            setErrorMessage('Error cancelling pipeline');
         } finally {
             setIsCancelling(false);
         }
@@ -91,17 +93,18 @@ const PipelineProgressLoader = ({ businessId, visible = false }) => {
     // Handle retry
     const handleRetry = async () => {
         setIsRetrying(true);
+        setErrorMessage(null);
         try {
             const result = await retryPipeline(businessId);
             
             if (!result.success) {
                 console.error('Failed to retry pipeline:', result.error);
-                alert('Failed to retry pipeline: ' + result.error);
+                setErrorMessage('Failed to retry pipeline: ' + result.error);
             }
             // Status will be updated via WebSocket
         } catch (err) {
             console.error('Error retrying pipeline:', err);
-            alert('Error retrying pipeline');
+            setErrorMessage('Error retrying pipeline');
         } finally {
             setIsRetrying(false);
         }
@@ -185,6 +188,13 @@ const PipelineProgressLoader = ({ businessId, visible = false }) => {
                                         {pipelineStatus.error_message}
                                     </Text>
                                 )}
+                                {errorMessage && (
+                                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                        <Text className="text-red-600 text-sm m-0">
+                                            {errorMessage}
+                                        </Text>
+                                    </div>
+                                )}
                                 <div className="flex gap-3 justify-center mt-4">
                                     <SecondaryButton
                                         label="Retry"
@@ -263,6 +273,13 @@ const PipelineProgressLoader = ({ businessId, visible = false }) => {
                     <Text className="text-red-600 text-sm font-semibold">
                         This action cannot be undone.
                     </Text>
+                    {errorMessage && (
+                        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <Text className="text-red-600 text-sm m-0">
+                                {errorMessage}
+                            </Text>
+                        </div>
+                    )}
                 </div>
                 <div className="flex justify-end gap-3 mt-4">
                     <SecondaryButton
