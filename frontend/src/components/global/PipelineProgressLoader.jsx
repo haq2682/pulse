@@ -6,7 +6,7 @@ import { PrimaryButton, SecondaryButton } from '@/components/global/Button';
 import Text from '@/components/global/Typography/Text';
 import Heading from '@/components/global/Typography/Heading';
 
-const PipelineProgressLoader = ({ businessId, visible = false }) => {
+const PipelineProgressLoader = ({ businessId, visible = false, onComplete }) => {
     const {
         pipelineStatus,
         isConnected,
@@ -110,6 +110,15 @@ const PipelineProgressLoader = ({ businessId, visible = false }) => {
         }
     };
     
+    // Close/dismiss handler
+    const handleClose = () => {
+        if (onComplete) {
+            onComplete();
+        }
+        // Reset error state
+        setErrorMessage(null);
+    };
+    
     if (!shouldShowLoader) {
         return null;
     }
@@ -169,7 +178,7 @@ const PipelineProgressLoader = ({ businessId, visible = false }) => {
                                 </Text>
                                 <PrimaryButton
                                     label="Continue to Dashboard"
-                                    onClick={() => window.location.reload()}
+                                    onClick={handleClose}
                                     className="mt-2"
                                 />
                             </>
@@ -204,7 +213,7 @@ const PipelineProgressLoader = ({ businessId, visible = false }) => {
                                     />
                                     <PrimaryButton
                                         label="Close"
-                                        onClick={() => window.location.reload()}
+                                        onClick={handleClose}
                                     />
                                 </div>
                             </>
