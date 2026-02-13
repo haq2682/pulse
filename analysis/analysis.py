@@ -1,3 +1,4 @@
+import argparse
 import pyspark.sql.functions as F
 from pyspark.sql import Window
 from analysis_config import create_spark_session
@@ -42,16 +43,24 @@ supplier_analysis = {}
 dataframes = {}
 
 
-def main():
-
+def main(bucket_name=None):
+    """
+    Main analysis pipeline function.
+    
+    Args:
+        bucket_name: MinIO bucket name (business_id). If None, uses default from env.
+    """
     print("🚀 Starting Analysis Pipeline...")
+    if bucket_name:
+        print(f"   Using bucket: {bucket_name}")
+        
     spark = create_spark_session("Ecommerce_Analysis_Main")
 
 
 
     print("\n📥 Loading Aggregated Tables from MinIO...")
         # Load transformed data from MinIO bucket
-    dataframes = get_agg_tables(spark)
+    dataframes = get_agg_tables(spark, bucket_name=bucket_name)
         
     if not dataframes:
         print("❌ No tables loaded. Exiting.")
@@ -7794,7 +7803,7 @@ def main():
         analysis=analysis,
         product_analysis=product_analysis,
         supplier_analysis=supplier_analysis,
-        business_id=None,  # Uses default bucket from env
+        business_id=bucket_name,  # Use bucket_name if provided
         file_format="parquet",  # Can be changed to "csv" or "json"
         parallel=True,
         max_workers=8
@@ -7805,4 +7814,8 @@ def main():
     print(f"   Format: {export_result['format']}")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='E-commerce analytics pipeline')
+    parser.add_argument('--bucket-name', type=str, help='MinIO bucket name (business_id)')
+    args = parser.parse_args()
+    
+    main(bucket_name=args.bucket_name)

@@ -52,20 +52,24 @@ def get_minio_client():
 
 
 
-def get_agg_tables(spark, db_config=None):
+def get_agg_tables(spark, db_config=None, bucket_name=None):
     """
     Load aggregated tables from MinIO transformed/ directory.
     
     Args:
         spark: SparkSession
         db_config: Deprecated parameter kept for backward compatibility
+        bucket_name: MinIO bucket name (business_id). If None, uses default from env.
         
     Returns:
         dict: Dictionary of table names to Spark DataFrames
     """
     try:
         minio_client = get_minio_client()
-        bucket_name = os.getenv("MINIO_BUCKET", "pulse-bucket-1")
+        
+        # Use provided bucket_name or fall back to env/default
+        if bucket_name is None:
+            bucket_name = os.getenv("MINIO_BUCKET", "pulse-bucket-1")
         
         print(f"Loading aggregated tables from MinIO bucket: {bucket_name}")
         print(f"Directory: transformed/")

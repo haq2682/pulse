@@ -13,6 +13,7 @@ This script orchestrates the complete data cleaning process including:
 - Saving cleaned data back to MinIO
 """
 
+import argparse
 from cleaning_config import create_spark_session, create_minio_client, get_bucket_name
 from schema import cast_dataframes
 from merge import merge_tables
@@ -39,9 +40,12 @@ from cleaning_utils import load_data_from_minio, save_data_to_minio, display_sum
 from pyspark.sql.functions import regexp_extract, col, when
 
 
-def main():
+def main(bucket_name=None):
     """
     Main function to execute the data cleaning pipeline.
+    
+    Args:
+        bucket_name: MinIO bucket name (business_id). If None, uses default from config.
     """
     print("=" * 60)
     print("🚀 STARTING DATA CLEANING PIPELINE")
@@ -51,8 +55,12 @@ def main():
     print("\n📌 Step 1: Initializing Spark and MinIO...")
     spark = create_spark_session()
     minio_client = create_minio_client()
-    bucket_name = get_bucket_name()
-    print("✅ Initialization complete")
+    
+    # Use provided bucket_name or fall back to default
+    if bucket_name is None:
+        bucket_name = get_bucket_name()
+    
+    print(f"✅ Initialization complete - Using bucket: {bucket_name}")
 
     # 2. Load data from MinIO
     print("\n📌 Step 2: Loading data from MinIO...")
@@ -180,4 +188,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='Data cleaning pipeline for e-commerce data')
+    parser.add_argument('--bucket-name', type=str, help='MinIO bucket name (business_id)')
+    args = parser.parse_args()
+    
+    main(bucket_name=args.bucket_name)
