@@ -8,8 +8,7 @@ import subprocess
 from datetime import datetime
 from typing import Optional, Dict
 from sqlalchemy import text
-from database import SessionLocal
-import aioredis
+from database import SessionLocal, redis
 import boto3
 from botocore.client import Config
 
@@ -17,8 +16,6 @@ from botocore.client import Config
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://localhost:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
-
-redis = aioredis.from_url("redis://redis:6379", decode_responses=True)
 
 s3 = boto3.client(
     "s3",

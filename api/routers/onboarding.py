@@ -3,9 +3,8 @@ import signal
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, Query, UploadFile, File
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
-from database import get_db
+from database import get_db, redis
 from sqlalchemy import text
-import aioredis
 import pycountry
 import uuid
 from rapidfuzz import process, fuzz
@@ -18,8 +17,6 @@ from datetime import datetime
 import asyncio
 import time
 from services.pipeline_service import execute_pipeline
-
-redis = aioredis.from_url("redis://redis:6379", decode_responses=True)
 
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://localhost:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")

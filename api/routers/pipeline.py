@@ -3,14 +3,13 @@ Pipeline management API endpoints.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from database import get_db
+from database import get_db, redis
 from sqlalchemy import text
 import asyncio
 import json
 from services.pipeline_service import (
     execute_pipeline,
-    cancel_pipeline,
-    redis
+    cancel_pipeline
 )
 
 router = APIRouter(
