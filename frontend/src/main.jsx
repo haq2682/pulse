@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route } from "react-router";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from '@/context/AuthContext'; 
 import { AdminAuthProvider } from '@/context/AdminAuthContext';
+import { PipelineProgressProvider } from '@/context/PipelineProgressContext';
 
 // Guards
 import ProtectedAdminRoute from '@/components/auth/ProtectedAdminRoute';
@@ -51,8 +52,10 @@ createRoot(document.getElementById('root')).render(
       <BrowserRouter>
         {/* AuthProvider must be INSIDE BrowserRouter */}
         <AuthProvider>
-           {/* Nest AdminAuthProvider here so it can use Router and Auth hooks if needed */}
-           <AdminAuthProvider>
+          {/* PipelineProgressProvider for pipeline tracking */}
+          <PipelineProgressProvider>
+            {/* Nest AdminAuthProvider here so it can use Router and Auth hooks if needed */}
+            <AdminAuthProvider>
                 <Routes>
                     {/* PUBLIC ROUTES */}
                     <Route path="/" element={<GuestRoute><Landing /></GuestRoute>} />
@@ -129,6 +132,7 @@ createRoot(document.getElementById('root')).render(
 
                 </Routes>
            </AdminAuthProvider>
+          </PipelineProgressProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>
