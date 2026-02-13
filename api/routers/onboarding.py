@@ -1421,7 +1421,7 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
 async def confirm_mapping(request: Request, db=Depends(get_db)):
     """
     Confirm that user has reviewed the mapping results and accepts them.
-    This marks the onboarding as complete.
+    This marks the onboarding as complete and triggers the data processing pipeline.
     """
     try:
         body = await request.json()
@@ -1470,6 +1470,25 @@ async def confirm_mapping(request: Request, db=Depends(get_db)):
         db.commit()
         
         print(f"User {user_id} confirmed mapping for business {business_id}")
+        
+        # Trigger data processing pipeline
+        try:
+            from services.pipeline_service import PipelineService
+            from services.websocket_manager import WebSocketManager
+            
+            # Use global websocket manager from pipeline router
+            from routers.pipeline import websocket_manager
+            
+            pipeline_service = PipelineService(db, websocket_manager)
+            pipeline_id = await pipeline_service.start_pipeline(business_id, user_id)
+            
+            print(f"Pipeline {pipeline_id} started for business {business_id}")
+            
+        except Exception as pipeline_error:
+            # Log pipeline start error but don't fail the mapping confirmation
+            print(f"Warning: Failed to start pipeline automatically: {pipeline_error}")
+            import traceback
+            traceback.print_exc()
         
         return {
             "status": 200,
