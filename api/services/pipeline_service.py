@@ -13,9 +13,10 @@ import os
 import asyncio
 import subprocess
 import uuid
+import json
+import signal
 from datetime import datetime
 from typing import Optional, Dict, Any
-import json
 from sqlalchemy import text
 
 
@@ -433,20 +434,24 @@ class PipelineService:
             # Terminate running processes if we have process IDs
             if process_ids_json:
                 try:
-                    import json
-                    import signal
-                    
                     process_ids = json.loads(process_ids_json)
                     print(f"Attempting to terminate processes: {process_ids}")
                     
                     for phase_name, pid in process_ids.items():
                         try:
-                            # Send SIGTERM to gracefully terminate
+                            # Check if process exists before trying to kill it
+                            # Using signal 0 to check existence without killing
+                            os.kill(pid, 0)
+                            
+                            # Process exists, send SIGTERM to gracefully terminate
                             os.kill(pid, signal.SIGTERM)
                             print(f"Sent SIGTERM to {phase_name} process (PID: {pid})")
                         except ProcessLookupError:
-                            # Process already terminated
-                            print(f"Process {pid} ({phase_name}) already terminated")
+                            # Process already terminated or doesn't exist
+                            print(f"Process {pid} ({phase_name}) already terminated or does not exist")
+                        except PermissionError:
+                            # Don't have permission to terminate this process
+                            print(f"Permission denied to terminate process {pid} ({phase_name})")
                         except Exception as e:
                             print(f"Error terminating process {pid} ({phase_name}): {e}")
                             

@@ -12,6 +12,8 @@ export const PipelineProgressProvider = ({ children }) => {
     const wsRef = useRef(null);
     const reconnectTimeoutRef = useRef(null);
     const reconnectAttemptsRef = useRef(0);
+    const pingIntervalRef = useRef(null);
+    const shouldReconnectRef = useRef(true);
     const MAX_RECONNECT_ATTEMPTS = 5;
     const RECONNECT_DELAY = 3000;
     
@@ -45,11 +47,12 @@ export const PipelineProgressProvider = ({ children }) => {
                 reconnectAttemptsRef.current = 0;
                 
                 // Send ping to keep connection alive
-                const pingInterval = setInterval(() => {
+                pingIntervalRef.current = setInterval(() => {
                     if (ws.readyState === WebSocket.OPEN) {
                         ws.send('ping');
                     } else {
-                        clearInterval(pingInterval);
+                        clearInterval(pingIntervalRef.current);
+                        pingIntervalRef.current = null;
                     }
                 }, 30000); // Ping every 30 seconds
             };
@@ -74,8 +77,14 @@ export const PipelineProgressProvider = ({ children }) => {
                 setIsConnected(false);
                 wsRef.current = null;
                 
-                // Attempt to reconnect if not manually closed
-                if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+                // Clear ping interval
+                if (pingIntervalRef.current) {
+                    clearInterval(pingIntervalRef.current);
+                    pingIntervalRef.current = null;
+                }
+                
+                // Attempt to reconnect if allowed
+                if (shouldReconnectRef.current && reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
                     reconnectAttemptsRef.current++;
                     console.log(`Reconnecting... (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`);
                     
@@ -92,9 +101,17 @@ export const PipelineProgressProvider = ({ children }) => {
     }, [getWebSocketUrl]);
     
     const disconnectWebSocket = useCallback(() => {
+        // Prevent auto-reconnection
+        shouldReconnectRef.current = false;
+        
         if (reconnectTimeoutRef.current) {
             clearTimeout(reconnectTimeoutRef.current);
             reconnectTimeoutRef.current = null;
+        }
+        
+        if (pingIntervalRef.current) {
+            clearInterval(pingIntervalRef.current);
+            pingIntervalRef.current = null;
         }
         
         if (wsRef.current) {
@@ -103,7 +120,6 @@ export const PipelineProgressProvider = ({ children }) => {
         }
         
         setIsConnected(false);
-        reconnectAttemptsRef.current = MAX_RECONNECT_ATTEMPTS; // Prevent auto-reconnect
     }, []);
     
     // Fetch current pipeline status from REST API
