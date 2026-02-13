@@ -1,4 +1,5 @@
 import os
+import argparse
 from dotenv import load_dotenv, find_dotenv
 
 from config.spark_config import create_spark_session
@@ -32,12 +33,24 @@ from aggregations.time_based import time_based_aggregations
 load_dotenv(find_dotenv())
 
 
-def main():
+def main(bucket_name=None):
+    """
+    Main transformation pipeline function.
+    
+    Args:
+        bucket_name: MinIO bucket name (business_id). If None, uses default from config.
+    """
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("ERROR")
     minio_client = create_minio_client()
 
-    dataframes = load_data_from_minio(spark, minio_client, BUCKET_NAME)
+    # Use provided bucket_name or fall back to default
+    if bucket_name is None:
+        bucket_name = BUCKET_NAME
+    
+    print(f"🚀 Starting transformation pipeline - Using bucket: {bucket_name}")
+
+    dataframes = load_data_from_minio(spark, minio_client, bucket_name)
 
     transform_orders(dataframes)
     transform_customers(dataframes)
@@ -87,4 +100,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='Data transformation and aggregation pipeline')
+    parser.add_argument('--bucket-name', type=str, help='MinIO bucket name (business_id)')
+    args = parser.parse_args()
+    
+    main(bucket_name=args.bucket_name)

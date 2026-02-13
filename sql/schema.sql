@@ -121,3 +121,26 @@ CREATE TRIGGER update_uploaded_files_updated_at
 BEFORE UPDATE ON uploaded_files
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
+
+-- Pipeline Status table for tracking data processing pipeline execution
+CREATE TABLE pipeline_status (
+    pipeline_id VARCHAR(50) PRIMARY KEY,
+    business_id VARCHAR(50) NOT NULL,
+    user_id VARCHAR(50) NOT NULL,
+    status VARCHAR(50) NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+    current_step VARCHAR(100),
+    progress_percentage INTEGER DEFAULT 0 CHECK (progress_percentage >= 0 AND progress_percentage <= 100),
+    started_at TIMESTAMP NULL,
+    completed_at TIMESTAMP NULL,
+    error_message TEXT NULL,
+    process_ids JSONB NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (business_id) REFERENCES businesses(business_id) ON DELETE CASCADE
+);
+
+CREATE TRIGGER update_pipeline_status_updated_at
+BEFORE UPDATE ON pipeline_status
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
