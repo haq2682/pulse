@@ -8,6 +8,7 @@ import { Dropdown } from 'primereact/dropdown';
 import { useAuth } from '@/context/AuthContext';
 import axiosInstance from '@/services/api/axiosInstance';
 import { useNavigate, useParams } from 'react-router-dom';
+import PipelineProgressLoader from '@/components/global/PipelineProgressLoader';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
@@ -88,6 +89,12 @@ const Dashboard = () => {
 
     return (
         <div className="flex h-screen overflow-hidden bg-gray-50">
+            {/* Pipeline Progress Loader - Global */}
+            <PipelineProgressLoader 
+                businessId={businessId} 
+                visible={!!businessId}
+            />
+            
             {/* Sidebar */}
             <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
