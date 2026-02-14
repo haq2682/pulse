@@ -475,7 +475,6 @@ const Mapping = () => {
                     <Text className="text-gray-600 mb-4">
                         • Insights and analytics requiring these columns will not be generated<br />
                         • You may have limited functionality in your dashboard<br />
-                        • You can always update these mappings later
                     </Text>
                     <Text className="text-gray-700 font-semibold">
                         Do you want to continue without mapping these columns?
