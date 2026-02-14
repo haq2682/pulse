@@ -119,8 +119,6 @@ const Dashboard = () => {
                         Dashboard
                     </Heading>
 
-
-
                     <InputText type="text" className="p-inputtext-sm w-2/4" placeholder="Search Insight..." />
 
                     {/* Right Side - Notifications & Avatar */}
