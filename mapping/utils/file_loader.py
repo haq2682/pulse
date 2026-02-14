@@ -81,10 +81,15 @@ def load_file_from_minio(minio_client, bucket_name, file_name, spark):
     Returns:
         Single Spark DataFrame or dict of {table_name: Spark DataFrame} for multi-table files
     """
+    
     obj = minio_client.get_object(bucket_name, file_name)
     data = obj.read()
     obj.close()
     obj.release_conn()
+    
+    print(f"File: {file_name}")
+    print(f"File size: {len(data)} bytes")
+    print(f"First few bytes: {data[:10]}")
 
     # Handle different file types
     if file_name.endswith(".csv"):
@@ -94,14 +99,16 @@ def load_file_from_minio(minio_client, bucket_name, file_name, spark):
         spark_df.count()
         return spark_df
         
-    elif file_name.endswith(".xlsx"):
+    elif file_name.endswith(".xlsx") or file_name.endswith(".xls"):
         # Excel files can have multiple sheets - handle each sheet as a potential table
         excel_file = BytesIO(data)
-        sheet_names = pd.ExcelFile(excel_file).sheet_names
+        excel_file.seek(0)  # Ensure we're at the start of the stream
+        xl_file = pd.ExcelFile(excel_file, engine='openpyxl')
+        sheet_names = xl_file.sheet_names
         
         if len(sheet_names) == 1:
             # Single sheet - return as single DataFrame
-            pdf = pd.read_excel(excel_file, sheet_name=0, dtype=str)
+            pdf = pd.read_excel(xl_file, sheet_name=0, dtype=str)
             spark_df = spark.createDataFrame(pdf)
             spark_df.cache()
             spark_df.count()
@@ -110,7 +117,7 @@ def load_file_from_minio(minio_client, bucket_name, file_name, spark):
             # Multiple sheets - return dict of DataFrames
             result = {}
             for sheet_name in sheet_names:
-                pdf = pd.read_excel(excel_file, sheet_name=sheet_name, dtype=str)
+                pdf = pd.read_excel(xl_file, sheet_name=sheet_name, dtype=str)
                 if not pdf.empty:  # Skip empty sheets
                     spark_df = spark.createDataFrame(pdf)
                     spark_df.cache()
