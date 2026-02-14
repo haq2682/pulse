@@ -61,7 +61,24 @@ class PipelineService:
         """
         self.db = db
         self.websocket_manager = websocket_manager
-        self.project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        
+        # Determine project root - handle both development and container environments
+        # In container: /app/services/pipeline_service.py -> /app
+        # In development: /path/to/pulse/api/services/pipeline_service.py -> /path/to/pulse
+        current_file = os.path.abspath(__file__)
+        
+        # Check if we're in the 'api/services' structure or just 'services'
+        if '/api/services/' in current_file or current_file.endswith('/api/services/pipeline_service.py'):
+            # Development structure: go up 3 levels (services -> api -> project_root)
+            self.project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
+        elif '/services/' in current_file or current_file.endswith('/services/pipeline_service.py'):
+            # Container structure: go up 2 levels (services -> app)
+            self.project_root = os.path.dirname(os.path.dirname(current_file))
+        else:
+            # Fallback: assume we're in the project root
+            self.project_root = os.path.dirname(current_file)
+        
+        print(f"PipelineService initialized with project_root: {self.project_root}")
     
     async def start_pipeline(self, business_id: str, user_id: str) -> str:
         """
@@ -81,7 +98,7 @@ class PipelineService:
             text("""
                 INSERT INTO pipeline_status 
                 (pipeline_id, business_id, user_id, status, current_step, progress_percentage, started_at)
-                VALUES (:pipeline_id, :business_id, :user_id, :status, :current_step, :progress, :started_at)
+                VALUES (:pipeline_id, :business_id, :user_id, :status, :current_step, :progress_percentage, :started_at)
             """),
             {
                 "pipeline_id": pipeline_id,
@@ -89,7 +106,7 @@ class PipelineService:
                 "user_id": user_id,
                 "status": "running",
                 "current_step": "Initializing Pipeline",
-                "progress": 0,
+                "progress_percentage": 0,
                 "started_at": datetime.now()
             }
         )
@@ -318,7 +335,7 @@ class PipelineService:
                 "pipeline_id": pipeline_id,
                 "status": status,
                 "current_step": current_step,
-                "progress": min(progress, 100),
+                "progress_percentage": min(progress, 100),
                 "error_message": error_message
             }
             
