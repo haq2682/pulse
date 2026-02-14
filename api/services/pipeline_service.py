@@ -80,13 +80,14 @@ class PipelineService:
         
         print(f"PipelineService initialized with project_root: {self.project_root}")
     
-    async def start_pipeline(self, business_id: str, user_id: str) -> str:
+    async def start_pipeline(self, business_id: str, user_id: str, start_from_phase: Optional[str] = None) -> str:
         """
         Start the data processing pipeline for a business.
         
         Args:
             business_id: The business ID (used as bucket name)
             user_id: The user ID
+            start_from_phase: Optional phase name to start from (for resuming)
             
         Returns:
             pipeline_id: The unique pipeline execution ID
@@ -121,11 +122,11 @@ class PipelineService:
         })
         
         # Start pipeline execution in background
-        asyncio.create_task(self._execute_pipeline(pipeline_id, business_id, user_id))
+        asyncio.create_task(self._execute_pipeline(pipeline_id, business_id, user_id, start_from_phase))
         
         return pipeline_id
     
-    async def _execute_pipeline(self, pipeline_id: str, business_id: str, user_id: str):
+    async def _execute_pipeline(self, pipeline_id: str, business_id: str, user_id: str, start_from_phase: Optional[str] = None):
         """
         Execute the complete pipeline asynchronously.
         
@@ -133,12 +134,26 @@ class PipelineService:
             pipeline_id: Pipeline execution ID
             business_id: Business ID (bucket name)
             user_id: User ID
+            start_from_phase: Optional phase name to start from (for resuming)
         """
         try:
             cumulative_progress = 0
             process_ids = {}
             
-            for phase in self.PIPELINE_PHASES:
+            # Determine starting point
+            start_index = 0
+            if start_from_phase:
+                for i, phase in enumerate(self.PIPELINE_PHASES):
+                    if phase["name"] == start_from_phase:
+                        start_index = i
+                        # Calculate cumulative progress up to this phase
+                        for j in range(i):
+                            cumulative_progress += self.PIPELINE_PHASES[j]["weight"]
+                        break
+                print(f"Resuming pipeline from phase: {start_from_phase} (index {start_index})")
+            
+            for i in range(start_index, len(self.PIPELINE_PHASES)):
+                phase = self.PIPELINE_PHASES[i]
                 phase_name = phase["name"]
                 
                 # Check if pipeline was cancelled
@@ -168,7 +183,7 @@ class PipelineService:
                     process_ids[phase_name] = process_id
                 
                 if not success:
-                    # Phase failed
+                    # Phase failed - store the failed phase name
                     error_msg = f"Pipeline failed during {phase_name} phase"
                     await self._update_progress(
                         pipeline_id, business_id,
@@ -176,6 +191,7 @@ class PipelineService:
                         current_step=phase["description"],
                         progress=cumulative_progress,
                         error_message=error_msg,
+                        failed_phase=phase_name,
                         process_ids=process_ids
                     )
                     return
@@ -209,12 +225,14 @@ class PipelineService:
             import traceback
             traceback.print_exc()
             
+            # Store error information
             await self._update_progress(
                 pipeline_id, business_id,
                 status="failed",
                 current_step="Pipeline Error",
                 progress=cumulative_progress,
-                error_message=str(e)
+                error_message=str(e),
+                failed_phase=phase_name if 'phase_name' in locals() else None
             )
     
     async def _execute_phase(
@@ -313,6 +331,7 @@ class PipelineService:
         current_step: str,
         progress: int,
         error_message: Optional[str] = None,
+        failed_phase: Optional[str] = None,
         completed: bool = False,
         process_ids: Optional[Dict] = None
     ):
@@ -326,6 +345,7 @@ class PipelineService:
             current_step: Current step description
             progress: Progress percentage (0-100)
             error_message: Error message if failed
+            failed_phase: Name of phase where pipeline failed
             completed: Whether pipeline is completed
             process_ids: Dict of process IDs for each phase
         """
@@ -336,7 +356,8 @@ class PipelineService:
                 "status": status,
                 "current_step": current_step,
                 "progress_percentage": min(progress, 100),
-                "error_message": error_message
+                "error_message": error_message,
+                "failed_phase": failed_phase
             }
             
             if completed:
@@ -358,7 +379,8 @@ class PipelineService:
                 "status": status,
                 "current_step": current_step,
                 "progress": progress,
-                "error_message": error_message
+                "error_message": error_message,
+                "failed_phase": failed_phase
             })
             
         except Exception as e:
@@ -541,7 +563,7 @@ class PipelineService:
             result = self.db.execute(
                 text("""
                     SELECT pipeline_id, status, current_step, progress_percentage, 
-                           started_at, completed_at, error_message
+                           started_at, completed_at, error_message, failed_phase
                     FROM pipeline_status
                     WHERE business_id = :business_id
                     ORDER BY started_at DESC
@@ -558,7 +580,8 @@ class PipelineService:
                     "progress": result[3],
                     "started_at": result[4].isoformat() if result[4] else None,
                     "completed_at": result[5].isoformat() if result[5] else None,
-                    "error_message": result[6]
+                    "error_message": result[6],
+                    "failed_phase": result[7]
                 }
             
             return None
