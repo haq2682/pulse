@@ -174,7 +174,7 @@ async def cancel_pipeline(request: Request, db=Depends(get_db)):
 @router.post("/retry")
 async def retry_pipeline(request: Request, db=Depends(get_db)):
     """
-    Retry a failed pipeline.
+    Retry a failed pipeline, resuming from the failed phase.
     
     Request body:
         - userId: User ID
@@ -197,10 +197,10 @@ async def retry_pipeline(request: Request, db=Depends(get_db)):
         if not result:
             raise HTTPException(status_code=404, detail="Business not found or access denied")
         
-        # Check current pipeline status
+        # Check current pipeline status and get failed phase
         current = db.execute(
             text("""
-                SELECT pipeline_id, status FROM pipeline_status 
+                SELECT pipeline_id, status, failed_phase FROM pipeline_status 
                 WHERE business_id = :business_id
                 ORDER BY started_at DESC LIMIT 1
             """),
@@ -213,14 +213,18 @@ async def retry_pipeline(request: Request, db=Depends(get_db)):
                 detail="Pipeline is already running for this business"
             )
         
-        # Start new pipeline execution
+        # Get the failed phase to resume from
+        failed_phase = current[2] if current and current[2] else None
+        
+        # Start new pipeline execution, resuming from failed phase if available
         pipeline_service = PipelineService(db, websocket_manager)
-        pipeline_id = await pipeline_service.start_pipeline(business_id, user_id)
+        pipeline_id = await pipeline_service.start_pipeline(business_id, user_id, start_from_phase=failed_phase)
         
         return {
             "status": 200,
-            "message": "Pipeline retry started successfully",
-            "pipeline_id": pipeline_id
+            "message": f"Pipeline retry started successfully{' from ' + failed_phase + ' phase' if failed_phase else ''}",
+            "pipeline_id": pipeline_id,
+            "resumed_from_phase": failed_phase
         }
         
     except HTTPException:

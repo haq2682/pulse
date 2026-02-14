@@ -130,6 +130,7 @@ CREATE TABLE pipeline_status (
     status VARCHAR(50) NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
     current_step VARCHAR(100),
     progress_percentage INTEGER DEFAULT 0 CHECK (progress_percentage >= 0 AND progress_percentage <= 100),
+    failed_phase VARCHAR(50) NULL,
     started_at TIMESTAMP NULL,
     completed_at TIMESTAMP NULL,
     error_message TEXT NULL,
