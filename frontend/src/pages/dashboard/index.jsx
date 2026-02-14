@@ -6,12 +6,14 @@ import { InputText } from 'primereact/inputtext';
 import { Button } from 'primereact/button';
 import { Dropdown } from 'primereact/dropdown';
 import { useAuth } from '@/context/AuthContext';
+import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import axiosInstance from '@/services/api/axiosInstance';
 import { useNavigate, useParams } from 'react-router-dom';
-import PipelineProgressLoader from '@/components/global/PipelineProgressLoader';
+import InlinePipelineProgress from '@/components/global/InlinePipelineProgress';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
+    const { startPipeline } = usePipelineProgress();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [selectedBusiness, setSelectedBusiness] = useState(null);
     const navigate = useNavigate();
@@ -92,15 +94,26 @@ const Dashboard = () => {
             }
         }
     }, [businessId, businesses]);
+    
+    // Handle starting analysis
+    const handleStartAnalysis = async () => {
+        if (!businessId || !user?.user_id) {
+            console.error('Missing businessId or user_id');
+            return;
+        }
+        
+        try {
+            const result = await startPipeline(businessId);
+            if (!result.success) {
+                console.error('Failed to start pipeline:', result.error);
+            }
+        } catch (err) {
+            console.error('Error starting pipeline:', err);
+        }
+    };
 
     return (
         <div className="flex h-screen overflow-hidden bg-gray-50">
-            {/* Pipeline Progress Loader - Global */}
-            <PipelineProgressLoader 
-                businessId={businessId} 
-                visible={!!businessId}
-            />
-            
             {/* Sidebar */}
             <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
@@ -208,13 +221,21 @@ const Dashboard = () => {
                         </div>
                     </div>
                     
-                    <div className="flex items-center justify-center min-h-[60vh]">
-                        <div className="text-center max-w-md">
-                            <Text className="text-gray-500 text-base md:text-lg leading-relaxed">
-                                You have not added any business yet. Please click on the "Add Business Button" above to add a business.
-                            </Text>
+                    {/* Show inline pipeline progress when business is selected */}
+                    {businessId ? (
+                        <InlinePipelineProgress 
+                            businessId={businessId}
+                            onStartAnalysis={handleStartAnalysis}
+                        />
+                    ) : (
+                        <div className="flex items-center justify-center min-h-[60vh]">
+                            <div className="text-center max-w-md">
+                                <Text className="text-gray-500 text-base md:text-lg leading-relaxed">
+                                    You have not added any business yet. Please click on the "Add Business Button" above to add a business.
+                                </Text>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </main>
             </div>
         </div>
