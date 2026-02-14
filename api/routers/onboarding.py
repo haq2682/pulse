@@ -1409,7 +1409,8 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
         return {
             "status": 200,
             "message": message,
-            "mapping_results": mapping_results
+            "mapping_results": mapping_results,
+            "business_id": business_id
         }
     
     except HTTPException:
@@ -1495,7 +1496,8 @@ async def confirm_mapping(request: Request, db=Depends(get_db)):
         return {
             "status": 200,
             "message": "Mapping confirmed and onboarding completed successfully",
-            "is_completed": True
+            "is_completed": True,
+            "business_id": business_id
         }
     
     except HTTPException:
