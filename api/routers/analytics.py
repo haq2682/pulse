@@ -13,6 +13,6 @@ router = APIRouter(
 
 @router.get("/get-businesses")
 async def get_businesses(userId: str, db=Depends(get_db)):
-    result = db.execute(text("SELECT DISTINCT business_id, business_name FROM businesses WHERE user_id = :user_id"), {"user_id": userId})
-    businesses = [{"business_id": row[0], "business_name": row[1]} for row in result.fetchall()]
+    result = db.execute(text("SELECT DISTINCT b.business_id, b.business_name, o.ingestion_type FROM businesses b JOIN onboarding o ON b.business_id = o.business_id WHERE o.user_id = :user_id AND o.is_completed = true"), {"user_id": userId})
+    businesses = [{"business_id": row[0], "business_name": row[1], "ingestion_type": row[2]} for row in result.fetchall()]
     return {"businesses": businesses}

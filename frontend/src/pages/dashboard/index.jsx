@@ -13,10 +13,10 @@ import PipelineProgress from '@/components/PipelineProgress';
 const Dashboard = () => {
     const { logout, user } = useAuth();
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [selectedItem, setSelectedItem] = useState(null);
     const [selectedBusiness, setSelectedBusiness] = useState(null);
     const navigate = useNavigate();
     const [isAddBusinessLoading, setIsAddBusinessLoading] = useState(false);
+    const [businessIngestionType, setBusinessIngestionType] = useState(null);
 
     const { businessId } = useParams();
     // NEW: State to toggle the custom profile menu
@@ -61,6 +61,7 @@ const Dashboard = () => {
 
             // Redirect to first business if URL has no business ID
             if (!businessId && businessList.length > 0) {
+                setBusinessIngestionType(businessList[0].ingestion_type);
                 navigate(`/analytics/${businessList[0].business_id}`);
             }
 
@@ -71,6 +72,7 @@ const Dashboard = () => {
 
     const handleBusinessChange = (e) => {
         setSelectedBusiness(e.value);
+        setBusinessIngestionType(e.option?.ingestion_type || null);
         navigate(`/analytics/${e.value}`);
     }
 
@@ -82,6 +84,10 @@ const Dashboard = () => {
         if (businessId && businesses.length > 0) {
             // Only set if different
             if (selectedBusiness !== businessId) {
+                const business = businesses.find(b => b.business_id === businessId);
+                if (business) {
+                    setBusinessIngestionType(business.ingestion_type);
+                }
                 setSelectedBusiness(businessId);
             }
         }
@@ -110,8 +116,10 @@ const Dashboard = () => {
                     </button>
 
                     <Heading level={3} gradient={true} className="hidden md:block text-xl md:text-2xl m-0">
-                        Analytics Overview
+                        Dashboard
                     </Heading>
+
+
 
                     <InputText type="text" className="p-inputtext-sm w-2/4" placeholder="Search Insight..." />
 

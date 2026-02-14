@@ -127,7 +127,7 @@ async def create_business(request: Request, db=Depends(get_db)):
         businessCurrency = body.get("businessCurrency")
         if not userId or not businessName or not businessRegion or not businessCurrency:
             raise HTTPException(status_code=400, detail="Authenticated User, Business Name, Business Region, and Business Currency are required")
-        onboarding = db.execute(text("SELECT onboarding_id FROM onboarding WHERE user_id = :user_id"), {"user_id": userId})
+        onboarding = db.execute(text("SELECT onboarding_id FROM onboarding WHERE user_id = :user_id AND is_completed = false"), {"user_id": userId})
         onboarding_record = onboarding.fetchone()
         if not onboarding_record:
             raise HTTPException(status_code=404, detail="Onboarding record not found")
@@ -136,7 +136,7 @@ async def create_business(request: Request, db=Depends(get_db)):
         businessRegion = businessRegion.get("value")
         db.execute(text("INSERT INTO businesses (business_id, user_id, business_name, business_region, business_currency) VALUES (:business_id, :user_id, :business_name, :business_region, :business_currency)"), {"business_id": business_id, "user_id": userId, "business_name": businessName, "business_region": businessRegion, "business_currency": businessCurrency})
         db.commit()
-        db.execute(text("UPDATE onboarding SET current_step = :next_step, business_id = :business_id WHERE user_id = :user_id"), {"next_step": "data-type", "user_id": userId, "business_id": business_id})
+        db.execute(text("UPDATE onboarding SET current_step = :next_step, business_id = :business_id WHERE user_id = :user_id AND is_completed = false"), {"next_step": "data-type", "user_id": userId, "business_id": business_id})
         db.commit()
         try:
             existing_buckets = s3.list_buckets().get('Buckets', [])
@@ -159,11 +159,11 @@ async def select_data_type(request: Request, db=Depends(get_db)):
         dataType = body.get("dataType")
         if not userId or not dataType:
             raise HTTPException(status_code=400, detail="Authenticated User and Data Type are required")
-        onboarding = db.execute(text("SELECT onboarding_id, business_id FROM onboarding WHERE user_id = :user_id"), {"user_id": userId})
+        onboarding = db.execute(text("SELECT onboarding_id, business_id FROM onboarding WHERE user_id = :user_id AND is_completed = false"), {"user_id": userId})
         onboarding_record = onboarding.fetchone()
         if not onboarding_record:
             raise HTTPException(status_code=404, detail="Onboarding record not found")
-        db.execute(text("UPDATE onboarding SET current_step = :next_step, ingestion_type = :ingestion_type WHERE user_id = :user_id"), {"next_step": "connect", "ingestion_type": dataType, "user_id": userId})
+        db.execute(text("UPDATE onboarding SET current_step = :next_step, ingestion_type = :ingestion_type WHERE user_id = :user_id AND is_completed = false"), {"next_step": "connect", "ingestion_type": dataType, "user_id": userId})
         db.commit()
         return {"status": 200}
     except Exception as e:
@@ -174,7 +174,7 @@ async def get_data_type(userId: str, db=Depends(get_db)):
     try:
         if not userId:
             raise HTTPException(status_code=400, detail="Authenticated User is required")
-        onboarding = db.execute(text("SELECT ingestion_type, business_id FROM onboarding WHERE user_id = :user_id"), {"user_id": userId})
+        onboarding = db.execute(text("SELECT ingestion_type, business_id FROM onboarding WHERE user_id = :user_id AND is_completed = false"), {"user_id": userId})
         onboarding_record = onboarding.fetchone()
         if not onboarding_record:
             raise HTTPException(status_code=404, detail="Onboarding record not found")
@@ -198,7 +198,7 @@ async def get_data_type(userId: str, db=Depends(get_db)):
 #         file_type = form["fileType"]
 #         user_id = form["userId"]
         
-#         onboarding = db.execute(text("SELECT business_id FROM onboarding WHERE user_id = :user_id"), {"user_id": user_id})
+#         onboarding = db.execute(text("SELECT business_id FROM onboarding WHERE user_id = :user_id AND is_completed = false"), {"user_id": user_id})
 #         onboarding_record = onboarding.fetchone()
 #         if not onboarding_record:
 #             raise HTTPException(status_code=404, detail="Onboarding record not found")
@@ -266,7 +266,7 @@ async def get_uploaded_files(userId: str, db=Depends(get_db)):
         if not userId:
             raise HTTPException(status_code=400, detail="userId is required")
         
-        onboarding = db.execute(text("SELECT business_id FROM onboarding WHERE user_id = :user_id"), {"user_id": userId})
+        onboarding = db.execute(text("SELECT business_id FROM onboarding WHERE user_id = :user_id AND is_completed = false"), {"user_id": userId})
         onboarding_record = onboarding.fetchone()
         if not onboarding_record or not onboarding_record[0]:
             return {"status": 200, "files": []}
@@ -303,7 +303,7 @@ async def delete_file(request: Request, db=Depends(get_db)):
         if not file_id or not user_id:
             raise HTTPException(status_code=400, detail="fileId and userId are required")
         
-        onboarding = db.execute(text("SELECT business_id FROM onboarding WHERE user_id = :user_id"), {"user_id": user_id})
+        onboarding = db.execute(text("SELECT business_id FROM onboarding WHERE user_id = :user_id AND is_completed = false"), {"user_id": user_id})
         onboarding_record = onboarding.fetchone()
         if not onboarding_record:
             raise HTTPException(status_code=404, detail="Onboarding record not found")
@@ -421,7 +421,7 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         
         # Get the onboarding record
         onboarding = db.execute(
-            text("SELECT onboarding_id, business_id, current_step, mapping_status FROM onboarding WHERE user_id = :user_id"),
+            text("SELECT onboarding_id, business_id, current_step, mapping_status FROM onboarding WHERE user_id = :user_id AND is_completed = false"),
             {"user_id": user_id}
         )
         onboarding_record = onboarding.fetchone()
@@ -465,7 +465,7 @@ async def start_mapping(request: Request, db=Depends(get_db)):
                     SET mapping_status = :mapping_status,
                         mapping_error = :mapping_error,
                         mapping_completed_at = :completed_at
-                    WHERE user_id = :user_id
+                    WHERE user_id = :user_id AND is_completed = false
                 """),
                 {
                     "mapping_status": "failed",
@@ -486,7 +486,7 @@ async def start_mapping(request: Request, db=Depends(get_db)):
                     mapping_started_at = :started_at,
                     mapping_error = NULL,
                     mapping_completed_at = NULL
-                WHERE user_id = :user_id
+                WHERE user_id = :user_id AND is_completed = false
             """),
             {
                 "current_step": "mapping-in-progress",
@@ -593,7 +593,7 @@ async def start_mapping(request: Request, db=Depends(get_db)):
                         SET mapping_status = :mapping_status,
                             mapping_error = :error,
                             current_step = :current_step
-                        WHERE user_id = :user_id
+                        WHERE user_id = :user_id AND is_completed = false
                     """),
                     {
                         "mapping_status": "failed",
@@ -632,7 +632,7 @@ async def cancel_mapping(request: Request, db=Depends(get_db)):
         
         # Get the onboarding record
         onboarding = db.execute(
-            text("SELECT onboarding_id, business_id, mapping_status, current_step FROM onboarding WHERE user_id = :user_id"),
+            text("SELECT onboarding_id, business_id, mapping_status, current_step FROM onboarding WHERE user_id = :user_id AND is_completed = false"),
             {"user_id": user_id}
         )
         onboarding_record = onboarding.fetchone()
@@ -671,7 +671,7 @@ async def cancel_mapping(request: Request, db=Depends(get_db)):
                         UPDATE onboarding 
                         SET mapping_status = :mapping_status,
                             current_step = :current_step
-                        WHERE user_id = :user_id
+                        WHERE user_id = :user_id AND is_completed = false
                     """),
                     {
                         "mapping_status": "completed",  # Restore to completed since initial mapping finished
@@ -689,7 +689,7 @@ async def cancel_mapping(request: Request, db=Depends(get_db)):
                             mapping_error = :error,
                             mapping_completed_at = :completed_at,
                             current_step = :current_step
-                        WHERE user_id = :user_id
+                        WHERE user_id = :user_id AND is_completed = false
                     """),
                     {
                         "mapping_status": "cancelled",
@@ -752,6 +752,7 @@ async def get_mapping_status(request: Request, userId: str, db=Depends(get_db)):
                     business_id
                 FROM onboarding 
                 WHERE user_id = :user_id
+                AND is_completed = false
             """),
             {"user_id": userId}
         )
@@ -808,7 +809,7 @@ async def get_mapping_status(request: Request, userId: str, db=Depends(get_db)):
                                     SET mapping_status = :mapping_status,
                                         mapping_completed_at = :completed_at,
                                         current_step = :current_step
-                                    WHERE user_id = :user_id
+                                    WHERE user_id = :user_id AND is_completed = false
                                 """),
                                 {
                                     "mapping_status": "completed",
@@ -829,7 +830,7 @@ async def get_mapping_status(request: Request, userId: str, db=Depends(get_db)):
                                     SET mapping_status = :mapping_status,
                                         mapping_error = :error,
                                         current_step = :current_step
-                                    WHERE user_id = :user_id
+                                    WHERE user_id = :user_id AND is_completed = false
                                 """),
                                 {
                                     "mapping_status": "failed",
@@ -869,7 +870,7 @@ async def get_mapping_logs(request: Request, userId: str, db=Depends(get_db)):
         
         # Get the business_id from onboarding record
         onboarding = db.execute(
-            text("SELECT business_id FROM onboarding WHERE user_id = :user_id"),
+            text("SELECT business_id FROM onboarding WHERE user_id = :user_id AND is_completed = false"),
             {"user_id": userId}
         )
         onboarding_record = onboarding.fetchone()
@@ -936,7 +937,7 @@ async def stream_mapping_logs(request: Request, userId: str, db=Depends(get_db))
     
     # Get the business_id from onboarding record
     onboarding = db.execute(
-        text("SELECT business_id FROM onboarding WHERE user_id = :user_id"),
+        text("SELECT business_id FROM onboarding WHERE user_id = :user_id AND is_completed = false"),
         {"user_id": userId}
     )
     onboarding_record = onboarding.fetchone()
@@ -1055,7 +1056,7 @@ async def stream_mapping_logs(request: Request, userId: str, db=Depends(get_db))
                                     mapping_error = :error,
                                     mapping_completed_at = :completed_at,
                                     current_step = :current_step
-                                WHERE business_id = :business_id
+                                WHERE business_id = :business_id AND is_completed = false
                             """),
                             {
                                 "mapping_status": "failed",
@@ -1113,6 +1114,7 @@ async def get_mapping_results(request: Request, userId: str, db=Depends(get_db))
                     mapping_status
                 FROM onboarding 
                 WHERE user_id = :user_id
+                AND is_completed = false
             """),
             {"user_id": userId}
         )
@@ -1171,7 +1173,7 @@ async def get_mapping_results(request: Request, userId: str, db=Depends(get_db))
                         text("""
                             UPDATE onboarding 
                             SET mapping_results = :mapping_results
-                            WHERE user_id = :user_id
+                            WHERE user_id = :user_id AND is_completed = false
                         """),
                         {
                             "mapping_results": json.dumps(mapping_results),  # ← SOLUTION: convert to JSON string
@@ -1236,7 +1238,7 @@ async def save_manual_mappings(request: Request, db=Depends(get_db)):
         
         # Get the onboarding record
         onboarding = db.execute(
-            text("SELECT business_id FROM onboarding WHERE user_id = :user_id"),
+            text("SELECT business_id FROM onboarding WHERE user_id = :user_id AND is_completed = false"),
             {"user_id": user_id}
         )
         onboarding_record = onboarding.fetchone()
@@ -1251,7 +1253,7 @@ async def save_manual_mappings(request: Request, db=Depends(get_db)):
             text("""
                 UPDATE onboarding 
                 SET manual_mappings = :manual_mappings
-                WHERE user_id = :user_id
+                WHERE user_id = :user_id AND is_completed = false
             """),
             {
                 "manual_mappings": json.dumps(manual_mappings),
@@ -1297,7 +1299,7 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
         
         # Get the onboarding record
         onboarding = db.execute(
-            text("SELECT business_id, mapping_status FROM onboarding WHERE user_id = :user_id"),
+            text("SELECT business_id, mapping_status FROM onboarding WHERE user_id = :user_id AND is_completed = false"),
             {"user_id": user_id}
         )
         onboarding_record = onboarding.fetchone()
@@ -1322,7 +1324,7 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
             text("""
                 UPDATE onboarding 
                 SET manual_mappings = :manual_mappings
-                WHERE user_id = :user_id
+                WHERE user_id = :user_id AND is_completed = false
             """),
             {
                 "manual_mappings": json.dumps(manual_mappings),
@@ -1390,7 +1392,7 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
             text("""
                 UPDATE onboarding 
                 SET mapping_results = :mapping_results
-                WHERE user_id = :user_id
+                WHERE user_id = :user_id AND is_completed = false
             """),
             {
                 "mapping_results": json.dumps(mapping_results),
@@ -1436,7 +1438,7 @@ async def confirm_mapping(request: Request, db=Depends(get_db)):
         
         # Get the onboarding record
         onboarding = db.execute(
-            text("SELECT business_id, mapping_status, current_step FROM onboarding WHERE user_id = :user_id"),
+            text("SELECT business_id, mapping_status, current_step FROM onboarding WHERE user_id = :user_id AND is_completed = false"),
             {"user_id": user_id}
         )
         onboarding_record = onboarding.fetchone()
@@ -1459,7 +1461,7 @@ async def confirm_mapping(request: Request, db=Depends(get_db)):
                 UPDATE onboarding 
                 SET is_completed = :is_completed,
                     current_step = :current_step
-                WHERE user_id = :user_id
+                WHERE user_id = :user_id AND is_completed = false
             """),
             {
                 "is_completed": True,
