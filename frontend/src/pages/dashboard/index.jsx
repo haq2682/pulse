@@ -8,7 +8,7 @@ import { Dropdown } from 'primereact/dropdown';
 import { useAuth } from '@/context/AuthContext';
 import axiosInstance from '@/services/api/axiosInstance';
 import { useNavigate, useParams } from 'react-router-dom';
-import PipelineProgress from '@/components/PipelineProgress';
+import PipelineProgressLoader from '@/components/global/PipelineProgressLoader';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
