@@ -1,326 +1,240 @@
 """
-Streaming Cleaning Pipeline - Phase 2
+Streaming Cleaning Pipeline - Refactored to Functional Style with Code Reuse
 
 This module implements Spark Structured Streaming for continuous data cleaning.
-Instead of batch processing, it continuously monitors MinIO/mapped/ for new files
-and processes them with 10-second micro-batches.
+REFACTORED: Uses pure functions and imports from existing cleaning modules.
+
+Key Changes:
+- Removed StreamingCleaner class → pure functions
+- Imports from cleaning.data_cleaning (drop_duplicates, drop_null_rows, etc.)
+- Imports from cleaning.standardization (remove_outliers, etc.)
+- No duplicate code - reuses existing batch cleaning logic
+- Functional programming style for easier testing and maintenance
 
 Features:
 - Continuous monitoring of MinIO/mapped/
 - 10-second micro-batch processing
-- Stateful deduplication
-- Streaming data quality checks
+- Reuses existing cleaning functions
 - Checkpoint-based fault tolerance
 - Real-time cleaning metrics
 """
 
 import os
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import (
-    col, when, trim, regexp_replace, current_timestamp,
-    count, sum as spark_sum, avg, min as spark_min, max as spark_max
+from pyspark.sql.functions import current_timestamp
+
+# Import existing cleaning functions - NO DUPLICATION!
+from cleaning.data_cleaning import (
+    drop_duplicates,
+    drop_null_rows,
+    clean_text_columns,
+    fill_null_values,
+    validate_all_cleaned_data
 )
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DoubleType, TimestampType
+from cleaning.standardization import (
+    remove_outliers,
+    normalize_dates_and_timestamps
+)
 
 
-class StreamingCleaner:
+def create_cleaning_stream(spark, source_path, table_name, 
+                          output_path=None,
+                          checkpoint_path="/tmp/spark_checkpoints/cleaning",
+                          trigger_interval="10 seconds",
+                          file_format="csv"):
     """
-    Manages streaming data cleaning pipeline with Spark Structured Streaming.
+    Create streaming cleaning pipeline using existing batch cleaning functions.
+    Pure function - no class, no state, imports existing logic.
+    
+    Args:
+        spark: SparkSession instance
+        source_path: Path to source data (e.g., "s3a://bucket/mapped/orders/")
+        table_name: Name of the table (e.g., "orders")
+        output_path: Path to write cleaned data (optional)
+        checkpoint_path: Path for Spark checkpoints
+        trigger_interval: Micro-batch trigger interval (default: "10 seconds")
+        file_format: Input file format (csv, parquet, json)
+        
+    Returns:
+        StreamingQuery object
     """
+    # Configure Spark for streaming
+    spark.conf.set("spark.sql.streaming.checkpointLocation", checkpoint_path)
+    spark.conf.set("spark.sql.streaming.schemaInference", "true")
     
-    def __init__(self, spark, bucket_name="pulse-bucket-1", trigger_interval="10 seconds"):
-        """
-        Initialize streaming cleaner.
-        
-        Args:
-            spark: SparkSession instance
-            bucket_name: MinIO bucket name
-            trigger_interval: Micro-batch trigger interval (default: 10 seconds)
-        """
-        self.spark = spark
-        self.bucket_name = bucket_name
-        self.trigger_interval = trigger_interval
-        self.checkpoint_location = "/tmp/spark_checkpoints/cleaning"
-        
-        # Configure Spark for streaming
-        self.spark.conf.set("spark.sql.streaming.checkpointLocation", self.checkpoint_location)
-        self.spark.conf.set("spark.sql.streaming.schemaInference", "true")
-        
-        print(f"✅ StreamingCleaner initialized")
-        print(f"   Bucket: {bucket_name}")
-        print(f"   Trigger: {trigger_interval}")
-        print(f"   Checkpoints: {self.checkpoint_location}")
+    # Read stream
+    reader = spark.readStream.format(file_format)
     
-    def create_input_stream(self, source_path, schema=None, file_format="csv"):
-        """
-        Create input streaming DataFrame from MinIO.
-        
-        Args:
-            source_path: Path to source data (e.g., "s3a://bucket/mapped/orders/")
-            schema: Optional StructType schema
-            file_format: File format (csv, parquet, json)
-            
-        Returns:
-            Streaming DataFrame
-        """
-        reader = self.spark.readStream.format(file_format)
-        
-        if schema:
-            reader = reader.schema(schema)
-        
-        if file_format == "csv":
-            reader = reader.option("header", "true").option("inferSchema", "true")
-        
-        # Configure for incremental file discovery
-        reader = reader.option("maxFilesPerTrigger", 1)  # Process 1 file per micro-batch
-        reader = reader.option("cleanSource", "delete")  # Optional: archive processed files
-        
-        df = reader.load(source_path)
-        
-        print(f"✅ Created input stream from {source_path}")
-        return df
+    if file_format == "csv":
+        reader = reader.option("header", "true").option("inferSchema", "true")
     
-    def clean_text_column(self, df, column_name):
-        """
-        Clean a text column: trim, remove extra spaces, handle nulls.
-        
-        Args:
-            df: DataFrame
-            column_name: Column to clean
-            
-        Returns:
-            DataFrame with cleaned column
-        """
-        if column_name not in df.columns:
-            return df
-        
-        return df.withColumn(
-            column_name,
-            when(col(column_name).isNull(), None)
-            .otherwise(
-                trim(regexp_replace(col(column_name), r'\s+', ' '))
-            )
-        )
+    # Configure for incremental file discovery
+    reader = reader.option("maxFilesPerTrigger", 1)  # Process 1 file per micro-batch
     
-    def remove_duplicates_streaming(self, df, key_columns, watermark_column=None, watermark_duration="1 hour"):
-        """
-        Remove duplicates in streaming context using watermarking.
-        
-        Args:
-            df: Streaming DataFrame
-            key_columns: List of columns to check for duplicates
-            watermark_column: Column for watermarking (timestamp)
-            watermark_duration: How long to keep state (default: 1 hour)
-            
-        Returns:
-            DataFrame without duplicates
-        """
-        if watermark_column and watermark_column in df.columns:
-            # With watermarking (for stateful dedup)
-            df = df.withWatermark(watermark_column, watermark_duration)
-            return df.dropDuplicates(key_columns)
-        else:
-            # Simple dedup within micro-batch
-            return df.dropDuplicates(key_columns)
+    df = reader.load(source_path)
     
-    def apply_cleaning_rules(self, df, table_name):
+    print(f"✅ Created input stream from {source_path}")
+    print(f"   Table: {table_name}")
+    print(f"   Trigger: {trigger_interval}")
+    
+    # Apply cleaning using foreachBatch to use existing functions
+    def apply_batch_cleaning(batch_df, batch_id):
         """
-        Apply table-specific cleaning rules.
+        Apply existing batch cleaning functions to each micro-batch.
+        This is the key: REUSE existing functions, don't duplicate!
+        """
+        if batch_df.isEmpty():
+            return
         
-        Args:
-            df: Streaming DataFrame
-            table_name: Name of the table (orders, customers, etc.)
-            
-        Returns:
-            Cleaned DataFrame
-        """
+        print(f"\n📊 Processing batch {batch_id} for {table_name}")
+        print(f"   Input rows: {batch_df.count()}")
+        
+        # Wrap batch_df in dict format expected by existing functions
+        dataframes = {table_name: batch_df}
+        
+        # REUSE existing cleaning functions (no duplication!)
+        # These are the same functions used in batch processing
+        dataframes = drop_duplicates(dataframes)
+        dataframes = drop_null_rows(dataframes, table_name, "id")
+        dataframes = clean_text_columns(dataframes)
+        dataframes = fill_null_values(dataframes)
+        
         # Add processing timestamp
-        df = df.withColumn("cleaned_at", current_timestamp())
-        
-        # Table-specific cleaning
-        if table_name == "orders":
-            # Clean order-specific columns
-            df = self.clean_text_column(df, "order_status")
-            df = self.clean_text_column(df, "payment_method")
-            
-            # Remove duplicates on order_id
-            if "order_id" in df.columns:
-                df = self.remove_duplicates_streaming(df, ["order_id"])
-        
-        elif table_name == "customers":
-            # Clean customer-specific columns
-            df = self.clean_text_column(df, "first_name")
-            df = self.clean_text_column(df, "last_name")
-            df = self.clean_text_column(df, "email")
-            
-            # Remove duplicates on customer_id
-            if "customer_id" in df.columns:
-                df = self.remove_duplicates_streaming(df, ["customer_id"])
-        
-        elif table_name == "products":
-            # Clean product-specific columns
-            df = self.clean_text_column(df, "product_name")
-            df = self.clean_text_column(df, "description")
-            
-            # Remove duplicates on product_id
-            if "product_id" in df.columns:
-                df = self.remove_duplicates_streaming(df, ["product_id"])
-        
-        # Add more table-specific rules as needed
-        
-        return df
-    
-    def write_stream(self, df, output_path, checkpoint_suffix="default", output_mode="append"):
-        """
-        Write streaming DataFrame to MinIO.
-        
-        Args:
-            df: Streaming DataFrame
-            output_path: Destination path (e.g., "s3a://bucket/cleaned/orders/")
-            checkpoint_suffix: Unique suffix for checkpoint location
-            output_mode: append, update, or complete
-            
-        Returns:
-            StreamingQuery object
-        """
-        checkpoint_path = f"{self.checkpoint_location}/{checkpoint_suffix}"
-        
-        query = (
-            df.writeStream
-            .format("parquet")  # Use Parquet for efficiency
-            .outputMode(output_mode)
-            .option("path", output_path)
-            .option("checkpointLocation", checkpoint_path)
-            .trigger(processingTime=self.trigger_interval)
-            .start()
+        cleaned_df = dataframes[table_name].withColumn(
+            "streaming_processed_at", 
+            current_timestamp()
         )
         
-        print(f"✅ Started streaming write to {output_path}")
-        print(f"   Checkpoint: {checkpoint_path}")
-        print(f"   Mode: {output_mode}")
-        print(f"   Trigger: {self.trigger_interval}")
+        print(f"   Output rows: {cleaned_df.count()}")
+        print(f"   ✅ Batch {batch_id} cleaned successfully")
         
-        return query
+        # Write to output if specified
+        if output_path:
+            (cleaned_df.write
+             .mode("append")
+             .format("parquet")
+             .save(output_path))
+        
+        return cleaned_df
     
-    def create_cleaning_pipeline(self, table_name):
-        """
-        Create end-to-end streaming cleaning pipeline for a table.
+    # Create streaming query with foreachBatch
+    checkpoint_full_path = f"{checkpoint_path}/{table_name}"
+    
+    if output_path:
+        # Write to output path
+        query = (df.writeStream
+                 .foreachBatch(apply_batch_cleaning)
+                 .trigger(processingTime=trigger_interval)
+                 .option("checkpointLocation", checkpoint_full_path)
+                 .start())
+    else:
+        # Just process without writing (for testing)
+        query = (df.writeStream
+                 .foreachBatch(apply_batch_cleaning)
+                 .trigger(processingTime=trigger_interval)
+                 .option("checkpointLocation", checkpoint_full_path)
+                 .format("console")
+                 .start())
+    
+    print(f"✅ Streaming cleaning query started for {table_name}")
+    return query
+
+
+def create_all_cleaning_streams(spark, bucket_name="pulse-bucket-1", 
+                                trigger_interval="10 seconds"):
+    """
+    Create streaming cleaning pipelines for all tables.
+    Pure function that orchestrates multiple streams.
+    
+    Args:
+        spark: SparkSession instance
+        bucket_name: MinIO bucket name
+        trigger_interval: Micro-batch trigger interval
         
-        Args:
-            table_name: Name of table to clean (e.g., "orders")
-            
-        Returns:
-            StreamingQuery object
-        """
-        print(f"\n{'='*60}")
-        print(f"Creating streaming cleaning pipeline for: {table_name}")
-        print(f"{'='*60}")
+    Returns:
+        List of StreamingQuery objects
+    """
+    tables = ["orders", "customers", "products"]
+    queries = []
+    
+    for table in tables:
+        source_path = f"s3a://{bucket_name}/mapped/{table}/"
+        output_path = f"s3a://{bucket_name}/cleaned_streaming/{table}/"
+        checkpoint_path = f"/tmp/spark_checkpoints/cleaning/{table}"
         
-        # Define paths
-        source_path = f"s3a://{self.bucket_name}/mapped/{table_name}/"
-        output_path = f"s3a://{self.bucket_name}/cleaned_streaming/{table_name}/"
-        
-        # Create input stream
-        df = self.create_input_stream(source_path)
-        
-        # Apply cleaning rules
-        df_cleaned = self.apply_cleaning_rules(df, table_name)
-        
-        # Write stream
-        query = self.write_stream(
-            df_cleaned,
-            output_path,
-            checkpoint_suffix=f"cleaning_{table_name}",
-            output_mode="append"
+        query = create_cleaning_stream(
+            spark=spark,
+            source_path=source_path,
+            table_name=table,
+            output_path=output_path,
+            checkpoint_path=checkpoint_path,
+            trigger_interval=trigger_interval
         )
         
-        return query
+        queries.append(query)
     
-    def monitor_stream(self, query, query_name="streaming_query"):
-        """
-        Monitor a streaming query and print status.
-        
-        Args:
-            query: StreamingQuery object
-            query_name: Name for logging
-        """
-        print(f"\n📊 Monitoring: {query_name}")
-        print(f"   Status: {query.status}")
-        print(f"   Is Active: {query.isActive}")
-        
-        if query.lastProgress:
-            progress = query.lastProgress
-            print(f"   Batch ID: {progress.get('batchId', 'N/A')}")
-            print(f"   Rows Processed: {progress.get('numInputRows', 'N/A')}")
-            print(f"   Processing Rate: {progress.get('processedRowsPerSecond', 'N/A')} rows/sec")
-            print(f"   Duration: {progress.get('durationMs', {}).get('total', 'N/A')} ms")
+    print(f"\n✅ All {len(queries)} cleaning streams started")
+    return queries
+
+
+def monitor_cleaning_queries(queries):
+    """
+    Monitor streaming queries and display status.
+    Pure function for monitoring.
     
-    def stop_all_streams(self):
-        """Stop all active streaming queries."""
-        active_streams = self.spark.streams.active
-        print(f"\n🛑 Stopping {len(active_streams)} active streams...")
-        
-        for stream in active_streams:
-            stream.stop()
-            print(f"   ✓ Stopped: {stream.name if stream.name else stream.id}")
-        
-        print("✅ All streams stopped")
+    Args:
+        queries: List of StreamingQuery objects
+    """
+    print("\n📊 STREAMING CLEANING STATUS")
+    print("=" * 60)
+    
+    for query in queries:
+        if query.isActive:
+            status = query.status
+            print(f"\n🟢 Query: {query.name or 'unnamed'}")
+            print(f"   Active: {query.isActive}")
+            print(f"   ID: {query.id}")
+            
+            if status:
+                print(f"   Message: {status.get('message', 'N/A')}")
+                print(f"   Data Available: {status.get('isDataAvailable', False)}")
+        else:
+            print(f"\n🔴 Query: {query.name or 'unnamed'}")
+            print(f"   Active: False")
+    
+    print("=" * 60)
 
 
 def main():
     """
-    Main function to run streaming cleaning pipeline.
+    Main entry point for streaming cleaning.
+    Pure function - just orchestrates other functions.
     """
-    print("=" * 60)
-    print("🚀 STARTING STREAMING CLEANING PIPELINE - PHASE 2")
-    print("=" * 60)
-    
     # Create Spark session
-    from cleaning.cleaning_config import create_spark_session
-    spark = create_spark_session()
+    spark = (SparkSession.builder
+             .appName("StreamingCleaning")
+             .config("spark.sql.streaming.schemaInference", "true")
+             .getOrCreate())
     
-    # Create streaming cleaner
-    cleaner = StreamingCleaner(
-        spark=spark,
-        bucket_name=os.getenv("MINIO_BUCKET", "pulse-bucket-1"),
-        trigger_interval="10 seconds"
-    )
+    print("🚀 Starting Streaming Cleaning Pipeline (Functional Style)")
+    print("=" * 60)
     
-    # Define tables to stream
-    tables = ["orders", "customers", "products"]
-    
-    # Create streaming pipelines
-    queries = []
-    for table in tables:
-        try:
-            query = cleaner.create_cleaning_pipeline(table)
-            queries.append(query)
-        except Exception as e:
-            print(f"❌ Error creating pipeline for {table}: {e}")
+    # Start all cleaning streams
+    queries = create_all_cleaning_streams(spark, trigger_interval="10 seconds")
     
     # Monitor queries
-    print(f"\n✅ Started {len(queries)} streaming queries")
-    print("Press Ctrl+C to stop...")
-    
     try:
-        # Keep running and monitor
-        import time
         while True:
-            time.sleep(30)  # Check every 30 seconds
-            print(f"\n{'='*60}")
-            print(f"📊 STREAMING STATUS UPDATE")
-            print(f"{'='*60}")
-            for i, query in enumerate(queries):
-                cleaner.monitor_stream(query, f"{tables[i]}_cleaning")
-    
+            import time
+            time.sleep(30)  # Monitor every 30 seconds
+            monitor_cleaning_queries(queries)
     except KeyboardInterrupt:
-        print("\n⚠️  Keyboard interrupt received")
+        print("\n⚠️  Stopping streaming queries...")
+        for query in queries:
+            query.stop()
+        print("✅ All queries stopped")
     
-    finally:
-        # Stop all streams gracefully
-        cleaner.stop_all_streams()
-        spark.stop()
-        print("\n✅ Streaming cleaning pipeline stopped")
+    spark.stop()
 
 
 if __name__ == "__main__":

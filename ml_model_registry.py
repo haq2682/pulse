@@ -1,325 +1,171 @@
 """
-ML Model Registry
-Manages ML model lifecycle, versioning, and metadata
+ML Model Registry - Refactored to Functional Style
+
+REFACTORED: Simple functions for model management, no class needed.
+
+Key Changes:
+- Removed MLModelRegistry class → simple pure functions
+- Minimal wrapper around MinIO operations
+- Functional programming style
+
+Features:
+- Load/save models from MinIO
+- Simple version management
 """
 
 import os
-import json
+import joblib
 from datetime import datetime
-from pathlib import Path
-from typing import List, Dict, Optional
+from minio import Minio
 
 
-class MLModelRegistry:
+def get_minio_client():
     """
-    Model registry for tracking and managing ML model versions
+    Get MinIO client.
+    Simple factory function.
     """
+    return Minio(
+        "localhost:9000",
+        access_key=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
+        secret_key=os.getenv("MINIO_SECRET_KEY", "minioadmin"),
+        secure=False
+    )
+
+
+def save_model(model, model_name, bucket_name="pulse-bucket-1", 
+               model_type="general", metadata=None):
+    """
+    Save model to MinIO with versioning.
+    Pure function for saving.
     
-    def __init__(self, bucket_name="pulse-bucket-1"):
-        """
-        Initialize model registry
-        
-        Args:
-            bucket_name: MinIO bucket name
-        """
-        self.bucket_name = bucket_name
-        self.models_base_path = f"s3a://{bucket_name}/models"
-        self.metadata_file = f"s3a://{bucket_name}/models/registry.json"
-        
-        print(f"✅ MLModelRegistry initialized")
-        print(f"   Bucket: {bucket_name}")
-        print(f"   Models path: {self.models_base_path}")
+    Args:
+        model: Model object to save
+        model_name: Name of the model
+        bucket_name: MinIO bucket
+        model_type: "general" or "specific"
+        metadata: Optional metadata dict
+    """
+    client = get_minio_client()
     
-    def list_models(self, model_category="general") -> List[str]:
-        """
-        List all available models
-        
-        Args:
-            model_category: 'general' or 'specific'
-        
-        Returns:
-            List of model names
-        """
-        # In production, this would query MinIO
-        # For now, return known models
-        
-        if model_category == "general":
-            models = [
-                # Classification
-                "cart_abandonment",
-                "customer_churn",
-                "customer_segments",
-                "payment_success",
-                "review_sentiment",
-                "stock_status",
-                # Regression
-                "aov",
-                "clv",
-                "restock_quantity",
-                "revenue_forecast",
-                "safety_stock",
-                "session_conversion",
-                "stockout_probability",
-                # Clustering
-                "customer_segment",
-                "geo_cluster",
-                "session_behavior",
-                "supplier_performance",
-            ]
-        else:  # specific
-            models = [
-                # Classification
-                "fulfillment_risk",
-                "product_bundling",
-                # Regression
-                "campaign_roi",
-                "delivery_time",
-                "demand_forecast",
-                "price_optimization",
-                # Clustering
-                "product_affinity",
-                "product_lifecycle",
-            ]
-        
-        return models
+    # Create version timestamp
+    version = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    def list_model_versions(self, model_name: str, model_type: str = "classification") -> List[str]:
-        """
-        List all versions of a specific model
-        
-        Args:
-            model_name: Name of the model
-            model_type: Type of model
-        
-        Returns:
-            List of version timestamps
-        """
-        # In production, this would:
-        # 1. List directories in MinIO under models/general/{model_type}/{model_name}/
-        # 2. Parse version timestamps
-        # 3. Return sorted list (newest first)
-        
-        # Mock versions
-        versions = [
-            "20260215_203000",
-            "20260208_203000",
-            "20260201_203000",
-        ]
-        
-        return versions
+    # Save locally first
+    local_path = f"/tmp/{model_name}_{version}.pkl"
+    joblib.dump(model, local_path)
     
-    def get_latest_version(self, model_name: str, model_type: str = "classification") -> str:
-        """
-        Get latest version timestamp for a model
-        
-        Args:
-            model_name: Name of the model
-            model_type: Type of model
-        
-        Returns:
-            Latest version timestamp
-        """
-        versions = self.list_model_versions(model_name, model_type)
-        return versions[0] if versions else None
+    # Upload to MinIO
+    object_path = f"models/{model_type}/{model_name}/{version}.pkl"
+    client.fput_object(bucket_name, object_path, local_path)
     
-    def load_model_metadata(self, model_name: str, version: str = "latest") -> Dict:
-        """
-        Load model metadata
-        
-        Args:
-            model_name: Name of the model
-            version: Version timestamp or 'latest'
-        
-        Returns:
-            Model metadata dictionary
-        """
-        # In production, this would load metadata from MinIO
-        # metadata.json stored alongside model
-        
-        if version == "latest":
-            version = self.get_latest_version(model_name)
-        
-        # Mock metadata
-        metadata = {
-            "model_name": model_name,
-            "version": version,
-            "trained_at": datetime.now().isoformat(),
-            "training_records": 50000,
-            "metrics": {
-                "accuracy": 0.92,
-                "precision": 0.89,
-                "recall": 0.91,
-                "f1_score": 0.90
-            },
-            "features": [
-                "feature1", "feature2", "feature3"
-            ],
-            "model_type": "RandomForestClassifier",
-            "hyperparameters": {
-                "n_estimators": 100,
-                "max_depth": 10
-            }
-        }
-        
-        return metadata
+    # Also save as "latest"
+    latest_path = f"models/{model_type}/{model_name}/latest.pkl"
+    client.fput_object(bucket_name, latest_path, local_path)
     
-    def save_model_metadata(self, model_name: str, version: str, metadata: Dict):
-        """
-        Save model metadata
-        
-        Args:
-            model_name: Name of the model
-            version: Version timestamp
-            metadata: Metadata dictionary to save
-        """
-        # In production, this would:
-        # 1. Serialize metadata to JSON
-        # 2. Save to MinIO alongside model
-        # 3. Update registry index
-        
-        print(f"   💾 Saving metadata for {model_name} v{version}")
-        
-        # Mock save
-        metadata_path = f"{self.models_base_path}/general/{model_name}/{version}/metadata.json"
-        print(f"   ✅ Metadata saved: {metadata_path}")
+    print(f"✅ Saved model: {model_name} (version: {version})")
     
-    def get_model_performance_history(self, model_name: str) -> List[Dict]:
-        """
-        Get performance history across versions
-        
-        Args:
-            model_name: Name of the model
-        
-        Returns:
-            List of performance metrics by version
-        """
-        # In production, this would query metadata for all versions
-        
-        history = [
-            {
-                "version": "20260215_203000",
-                "trained_at": "2026-02-15T20:30:00",
-                "accuracy": 0.92,
-                "records": 50000
-            },
-            {
-                "version": "20260208_203000",
-                "trained_at": "2026-02-08T20:30:00",
-                "accuracy": 0.90,
-                "records": 48000
-            },
-            {
-                "version": "20260201_203000",
-                "trained_at": "2026-02-01T20:30:00",
-                "accuracy": 0.88,
-                "records": 45000
-            }
-        ]
-        
-        return history
+    # Cleanup
+    os.remove(local_path)
     
-    def compare_versions(self, model_name: str, version1: str, version2: str) -> Dict:
-        """
-        Compare two versions of a model
-        
-        Args:
-            model_name: Name of the model
-            version1: First version
-            version2: Second version
-        
-        Returns:
-            Comparison dictionary
-        """
-        meta1 = self.load_model_metadata(model_name, version1)
-        meta2 = self.load_model_metadata(model_name, version2)
-        
-        comparison = {
-            "model_name": model_name,
-            "version1": {
-                "version": version1,
-                "metrics": meta1.get("metrics", {})
-            },
-            "version2": {
-                "version": version2,
-                "metrics": meta2.get("metrics", {})
-            },
-            "improvements": {}
-        }
-        
-        # Calculate improvements
-        for metric in ["accuracy", "precision", "recall", "f1_score"]:
-            v1_val = meta1.get("metrics", {}).get(metric, 0)
-            v2_val = meta2.get("metrics", {}).get(metric, 0)
-            improvement = v2_val - v1_val
-            comparison["improvements"][metric] = {
-                "absolute": improvement,
-                "relative": (improvement / v1_val * 100) if v1_val > 0 else 0
-            }
-        
-        return comparison
+    return version
+
+
+def load_model(model_name, bucket_name="pulse-bucket-1",
+               model_type="general", version="latest"):
+    """
+    Load model from MinIO.
+    Pure function for loading.
     
-    def archive_old_versions(self, model_name: str, keep_latest: int = 3):
-        """
-        Archive old model versions
+    Args:
+        model_name: Name of the model
+        bucket_name: MinIO bucket
+        model_type: "general" or "specific"
+        version: Version to load or "latest"
         
-        Args:
-            model_name: Name of the model
-            keep_latest: Number of latest versions to keep
-        """
-        versions = self.list_model_versions(model_name)
+    Returns:
+        Loaded model object
+    """
+    client = get_minio_client()
+    
+    # Determine object path
+    if version == "latest":
+        object_path = f"models/{model_type}/{model_name}/latest.pkl"
+    else:
+        object_path = f"models/{model_type}/{model_name}/{version}.pkl"
+    
+    # Download and load
+    local_path = f"/tmp/{model_name}_loaded.pkl"
+    
+    try:
+        client.fget_object(bucket_name, object_path, local_path)
+        model = joblib.load(local_path)
+        print(f"✅ Loaded model: {model_name} (version: {version})")
+        os.remove(local_path)
+        return model
+    except Exception as e:
+        print(f"❌ Failed to load model {model_name}: {e}")
+        return None
+
+
+def list_models(bucket_name="pulse-bucket-1", model_type="general"):
+    """
+    List available models.
+    Pure function for listing.
+    
+    Args:
+        bucket_name: MinIO bucket
+        model_type: "general" or "specific"
         
-        if len(versions) <= keep_latest:
-            print(f"   ℹ️  No archiving needed for {model_name} (only {len(versions)} versions)")
-            return
-        
-        versions_to_archive = versions[keep_latest:]
-        
-        print(f"   📦 Archiving {len(versions_to_archive)} old versions of {model_name}")
-        
-        for version in versions_to_archive:
-            # In production, this would:
-            # 1. Move model from models/ to models/archive/
-            # 2. Update registry
-            print(f"      Archived: {version}")
-        
-        print(f"   ✅ Archived {len(versions_to_archive)} versions")
+    Returns:
+        List of model names
+    """
+    client = get_minio_client()
+    prefix = f"models/{model_type}/"
+    
+    models = set()
+    objects = client.list_objects(bucket_name, prefix=prefix, recursive=True)
+    
+    for obj in objects:
+        # Extract model name from path
+        parts = obj.object_name.split('/')
+        if len(parts) >= 3:
+            model_name = parts[2]
+            models.add(model_name)
+    
+    return list(models)
 
 
 def main():
-    """Example usage"""
-    print("\n" + "="*70)
-    print("ML MODEL REGISTRY - EXAMPLE USAGE")
-    print("="*70)
+    """
+    Main entry point for model registry operations.
+    Pure function for CLI.
+    """
+    import argparse
     
-    registry = MLModelRegistry(bucket_name="pulse-bucket-1")
+    parser = argparse.ArgumentParser(description="ML Model Registry")
+    parser.add_argument("action", choices=["list", "save", "load"],
+                       help="Action to perform")
+    parser.add_argument("--model-name", help="Model name")
+    parser.add_argument("--bucket-name", default="pulse-bucket-1", help="MinIO bucket")
+    parser.add_argument("--model-type", choices=["general", "specific"],
+                       default="general", help="Model type")
     
-    # List models
-    print("\n📋 General Models:")
-    models = registry.list_models("general")
-    for model in models[:5]:
-        print(f"   - {model}")
-    print(f"   ... and {len(models) - 5} more")
+    args = parser.parse_args()
     
-    # List versions
-    print("\n📦 Versions of 'customer_churn':")
-    versions = registry.list_model_versions("customer_churn")
-    for version in versions:
-        print(f"   - {version}")
-    
-    # Load metadata
-    print("\n📊 Metadata for 'customer_churn' (latest):")
-    metadata = registry.load_model_metadata("customer_churn", "latest")
-    print(f"   Trained at: {metadata['trained_at']}")
-    print(f"   Records: {metadata['training_records']:,}")
-    print(f"   Accuracy: {metadata['metrics']['accuracy']:.2%}")
-    
-    # Performance history
-    print("\n📈 Performance History:")
-    history = registry.get_model_performance_history("customer_churn")
-    for entry in history:
-        print(f"   {entry['version']}: Accuracy {entry['accuracy']:.2%}")
-    
-    print("\n" + "="*70)
+    if args.action == "list":
+        models = list_models(args.bucket_name, args.model_type)
+        print(f"\n📋 Available {args.model_type} models:")
+        for model in models:
+            print(f"   - {model}")
+    elif args.action == "load":
+        if not args.model_name:
+            print("❌ --model-name required for load")
+            return
+        model = load_model(args.model_name, args.bucket_name, args.model_type)
+        if model:
+            print(f"✅ Model loaded successfully")
+    else:
+        print("❌ Save action requires programmatic usage")
 
 
 if __name__ == "__main__":
