@@ -5,6 +5,7 @@ import Text from '@/components/global/Typography/Text';
 import { InputText } from 'primereact/inputtext';
 import { Button } from 'primereact/button';
 import { Dropdown } from 'primereact/dropdown';
+import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
 import { useAuth } from '@/context/AuthContext';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import axiosInstance from '@/services/api/axiosInstance';
@@ -18,6 +19,7 @@ const Dashboard = () => {
     const [selectedBusiness, setSelectedBusiness] = useState(null);
     const navigate = useNavigate();
     const [isAddBusinessLoading, setIsAddBusinessLoading] = useState(false);
+    const [isDeleteBusinessLoading, setIsDeleteBusinessLoading] = useState(false);
     const [businessIngestionType, setBusinessIngestionType] = useState(null);
 
     const { businessId } = useParams();
@@ -111,9 +113,76 @@ const Dashboard = () => {
             console.error('Error starting pipeline:', err);
         }
     };
+    
+    // Handle delete business with confirmation
+    const handleDeleteBusiness = () => {
+        if (!selectedBusiness) {
+            return;
+        }
+        
+        const businessName = businesses.find(b => b.business_id === selectedBusiness)?.business_name || 'this business';
+        
+        confirmDialog({
+            message: (
+                <div>
+                    <p>Are you sure you want to delete <strong>{businessName}</strong>?</p>
+                    <p className="text-red-600 text-sm mt-2">
+                        This will permanently delete:
+                    </p>
+                    <ul className="text-sm text-red-600 list-disc list-inside mt-1">
+                        <li>All pipeline data</li>
+                        <li>All processed data from storage</li>
+                        <li>All business records</li>
+                    </ul>
+                    <p className="text-sm text-gray-600 mt-2">
+                        This action cannot be undone.
+                    </p>
+                </div>
+            ),
+            header: 'Delete Business',
+            icon: 'pi pi-exclamation-triangle',
+            acceptClassName: 'p-button-danger',
+            accept: async () => {
+                await performDeleteBusiness();
+            },
+        });
+    };
+    
+    const performDeleteBusiness = async () => {
+        if (!selectedBusiness || !user?.user_id) {
+            return;
+        }
+        
+        setIsDeleteBusinessLoading(true);
+        
+        try {
+            const response = await axiosInstance.delete('/analytics/delete-business', {
+                data: {
+                    userId: user.user_id,
+                    businessId: selectedBusiness
+                }
+            });
+            
+            if (response.data.status === 200) {
+                console.log('Business deleted successfully');
+                // Redirect to analytics page without business ID
+                navigate('/analytics/');
+                // Refresh business list
+                await getBusinesses();
+            }
+        } catch (error) {
+            console.error('Error deleting business:', error);
+            alert('Failed to delete business. Please try again.');
+        } finally {
+            setIsDeleteBusinessLoading(false);
+        }
+    };
 
     return (
         <div className="flex h-screen overflow-hidden bg-gray-50">
+            {/* Confirmation Dialog for Delete Business */}
+            <ConfirmDialog />
+            
             {/* Sidebar */}
             <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
@@ -193,7 +262,8 @@ const Dashboard = () => {
                 {/* Main Content Area */}
                 <main className="flex-1 overflow-y-auto p-4 md:p-6">
                     <div className="flex items-center justify-between">
-                        <div className="mx-10">
+                        <div className="mx-10 flex items-center gap-2">
+                            {/* Add Business Button */}
                             <Button
                                 onClick={handleAddBusiness}
                                 className="bg-white text-gray-700 border border-gray-300 hover:border-[var(--color-g2)] hover:bg-gray-50 transition-all p-2"
@@ -208,6 +278,27 @@ const Dashboard = () => {
                                     <span className="font-medium text-xs sm:text-sm">Add Business/Organization</span>
                                 </div>
                             </Button>
+                            
+                            {/* Delete Business Button (Icon Only) */}
+                            {selectedBusiness && (
+                                <Button
+                                    onClick={handleDeleteBusiness}
+                                    className="bg-white text-red-600 border border-red-300 hover:border-red-500 hover:bg-red-50 transition-all p-2"
+                                    style={{
+                                        background: 'white',
+                                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                                        width: '44px',
+                                        height: '44px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                    disabled={isDeleteBusinessLoading}
+                                    title="Delete Business"
+                                >
+                                    <i className={`pi ${isDeleteBusinessLoading ? 'pi-spin pi-spinner' : 'pi-trash'} text-lg`}></i>
+                                </Button>
+                            )}
                         </div>
                         <div className="w-48">
                             <Dropdown 
