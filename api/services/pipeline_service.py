@@ -298,12 +298,20 @@ class PipelineService:
         print(f"Executing: {' '.join(cmd)}")
         
         try:
-            # Start subprocess
+            # Set environment variable to track this as a pipeline process
+            env = os.environ.copy()
+            env['SPARK_SERVER'] = 'local[*]'
+            env['PIPELINE_ID'] = pipeline_id
+            env['PIPELINE_PHASE'] = phase['name']
+            
+            # Start subprocess with process group (allows terminating entire group including Spark)
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=self.project_root
+                cwd=self.project_root,
+                env=env,
+                start_new_session=True  # Create new process group for clean termination
             )
             
             # Stream output in real-time
@@ -529,9 +537,32 @@ class PipelineService:
                             # Using signal 0 to check existence without killing
                             os.kill(pid, 0)
                             
-                            # Process exists, send SIGTERM to gracefully terminate
-                            os.kill(pid, signal.SIGTERM)
-                            print(f"Sent SIGTERM to {phase_name} process (PID: {pid})")
+                            # Process exists, send SIGTERM to process group to terminate all child processes
+                            # This ensures Spark sessions and any subprocesses are also terminated
+                            try:
+                                os.killpg(os.getpgid(pid), signal.SIGTERM)
+                                print(f"Sent SIGTERM to process group of {phase_name} (PID: {pid})")
+                            except:
+                                # Fallback to killing just the process if process group fails
+                                os.kill(pid, signal.SIGTERM)
+                                print(f"Sent SIGTERM to {phase_name} process (PID: {pid})")
+                            
+                            # Give processes 2 seconds to terminate gracefully
+                            await asyncio.sleep(2)
+                            
+                            # Force kill if still running
+                            try:
+                                os.kill(pid, 0)  # Check if still exists
+                                try:
+                                    os.killpg(os.getpgid(pid), signal.SIGKILL)
+                                    print(f"Force killed process group of {phase_name} (PID: {pid})")
+                                except:
+                                    os.kill(pid, signal.SIGKILL)
+                                    print(f"Force killed {phase_name} process (PID: {pid})")
+                            except ProcessLookupError:
+                                # Process terminated gracefully
+                                print(f"Process {pid} ({phase_name}) terminated successfully")
+                                
                         except ProcessLookupError:
                             # Process already terminated or doesn't exist
                             print(f"Process {pid} ({phase_name}) already terminated or does not exist")
@@ -540,6 +571,22 @@ class PipelineService:
                             print(f"Permission denied to terminate process {pid} ({phase_name})")
                         except Exception as e:
                             print(f"Error terminating process {pid} ({phase_name}): {e}")
+                    
+                    # Additionally, try to kill any remaining Spark processes for this pipeline
+                    # This ensures we catch any Spark sessions that may have detached
+                    try:
+                        # Use subprocess to find and kill Spark processes related to this pipeline
+                        import subprocess as sp
+                        
+                        # Kill any java processes (Spark) associated with this pipeline
+                        sp.run(
+                            ['pkill', '-9', '-f', f'SparkSubmit.*{business_id}'],
+                            capture_output=True,
+                            timeout=5
+                        )
+                        print(f"Killed any remaining Spark processes for business {business_id}")
+                    except Exception as e:
+                        print(f"Note: Could not kill remaining Spark processes: {e}")
                             
                 except Exception as e:
                     print(f"Error parsing or terminating processes: {e}")
@@ -636,3 +683,46 @@ class PipelineService:
         except Exception as e:
             print(f"Error getting pipeline status info: {e}")
             return None
+    
+    async def delete_business_bucket(self, business_id: str):
+        """
+        Delete the entire business bucket from MinIO.
+        
+        Args:
+            business_id: Business ID (bucket name)
+        """
+        try:
+            import boto3
+            from botocore.client import Config
+            
+            # Initialize S3 client for MinIO
+            s3_client = boto3.client(
+                "s3",
+                endpoint_url=os.getenv("MINIO_ENDPOINT", "http://localhost:9000"),
+                aws_access_key_id=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
+                aws_secret_access_key=os.getenv("MINIO_SECRET_KEY", "minioadmin"),
+                config=Config(signature_version="s3v4"),
+                region_name="us-east-1"
+            )
+            
+            # List and delete all objects in the bucket
+            paginator = s3_client.get_paginator("list_objects_v2")
+            for page in paginator.paginate(Bucket=business_id):
+                if "Contents" in page:
+                    objects = [{"Key": obj["Key"]} for obj in page["Contents"]]
+                    if objects:
+                        s3_client.delete_objects(
+                            Bucket=business_id,
+                            Delete={"Objects": objects}
+                        )
+                        print(f"Deleted {len(objects)} objects from bucket {business_id}")
+            
+            # Delete the bucket itself
+            s3_client.delete_bucket(Bucket=business_id)
+            print(f"✅ Deleted bucket: {business_id}")
+            
+        except Exception as e:
+            print(f"Error deleting business bucket: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
