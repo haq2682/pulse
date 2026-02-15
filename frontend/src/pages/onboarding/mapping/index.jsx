@@ -282,20 +282,20 @@ const Mapping = () => {
                     console.log('Manual mappings applied successfully');
                     
                     // Confirm mapping and navigate to dashboard
-                    await axiosInstance.post('/onboarding/confirm-mapping', {
+                    const response = await axiosInstance.post('/onboarding/confirm-mapping', {
                         userId: user.user_id
                     });
                     setMappingLoading(false);
-                    navigate('/dashboard/overview');
+                    navigate(`/analytics/${response.data.business_id}`);
                 }
             } else {
                 // No manual mappings, just confirm and proceed
                 // This handles the case where all fields were already identified
-                await axiosInstance.post('/onboarding/confirm-mapping', {
+                const response = await axiosInstance.post('/onboarding/confirm-mapping', {
                     userId: user.user_id
                 });
                 setMappingLoading(false);
-                navigate('/dashboard/overview');
+                navigate(`/analytics/${response.data.business_id}`);
             }
         } catch (e) {
             console.error('Error saving mappings:', e);
@@ -344,11 +344,11 @@ const Mapping = () => {
                     
                     // Confirm mapping and navigate to dashboard
                     try {
-                        await axiosInstance.post('/onboarding/confirm-mapping', {
+                        const response = await axiosInstance.post('/onboarding/confirm-mapping', {
                             userId: user.user_id
                         });
                         setMappingLoading(false);
-                        navigate('/dashboard/overview');
+                        navigate(`/analytics/${response.data.business_id}`);
                     } catch (confirmError) {
                         console.error('Error confirming mapping:', confirmError);
                         setError('Mapping completed but failed to confirm. Please try again.');
@@ -475,7 +475,6 @@ const Mapping = () => {
                     <Text className="text-gray-600 mb-4">
                         • Insights and analytics requiring these columns will not be generated<br />
                         • You may have limited functionality in your dashboard<br />
-                        • You can always update these mappings later
                     </Text>
                     <Text className="text-gray-700 font-semibold">
                         Do you want to continue without mapping these columns?

@@ -5,17 +5,25 @@ import Text from '@/components/global/Typography/Text';
 import { InputText } from 'primereact/inputtext';
 import { Button } from 'primereact/button';
 import { Dropdown } from 'primereact/dropdown';
+import { Dialog } from 'primereact/dialog';
+import PrimaryButton from '@/components/global/Button/PrimaryButton';
+import SecondaryButton from '@/components/global/Button/SecondaryButton';
 import { useAuth } from '@/context/AuthContext';
+import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import axiosInstance from '@/services/api/axiosInstance';
 import { useNavigate, useParams } from 'react-router-dom';
+import InlinePipelineProgress from '@/components/global/InlinePipelineProgress';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
+    const { startPipeline } = usePipelineProgress();
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [selectedItem, setSelectedItem] = useState(null);
     const [selectedBusiness, setSelectedBusiness] = useState(null);
     const navigate = useNavigate();
     const [isAddBusinessLoading, setIsAddBusinessLoading] = useState(false);
+    const [isDeleteBusinessLoading, setIsDeleteBusinessLoading] = useState(false);
+    const [businessIngestionType, setBusinessIngestionType] = useState(null);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
     const { businessId } = useParams();
     // NEW: State to toggle the custom profile menu
@@ -60,6 +68,7 @@ const Dashboard = () => {
 
             // Redirect to first business if URL has no business ID
             if (!businessId && businessList.length > 0) {
+                setBusinessIngestionType(businessList[0].ingestion_type);
                 navigate(`/analytics/${businessList[0].business_id}`);
             }
 
@@ -70,6 +79,7 @@ const Dashboard = () => {
 
     const handleBusinessChange = (e) => {
         setSelectedBusiness(e.value);
+        setBusinessIngestionType(e.option?.ingestion_type || null);
         navigate(`/analytics/${e.value}`);
     }
 
@@ -81,13 +91,118 @@ const Dashboard = () => {
         if (businessId && businesses.length > 0) {
             // Only set if different
             if (selectedBusiness !== businessId) {
+                const business = businesses.find(b => b.business_id === businessId);
+                if (business) {
+                    setBusinessIngestionType(business.ingestion_type);
+                }
                 setSelectedBusiness(businessId);
             }
         }
     }, [businessId, businesses]);
+    
+    // Handle starting analysis
+    const handleStartAnalysis = async () => {
+        if (!businessId || !user?.user_id) {
+            console.error('Missing businessId or user_id');
+            return;
+        }
+        
+        try {
+            const result = await startPipeline(businessId);
+            if (!result.success) {
+                console.error('Failed to start pipeline:', result.error);
+            }
+        } catch (err) {
+            console.error('Error starting pipeline:', err);
+        }
+    };
+    
+    // Handle delete business with confirmation
+    const handleDeleteBusiness = () => {
+        if (!selectedBusiness) {
+            return;
+        }
+        setShowDeleteDialog(true);
+    };
+    
+    const performDeleteBusiness = async () => {
+        if (!selectedBusiness || !user?.user_id) {
+            return;
+        }
+        
+        setIsDeleteBusinessLoading(true);
+        
+        try {
+            const response = await axiosInstance.delete('/analytics/delete-business', {
+                data: {
+                    userId: user.user_id,
+                    businessId: selectedBusiness
+                }
+            });
+            
+            if (response.data.status === 200) {
+                console.log('Business deleted successfully');
+                setShowDeleteDialog(false);
+                // Redirect to analytics page without business ID
+                navigate('/analytics/');
+                // Refresh business list
+                await getBusinesses();
+            }
+        } catch (error) {
+            console.error('Error deleting business:', error);
+            alert('Failed to delete business. Please try again.');
+        } finally {
+            setIsDeleteBusinessLoading(false);
+        }
+    };
+
+    const businessName = businesses.find(b => b.business_id === selectedBusiness)?.business_name || 'this business';
+
+    const deleteDialogFooter = (
+        <div className="flex justify-end gap-2 mb-5 mr-5">
+            <SecondaryButton 
+                onClick={() => setShowDeleteDialog(false)}
+                disabled={isDeleteBusinessLoading}
+                label="Cancel"
+                success
+            >
+            </SecondaryButton>
+            <PrimaryButton 
+                onClick={performDeleteBusiness}
+                loading={isDeleteBusinessLoading}
+                label={isDeleteBusinessLoading ? 'Deleting...' : 'Delete'}
+                danger
+            />
+        </div>
+    );
 
     return (
         <div className="flex h-screen overflow-hidden bg-gray-50">
+            {/* Delete Business Dialog */}
+            <Dialog
+                visible={showDeleteDialog}
+                onHide={() => setShowDeleteDialog(false)}
+                header="Delete Business"
+                footer={deleteDialogFooter}
+                style={{ width: '450px' }}
+                modal
+            >
+                <div>
+                    <p>Are you sure you want to delete <strong>{businessName}</strong>?</p>
+                    <p className="text-red-600 text-sm mt-2">
+                        This will permanently delete:
+                    </p>
+                    <ul className="text-sm text-red-600 list-disc list-inside mt-1">
+                        <li>All pipeline data</li>
+                        <li>All processed data from storage</li>
+                        <li>All business records</li>
+                    </ul>
+                    <p className="text-sm text-gray-600 mt-2">
+                        This action cannot be undone.
+                    </p>
+                </div>
+            </Dialog>
+            
             {/* Sidebar */}
             <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
@@ -103,7 +218,7 @@ const Dashboard = () => {
                     </button>
 
                     <Heading level={3} gradient={true} className="hidden md:block text-xl md:text-2xl m-0">
-                        Analytics Overview
+                        Dashboard
                     </Heading>
 
                     <InputText type="text" className="p-inputtext-sm w-2/4" placeholder="Search Insight..." />
@@ -167,7 +282,8 @@ const Dashboard = () => {
                 {/* Main Content Area */}
                 <main className="flex-1 overflow-y-auto p-4 md:p-6">
                     <div className="flex items-center justify-between">
-                        <div className="mx-10">
+                        <div className="mx-10 flex items-center gap-2">
+                            {/* Add Business Button */}
                             <Button
                                 onClick={handleAddBusiness}
                                 className="bg-white text-gray-700 border border-gray-300 hover:border-[var(--color-g2)] hover:bg-gray-50 transition-all p-2"
@@ -182,6 +298,27 @@ const Dashboard = () => {
                                     <span className="font-medium text-xs sm:text-sm">Add Business/Organization</span>
                                 </div>
                             </Button>
+                            
+                            {/* Delete Business Button (Icon Only) */}
+                            {selectedBusiness && (
+                                <Button
+                                    onClick={handleDeleteBusiness}
+                                    className="bg-white text-red-600 border border-red-300 hover:border-red-500 hover:bg-red-50 transition-all p-2"
+                                    style={{
+                                        background: 'white',
+                                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                                        width: '44px',
+                                        height: '44px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                    disabled={isDeleteBusinessLoading}
+                                    title="Delete Business"
+                                >
+                                    <i className={`pi ${isDeleteBusinessLoading ? 'pi-spin pi-spinner' : 'pi-trash'} text-lg`}></i>
+                                </Button>
+                            )}
                         </div>
                         <div className="w-48">
                             <Dropdown 
@@ -195,13 +332,21 @@ const Dashboard = () => {
                         </div>
                     </div>
                     
-                    <div className="flex items-center justify-center min-h-[60vh]">
-                        <div className="text-center max-w-md">
-                            <Text className="text-gray-500 text-base md:text-lg leading-relaxed">
-                                You have not added any business yet. Please click on the "Add Business Button" above to add a business.
-                            </Text>
+                    {/* Show inline pipeline progress when business is selected */}
+                    {businessId ? (
+                        <InlinePipelineProgress 
+                            businessId={businessId}
+                            onStartAnalysis={handleStartAnalysis}
+                        />
+                    ) : (
+                        <div className="flex items-center justify-center min-h-[60vh]">
+                            <div className="text-center max-w-md">
+                                <Text className="text-gray-500 text-base md:text-lg leading-relaxed">
+                                    You have not added any business yet. Please click on the "Add Business Button" above to add a business.
+                                </Text>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </main>
             </div>
         </div>

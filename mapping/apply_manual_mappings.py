@@ -32,34 +32,79 @@ minio_client = Minio(
 
 def load_ingested_files_cache(bucket_name: str):
     """
-    Load all CSV files from the ingested folder and cache them.
+    Load all data files from the ingested folder and cache them.
+    Supports CSV, JSON, Excel (.xlsx, .xls), and Parquet files.
+    For Excel files, each sheet is cached separately.
     
     Args:
         bucket_name: Name of the MinIO bucket
     
     Returns:
         dict: Dictionary mapping table_name -> DataFrame for all ingested files
+              For Excel files, table names follow format: filename_sheetname
     """
+    from io import BytesIO  # Add this import if not already present
+    
     ingested_cache = {}
     ingested_folder = "ingested/"
     
+    # Supported file extensions
+    supported_extensions = ['.csv', '.json', '.xlsx', '.xls', '.parquet']
+    
     try:
         objects = list(minio_client.list_objects(bucket_name, prefix=ingested_folder, recursive=False))
-        csv_objects = [obj for obj in objects if obj.object_name.endswith('.csv')]
         
-        for obj in csv_objects:
-            table_name = obj.object_name.replace(ingested_folder, '').replace('.csv', '')
+        # Filter for supported file types
+        data_objects = [obj for obj in objects 
+                       if any(obj.object_name.endswith(ext) for ext in supported_extensions)]
+        
+        for obj in data_objects:
+            filename = obj.object_name.replace(ingested_folder, '')
+            
+            # Determine file extension and base name
+            file_ext = None
+            for ext in supported_extensions:
+                if filename.endswith(ext):
+                    file_ext = ext
+                    base_name = filename.replace(ext, '')
+                    break
+            
             try:
                 response = minio_client.get_object(bucket_name, obj.object_name)
-                csv_data = response.read().decode("utf-8")
-                df = pd.read_csv(StringIO(csv_data))
+                file_data = response.read()
                 response.close()
                 response.release_conn()
-                ingested_cache[table_name] = df
-                print(f"  Cached {table_name} from ingested/ ({len(df)} rows)")
+                
+                # Handle different file types
+                if file_ext == '.csv':
+                    df = pd.read_csv(StringIO(file_data.decode("utf-8")))
+                    ingested_cache[base_name] = df
+                    print(f"  Cached {base_name} from ingested/ ({len(df)} rows)")
+                
+                elif file_ext == '.json':
+                    df = pd.read_json(StringIO(file_data.decode("utf-8")))
+                    ingested_cache[base_name] = df
+                    print(f"  Cached {base_name} from ingested/ ({len(df)} rows)")
+                
+                elif file_ext == '.parquet':
+                    df = pd.read_parquet(BytesIO(file_data))
+                    ingested_cache[base_name] = df
+                    print(f"  Cached {base_name} from ingested/ ({len(df)} rows)")
+                
+                elif file_ext in ['.xlsx', '.xls']:
+                    # Read all sheets from Excel file
+                    excel_file = pd.ExcelFile(BytesIO(file_data), engine='openpyxl')
+                    for sheet_name in excel_file.sheet_names:
+                        df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                        # Create table name as filename_sheetname
+                        table_name = f"{base_name}_{sheet_name}"
+                        ingested_cache[table_name] = df
+                        print(f"  Cached {table_name} from ingested/ ({len(df)} rows)")
+                
             except Exception as e:
                 print(f"  ⚠️  Warning: Could not load {obj.object_name}: {e}")
                 continue
+                
     except Exception as e:
         print(f"  ⚠️  Warning: Could not list ingested files: {e}")
     

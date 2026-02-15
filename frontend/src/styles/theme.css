@@ -358,3 +358,11 @@ button:focus:not(:focus-visible) {
         stroke-dashoffset: -124px;
     }
 }
+
+.p-dialog .p-dialog-content {
+    padding: 0px 30px 30px;
+}
+
+.p-dialog .p-dialog-header {
+    padding: 20px 25px 0px;
+}
