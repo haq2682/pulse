@@ -297,13 +297,19 @@ class PipelineService:
         
         print(f"Executing: {' '.join(cmd)}")
         
+        # Prepare environment variables
+        # Force local Spark mode to avoid cluster connection attempts
+        env = os.environ.copy()
+        env['SPARK_SERVER'] = 'local[*]'
+        
         try:
             # Start subprocess
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=self.project_root
+                cwd=self.project_root,
+                env=env
             )
             
             # Stream output in real-time

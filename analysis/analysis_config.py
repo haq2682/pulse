@@ -36,13 +36,30 @@ MINIO_CONFIG = {
 }
 
 def create_spark_session(app_name="Analysis"):
-    spark = (
+    spark_master = os.getenv("SPARK_SERVER", "local[*]")
+    is_local = spark_master.startswith("local")
+    
+    builder = (
         SparkSession.builder.appName(app_name)
-        .master(os.getenv("SPARK_SERVER", "local[*]"))
-        .config("spark.dynamicAllocation.enabled", "true")
-        .config("spark.dynamicAllocation.minExecutors", "0")
-        .config("spark.dynamicAllocation.maxExecutors", "8")
-        .config("spark.dynamicAllocation.initialExecutors", "1")
+        .master(spark_master)
+    )
+    
+    # Only enable dynamic allocation for cluster mode
+    if not is_local:
+        builder = (
+            builder
+            .config("spark.dynamicAllocation.enabled", "true")
+            .config("spark.dynamicAllocation.minExecutors", "0")
+            .config("spark.dynamicAllocation.maxExecutors", "8")
+            .config("spark.dynamicAllocation.initialExecutors", "1")
+        )
+    else:
+        # Disable dynamic allocation for local mode
+        builder = builder.config("spark.dynamicAllocation.enabled", "false")
+    
+    # Apply common configurations
+    spark = (
+        builder
         .config(
             "spark.jars.packages",
             "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
