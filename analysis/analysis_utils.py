@@ -6,15 +6,17 @@ from minio import Minio
 
 def parse_minio_endpoint(endpoint_url):
     """
-    Parse MinIO endpoint URL and strip protocol prefix if present.
+    Parse MinIO endpoint URL and strip protocol prefix and path if present.
     
     The MinIO Python client expects endpoint in format 'hostname:port' without
-    protocol prefix. This function handles both formats:
+    protocol prefix or path components. This function handles various formats:
     - With protocol: 'http://localhost:9000' -> 'localhost:9000'
+    - With protocol and path: 'http://localhost:9000/path' -> 'localhost:9000'
     - Without protocol: 'localhost:9000' -> 'localhost:9000'
+    - Without protocol but with path: 'localhost:9000/path' -> 'localhost:9000'
     
     Args:
-        endpoint_url: MinIO endpoint URL (e.g., 'localhost:9000' or 'http://localhost:9000')
+        endpoint_url: MinIO endpoint URL (e.g., 'localhost:9000' or 'http://localhost:9000/path')
         
     Returns:
         str: Endpoint in 'hostname:port' format
@@ -29,10 +31,14 @@ def parse_minio_endpoint(endpoint_url):
     if "://" in endpoint_url:
         endpoint_url = endpoint_url.split("://", 1)[1]
     
+    # Strip any path component (everything after the first /)
+    if "/" in endpoint_url:
+        endpoint_url = endpoint_url.split("/", 1)[0]
+    
     # Validate that we have a non-empty endpoint after parsing
     endpoint_url = endpoint_url.strip()
     if not endpoint_url:
-        raise ValueError("MINIO_ENDPOINT is invalid after removing protocol")
+        raise ValueError("MINIO_ENDPOINT is invalid after removing protocol and path")
     
     return endpoint_url
 
