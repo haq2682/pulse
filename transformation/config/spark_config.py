@@ -6,13 +6,30 @@ findspark.init()
 
 
 def create_spark_session():
-    return (
+    spark_master = os.getenv("SPARK_SERVER", "local[*]")
+    is_local = spark_master.startswith("local")
+    
+    builder = (
         SparkSession.builder.appName("Transformation")
-        .master(os.getenv("SPARK_SERVER", "local[*]"))
-        .config("spark.dynamicAllocation.enabled", "true")
-        .config("spark.dynamicAllocation.minExecutors", "0")
-        .config("spark.dynamicAllocation.maxExecutors", "8")
-        .config("spark.dynamicAllocation.initialExecutors", "2")
+        .master(spark_master)
+    )
+    
+    # Only enable dynamic allocation for cluster mode
+    if not is_local:
+        builder = (
+            builder
+            .config("spark.dynamicAllocation.enabled", "true")
+            .config("spark.dynamicAllocation.minExecutors", "0")
+            .config("spark.dynamicAllocation.maxExecutors", "8")
+            .config("spark.dynamicAllocation.initialExecutors", "2")
+        )
+    else:
+        # Disable dynamic allocation for local mode
+        builder = builder.config("spark.dynamicAllocation.enabled", "false")
+    
+    # Apply common configurations
+    builder = (
+        builder
         .config("spark.executor.cores", "2")
         .config("spark.executor.memory", "6g")
         .config("spark.driver.memory", "2g")
@@ -32,8 +49,9 @@ def create_spark_session():
         )
         .config("inferSchema", "true")
         .config("mergeSchema", "true")
-        .getOrCreate()
     )
+    
+    return builder.getOrCreate()
 
         # .config("spark.dynamicAllocation.enabled", "true")
         # .config("spark.dynamicAllocation.minExecutors", "0")
