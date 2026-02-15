@@ -300,7 +300,6 @@ class PipelineService:
         try:
             # Set environment variable to track this as a pipeline process
             env = os.environ.copy()
-            env['SPARK_SERVER'] = 'local[*]'
             env['PIPELINE_ID'] = pipeline_id
             env['PIPELINE_PHASE'] = phase['name']
             
