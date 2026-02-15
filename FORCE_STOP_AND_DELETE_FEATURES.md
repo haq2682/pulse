@@ -20,6 +20,10 @@ Enhanced process termination to kill entire process groups and cleanup detached 
 **1. Process Group Creation**
 ```python
 # In _execute_phase method
+env = os.environ.copy()
+env['PIPELINE_ID'] = pipeline_id
+env['PIPELINE_PHASE'] = phase['name']
+
 process = await asyncio.create_subprocess_exec(
     *cmd,
     stdout=asyncio.subprocess.PIPE,
@@ -29,6 +33,8 @@ process = await asyncio.create_subprocess_exec(
     start_new_session=True  # Creates new process group
 )
 ```
+
+**Note:** The subprocess inherits all environment variables including `SPARK_SERVER` or `SPARK_MASTER_URL` from the Docker environment, allowing Spark to connect to the cluster as configured.
 
 **2. Enhanced Termination**
 ```python
