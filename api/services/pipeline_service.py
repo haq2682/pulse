@@ -184,7 +184,7 @@ class PipelineService:
                 phase_name = phase["name"]
                 
                 # Check if pipeline was cancelled
-                status = self._get_pipeline_status(pipeline_id)
+                status = self._get_pipeline_status(pipeline_id, db_connection=db_connection)
                 if status == "cancelled":
                     print(f"Pipeline {pipeline_id} was cancelled before {phase_name} phase")
                     return
@@ -194,7 +194,8 @@ class PipelineService:
                     pipeline_id, business_id,
                     status="running",
                     current_step=phase["description"],
-                    progress=cumulative_progress
+                    progress=cumulative_progress,
+                    db_connection=db_connection
                 )
                 
                 # Execute phase
@@ -219,7 +220,8 @@ class PipelineService:
                         progress=cumulative_progress,
                         error_message=error_msg,
                         failed_phase=phase_name,
-                        process_ids=process_ids
+                        process_ids=process_ids,
+                        db_connection=db_connection
                     )
                     return
                 
@@ -230,7 +232,8 @@ class PipelineService:
                     status="running",
                     current_step=phase["description"],
                     progress=min(cumulative_progress, 100),
-                    process_ids=process_ids
+                    process_ids=process_ids,
+                    db_connection=db_connection
                 )
             
             # Pipeline completed successfully
@@ -240,7 +243,8 @@ class PipelineService:
                 current_step="Pipeline completed successfully",
                 progress=100,
                 completed=True,
-                process_ids=process_ids
+                process_ids=process_ids,
+                db_connection=db_connection
             )
             
             print(f"\n{'='*60}")
@@ -259,7 +263,8 @@ class PipelineService:
                 current_step="Pipeline Error",
                 progress=cumulative_progress,
                 error_message=str(e),
-                failed_phase=phase_name if 'phase_name' in locals() else None
+                failed_phase=phase_name if 'phase_name' in locals() else None,
+                db_connection=db_connection
             )
     
     async def _execute_phase(
