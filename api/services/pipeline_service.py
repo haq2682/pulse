@@ -133,15 +133,25 @@ class PipelineService:
         """
         from database import get_db_connection
         
+        print(f"Creating new database connection for pipeline {pipeline_id}")
         # Create a new connection for this background task
         db_connection = get_db_connection()
+        print(f"Database connection created: {db_connection}")
+        
         try:
             # Execute the pipeline with the new connection
             await self._execute_pipeline(pipeline_id, business_id, user_id, start_from_phase, db_connection)
+        except Exception as e:
+            print(f"Error in pipeline execution: {e}")
+            import traceback
+            traceback.print_exc()
         finally:
             # Always close the connection when done
-            db_connection.close()
-            print(f"Pipeline {pipeline_id} database connection closed")
+            try:
+                db_connection.close()
+                print(f"Pipeline {pipeline_id} database connection closed successfully")
+            except Exception as e:
+                print(f"Error closing database connection: {e}")
     
     async def _execute_pipeline(self, pipeline_id: str, business_id: str, user_id: str, start_from_phase: Optional[str] = None, db_connection=None):
         """
@@ -370,6 +380,12 @@ class PipelineService:
         """
         # Use the provided connection or fall back to self.db
         db = db_connection if db_connection is not None else self.db
+        
+        # Log which connection is being used
+        if db_connection is not None:
+            print(f"_update_progress using provided db_connection for pipeline {pipeline_id}")
+        else:
+            print(f"_update_progress WARNING: using self.db (request-scoped) for pipeline {pipeline_id}")
         
         try:
             # Prepare update data

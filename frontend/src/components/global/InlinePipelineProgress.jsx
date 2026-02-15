@@ -21,21 +21,27 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis }) => {
     const [isRetrying, setIsRetrying] = React.useState(false);
     const [isStarting, setIsStarting] = React.useState(false);
     const [errorMessage, setErrorMessage] = React.useState(null);
+    const previousBusinessIdRef = React.useRef(null);
     
     // Connect WebSocket when business changes
     useEffect(() => {
-        if (businessId) {
+        if (businessId && businessId !== previousBusinessIdRef.current) {
             // Fetch initial status
             fetchPipelineStatus(businessId);
             
             // Connect WebSocket
             connectWebSocket(businessId);
             
+            previousBusinessIdRef.current = businessId;
+            
             return () => {
+                // Only disconnect when component unmounts or business changes
                 disconnectWebSocket();
+                previousBusinessIdRef.current = null;
             };
         }
-    }, [businessId, connectWebSocket, disconnectWebSocket, fetchPipelineStatus]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [businessId]); // Only depend on businessId to prevent reconnection loops
     
     // Get progress percentage
     const progress = pipelineStatus?.progress || 0;

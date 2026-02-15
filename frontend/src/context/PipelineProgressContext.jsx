@@ -14,6 +14,8 @@ export const PipelineProgressProvider = ({ children }) => {
     const reconnectAttemptsRef = useRef(0);
     const pingIntervalRef = useRef(null);
     const shouldReconnectRef = useRef(true);
+    const currentBusinessIdRef = useRef(null);
+    const isConnectingRef = useRef(false);
     const MAX_RECONNECT_ATTEMPTS = 5;
     const RECONNECT_DELAY = 3000;
     
@@ -28,10 +30,23 @@ export const PipelineProgressProvider = ({ children }) => {
     const connectWebSocket = useCallback((businessId) => {
         if (!businessId) return;
         
-        // Close existing connection if any
-        if (wsRef.current) {
-            wsRef.current.close();
+        // Prevent duplicate connections for the same business
+        if (isConnectingRef.current || 
+            (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && currentBusinessIdRef.current === businessId)) {
+            console.log(`WebSocket already connected or connecting for business ${businessId}`);
+            return;
         }
+        
+        // Close existing connection if switching to a different business
+        if (wsRef.current && currentBusinessIdRef.current !== businessId) {
+            console.log(`Closing existing connection for business ${currentBusinessIdRef.current}`);
+            wsRef.current.close();
+            wsRef.current = null;
+        }
+        
+        isConnectingRef.current = true;
+        currentBusinessIdRef.current = businessId;
+        shouldReconnectRef.current = true;
         
         try {
             const wsUrl = getWebSocketUrl(businessId);
@@ -45,20 +60,26 @@ export const PipelineProgressProvider = ({ children }) => {
                 setIsConnected(true);
                 setError(null);
                 reconnectAttemptsRef.current = 0;
+                isConnectingRef.current = false;
                 
                 // Send ping to keep connection alive
+                if (pingIntervalRef.current) {
+                    clearInterval(pingIntervalRef.current);
+                }
                 pingIntervalRef.current = setInterval(() => {
                     if (ws.readyState === WebSocket.OPEN) {
                         ws.send('ping');
-                    } else {
-                        clearInterval(pingIntervalRef.current);
-                        pingIntervalRef.current = null;
                     }
                 }, 30000); // Ping every 30 seconds
             };
             
             ws.onmessage = (event) => {
                 try {
+                    // Handle pong response
+                    if (event.data === 'pong') {
+                        return;
+                    }
+                    
                     const data = JSON.parse(event.data);
                     console.log('Pipeline update received:', data);
                     setPipelineStatus(data);
@@ -70,12 +91,14 @@ export const PipelineProgressProvider = ({ children }) => {
             ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
                 setError('Connection error');
+                isConnectingRef.current = false;
             };
             
             ws.onclose = () => {
                 console.log('WebSocket disconnected');
                 setIsConnected(false);
                 wsRef.current = null;
+                isConnectingRef.current = false;
                 
                 // Clear ping interval
                 if (pingIntervalRef.current) {
@@ -83,8 +106,10 @@ export const PipelineProgressProvider = ({ children }) => {
                     pingIntervalRef.current = null;
                 }
                 
-                // Attempt to reconnect if allowed
-                if (shouldReconnectRef.current && reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+                // Attempt to reconnect if allowed and still on the same business
+                if (shouldReconnectRef.current && 
+                    reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS &&
+                    currentBusinessIdRef.current === businessId) {
                     reconnectAttemptsRef.current++;
                     console.log(`Reconnecting... (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`);
                     
@@ -97,12 +122,14 @@ export const PipelineProgressProvider = ({ children }) => {
         } catch (err) {
             console.error('Error creating WebSocket connection:', err);
             setError('Failed to connect');
+            isConnectingRef.current = false;
         }
     }, [getWebSocketUrl]);
     
     const disconnectWebSocket = useCallback(() => {
         // Prevent auto-reconnection
         shouldReconnectRef.current = false;
+        currentBusinessIdRef.current = null;
         
         if (reconnectTimeoutRef.current) {
             clearTimeout(reconnectTimeoutRef.current);
@@ -120,6 +147,7 @@ export const PipelineProgressProvider = ({ children }) => {
         }
         
         setIsConnected(false);
+        isConnectingRef.current = false;
     }, []);
     
     // Fetch current pipeline status from REST API
