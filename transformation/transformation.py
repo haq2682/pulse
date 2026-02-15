@@ -89,7 +89,8 @@ def main(bucket_name=None):
     
     # Export as Parquet with schema enforcement and type preservation
     export_to_minio(
-        dataframes, 
+        dataframes,
+        bucket_name=bucket_name,        # Use the business_id bucket
         sql_schema_path=sql_schema_path,
         enforce_schemas=True,          # Add missing columns as NULL
         preserve_types=True,            # Cast to correct data types
