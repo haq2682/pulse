@@ -56,7 +56,7 @@ class PipelineService:
         Initialize pipeline service.
         
         Args:
-            db: Database connection
+            db: Database connection (only used for initial operations)
             websocket_manager: WebSocket manager for broadcasting updates (optional)
         """
         self.db = db
@@ -94,7 +94,7 @@ class PipelineService:
         """
         pipeline_id = str(uuid.uuid4())
         
-        # Create pipeline status record
+        # Create pipeline status record using the request-scoped connection
         self.db.execute(
             text("""
                 INSERT INTO pipeline_status 
@@ -121,12 +121,29 @@ class PipelineService:
             "progress": 0
         })
         
-        # Start pipeline execution in background
-        asyncio.create_task(self._execute_pipeline(pipeline_id, business_id, user_id, start_from_phase))
+        # Start pipeline execution in background with a new database connection
+        asyncio.create_task(self._execute_pipeline_with_new_connection(pipeline_id, business_id, user_id, start_from_phase))
         
         return pipeline_id
     
-    async def _execute_pipeline(self, pipeline_id: str, business_id: str, user_id: str, start_from_phase: Optional[str] = None):
+    async def _execute_pipeline_with_new_connection(self, pipeline_id: str, business_id: str, user_id: str, start_from_phase: Optional[str] = None):
+        """
+        Wrapper to execute pipeline with a new database connection.
+        This ensures the background task has its own connection that won't be closed by the request handler.
+        """
+        from database import get_db_connection
+        
+        # Create a new connection for this background task
+        db_connection = get_db_connection()
+        try:
+            # Execute the pipeline with the new connection
+            await self._execute_pipeline(pipeline_id, business_id, user_id, start_from_phase, db_connection)
+        finally:
+            # Always close the connection when done
+            db_connection.close()
+            print(f"Pipeline {pipeline_id} database connection closed")
+    
+    async def _execute_pipeline(self, pipeline_id: str, business_id: str, user_id: str, start_from_phase: Optional[str] = None, db_connection=None):
         """
         Execute the complete pipeline asynchronously.
         
@@ -333,7 +350,8 @@ class PipelineService:
         error_message: Optional[str] = None,
         failed_phase: Optional[str] = None,
         completed: bool = False,
-        process_ids: Optional[Dict] = None
+        process_ids: Optional[Dict] = None,
+        db_connection=None
     ):
         """
         Update pipeline progress in database and broadcast via WebSocket.
@@ -348,7 +366,11 @@ class PipelineService:
             failed_phase: Name of phase where pipeline failed
             completed: Whether pipeline is completed
             process_ids: Dict of process IDs for each phase
+            db_connection: Database connection to use (if None, uses self.db)
         """
+        # Use the provided connection or fall back to self.db
+        db = db_connection if db_connection is not None else self.db
+        
         try:
             # Prepare update data
             update_data = {
@@ -370,8 +392,8 @@ class PipelineService:
             set_clause = ", ".join([f"{k} = :{k}" for k in update_data.keys() if k != "pipeline_id"])
             query = f"UPDATE pipeline_status SET {set_clause} WHERE pipeline_id = :pipeline_id"
             
-            self.db.execute(text(query), update_data)
-            self.db.commit()
+            db.execute(text(query), update_data)
+            db.commit()
             
             # Broadcast via WebSocket
             await self._broadcast_progress(business_id, {
@@ -405,18 +427,22 @@ class PipelineService:
             except Exception as e:
                 print(f"Error broadcasting progress: {e}")
     
-    def _get_pipeline_status(self, pipeline_id: str) -> Optional[str]:
+    def _get_pipeline_status(self, pipeline_id: str, db_connection=None) -> Optional[str]:
         """
         Get current pipeline status from database.
         
         Args:
             pipeline_id: Pipeline execution ID
+            db_connection: Database connection to use (if None, uses self.db)
             
         Returns:
             Status string or None
         """
+        # Use the provided connection or fall back to self.db
+        db = db_connection if db_connection is not None else self.db
+        
         try:
-            result = self.db.execute(
+            result = db.execute(
                 text("SELECT status FROM pipeline_status WHERE pipeline_id = :pipeline_id"),
                 {"pipeline_id": pipeline_id}
             ).fetchone()

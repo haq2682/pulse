@@ -17,3 +17,11 @@ def get_db():
     with engine.connect() as connection:
         yield connection
         # The connection automatically closes here because of the 'with' block
+
+# 3. Helper function to get a new connection for background tasks
+def get_db_connection():
+    """
+    Get a new database connection for background tasks.
+    This connection must be explicitly closed by the caller.
+    """
+    return engine.connect()
