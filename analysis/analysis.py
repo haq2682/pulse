@@ -7812,6 +7812,14 @@ def main(bucket_name=None):
     print(f"\n✅ Export completed: {export_result['stats']['successful']} analytics exported successfully")
     print(f"   Bucket: {export_result['bucket']}")
     print(f"   Format: {export_result['format']}")
+    
+    # Stop Spark session
+    spark.stop()
+    print("\n✅ Spark session stopped")
+    
+    print("\n" + "=" * 60)
+    print("🎉 ANALYSIS PIPELINE COMPLETED SUCCESSFULLY!")
+    print("=" * 60)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='E-commerce analytics pipeline')
