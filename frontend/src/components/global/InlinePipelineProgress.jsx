@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Knob } from 'primereact/knob';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
-import { PrimaryButton, SecondaryButton } from '@/components/global/Button';
+import { PrimaryButton } from '@/components/global/Button';
 import Text from '@/components/global/Typography/Text';
 import Heading from '@/components/global/Typography/Heading';
 
@@ -129,7 +129,7 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis }) => {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
                 <div className="text-center max-w-2xl">
-                    <div className="mb-6">
+                    <div className="mb-6 place-self-center">
                         <i className="pi pi-chart-line text-6xl text-gray-300 mb-4"></i>
                     </div>
                     <Heading level={3} className="mb-3">
@@ -143,7 +143,6 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis }) => {
                         label="Start Analysis"
                         onClick={handleStartAnalysis}
                         loading={isStarting}
-                        icon="pi pi-play"
                         className="px-8 py-3"
                     />
                     {errorMessage && (
@@ -164,7 +163,7 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis }) => {
             <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
                 <div className="text-center max-w-2xl">
                     {/* Knob */}
-                    <div className="mb-6">
+                    <div className="mb-6 place-self-center">
                         <Knob
                             value={progress}
                             readOnly
@@ -210,12 +209,11 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis }) => {
                     </div>
                     
                     {/* Cancel Button */}
-                    <SecondaryButton
+                    <PrimaryButton
                         label="Cancel Pipeline"
                         onClick={handleCancel}
                         loading={isCancelling}
                         danger
-                        icon="pi pi-times"
                         className="text-sm"
                     />
                     
@@ -269,7 +267,7 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis }) => {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
                 <div className="text-center max-w-2xl">
-                    <div className="mb-6">
+                    <div className="mb-6 place-self-center">
                         <Knob
                             value={progress}
                             readOnly

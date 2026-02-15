@@ -2,6 +2,7 @@ import os
 from typing import Optional
 from minio import Minio
 from analysis_config import MINIO_CONFIG
+from analysis_utils import parse_minio_endpoint
 
 SUPPORTED_FORMATS = ["parquet", "csv", "json"]
 
@@ -107,7 +108,7 @@ def create_minio_client() -> Minio:
     if not all([MINIO_CONFIG["endpoint"], MINIO_CONFIG["access_key"], MINIO_CONFIG["secret_key"]]):
         raise ValueError("Missing required MinIO environment variables")
     return Minio(
-        MINIO_CONFIG["endpoint"],
+        parse_minio_endpoint(MINIO_CONFIG["endpoint"]),
         access_key=MINIO_CONFIG["access_key"],
         secret_key=MINIO_CONFIG["secret_key"],
         secure=False
