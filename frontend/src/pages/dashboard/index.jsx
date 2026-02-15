@@ -5,7 +5,9 @@ import Text from '@/components/global/Typography/Text';
 import { InputText } from 'primereact/inputtext';
 import { Button } from 'primereact/button';
 import { Dropdown } from 'primereact/dropdown';
-import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
+import { Dialog } from 'primereact/dialog';
+import PrimaryButton from '@/components/global/Button/PrimaryButton';
+import SecondaryButton from '@/components/global/Button/SecondaryButton';
 import { useAuth } from '@/context/AuthContext';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import axiosInstance from '@/services/api/axiosInstance';
@@ -21,6 +23,7 @@ const Dashboard = () => {
     const [isAddBusinessLoading, setIsAddBusinessLoading] = useState(false);
     const [isDeleteBusinessLoading, setIsDeleteBusinessLoading] = useState(false);
     const [businessIngestionType, setBusinessIngestionType] = useState(null);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
     const { businessId } = useParams();
     // NEW: State to toggle the custom profile menu
@@ -119,33 +122,7 @@ const Dashboard = () => {
         if (!selectedBusiness) {
             return;
         }
-        
-        const businessName = businesses.find(b => b.business_id === selectedBusiness)?.business_name || 'this business';
-        
-        confirmDialog({
-            message: (
-                <div>
-                    <p>Are you sure you want to delete <strong>{businessName}</strong>?</p>
-                    <p className="text-red-600 text-sm mt-2">
-                        This will permanently delete:
-                    </p>
-                    <ul className="text-sm text-red-600 list-disc list-inside mt-1">
-                        <li>All pipeline data</li>
-                        <li>All processed data from storage</li>
-                        <li>All business records</li>
-                    </ul>
-                    <p className="text-sm text-gray-600 mt-2">
-                        This action cannot be undone.
-                    </p>
-                </div>
-            ),
-            header: 'Delete Business',
-            icon: 'pi pi-exclamation-triangle',
-            acceptClassName: 'p-button-danger',
-            accept: async () => {
-                await performDeleteBusiness();
-            },
-        });
+        setShowDeleteDialog(true);
     };
     
     const performDeleteBusiness = async () => {
@@ -165,6 +142,7 @@ const Dashboard = () => {
             
             if (response.data.status === 200) {
                 console.log('Business deleted successfully');
+                setShowDeleteDialog(false);
                 // Redirect to analytics page without business ID
                 navigate('/analytics/');
                 // Refresh business list
@@ -178,10 +156,52 @@ const Dashboard = () => {
         }
     };
 
+    const businessName = businesses.find(b => b.business_id === selectedBusiness)?.business_name || 'this business';
+
+    const deleteDialogFooter = (
+        <div className="flex justify-end gap-2 mb-5 mr-5">
+            <SecondaryButton 
+                onClick={() => setShowDeleteDialog(false)}
+                disabled={isDeleteBusinessLoading}
+                label="Cancel"
+                success
+            >
+            </SecondaryButton>
+            <PrimaryButton 
+                onClick={performDeleteBusiness}
+                loading={isDeleteBusinessLoading}
+                label={isDeleteBusinessLoading ? 'Deleting...' : 'Delete'}
+                danger
+            />
+        </div>
+    );
+
     return (
         <div className="flex h-screen overflow-hidden bg-gray-50">
-            {/* Confirmation Dialog for Delete Business */}
-            <ConfirmDialog />
+            {/* Delete Business Dialog */}
+            <Dialog
+                visible={showDeleteDialog}
+                onHide={() => setShowDeleteDialog(false)}
+                header="Delete Business"
+                footer={deleteDialogFooter}
+                style={{ width: '450px' }}
+                modal
+            >
+                <div>
+                    <p>Are you sure you want to delete <strong>{businessName}</strong>?</p>
+                    <p className="text-red-600 text-sm mt-2">
+                        This will permanently delete:
+                    </p>
+                    <ul className="text-sm text-red-600 list-disc list-inside mt-1">
+                        <li>All pipeline data</li>
+                        <li>All processed data from storage</li>
+                        <li>All business records</li>
+                    </ul>
+                    <p className="text-sm text-gray-600 mt-2">
+                        This action cannot be undone.
+                    </p>
+                </div>
+            </Dialog>
             
             {/* Sidebar */}
             <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
