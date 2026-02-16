@@ -210,17 +210,35 @@ def main():
     Main entry point for streaming cleaning.
     Pure function - just orchestrates other functions.
     """
+    import argparse
+    
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description='Streaming Cleaning Pipeline')
+    parser.add_argument('--bucket-name', required=True, help='Business ID / bucket name')
+    parser.add_argument('--mode', default='batch', choices=['batch', 'db', 'api'], 
+                       help='Data ingestion mode (batch, db, api)')
+    parser.add_argument('--trigger-interval', default='10 seconds', 
+                       help='Trigger interval for micro-batches')
+    args = parser.parse_args()
+    
     # Create Spark session
     spark = (SparkSession.builder
-             .appName("StreamingCleaning")
+             .appName(f"StreamingCleaning-{args.bucket_name}")
              .config("spark.sql.streaming.schemaInference", "true")
              .getOrCreate())
     
-    print("🚀 Starting Streaming Cleaning Pipeline (Functional Style)")
+    print(f"🚀 Starting Streaming Cleaning Pipeline (Functional Style)")
+    print(f"   Business ID: {args.bucket_name}")
+    print(f"   Mode: {args.mode}")
+    print(f"   Trigger Interval: {args.trigger_interval}")
     print("=" * 60)
     
     # Start all cleaning streams
-    queries = create_all_cleaning_streams(spark, trigger_interval="10 seconds")
+    queries = create_all_cleaning_streams(
+        spark, 
+        bucket_name=args.bucket_name,
+        trigger_interval=args.trigger_interval
+    )
     
     # Monitor queries
     try:

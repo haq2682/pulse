@@ -204,14 +204,32 @@ def main():
     Main entry point for streaming ML inference.
     Pure function - just orchestrates other functions.
     """
+    import argparse
+    
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description='Streaming ML Inference Pipeline')
+    parser.add_argument('--bucket-name', required=True, help='Business ID / bucket name')
+    parser.add_argument('--mode', default='batch', choices=['batch', 'db', 'api'], 
+                       help='Data ingestion mode (batch, db, api)')
+    parser.add_argument('--trigger-interval', default='10 seconds', 
+                       help='Trigger interval for micro-batches')
+    args = parser.parse_args()
+    
     spark = (SparkSession.builder
-             .appName("StreamingMLInference")
+             .appName(f"StreamingMLInference-{args.bucket_name}")
              .getOrCreate())
     
-    print("🚀 Starting Streaming ML Inference (Functional Style)")
+    print(f"🚀 Starting Streaming ML Inference (Functional Style)")
+    print(f"   Business ID: {args.bucket_name}")
+    print(f"   Mode: {args.mode}")
+    print(f"   Trigger Interval: {args.trigger_interval}")
     print("=" * 60)
     
-    queries = create_all_ml_inference_streams(spark)
+    queries = create_all_ml_inference_streams(
+        spark, 
+        bucket_name=args.bucket_name,
+        trigger_interval=args.trigger_interval
+    )
     
     try:
         while True:
