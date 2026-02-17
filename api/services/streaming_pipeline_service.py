@@ -39,7 +39,7 @@ class StreamingPipelineService:
         },
         {
             "name": "streaming_ml_inference",
-            "script": "streaming_ml_inference.py",
+            "script": "machine-learning/streaming_ml_inference.py",
             "description": "Real-time ML Predictions (Streaming)",
             "weight": 40,
             "is_continuous": True

@@ -27,7 +27,7 @@ from transformation.streaming_transformation import (
     create_all_transformation_streams,
     monitor_transformation_queries
 )
-from streaming_ml_inference import create_all_ml_inference_streams
+from machine_learning.streaming_ml_inference import create_all_ml_inference_streams
 
 
 def start_streaming_pipeline(spark, bucket_name="pulse-bucket-1",
