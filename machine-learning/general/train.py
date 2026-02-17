@@ -32,7 +32,7 @@ def main():
     # review_sentiment()
     # stock_status()
 
-    aov()
+    # aov()
     # clv()
     # restock_quantity()
     # revenue_forecast()

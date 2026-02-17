@@ -7,7 +7,7 @@ def main():
     parser.add_argument('--bucket-name', type=str, required=True, help='S3 bucket name')
     args = parser.parse_args()
     
-    general_infer(args.bucket_name)
+    # general_infer(args.bucket_name)
     specific_infer(args.bucket_name)
     
 if __name__ == "__main__":

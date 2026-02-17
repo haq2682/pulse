@@ -231,7 +231,7 @@ def main(BUCKET_NAME):
     # Step 1: Load model
     print("Step 1: Load Model")
     print("-" * 60)
-    model = load_model(MODEL_NAME)
+    model = load_model(MODEL_NAME, MODEL_BASE_PATH)
     
     if model is None:
         print("\n✗ Inference aborted: Model not found")

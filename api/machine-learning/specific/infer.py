@@ -14,8 +14,11 @@ from specific.inference.regression.infer_price_optimization import main as price
 
 from specific.inference.clustering.infer_product_affinity import main as product_affinity
 from specific.inference.clustering.infer_product_lifecycle import main as product_lifecycle
+from specific.train import main as train_all
 
 def main(BUCKET_NAME):
+    train_all(BUCKET_NAME)
+    
     fulfillment_risk(BUCKET_NAME)
     product_bundling(BUCKET_NAME)
 
