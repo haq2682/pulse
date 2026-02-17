@@ -19,7 +19,6 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 from pyspark.sql.types import StringType
-from pyspark.ml.feature import VectorAssembler, StandardScaler
 from pyspark.ml.regression import LinearRegressionModel, RandomForestRegressionModel, GBTRegressionModel
 from pyspark.ml import PipelineModel
 from datetime import datetime
@@ -308,7 +307,7 @@ def prepare_inference_data(df):
 
     # Select required columns (metadata columns + all feature columns)
     # Note: Some metadata columns may overlap with FEATURE_COLUMNS (e.g., total_orders)
-    metadata_cols = ["year_month", "total_revenue", "revenue_rolling_12m", "revenue_growth_1m"]
+    metadata_cols = ["year_month", "total_revenue", "revenue_rolling_12m", "revenue_growth_rate"]
     all_cols = metadata_cols + FEATURE_COLUMNS
     
     # Remove duplicates while preserving order
@@ -381,7 +380,7 @@ def generate_predictions(model, df, model_name, FORECAST_HORIZON_DAYS):
         (F.col("predicted_seasonal_index") * 0.90).alias("confidence_interval_lower"),
         (F.col("predicted_seasonal_index") * 1.10).alias("confidence_interval_upper"),
         F.lit(FORECAST_HORIZON_DAYS).alias("forecast_horizon_days"),
-        (1 + F.col("revenue_growth_1m")).alias("trend_factor"),
+        (1 + F.col("revenue_growth_rate")).alias("trend_factor"),
         F.lit(0.90).alias("confidence_score"),
         F.lit(model_name).alias("model_version")
     )
