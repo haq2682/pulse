@@ -307,7 +307,7 @@ def prepare_inference_data(df):
     df_filled = df.fillna(0, subset=FEATURE_COLUMNS)
 
     # Select required columns (metadata columns + all feature columns)
-    # Note: Some metadata columns (e.g., total_orders) overlap with FEATURE_COLUMNS
+    # Note: Some metadata columns may overlap with FEATURE_COLUMNS (e.g., total_orders)
     metadata_cols = ["year_month", "total_revenue", "revenue_rolling_12m", "revenue_growth_1m"]
     all_cols = metadata_cols + FEATURE_COLUMNS
     
