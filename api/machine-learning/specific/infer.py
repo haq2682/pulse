@@ -11,6 +11,8 @@ from specific.inference.regression.infer_campaign_roi import main as campaign_ro
 from specific.inference.regression.infer_delivery_time import main as delivery_time
 from specific.inference.regression.infer_demand_forecast import main as demand_forecast
 from specific.inference.regression.infer_price_optimization import main as price_optimization
+from specific.inference.regression.infer_revenue_forecast import main as revenue_forecast
+from specific.inference.regression.infer_seasonal_trends import main as seasonal_trends
 
 from specific.inference.clustering.infer_product_affinity import main as product_affinity
 from specific.inference.clustering.infer_product_lifecycle import main as product_lifecycle
@@ -26,6 +28,8 @@ def main(BUCKET_NAME):
     delivery_time(BUCKET_NAME)
     demand_forecast(BUCKET_NAME)
     price_optimization(BUCKET_NAME)
+    revenue_forecast(BUCKET_NAME)
+    seasonal_trends(BUCKET_NAME)
 
     product_affinity(BUCKET_NAME)
     product_lifecycle(BUCKET_NAME)

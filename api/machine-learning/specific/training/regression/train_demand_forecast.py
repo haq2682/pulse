@@ -373,9 +373,10 @@ def prepare_training_data(df, MIN_RECORDS_THRESHOLD):
     
     df_scaled = df_scaled.toDF(*new_cols)
     
-    # Final selection
+    # Final selection (keep year_month for time-based splitting)
     df_prepared = df_scaled.select(
         "product_id",
+        "year_month",
         "features",
         TARGET_COLUMN
     ).dropDuplicates(["product_id"])
@@ -610,12 +611,20 @@ def main(BUCKET_NAME):
     
     df_prepared, scaler_model = result
     
-    # Split data
-    print("\nStep 4: Train/Test Split")
+    # Split data using time-based split (chronological ordering, not random)
+    print("\nStep 4: Time-Based Train/Test Split")
     print("-" * 60)
-    train_df, test_df = df_prepared.randomSplit([0.8, 0.2], seed=42)
-    print(f"Training set: {train_df.count()} records")
-    print(f"Test set: {test_df.count()} records")
+    total_count = df_prepared.count()
+    split_point = int(total_count * 0.8)
+
+    # Order by year_month so earlier products go to training and later to testing
+    window_spec = Window.orderBy("year_month")
+    df_with_row = df_prepared.withColumn("_row_num", F.row_number().over(window_spec))
+
+    train_df = df_with_row.filter(F.col("_row_num") <= split_point).drop("_row_num")
+    test_df = df_with_row.filter(F.col("_row_num") > split_point).drop("_row_num")
+    print(f"Training set: {train_df.count()} records (earlier time periods)")
+    print(f"Test set: {test_df.count()} records (later time periods)")
     
     # Train models
     print("\nStep 5: Model Training")
