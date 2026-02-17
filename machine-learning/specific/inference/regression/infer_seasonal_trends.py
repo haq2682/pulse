@@ -306,15 +306,20 @@ def prepare_inference_data(df):
     # Fill missing values
     df_filled = df.fillna(0, subset=FEATURE_COLUMNS)
 
-    # Select required columns
-    df_prepared = df_filled.select(
-        "year_month",
-        "total_revenue",
-        "total_orders",
-        "revenue_rolling_12m",
-        "revenue_growth_1m",
-        *FEATURE_COLUMNS
-    )
+    # Select required columns (metadata columns + all feature columns)
+    # Note: Some metadata columns (e.g., total_orders) overlap with FEATURE_COLUMNS
+    metadata_cols = ["year_month", "total_revenue", "revenue_rolling_12m", "revenue_growth_1m"]
+    all_cols = metadata_cols + FEATURE_COLUMNS
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_cols = []
+    for col in all_cols:
+        if col not in seen:
+            seen.add(col)
+            unique_cols.append(col)
+    
+    df_prepared = df_filled.select(*unique_cols)
 
     print(f"✓ Data prepared for inference")
     return df_prepared

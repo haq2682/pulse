@@ -90,6 +90,27 @@ FEATURE_COLUMNS = [
 TARGET_COLUMN = "seasonal_index"
 
 
+def create_feature_pipeline_stages():
+    """
+    Create common pipeline stages for feature assembly and scaling.
+    Used by all model training functions to ensure consistency.
+    """
+    assembler = VectorAssembler(
+        inputCols=FEATURE_COLUMNS,
+        outputCol="features_unscaled",
+        handleInvalid="keep"
+    )
+    
+    scaler = StandardScaler(
+        inputCol="features_unscaled",
+        outputCol="features",
+        withStd=True,
+        withMean=True
+    )
+    
+    return assembler, scaler
+
+
 def create_spark_session():
     """Initialize Spark session with MinIO configuration"""
     return (
@@ -355,19 +376,8 @@ def train_linear_regression(train_df, test_df, use_cv=False):
     print("Training Linear Regression")
     print("="*60)
 
-    # Create pipeline stages
-    assembler = VectorAssembler(
-        inputCols=FEATURE_COLUMNS,
-        outputCol="features_unscaled",
-        handleInvalid="keep"
-    )
-    
-    scaler = StandardScaler(
-        inputCol="features_unscaled",
-        outputCol="features",
-        withStd=True,
-        withMean=True
-    )
+    # Create common pipeline stages
+    assembler, scaler = create_feature_pipeline_stages()
 
     lr = LinearRegression(
         featuresCol="features",
@@ -415,19 +425,8 @@ def train_random_forest(train_df, test_df, use_cv=False):
     print("Training Random Forest")
     print("="*60)
 
-    # Create pipeline stages
-    assembler = VectorAssembler(
-        inputCols=FEATURE_COLUMNS,
-        outputCol="features_unscaled",
-        handleInvalid="keep"
-    )
-    
-    scaler = StandardScaler(
-        inputCol="features_unscaled",
-        outputCol="features",
-        withStd=True,
-        withMean=True
-    )
+    # Create common pipeline stages
+    assembler, scaler = create_feature_pipeline_stages()
 
     rf = RandomForestRegressor(
         featuresCol="features",
@@ -475,19 +474,8 @@ def train_gbt(train_df, test_df, use_cv=False):
     print("Training Gradient Boosted Trees")
     print("="*60)
 
-    # Create pipeline stages
-    assembler = VectorAssembler(
-        inputCols=FEATURE_COLUMNS,
-        outputCol="features_unscaled",
-        handleInvalid="keep"
-    )
-    
-    scaler = StandardScaler(
-        inputCol="features_unscaled",
-        outputCol="features",
-        withStd=True,
-        withMean=True
-    )
+    # Create common pipeline stages
+    assembler, scaler = create_feature_pipeline_stages()
 
     gbt = GBTRegressor(
         featuresCol="features",
