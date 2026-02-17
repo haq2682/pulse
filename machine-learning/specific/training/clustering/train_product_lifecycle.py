@@ -184,7 +184,7 @@ def profile_clusters(predictions, stats):
     return profiles
 
 
-def save_model_and_metrics(spark, preprocess_model, kmeans_model, profiles, stats, best_k, best_silhouette, MODEL_OUTPUT_PATH, LOCAL_METRICS_PATH, METRICS_OUTPUT_PATH):
+def save_model_and_metrics(spark, preprocess_model, kmeans_model, profiles, stats, best_k, best_silhouette, MODEL_OUTPUT_PATH, LOCAL_METRICS_PATH, METRICS_OUTPUT_PATH, FEATURES):
     full_stages = list(preprocess_model.stages) + [kmeans_model]
     full_pipeline = PipelineModel(stages=full_stages)
     full_pipeline.write().overwrite().save(f"{MODEL_OUTPUT_PATH}product_lifecycle_pipeline")
@@ -282,7 +282,7 @@ def main(BUCKET):
     for p in profiles:
         print(f"  Cluster {p['cluster_id']}: {p['stage']} ({p['count']})")
     
-    save_model_and_metrics(spark, preprocess_model, best_model, profiles, stats, best_k, best_sil, MODEL_OUTPUT_PATH, LOCAL_METRICS_PATH, METRICS_OUTPUT_PATH)
+    save_model_and_metrics(spark, preprocess_model, best_model, profiles, stats, best_k, best_sil, MODEL_OUTPUT_PATH, LOCAL_METRICS_PATH, METRICS_OUTPUT_PATH, FEATURES)
     
     df.unpersist()
     df_scaled.unpersist()

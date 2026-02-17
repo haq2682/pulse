@@ -656,12 +656,12 @@ def main(BUCKET_NAME):
     # Calculate demand metrics
     print("\nStep 3: Calculate Demand Metrics")
     print("-" * 80)
-    demand_stats = calculate_demand_metrics_with_trends(orders_df, order_items_df)
+    demand_stats = calculate_demand_metrics_with_trends(orders_df, order_items_df, MIN_DEMAND_DAYS)
     
     # Create features
     print("\nStep 4: Feature Engineering")
     print("-" * 80)
-    df_features = create_inference_features(products_df, inventory_df, suppliers_df, demand_stats, DEFAULT_SERVICE_LEVEL, Z_SCORE_95, Z_SCORE_99)
+    df_features = create_inference_features(products_df, inventory_df, suppliers_df, demand_stats)
     
     # Prepare data
     print("\nStep 5: Data Preparation & Encoding")

@@ -656,7 +656,7 @@ def main(BUCKET_NAME):
     # Calculate demand metrics
     print("\nStep 3: Calculate Demand Metrics")
     print("-" * 80)
-    demand_stats = calculate_demand_metrics_with_trends(orders_df, order_items_df)
+    demand_stats = calculate_demand_metrics_with_trends(orders_df, order_items_df, MIN_DEMAND_DAYS)
     
     # Create features
     print("\nStep 4: Feature Engineering")

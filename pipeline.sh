@@ -43,8 +43,8 @@
 # ./pydoc.sh machine-learning/specific/training/regression/train_demand_forecast.py
 # ./pydoc.sh machine-learning/specific/inference/regression/infer_demand_forecast.py
 
-# ./pydoc.sh machine-learning/general/training/regression/train_revenue_forecast.py
-# ./pydoc.sh machine-learning/general/inference/regression/infer_revenue_forecast.py
+# ./pydoc.sh machine-learning/specific/training/regression/train_revenue_forecast.py
+# ./pydoc.sh machine-learning/specific/inference/regression/infer_revenue_forecast.py
 
 # ./pydoc.sh machine-learning/general/training/regression/train_aov.py
 # ./pydoc.sh machine-learning/general/inference/regression/infer_aov.py
@@ -87,5 +87,8 @@
 
 # ./pydoc.sh machine-learning/specific/training/clustering/train_product_lifecycle.py
 # ./pydoc.sh machine-learning/specific/inference/clustering/infer_product_lifecycle.py
+
+# ./pydoc.sh machine-learning/specific/training/regression/train_seasonal_trends.py
+# ./pydoc.sh machine-learning/specific/inference/regression/infer_seasonal_trends.py
 
 read -p "Press Enter to exit..."
