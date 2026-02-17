@@ -530,8 +530,12 @@ def save_artifacts(
     print(f"✓ Campaign status indexer saved: {status_path}")
 
     spark = SparkSession.getActiveSession()
-    features_json = json.dumps({"features": feature_list})
-    spark.sparkContext.parallelize([features_json]).saveAsTextFile(features_path)
+    features_df = spark.createDataFrame(
+        [(json.dumps({"features": feature_list}),)],
+        ["json"]
+    )
+
+    features_df.write.mode("overwrite").text(features_path)
     print(f"✓ Feature list saved: {features_path}")
 
 

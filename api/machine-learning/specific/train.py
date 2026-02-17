@@ -16,15 +16,15 @@ from specific.training.clustering.train_product_affinity import main as product_
 from specific.training.clustering.train_product_lifecycle import main as product_lifecycle
 
 def main(BUCKET_NAME):
-    # fulfillment_risk(BUCKET_NAME)
-    # product_bundling(BUCKET_NAME)
+    fulfillment_risk(BUCKET_NAME)
+    product_bundling(BUCKET_NAME)
 
-    # campaign_roi(BUCKET_NAME)
-    # delivery_time(BUCKET_NAME)
-    # demand_forecast(BUCKET_NAME)
-    # price_optimization(BUCKET_NAME)
+    campaign_roi(BUCKET_NAME)
+    delivery_time(BUCKET_NAME)
+    demand_forecast(BUCKET_NAME)
+    price_optimization(BUCKET_NAME)
 
-    # product_affinity(BUCKET_NAME)
+    product_affinity(BUCKET_NAME)
     product_lifecycle(BUCKET_NAME)
 
 if __name__ == "__main__":
