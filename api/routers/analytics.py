@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, Request, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Response, Request, Query, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from database import get_db
 from sqlalchemy import text
 import aioredis
+from datetime import datetime
 from services.pipeline_service import PipelineService
 from services.websocket_manager import WebSocketManager
 from services.analytics_service import AnalyticsService
+from services.analytics_watcher_service import get_analytics_watcher
 
 redis = aioredis.from_url("redis://redis:6379", decode_responses=True)
 
@@ -14,7 +16,7 @@ router = APIRouter(
     tags=["analytics"],
 )
 
-# WebSocket manager for pipeline operations
+# WebSocket manager for analytics updates
 websocket_manager = WebSocketManager()
 
 # Analytics service
@@ -280,3 +282,114 @@ async def clear_analytics_cache(business_id: str):
         return {"message": f"Cache cleared for business {business_id}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.websocket("/ws/{business_id}")
+async def analytics_websocket(websocket: WebSocket, business_id: str):
+    """
+    WebSocket endpoint for real-time analytics updates.
+    
+    Clients connect to this endpoint to receive real-time notifications
+    when analytics parquet files are updated in MinIO.
+    
+    Args:
+        websocket: WebSocket connection
+        business_id: Business ID to monitor
+        
+    Message format sent to clients:
+        {
+            "event": "analytics_updated",
+            "business_id": "business_123",
+            "files": ["customer_acquisition_daily", "new_customers_weekly"],
+            "categories": ["customer", "acquisition"],
+            "changed_count": 1,
+            "new_count": 1,
+            "timestamp": "2026-02-17T18:58:00Z",
+            "total_files": 2
+        }
+    """
+    await websocket_manager.connect(websocket, business_id)
+    
+    # Start monitoring this business's analytics if not already monitoring
+    watcher = get_analytics_watcher()
+    if watcher and not watcher.is_monitoring(business_id):
+        watcher.start_monitoring(business_id)
+        print(f"Started analytics monitoring for business {business_id}")
+    
+    try:
+        # Send initial connection confirmation
+        await websocket.send_json({
+            "event": "connected",
+            "business_id": business_id,
+            "message": "Connected to analytics updates",
+            "timestamp": str(datetime.now())
+        })
+        
+        # Keep connection alive and wait for disconnect
+        while True:
+            # Receive any messages from client (ping/pong, etc.)
+            data = await websocket.receive_text()
+            
+            # Handle client commands
+            if data == "ping":
+                await websocket.send_json({"event": "pong"})
+            elif data == "refresh":
+                # Manually trigger update check
+                if watcher:
+                    await watcher.manual_trigger_update(business_id)
+                    
+    except WebSocketDisconnect:
+        websocket_manager.disconnect(websocket, business_id)
+        print(f"Analytics WebSocket disconnected for business {business_id}")
+        
+        # Stop monitoring if no more connections for this business
+        if websocket_manager.get_connection_count(business_id) == 0 and watcher:
+            watcher.stop_monitoring(business_id)
+            print(f"Stopped analytics monitoring for business {business_id} (no more connections)")
+
+
+@router.post("/trigger-update/{business_id}")
+async def trigger_analytics_update(business_id: str):
+    """
+    Manually trigger an analytics update check (for testing).
+    
+    Args:
+        business_id: Business ID
+        
+    Returns:
+        Success message
+    """
+    watcher = get_analytics_watcher()
+    if not watcher:
+        raise HTTPException(status_code=503, detail="Analytics watcher not available")
+    
+    try:
+        await watcher.manual_trigger_update(business_id)
+        return {
+            "message": f"Update check triggered for business {business_id}",
+            "is_monitoring": watcher.is_monitoring(business_id)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/monitoring-status")
+async def get_monitoring_status():
+    """
+    Get status of analytics monitoring service.
+    
+    Returns:
+        List of monitored businesses and their status
+    """
+    watcher = get_analytics_watcher()
+    if not watcher:
+        return {
+            "status": "not_initialized",
+            "monitored_businesses": []
+        }
+    
+    return {
+        "status": "active",
+        "monitored_businesses": watcher.get_monitored_businesses(),
+        "count": len(watcher.get_monitored_businesses())
+    }
