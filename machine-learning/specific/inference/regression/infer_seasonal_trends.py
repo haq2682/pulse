@@ -21,6 +21,7 @@ from pyspark.sql.window import Window
 from pyspark.sql.types import StringType
 from pyspark.ml.feature import VectorAssembler, StandardScaler
 from pyspark.ml.regression import LinearRegressionModel, RandomForestRegressionModel, GBTRegressionModel
+from pyspark.ml import PipelineModel
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import uuid
@@ -111,21 +112,13 @@ def create_spark_session():
 
 
 def load_model(model_name, MODEL_BASE_PATH):
-    """Load trained model from MinIO"""
+    """Load trained pipeline model from MinIO"""
     model_path = f"{MODEL_BASE_PATH}{model_name}"
 
     try:
-        if model_name == "linear_regression":
-            model = LinearRegressionModel.load(model_path)
-        elif model_name == "random_forest":
-            model = RandomForestRegressionModel.load(model_path)
-        elif model_name == "gbt":
-            model = GBTRegressionModel.load(model_path)
-        else:
-            print(f"✗ Unknown model type: {model_name}")
-            return None
-
-        print(f"✓ Model loaded: {model_path}")
+        # Load as PipelineModel (which includes the scaler)
+        model = PipelineModel.load(model_path)
+        print(f"✓ Pipeline model loaded: {model_path}")
         return model
     except Exception as e:
         print(f"✗ Failed to load model: {str(e)}")
@@ -307,41 +300,28 @@ def create_inference_features(monthly_df):
 
 def prepare_inference_data(df):
     """
-    Prepare and scale features for inference
+    Prepare features for inference.
+    Note: Feature scaling is handled by the Pipeline model.
     """
     # Fill missing values
     df_filled = df.fillna(0, subset=FEATURE_COLUMNS)
 
-    # Assemble features
-    assembler = VectorAssembler(
-        inputCols=FEATURE_COLUMNS,
-        outputCol="features_unscaled",
-        handleInvalid="keep"
-    )
+    # Select required columns (metadata columns + all feature columns)
+    # Note: Some metadata columns may overlap with FEATURE_COLUMNS (e.g., total_orders)
+    metadata_cols = ["year_month", "total_revenue", "revenue_rolling_12m", "revenue_growth_1m"]
+    all_cols = metadata_cols + FEATURE_COLUMNS
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_cols = []
+    for col in all_cols:
+        if col not in seen:
+            seen.add(col)
+            unique_cols.append(col)
+    
+    df_prepared = df_filled.select(*unique_cols)
 
-    df_assembled = assembler.transform(df_filled)
-
-    # Apply StandardScaler
-    scaler = StandardScaler(
-        inputCol="features_unscaled",
-        outputCol="features",
-        withStd=True,
-        withMean=True
-    )
-
-    scaler_model = scaler.fit(df_assembled)
-    df_scaled = scaler_model.transform(df_assembled)
-
-    df_prepared = df_scaled.select(
-        "year_month",
-        "total_revenue",
-        "total_orders",
-        "revenue_rolling_12m",
-        "revenue_growth_1m",
-        "features"
-    )
-
-    print(f"✓ Data prepared and scaled")
+    print(f"✓ Data prepared for inference")
     return df_prepared
 
 
@@ -486,7 +466,7 @@ def main(BUCKET_NAME):
     df_features = create_inference_features(monthly_df)
 
     # Prepare data
-    print("\nStep 4: Data Preparation & Scaling")
+    print("\nStep 4: Data Preparation")
     print("-" * 60)
     df_prepared = prepare_inference_data(df_features)
 

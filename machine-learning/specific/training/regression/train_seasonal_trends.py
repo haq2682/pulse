@@ -25,6 +25,7 @@ from pyspark.ml.feature import VectorAssembler, StandardScaler
 from pyspark.ml.regression import LinearRegression, RandomForestRegressor, GBTRegressor
 from pyspark.ml.evaluation import RegressionEvaluator
 from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
+from pyspark.ml import Pipeline
 from datetime import datetime
 import math
 
@@ -87,6 +88,27 @@ FEATURE_COLUMNS = [
 ]
 
 TARGET_COLUMN = "seasonal_index"
+
+
+def create_feature_pipeline_stages():
+    """
+    Create common pipeline stages for feature assembly and scaling.
+    Used by all model training functions to ensure consistency.
+    """
+    assembler = VectorAssembler(
+        inputCols=FEATURE_COLUMNS,
+        outputCol="features_unscaled",
+        handleInvalid="keep"
+    )
+    
+    scaler = StandardScaler(
+        inputCol="features_unscaled",
+        outputCol="features",
+        withStd=True,
+        withMean=True
+    )
+    
+    return assembler, scaler
 
 
 def create_spark_session():
@@ -297,9 +319,10 @@ def create_seasonal_features(monthly_df):
 
 def prepare_training_data(df):
     """
-    Prepare data for training with feature scaling.
+    Prepare data for training.
     Filters out records without valid seasonal index
     (first ~12 months won't have enough history for 12m rolling average).
+    Note: Feature scaling is now handled by Pipeline in train_* functions.
     """
     # Filter records where seasonal_index is valid
     df_valid = df.filter(
@@ -317,35 +340,15 @@ def prepare_training_data(df):
     # Fill missing values with 0
     df_filled = df_valid.fillna(0, subset=FEATURE_COLUMNS)
 
-    # Assemble features
-    assembler = VectorAssembler(
-        inputCols=FEATURE_COLUMNS,
-        outputCol="features_unscaled",
-        handleInvalid="keep"
-    )
-
-    df_assembled = assembler.transform(df_filled)
-
-    # Apply StandardScaler
-    scaler = StandardScaler(
-        inputCol="features_unscaled",
-        outputCol="features",
-        withStd=True,
-        withMean=True
-    )
-
-    scaler_model = scaler.fit(df_assembled)
-    df_scaled = scaler_model.transform(df_assembled)
-
     # Select final columns (keep year_month for time-based splitting)
-    df_prepared = df_scaled.select(
+    df_prepared = df_filled.select(
         "year_month",
-        "features",
+        *FEATURE_COLUMNS,
         TARGET_COLUMN
     )
 
-    print(f"✓ Data prepared and scaled: {df_prepared.count()} records")
-    return df_prepared, scaler_model
+    print(f"✓ Data prepared: {df_prepared.count()} records")
+    return df_prepared
 
 
 def time_based_split(df, train_ratio=0.8):
@@ -368,10 +371,13 @@ def time_based_split(df, train_ratio=0.8):
 
 
 def train_linear_regression(train_df, test_df, use_cv=False):
-    """Train Linear Regression with optional CV"""
+    """Train Linear Regression with Pipeline including scaler"""
     print("\n" + "="*60)
     print("Training Linear Regression")
     print("="*60)
+
+    # Create common pipeline stages
+    assembler, scaler = create_feature_pipeline_stages()
 
     lr = LinearRegression(
         featuresCol="features",
@@ -380,6 +386,9 @@ def train_linear_regression(train_df, test_df, use_cv=False):
         regParam=0.01,
         elasticNetParam=0.5
     )
+
+    # Build pipeline
+    pipeline = Pipeline(stages=[assembler, scaler, lr])
 
     if use_cv:
         print("Using CrossValidator...")
@@ -395,7 +404,7 @@ def train_linear_regression(train_df, test_df, use_cv=False):
         )
 
         cv = CrossValidator(
-            estimator=lr,
+            estimator=pipeline,
             estimatorParamMaps=param_grid,
             evaluator=evaluator,
             numFolds=3,
@@ -404,17 +413,20 @@ def train_linear_regression(train_df, test_df, use_cv=False):
 
         model = cv.fit(train_df).bestModel
     else:
-        model = lr.fit(train_df)
+        model = pipeline.fit(train_df)
 
     predictions = model.transform(test_df)
     return model, predictions, "linear_regression"
 
 
 def train_random_forest(train_df, test_df, use_cv=False):
-    """Train Random Forest with optional CV"""
+    """Train Random Forest with Pipeline including scaler"""
     print("\n" + "="*60)
     print("Training Random Forest")
     print("="*60)
+
+    # Create common pipeline stages
+    assembler, scaler = create_feature_pipeline_stages()
 
     rf = RandomForestRegressor(
         featuresCol="features",
@@ -423,6 +435,9 @@ def train_random_forest(train_df, test_df, use_cv=False):
         maxDepth=12,
         seed=42
     )
+
+    # Build pipeline
+    pipeline = Pipeline(stages=[assembler, scaler, rf])
 
     if use_cv:
         print("Using CrossValidator...")
@@ -438,7 +453,7 @@ def train_random_forest(train_df, test_df, use_cv=False):
         )
 
         cv = CrossValidator(
-            estimator=rf,
+            estimator=pipeline,
             estimatorParamMaps=param_grid,
             evaluator=evaluator,
             numFolds=3,
@@ -447,17 +462,20 @@ def train_random_forest(train_df, test_df, use_cv=False):
 
         model = cv.fit(train_df).bestModel
     else:
-        model = rf.fit(train_df)
+        model = pipeline.fit(train_df)
 
     predictions = model.transform(test_df)
     return model, predictions, "random_forest"
 
 
 def train_gbt(train_df, test_df, use_cv=False):
-    """Train GBT with optional CV"""
+    """Train GBT with Pipeline including scaler"""
     print("\n" + "="*60)
     print("Training Gradient Boosted Trees")
     print("="*60)
+
+    # Create common pipeline stages
+    assembler, scaler = create_feature_pipeline_stages()
 
     gbt = GBTRegressor(
         featuresCol="features",
@@ -466,6 +484,9 @@ def train_gbt(train_df, test_df, use_cv=False):
         maxDepth=6,
         seed=42
     )
+
+    # Build pipeline
+    pipeline = Pipeline(stages=[assembler, scaler, gbt])
 
     if use_cv:
         print("Using CrossValidator...")
@@ -481,7 +502,7 @@ def train_gbt(train_df, test_df, use_cv=False):
         )
 
         cv = CrossValidator(
-            estimator=gbt,
+            estimator=pipeline,
             estimatorParamMaps=param_grid,
             evaluator=evaluator,
             numFolds=3,
@@ -490,7 +511,7 @@ def train_gbt(train_df, test_df, use_cv=False):
 
         model = cv.fit(train_df).bestModel
     else:
-        model = gbt.fit(train_df)
+        model = pipeline.fit(train_df)
 
     predictions = model.transform(test_df)
     return model, predictions, "gbt"
@@ -586,16 +607,14 @@ def main(BUCKET_NAME):
     df_features = create_seasonal_features(monthly_df)
 
     # Step 4: Prepare training data
-    print("\nStep 4: Data Preparation & Scaling")
+    print("\nStep 4: Data Preparation")
     print("-" * 60)
-    result = prepare_training_data(df_features)
+    df_prepared = prepare_training_data(df_features)
 
-    if result is None:
+    if df_prepared is None:
         print("⚠️  Training skipped due to insufficient data")
         spark.stop()
         return
-
-    df_prepared, scaler_model = result
 
     # Step 5: Time-based split (chronological ordering, not random)
     print("\nStep 5: Time-Based Train/Test Split")
