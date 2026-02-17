@@ -33,7 +33,46 @@ NUMERICAL_FEATURES = [
     "warehouse_current_load",
     "order_placed_day_of_week",
     "order_placed_hour",
-    "weather_risk_score"
+    "weather_risk_score",
+    # Real features from agg_orders schema
+    "shipping_cost",
+    "discount_percentage",
+    # Real features from agg_products schema (aggregated per order)
+    "avg_product_rating",
+    "avg_product_performance",
+    "total_stockout_history",
+    "avg_inventory_turnover",
+    # Real features from agg_inventory schema (aggregated per order)
+    "avg_available_stock",
+    "avg_stock_coverage_days",
+    "total_reorder_breaches",
+    "avg_stock_turnover_ratio",
+    # Real features from agg_customers schema
+    "customer_total_orders",
+    "customer_cancellation_rate",
+    "customer_avg_order_value",
+    "customer_lifetime_value",
+    "customer_tenure_days",
+    "rfm_overall_score",
+    "customer_activity_score",
+    # Real features from agg_suppliers schema (aggregated per order)
+    "avg_supplier_performance_score",
+    "avg_supplier_rating",
+    "avg_supplier_fulfilled_orders",
+    "avg_supplier_inventory_health",
+    # Engineered features from real data
+    "stock_to_order_ratio",
+    "low_stock_ratio",
+    "out_of_stock_count",
+    "order_value_per_item",
+    "reserved_to_quantity_ratio",
+    "supplier_risk_composite",
+    "lead_time_quantity_interaction",
+    "order_month",
+    "value_at_risk",
+    "fulfillment_complexity",
+    "stock_health_combined",
+    "customer_reliability_score",
 ]
 
 CATEGORICAL_FEATURES = [
@@ -47,7 +86,8 @@ BOOLEAN_FEATURES = [
     "destination_remote_flag",
     "is_holiday_period",
     "is_peak_shopping_season",
-    "logistics_disruption_flag"
+    "logistics_disruption_flag",
+    "is_repeat_customer",
 ]
 
 TARGET_COLUMN = "fulfillment_risk_class"  # 0=Low, 1=Medium, 2=High, 3=Critical
@@ -121,6 +161,8 @@ def join_all_tables(orders_df, order_items_df, products_df, inventory_df, suppli
         "order_placed_at",
         "order_placed_day_of_week",
         "total_amount",
+        "shipping_cost",
+        "discount_percentage",
         "order_size_category",
         "season",
         "order_shipped_at",  # For label generation only
@@ -132,30 +174,46 @@ def join_all_tables(orders_df, order_items_df, products_df, inventory_df, suppli
     
     # Step 3: Get product-level aggregates per order
     order_products = order_items_df.join(
-        products_df.select("product_id", "category", "supplier_id", "current_stock"),
+        products_df.select(
+            "product_id", "category", "supplier_id", "current_stock",
+            "avg_rating", "product_performance_score",
+            "stockout_occurrences", "inventory_turnover_rate"
+        ),
         on="product_id",
         how="left"
     )
-    
+
     # Aggregate product info per order
     product_agg = order_products.groupBy("order_id").agg(
         count(when(col("current_stock") > 0, 1)).alias("products_in_stock_count"),
         count(when((col("current_stock") > 0) & (col("current_stock") <= 10), 1)).alias("products_low_stock_count"),
         avg(when(col("current_stock") > 0, 1).otherwise(0)).alias("avg_product_availability"),
-        count("supplier_id").alias("supplier_count")
+        count("supplier_id").alias("supplier_count"),
+        avg("avg_rating").alias("avg_product_rating"),
+        avg("product_performance_score").alias("avg_product_performance"),
+        spark_sum("stockout_occurrences").alias("total_stockout_history"),
+        avg("inventory_turnover_rate").alias("avg_inventory_turnover")
     )
     
     df = df.join(product_agg, on="order_id", how="left")
     
     # Step 4: Get inventory aggregates per order
     order_inventory = order_items_df.join(
-        inventory_df.select("product_id", "reserved_quantity", "stock_status"),
+        inventory_df.select(
+            "product_id", "reserved_quantity", "stock_status",
+            "available_stock", "stock_coverage_days",
+            "reorder_point_breach", "stock_turnover_ratio"
+        ),
         on="product_id",
         how="left"
     )
-    
+
     inventory_agg = order_inventory.groupBy("order_id").agg(
-        spark_sum("reserved_quantity").alias("total_reserved_quantity")
+        spark_sum("reserved_quantity").alias("total_reserved_quantity"),
+        avg("available_stock").alias("avg_available_stock"),
+        avg("stock_coverage_days").alias("avg_stock_coverage_days"),
+        spark_sum("reorder_point_breach").alias("total_reorder_breaches"),
+        avg("stock_turnover_ratio").alias("avg_stock_turnover_ratio")
     )
     
     df = df.join(inventory_agg, on="order_id", how="left")
@@ -173,18 +231,26 @@ def join_all_tables(orders_df, order_items_df, products_df, inventory_df, suppli
             "supplier_id",
             col("supplier_reliability_score").alias("supplier_reliability"),
             col("avg_restock_lead_time").alias("supplier_lead_time"),
-            col("stockout_rate").alias("supplier_stockout_rate")
+            col("stockout_rate").alias("supplier_stockout_rate"),
+            col("supplier_performance_score"),
+            col("supplier_rating"),
+            col("total_orders_fulfilled"),
+            col("supplier_inventory_health_score")
         ),
         on="supplier_id",
         how="left"
     )
-    
+
     # Get primary (first) supplier per order
     supplier_agg = supplier_info.groupBy("order_id").agg(
         spark_max("supplier_reliability").alias("primary_supplier_reliability"),
         avg("supplier_lead_time").alias("avg_supplier_lead_time"),
         avg("supplier_stockout_rate").alias("supplier_stockout_rate"),
-        count("supplier_id").alias("distinct_suppliers")
+        count("supplier_id").alias("distinct_suppliers"),
+        avg("supplier_performance_score").alias("avg_supplier_performance_score"),
+        avg("supplier_rating").alias("avg_supplier_rating"),
+        avg("total_orders_fulfilled").alias("avg_supplier_fulfilled_orders"),
+        avg("supplier_inventory_health_score").alias("avg_supplier_inventory_health")
     )
     
     df = df.join(supplier_agg, on="order_id", how="left")
@@ -192,11 +258,19 @@ def join_all_tables(orders_df, order_items_df, products_df, inventory_df, suppli
     # Step 6: Get customer historical performance
     customer_info = customers_df.select(
         "customer_id",
-        col("total_cancelled_orders").alias("customer_past_delivery_issues")
+        col("total_cancelled_orders").alias("customer_past_delivery_issues"),
+        col("total_orders").alias("customer_total_orders"),
+        col("cancellation_rate").alias("customer_cancellation_rate"),
+        col("avg_order_value").alias("customer_avg_order_value"),
+        col("customer_lifetime_value"),
+        col("is_repeat_customer"),
+        col("customer_tenure_days"),
+        col("rfm_overall_score"),
+        col("customer_activity_score")
     )
-    
+
     df = df.join(customer_info, on="customer_id", how="left")
-    
+
     print(f"✓ Joined all tables: {df.count()} orders with features")
     return df
 
@@ -260,6 +334,108 @@ def generate_simulated_features(df):
     )
     
     print("✓ Generated simulated features")
+    return df
+
+
+def engineer_features(df):
+    """
+    Engineer derived features from real data to improve model accuracy.
+    These features capture meaningful relationships between existing columns
+    that help the model distinguish risk levels.
+    """
+    print("\n🔧 Engineering derived features...")
+
+    # Stock health ratios
+    df = df.withColumn(
+        "stock_to_order_ratio",
+        col("products_in_stock_count") / (col("unique_products_ordered") + lit(1))
+    )
+    df = df.withColumn(
+        "low_stock_ratio",
+        col("products_low_stock_count") / (col("unique_products_ordered") + lit(1))
+    )
+    df = df.withColumn(
+        "out_of_stock_count",
+        col("unique_products_ordered") - col("products_in_stock_count")
+    )
+
+    # Order complexity metrics
+    df = df.withColumn(
+        "order_value_per_item",
+        col("total_amount") / (col("total_quantity") + lit(1))
+    )
+    df = df.withColumn(
+        "reserved_to_quantity_ratio",
+        col("total_reserved_quantity") / (col("total_quantity") + lit(1))
+    )
+
+    # Supplier risk composite
+    df = df.withColumn(
+        "supplier_risk_composite",
+        (lit(1) - col("primary_supplier_reliability")) * (lit(1) + col("supplier_stockout_rate"))
+    )
+    df = df.withColumn(
+        "lead_time_quantity_interaction",
+        col("avg_supplier_lead_time") * col("total_quantity")
+    )
+
+    # Temporal feature
+    df = df.withColumn("order_month", month(col("order_placed_at")))
+
+    # Value at risk: financial exposure from stock issues
+    df = df.withColumn(
+        "value_at_risk",
+        col("total_amount") * (lit(1) - col("avg_product_availability"))
+    )
+
+    # Fulfillment complexity: order size weighted by stock risk and lead time
+    df = df.withColumn(
+        "fulfillment_complexity",
+        col("unique_products_ordered") * (lit(1) + col("low_stock_ratio")) *
+        (col("avg_supplier_lead_time") + lit(1))
+    )
+
+    # Stock health combined: available stock coverage relative to reorder issues
+    df = df.withColumn(
+        "stock_health_combined",
+        col("avg_available_stock") * col("avg_stock_coverage_days") /
+        (col("total_reorder_breaches") + lit(1))
+    )
+
+    # Customer reliability: RFM score adjusted by cancellation history
+    df = df.withColumn(
+        "customer_reliability_score",
+        col("rfm_overall_score") * (lit(1) - col("customer_cancellation_rate"))
+    )
+
+    # Fill nulls in all join-derived and engineered columns
+    fill_cols = [
+        # From agg_orders
+        "shipping_cost", "discount_percentage",
+        # From agg_products (aggregated per order)
+        "avg_product_rating", "avg_product_performance",
+        "total_stockout_history", "avg_inventory_turnover",
+        # From agg_inventory (aggregated per order)
+        "avg_available_stock", "avg_stock_coverage_days",
+        "total_reorder_breaches", "avg_stock_turnover_ratio",
+        # From agg_customers
+        "customer_total_orders", "customer_cancellation_rate",
+        "customer_avg_order_value", "customer_lifetime_value",
+        "customer_tenure_days", "rfm_overall_score", "customer_activity_score",
+        # From agg_suppliers (aggregated per order)
+        "avg_supplier_performance_score", "avg_supplier_rating",
+        "avg_supplier_fulfilled_orders", "avg_supplier_inventory_health",
+        # Engineered features
+        "stock_to_order_ratio", "low_stock_ratio", "out_of_stock_count",
+        "order_value_per_item", "reserved_to_quantity_ratio",
+        "supplier_risk_composite", "lead_time_quantity_interaction", "order_month",
+        "value_at_risk", "fulfillment_complexity",
+        "stock_health_combined", "customer_reliability_score",
+    ]
+    for c in fill_cols:
+        df = df.fillna({c: 0})
+
+    print("✓ Engineered derived features")
     return df
 
 
@@ -412,7 +588,7 @@ def train_logistic_regression(train_df):
 def train_random_forest(train_df):
     """Train Random Forest"""
     print("\n[2/4] Training Random Forest...")
-    rf = RandomForestClassifier(numTrees=100, maxDepth=10, seed=42)
+    rf = RandomForestClassifier(numTrees=200, maxDepth=15, seed=42)
     model = rf.fit(train_df)
     print("✓ Random Forest trained")
     return model, "RandomForest"
@@ -421,7 +597,7 @@ def train_random_forest(train_df):
 def train_decision_tree(train_df):
     """Train Decision Tree"""
     print("\n[3/4] Training Decision Tree...")
-    dt = DecisionTreeClassifier(maxDepth=10, seed=42)
+    dt = DecisionTreeClassifier(maxDepth=15, seed=42)
     model = dt.fit(train_df)
     print("✓ Decision Tree trained")
     return model, "DecisionTree"
@@ -527,7 +703,10 @@ def main(BUCKET_NAME):
     
     # Generate simulated external features
     df = generate_simulated_features(df)
-    
+
+    # Engineer derived features from real data
+    df = engineer_features(df)
+
     # Generate risk labels
     df = generate_risk_labels(df)
     
