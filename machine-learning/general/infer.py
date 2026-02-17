@@ -14,7 +14,6 @@ from general.inference.classification.infer_stock_status import main as stock_st
 # from general.inference.regression.infer_aov_v2 import main as aov
 from general.inference.regression.infer_clv import main as clv
 from general.inference.regression.infer_restock_quantity import main as restock_quantity
-from general.inference.regression.infer_revenue_forecast import main as revenue_forecast
 from general.inference.regression.infer_safety_stock import main as safety_stock
 from general.inference.regression.infer_session_conversion import main as session_conversion
 from general.inference.regression.infer_stockout_probability import main as stockout_probability
@@ -35,7 +34,6 @@ def main(BUCKET_NAME):
     # aov(BUCKET_NAME)
     clv(BUCKET_NAME)
     restock_quantity(BUCKET_NAME)
-    revenue_forecast(BUCKET_NAME)
     safety_stock(BUCKET_NAME)
     session_conversion(BUCKET_NAME)
     stockout_probability(BUCKET_NAME)

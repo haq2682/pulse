@@ -14,7 +14,6 @@ from general.training.classification.train_stock_status import main as stock_sta
 from general.training.regression.train_aov_v2 import main as aov
 from general.training.regression.train_clv import main as clv
 from general.training.regression.train_restock_quantity import main as restock_quantity
-from general.training.regression.train_revenue_forecast import main as revenue_forecast
 from general.training.regression.train_safety_stock import main as safety_stock
 from general.training.regression.train_session_conversion import main as session_conversion
 from general.training.regression.train_stockout_probability import main as stockout_probability
@@ -35,7 +34,6 @@ def main():
     # aov()
     # clv()
     # restock_quantity()
-    # revenue_forecast()
     safety_stock()
     # session_conversion()
     # stockout_probability()
