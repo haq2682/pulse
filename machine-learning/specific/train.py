@@ -11,6 +11,8 @@ from specific.training.regression.train_campaign_roi import main as campaign_roi
 from specific.training.regression.train_delivery_time import main as delivery_time
 from specific.training.regression.train_demand_forecast import main as demand_forecast
 from specific.training.regression.train_price_optimization import main as price_optimization
+from specific.training.regression.train_revenue_forecast import main as revenue_forecast
+from specific.training.regression.train_seasonal_trends import main as seasonal_trends
 
 from specific.training.clustering.train_product_affinity import main as product_affinity
 from specific.training.clustering.train_product_lifecycle import main as product_lifecycle
@@ -23,6 +25,8 @@ def main(BUCKET_NAME):
     delivery_time(BUCKET_NAME)
     demand_forecast(BUCKET_NAME)
     price_optimization(BUCKET_NAME)
+    revenue_forecast(BUCKET_NAME)
+    seasonal_trends(BUCKET_NAME)
 
     product_affinity(BUCKET_NAME)
     product_lifecycle(BUCKET_NAME)

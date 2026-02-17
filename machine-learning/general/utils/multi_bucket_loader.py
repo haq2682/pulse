@@ -273,7 +273,6 @@ MODEL_TRAINING_WINDOWS = {
     "aov_v2": (200, 500_000),
     "clv": (100, 500_000),
     "restock_quantity": (100, 200_000),
-    "revenue_forecast": (12, 1000),  # Time series - needs fewer but specific records
     "safety_stock": (100, 200_000),
     "session_conversion": (200, 500_000),
     "stockout_probability": (100, 200_000),
