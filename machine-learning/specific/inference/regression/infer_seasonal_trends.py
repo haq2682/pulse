@@ -31,29 +31,50 @@ load_dotenv()
 
 
 # Feature columns (must match training)
+# Uses fields from agg_monthly_aggregations schema
 FEATURE_COLUMNS = [
+    # Seasonal encoding (cyclical, derived)
     "order_month",
     "month_sin",
     "month_cos",
     "quarter_sin",
     "quarter_cos",
+
+    # Activity metrics (from agg_monthly_aggregations)
     "total_orders",
     "total_customers",
     "avg_order_value",
     "total_units_sold",
+    "total_sessions",
+    "total_conversions",
+    "session_to_order_rate",
+
+    # Customer metrics (from agg_monthly_aggregations)
     "new_customers",
     "returning_customers",
     "customer_retention_rate",
-    "revenue_lag_1m",
+    "churn_rate",
+    "prev_month_customers",
+
+    # Revenue metrics (from agg_monthly_aggregations)
+    "prev_month_revenue",
+    "revenue_growth_rate",
+
+    # Revenue lag features (derived from total_revenue)
     "revenue_lag_3m",
     "revenue_lag_6m",
     "revenue_lag_12m",
+
+    # Rolling averages (derived)
     "orders_rolling_3m",
     "orders_rolling_6m",
     "customers_rolling_3m",
-    "revenue_growth_1m",
+
+    # Growth features (derived)
     "revenue_growth_3m",
     "orders_growth_1m",
+
+    # Year-over-year features (derived)
     "yoy_revenue_ratio",
     "yoy_orders_ratio",
 ]
@@ -126,6 +147,13 @@ def validate_dataset(spark, path, name):
 def create_inference_features(monthly_df):
     """
     Create same seasonal features as training for the most recent month.
+
+    Uses fields directly from agg_monthly_aggregations schema:
+      - prev_month_revenue, revenue_growth_rate, prev_month_customers (schema fields)
+      - total_sessions, total_conversions, session_to_order_rate, churn_rate (schema fields)
+
+    Derives additional features via window functions:
+      - revenue_lag_3m/6m/12m, rolling averages, YoY ratios, orders growth
     """
     print("Creating inference features...")
 
@@ -141,11 +169,8 @@ def create_inference_features(monthly_df):
     window_rolling_6m = Window.partitionBy("partition_key").orderBy("year_month").rowsBetween(-6, -1)
     window_rolling_12m = Window.partitionBy("partition_key").orderBy("year_month").rowsBetween(-12, -1)
 
-    # Revenue lag features
+    # Revenue lag features (3m, 6m, 12m derived; 1m already in schema as prev_month_revenue)
     df = monthly_sorted.withColumn(
-        "revenue_lag_1m",
-        F.lag("total_revenue", 1).over(window_spec)
-    ).withColumn(
         "revenue_lag_3m",
         F.lag("total_revenue", 3).over(window_spec)
     ).withColumn(
@@ -156,7 +181,7 @@ def create_inference_features(monthly_df):
         F.lag("total_revenue", 12).over(window_spec)
     )
 
-    # Rolling averages for revenue
+    # Rolling average for revenue (12m, used for predictions)
     df = df.withColumn(
         "revenue_rolling_12m",
         F.avg("total_revenue").over(window_rolling_12m)
@@ -177,14 +202,9 @@ def create_inference_features(monthly_df):
         F.avg("total_customers").over(window_rolling_3m)
     )
 
-    # Growth rates
+    # 3-month revenue growth (derived)
+    # revenue_growth_rate (1m) already exists in schema
     df = df.withColumn(
-        "revenue_growth_1m",
-        F.when(
-            (F.col("revenue_lag_1m").isNotNull()) & (F.col("revenue_lag_1m") > 0),
-            (F.col("total_revenue") - F.col("revenue_lag_1m")) / F.col("revenue_lag_1m")
-        ).otherwise(0)
-    ).withColumn(
         "revenue_growth_3m",
         F.when(
             (F.col("revenue_lag_3m").isNotNull()) & (F.col("revenue_lag_3m") > 0),
@@ -192,7 +212,7 @@ def create_inference_features(monthly_df):
         ).otherwise(0)
     )
 
-    # Orders growth
+    # Orders growth (derived)
     orders_lag_1m = F.lag("total_orders", 1).over(window_spec)
     df = df.withColumn(
         "orders_lag_1m_temp",
@@ -205,7 +225,7 @@ def create_inference_features(monthly_df):
         ).otherwise(0)
     ).drop("orders_lag_1m_temp")
 
-    # Year-over-year features
+    # Year-over-year features (derived)
     df = df.withColumn(
         "yoy_revenue_ratio",
         F.when(
@@ -226,7 +246,7 @@ def create_inference_features(monthly_df):
         ).otherwise(1.0)
     ).drop("orders_lag_12m_temp")
 
-    # Seasonal encoding
+    # Seasonal encoding (derived)
     df = df.withColumn(
         "month_sin",
         F.sin(2 * math.pi * F.col("order_month") / 12)
@@ -250,23 +270,25 @@ def create_inference_features(monthly_df):
         F.cos(2 * math.pi * F.col("order_quarter") / 4)
     )
 
-    # Fill nulls
-    lag_columns = [
-        "revenue_lag_1m", "revenue_lag_3m", "revenue_lag_6m", "revenue_lag_12m",
+    # Fill nulls in derived lag/rolling features
+    derived_lag_columns = [
+        "revenue_lag_3m", "revenue_lag_6m", "revenue_lag_12m",
         "revenue_rolling_12m", "orders_rolling_3m", "orders_rolling_6m",
-        "customers_rolling_3m", "revenue_growth_1m", "revenue_growth_3m",
-        "orders_growth_1m"
+        "customers_rolling_3m", "revenue_growth_3m", "orders_growth_1m"
     ]
 
-    for col in lag_columns:
+    for col in derived_lag_columns:
         df = df.fillna({col: 0})
 
+    # Fill nulls in schema fields (nullable fields from agg_monthly_aggregations)
     df = df.fillna({
-        "customer_retention_rate": 0,
-        "session_to_order_rate": 0,
+        "total_revenue": 0,
         "avg_order_value": 0,
-        "new_customers": 0,
-        "returning_customers": 0,
+        "session_to_order_rate": 0,
+        "prev_month_revenue": 0,
+        "revenue_growth_rate": 0,
+        "customer_retention_rate": 0,
+        "churn_rate": 0,
         "yoy_revenue_ratio": 1.0,
         "yoy_orders_ratio": 1.0,
     })
