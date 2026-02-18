@@ -1,0 +1,1036 @@
+supplier_id,supplier_rating,supplier_status,is_preferred,is_verified,contract_start_date,contract_end_date,city,state,zip_code,country
+SUP_10369,3.19,active,False,True,2024-05-08 00:00:00,2026-05-05 00:00:00,Marienberg,New Mexico,152-2093,中国
+SUP_10078,1.49,suspended,False,True,2025-03-24 00:00:00,2028-03-02 00:00:00,狛江市,Kentucky,84541,Ukraine
+SUP_10299,3.93,suspended,False,False,2024-11-11 00:00:00,2025-12-27 00:00:00,Mühldorf am Inn,Asturias,944-4528,ジャージー島
+SUP_10890,4.75,inactive,False,True,2024-07-05 00:00:00,2027-04-12,Anklam,Schleswig-Holstein,94647,Swaziland
+SUP_10821,3.91,suspended,True,True,2025-01-05 00:00:00,2027-06-30 00:00:00,JacobVille,Oregon,35044,Indonesia
+SUP_10931,3.96,on hold,False,TRUE,2024-11-25 00:00:00,2027-07-10 00:00:00,青ヶ島村,Mecklenburg-Vorpommern,547-9893,キプロス共和国
+SUP_10862,2.91,inactive,False,True,2023-07-13 00:00:00,2025-06-11 00:00:00,南房総市,Kentucky,444-0044,  Aruba  
+SUP_10542,4.27,suspended,False,False,2023-02-17 00:00:00,2025-10-18 00:00:00,New Sheilamouth,  Iowa  ,944-4118,Réunion (La)
+SUP_10053,3.67,active,False,True,2024-06-22 00:00:00,2026-02-15 00:00:00,汕尾县,Rhode Island,224-3115,Gabón
+SUP_10034,4.08,on hold,False,False,2022-11-11 00:00:00,2025-08-06 00:00:00,新宿区,New York,47008,エストニア
+SUP_10539,3.02,on hold,False,True,2025-04-19 00:00:00,2026-12-10 00:00:00,raymondmouth,Bremen,26154,Marokko
+SUP_10252,4.76,active,False,True,  2024-08-20  ,2027-08-13 00:00:00,Staffelstein,Jaén,69191,  马提尼克  
+SUP_10554,2.34,inactive,False,True,2024-03-01 00:00:00,2025-05-11 00:00:00,Sainte Auguste,  Thüringen  ,54058,Mozambique
+SUP_10581,4.06,active,False,False,2023-08-18 00:00:00,2024-09-01 00:00:00,北区,Toledo,376-6607,Neuseeland
+SUP_10773,2.7,on hold,False,  False  ,2023-12-29,2025-11-03 00:00:00,Erikside,Colorado,172-3033,荷属安的列斯群岛
+10480,1.47,,False,,,2024-04-10 00:00:00,,Baden-Württemberg,,Sweden
+SUP_10734,3.88,active,False,True,2024-03-16 00:00:00,2025-07-03 00:00:00,Mathieu,Idaho,47861,スリランカ
+SUP_10256,3.53,active,False,True,2025-02-25 00:00:00,2025-11-25 00:00:00,Málaga,Hamburg,955-5772,Nauru
+SUP_10167,4.8,active,False,True,2024-09-10 00:00:00,2027-06-18 00:00:00,Angermünde,Hessen,91356,Guernsey
+SUP_10168,4.1,on hold,True,True,2024-05-31 00:00:00,2025-07-12 00:00:00,Kramershire,Valladolid,21820,Bahamas
+SUP_10578,3.79,active,False,True,2023-01-03 00:00:00,2023-12-26 00:00:00,East Mariaville,Illinois,890-1862,Turks and Caicos Islands
+SUP_10836,4.21,  pending  ,True,False,2023-05-20 00:00:00,2024-03-26 00:00:00,West Jasmine,Nebraska,745-8593,  Dominica  
+SUP_10982,4.24,on hold,True,TRUE,2023-04-18 00:00:00,2025-09-24,Hardingview,  Iowa  ,186-2679,guyana
+SUP_10155,0.95,on hold,False,True,2022-10-12 00:00:00,2025-09-04 00:00:00,秀珍市,North Dakota,55527,Australie
+SUP_10875,,inactive,,False,2024-04-22,,Dupuy-sur-Gaillard,,573-8268,
+SUP_10440,5.19,,False,Yes,,,,SACHSEN-ANHALT,,USA
+SUP_10535,3.02,active,False,  True  ,2024-03-15 00:00:00,2025-06-22 00:00:00,Stendal,Pennsylvania,376-4508,  Iran  
+SUP_10325,,active,,True,2025-08-01 00:00:00,,Aschaffenburg,,71071,
+SUP_10295,4.62,active,True,True,2023-08-21 00:00:00,2026-05-01 00:00:00,New Chase,Niedersachsen,81214,Guam
+  SUP_10035  ,Fair,on hold,Yes,False,2022-10-22 00:00:00,2022-08-17 00:00:00,East Janefort,Valladolid,  661-8041  ,AM
+SUP_10701,4.81,inactive,False,True,2022-11-07 00:00:00,2024-09-23 00:00:00,Delaunay,Massachusetts,84861,Iran
+SUP_10171,4.27,suspended,False,False,2023-07-26 00:00:00,2024-09-15 00:00:00,長生郡長南町,Almería,99097,东萨摩亚
+SUP_10086,4.59,active,  False  ,True,2023-12-04 00:00:00,2024-12-20 00:00:00,Pontevedra,  Utah  ,971-6077,Libanon
+SUP_10986,4.5,inactive,True,True,2022-11-26 00:00:00,2025-03-03 00:00:00,Guadalajara,Tarragona,238-7141,Kyrgyz Republic
+SUP_10820,  2.41  ,,False,TRUE,,2027-05-28 00:00:00,,Bremen,,Chile
+SUP_10101,  4.93  ,active,False,True,2023-08-04 00:00:00,2025-11-11 00:00:00,Barcelona,  South Carolina  ,32280,Paraguay
+SUP_10892,4.04,active,False,False,2023-10-01 00:00:00,  2026-03-18  ,Wolfratshausen,Bayern,89082,ÉTATS-UNIS
+SUP_10873,4.18,active,False,False,2024-07-12 00:00:00,2025-07-13 00:00:00,North Louisetown,Murcia,950-8326,Suriname
+SUP_10020,2.42,,False,False,,2025-06-01 00:00:00,,Wyoming,,Japan
+SUP_10977,4.21,active,False,False,2023-01-04 00:00:00,2025-04-09,Lake Kimberley,Vizcaya,835-7989,Dominica
+SUP_10119,2.43,active,False,False,2025-01-20 00:00:00,2027-09-09 00:00:00,Grayside,Bayern,92624,Belize
+SUP_10914,3.63,active,False,  True  ,2025-05-23 00:00:00,2027-02-10 00:00:00,Hillfurt,Sachsen-Anhalt,98193,Lettonie
+SUP_10872,3.89,on hold,False,False,2025-03-27 00:00:00,2026-01-30 00:00:00,Badajoz,Nebraska,21257,  东萨摩亚  
+SUP_10218,3.61,active,False,False,  2022-11-26  ,2025-11-24 00:00:00,Charlottefort,Bayern,85504,Bhutan
+nil,, , ,,nil,,nil,,     ,
+SUP_10555,4.63,pending,True,True,2022-11-25 00:00:00,2025-09-12 00:00:00,呼和浩特县,Baden-Württemberg,553-0732,Fiji
+SUP_10485,2.22,pending,True,True,2025-01-29 00:00:00,2026-12-30 00:00:00,Niesky,Thüringen,616-5463,Spain
+SUP_10444,4.4,suspended,True,True,  2025-06-19  ,2028-01-17 00:00:00,Batesbury,Indiana,99231,斯洛伐克
+SUP_10848,3.4,pending,False,True,2024-07-13 00:00:00,2027-02-11 00:00:00,静市,Hawaii,668-5958,埃塞俄比亚
+SUP_10159,3.78,on hold,True,True,2024-07-14 00:00:00,2027-04-07 00:00:00,八街市,California,85171,Taiwan
+SUP_10008,3.43,active,False,  True  ,2023-07-01,2025-09-28 00:00:00,Ávila,Madrid,70323,ブルネイ
+SUP_10597,4.59,on hold,False,True,2025-06-07 00:00:00,2026-04-01 00:00:00,West Linda,  Baden-Württemberg  ,936-1265,萨尔瓦多
+SUP_10093,3.5,active,  False  ,True,2023-01-25 00:00:00,2025-08-18 00:00:00,Schwabmünchen,Mecklenburg-Vorpommern,  43418  ,Uganda
+SUP_10191,4.68,on hold,False,True,2023-07-27 00:00:00,2025-11-08 00:00:00,Port Greggton,Saarland,436-1898,Thailand
+SUP_10052,4.15,active,False,True,2024-10-22 00:00:00,2026-03-14 00:00:00,South Leighshire,Sachsen-Anhalt,467-4949,Hungary
+SUP_10314,4.66,active,True,True,2025-06-29 00:00:00,  2026-03-22  ,Ávila,Thüringen,78040,TOGO
+SUP_10194,  0.54  ,on hold,False,True,2024-09-12 00:00:00,2027-03-10 00:00:00,North Carlyburgh,Lugo,890-2709,Sao Tome and Principe
+,     , ,,,,,,,nil,
+,,,,,,,,,,
+SUP_10537,2.89,pending,False,True,2024-09-28 00:00:00,2026-03-10 00:00:00,  Miltenberg  ,Zamora,36983,セイシェル
+SUP_10041,2.37,under review,False,True,2025-07-19 00:00:00,2027-10-01 00:00:00,横浜市神奈川区,Palencia,56224,Mayotte
+SUP_10635,4.01,inactive,False,True,2023-05-22 00:00:00,2024-03-27 00:00:00,Aubry,Guadalajara,03886,Andorra
+SUP_10056,-0.11,blocked,,,04/16/2023,  04/16/2023  ,,,XXXXX,ind
+SUP_10458,2.53,pending,False,False,2025-02-14 00:00:00,2025-10-19 00:00:00,New Jessica,Thüringen,69832,Schweden
+SUP_10962,4,  on hold  ,False,True,2023-03-18 00:00:00,2024-10-18 00:00:00,New Brianstad,Wyoming,497-6195,Guernsey
+SUP_10735,Excellent,under review,1,True,2024-12-07 00:00:00,2024-11-20 00:00:00,Gerolzhofen,RI,950-9054,GW
+SUP_10454,4.24,  pending  ,False,True,2023-12-16 00:00:00,2025-03-07 00:00:00,調布市,  Madrid  ,68514,ミャンマー
+SUP_10859,3.65,active,False,True,  2024-12-09  ,2025-08-16 00:00:00,Simmonsshire,Nebraska,17538,Tokelau
+SUP_10505,3.66,  active  ,False,True,2024-08-30 00:00:00,2025-06-13 00:00:00,Albacete,Teruel,75447,Angola
+SUP_10948,4.45,inactive,False,True,2023-10-20 00:00:00,2026-07-28 00:00:00,广州县,Schleswig-Holstein,76169,Italie
+SUP_10672,3.58,on hold,False,False,2022-12-11 00:00:00,2023-11-24 00:00:00,Klein,Asturias,24613,古巴
+SUP_10522,3.29,active,False,True,2023-05-22 00:00:00,2024-09-05 00:00:00,玉兰市,Idaho,756-5002,合衆国領有小離島
+SUP_10550,,,,Pending,2006-05-17 00:00:00,,東大和市,,76665-7358,
+SUP_10767,4.88,active,False,True,2025-02-01 00:00:00,2026-04-26 00:00:00,川崎市中原区,Hamburg,  59652  ,Brasilien
+SUP_10513,4.68,active,False,True,2023-01-31 00:00:00,2024-04-08 00:00:00,Riesa,  La Rioja  ,325-5244,Congo
+SUP_10094,3.75,on hold,False,  False  ,  2024-04-09  ,2026-01-03 00:00:00,Aschaffenburg,Montana,989-3944,Myanmar
+SUP_10246,4.43,on hold,False,True,2025-02-18 00:00:00,2027-08-23 00:00:00,Barthelemy,Zamora,43787,Tajikistan
+SUP_10898,2.61,suspended,True,True,2025-05-12 00:00:00,  2026-05-08  ,Teruel,Hamburg,135-3337,  モルドバ共和国  
+SUP_10085,4.38,on hold,  False  ,False,2023-09-11 00:00:00,2024-10-21 00:00:00,Cáceres,León,457-0693,淑兰县
+SUP_10297,3.76,active,False,True,2024-10-28 00:00:00,2027-07-28 00:00:00,New Danachester,Segovia,343-4429,Swasiland
+SUP_10355,2.49,on hold,False,True,2023-06-30 00:00:00,2026-04-19 00:00:00,Granada,Tarragona,924-1999,Fiji
+SUP_10146,4.47,suspended,  True  ,False,2024-06-19 00:00:00,2025-06-29 00:00:00,León,Hessen,54464,Timor-Leste
+SUP_10025,,suspended,,False,2024-01-08 00:00:00,,六安县,,249-2417,
+SUP_10799,3.97,active,False,True,2025-02-25 00:00:00,2027-08-07 00:00:00,安房郡鋸南町,Ourense,30105,巴西
+SUP_10145,4.21,pending,False,True,2024-03-16 00:00:00,  2025-12-30  ,New Gail,Baden-Württemberg,91674,Südgeorgien und die Südlichen Sandwichinseln
+SUP_10337,3.85,active%,False,True,2022-12-14 00:00:00,2024-01-20 00:00:00,Bradleyport,Álava,  16726  ,  Eritrea  
+SUP_10056,2.69,active,False,True,2023-03-13 00:00:00,2025-11-25 00:00:00,Wendyville,Kansas,51441,Îles Mineures Éloignées des États-Unis
+SUP_10350,,TRUE,,,2010-04-23 00:00:00,,lake geraldinehaven,,81071-3158,
+SUP_10147,2.88,inactive,False,True,2023-09-20 00:00:00,2024-04-02 00:00:00,West Leah,Kansas,797-0439,タイ
+SUP_10925,,active,,True,2024-07-09 00:00:00,,长沙市,,40833,
+SUP_10421,2.11,active,False,False,2024-05-07 00:00:00,2026-10-18 00:00:00,Sainte Diane,  Hawaii  ,880-6731,Cayman (Îles)
+SUP_10661,4.96,active,False,False,2025-08-12 00:00:00,2027-07-08 00:00:00,Zaragoza,Sachsen,141-5624,Bhutan
+SUP_10996,4.61,active,False,True,2024-12-26 00:00:00,2025-07-04 00:00:00,合山县,Baden-Württemberg,975-7901,Iran
+  SUP_10459  ,4.27,active,False,True,2023-12-11 00:00:00,2025-04-28 00:00:00,Nauen,Barcelona,009-8414,圣诞岛
+SUP_10263,4.03,on hold,False,False,2025-02-21 00:00:00,2027-02-17 00:00:00,Almería,  Baden-Württemberg  ,51441,法属波里尼西亚
+SUP_10616,2.16,pending,False,False,2024-03-16 00:00:00,2024-12-18 00:00:00,Carlyberg,Málaga,535-6133,Turquie
+SUP_10628,3.99,on hold,False,False,2024-06-21 00:00:00,2027-04-30 00:00:00,Murcia,North Carolina,75726,Ouganda
+SUP_10980,Poor,,N,True,,2019-10-26 00:00:00,,Huelva,,NI
+SUP_10527,4.52,inactive,  False  ,True,2025-09-11 00:00:00,2026-04-25 00:00:00,Wittstock,Illinois,654-1768,Türkei
+SUP_10412,4.04,inactive,False,True,2023-11-25 00:00:00,2024-12-22 00:00:00,Santa Cruz de Tenerife,Arizona,70685,Sudan
+SUP_10196!,  4.05  ,active,FALSE,False,2025-08-31 00:00:00,  2027-09-16  ,凤兰市,  Sevilla  ,973-5584,Taiwan
+  sup_10425  ,,under review,,True,2024-12-31 00:00:00,,Lake Markview,,58258,
+SUP_10368,4.19,active,False,True,2024-03-16 00:00:00,2026-09-24 00:00:00,  Ávila  ,Saarland,57400,老挝
+SUP_10004,4.51,active,False,True,2023-07-06 00:00:00,2026-01-17 00:00:00,Dupuy-sur-Mer,Guadalajara,30522,アンティグアバーブーダ
+SUP_10431,  3.11  ,pending,False,True,2025-04-26 00:00:00,2027-12-04 00:00:00,Gießen,Ohio,87664,Spain
+SUP_10523,0.34,active,  False  ,True,2023-06-29 00:00:00,2024-05-19 00:00:00,Eggenfelden,Michigan,145-0208,马来西亚
+SUP_10182,4.82,under review,False,True,2024-07-22 00:00:00,  2027-03-21  ,Sömmerda,New Mexico,44578,Philippinen
+SUP_10674,3.11,active,False,False,2024-08-16 00:00:00,2026-07-08 00:00:00,Normand,Niedersachsen,651-7454,Zaïre
+SUP_10984,2.67,pending,False,False,2025-01-27 00:00:00,2027-05-29 00:00:00,Säckingen,Thüringen,638-2976,Kiribati
+SUP_10347,  4.26  ,suspended,False,  TRUE  ,2022-11-04 00:00:00,2023-08-01 00:00:00,Ribnitz-Damgarten,Rheinland-Pfalz,64511,portugal
+SUP_10825,-0.56,active,,True,2024-05-20 00:00:00,2024-05-20 00:00:00,宜都县,,20113,JPN
+SUP_10927,3.32,on hold,True,True,2025-08-25 00:00:00,2027-06-16 00:00:00,Faivre,Navarra,331-9266,コロンビア
+SUP_10978,4.67,inactive,FALSE,True,2024-09-07 00:00:00,2027-02-04 00:00:00,Bertin,Brandenburg,35065,  Hungary  
+SUP_10606,4.95,on hold,False,True,2024-11-26 00:00:00,2026-07-05 00:00:00,New Gerardmouth,La Rioja,554-6374,Mozambique
+SUP_10809,2.65,suspended,True,True,2025-05-22 00:00:00,2026-02-28 00:00:00,Mooremouth,Massachusetts,13601,Seychelles
+SUP_10611,1.09,pending,True,False,2023-05-25 00:00:00,2026-01-30 00:00:00,Moulindan,Idaho,512-1821,オランダ
+SUP_10230,  3.25  ,under review,True,True,2024-06-14 00:00:00,2025-07-02 00:00:00,Guipúzcoa,North Carolina,897-8813,サウスジョージア・サウスサンドウィッチ諸島
+SUP_10249,4.04,on hold,False,True,2025-02-15 00:00:00,2027-09-29 00:00:00,  Meyer-sur-Guichard  ,Kansas,66026,Poland
+SUP_10435,  4.59  ,on hold,False,True,2022-10-15 00:00:00,2025-07-16 00:00:00,三鷹市,Toledo,503-6628,Israël
+SUP_10236,4.11,inactive,False,  False  ,2024-01-13 00:00:00,2026-06-13 00:00:00,目黒区,Sachsen,461-2947,Canadá
+SUP_10177,4.66,active,  False  ,True,2025-05-01 00:00:00,2027-05-07 00:00:00,Cádiz,Illinois,  33202  ,Korea
+SUP_10273,2.06,pending%,False,True,2023-09-15 00:00:00,2024-11-01 00:00:00,川崎市宮前区,Nordrhein-Westfalen,15909,Cook Islands
+SUP_10153,3.91,active,False,True,2023-08-04 00:00:00,2025-04-15 00:00:00,Davidton,Iowa,53051,Turkey
+SUP_10013,1.46,on hold,False,False,2024-07-06 00:00:00,2025-04-23 00:00:00,Valencia,Bayern,77070,Malte
+SUP_10946,2.64,pending,False,True,  2024-12-05  ,2027-05-09 00:00:00,Hunterville,Bayern,666-8920,El Salvador
+SUP_10185,4.44,inactive,False,True,2025-05-22 00:00:00,2026-02-23,East Glenn,Schleswig-Holstein,41970,セントヘレナ
+SUP_10074,4.04,under review,False,False,2025-02-21 00:00:00,  2025-10-03  ,鑫县,Oklahoma,290-4128,越南
+SUP_10291,4.74,on hold,False,True,2023-05-05 00:00:00,2023-12-15 00:00:00,Delattre,Maine,18101,Barbados
+  SUP_10716  ,4.6,  active  ,False,True,2025-09-30 00:00:00,2027-03-27 00:00:00,Melilla,Oregon,33887,Suiza
+SUP_10438,3.89,under review,True,True,2025-05-20 00:00:00,2026-09-06 00:00:00,Lisaview,Castellón,715-5047,Chile
+SUP_10128,2.52,active,False,False,2025-09-06 00:00:00,2027-02-22 00:00:00,Rochlitz,Massachusetts,287-6437,Botsuana
+SUP_10399,2.1,on hold,True,True,2022-10-21 00:00:00,2023-09-13 00:00:00,兴安盟县,Colorado,827-3623,Lithuania
+SUP_10541,4.76,active,  False  ,True,2024-10-27 00:00:00,2026-06-30 00:00:00,坤市,Lugo,365-9153,ブルンジ
+SUP_10067,4.79,on hold,False,  False  ,2023-11-03,  2025-05-10  ,Sainte Alfred,Berlin,589-7033,Luxemburgo
+SUP_10514,4.83,under review,True,TRUE,2024-07-03 00:00:00,2026-02-15 00:00:00,Soltau,Álava,291-2147,アイルランド共和国
+SUP_10441,  3.94  ,active,False,False,  2024-08-10  ,2025-08-12 00:00:00,  Burgdorf  ,New Jersey,742-2275,Netherlands
+SUP_10427,4.47,suspended,False,False,2024-08-27 00:00:00,2026-07-05 00:00:00,Murcia,Sachsen-Anhalt,30963,Botswana
+SUP_10697,4.06,active,False,False,2024-08-01 00:00:00,2025-06-19 00:00:00,波县,Hessen,728-2344,Trinidad und Tobago
+SUP_10718,4.89,active,False,  False  ,2023-03-18 00:00:00,2024-12-04 00:00:00,Johnfurt,Hessen,25536,Andorra
+SUP_10005,2.47,suspended,False,True,2024-09-28 00:00:00,2027-09-18 00:00:00,Meunier-la-Forêt,Kansas,764-9577,Vierges britanniques (Îles)
+SUP_10882,3.47,under review,False,True,2023-05-10 00:00:00,2025-07-03 00:00:00,Augsburg,La Rioja,865-1035,Slovaquie
+SUP_10896,4.65,suspended,False,False,2024-02-16 00:00:00,2024-10-07 00:00:00,小金井市,Alabama,246-9760,Cameroon
+SUP_10562,4.38,under review,False,True,2025-01-18 00:00:00,2025-12-10,昆明市,Alabama,690-7430,Guinée
+sup_10930,4.4,active,False,,  20250822  ,2027-04-18 00:00:00, ,Missouri,XXXXX,Papua Nueva Guinea
+SUP_10248,4.36,active,False,True,2023-06-26 00:00:00,2026-01-01 00:00:00,Garcia,Louisiana,52380,エジプト
+SUP_10019,3.32,pending,False,False,2024-06-15 00:00:00,2026-10-12 00:00:00,杉並区,  Valencia  ,31530,中央アフリカ共和国
+SUP_10284,4.5,  suspended  ,False,False,2025-01-25,2028-01-12 00:00:00,Ávila,Lleida,60215,Sambia
+SUP_10451,3.01,active,False,  False  ,2023-01-25 00:00:00,2024-01-12 00:00:00,Vilsbiburg,Schleswig-Holstein,76150,Kenya
+SUP_10909,3.81,pending,True,True,  2025-06-07  ,2028-03-16 00:00:00,Bayreuth,  New York  ,21592,法国
+  SUP_10488  ,4.92,active,False,True,2023-04-19 00:00:00,2025-08-05,South Marymouth,Teruel,941-9372,India
+SUP_10287,0.42,active,True,True,2023-10-21 00:00:00,2024-09-02 00:00:00,  贵阳市  ,Teruel,117-9702,MOZAMBIQUE
+SUP_10814,4.45,under review,False,False,2024-02-24 00:00:00,2026-08-21 00:00:00,Sainte Jérôme,Castellón,575-3737,San Marino
+SUP_10479,2.04,under review,False,True,2023-04-07 00:00:00,2025-09-03 00:00:00,Holmesborough,Georgia,56389,Korea
+SUP_10077,2.6,suspended@,  False  ,true,2024-08-10 00:00:00,2025-07-12 00:00:00,三宅島三宅村,Mecklenburg-Vorpommern,41063,ソロモン諸島
+SUP_10310,3.64,pending,False,True,2024-10-14 00:00:00,2027-07-20 00:00:00,Lake Michaelborough,Niedersachsen,631-7424,Bosnia and Herzegovina
+SUP_10064,Good,active,Y,True,2025-08-13 00:00:00,  2025-02-11  ,La Rioja,  NJ  ,56298,MX
+SUP_10320,2.41,,True,Y,,2026-02-22 00:00:00,,Schleswig-Holstein,,卡塔尔
+SUP_10015,3.3,  active  ,False,True,2025-07-31 00:00:00,2028-04-08 00:00:00,Shaneview,Bremen,468-5180,ウォリス・フツナ
+SUP_10410,4.48,  on hold  ,False,False,2023-08-18 00:00:00,2025-06-15 00:00:00,Clivemouth,Ciudad,26189,Christmas Island
+SUP_10158,1.45,on hold,False,True,2025-08-19 00:00:00,2027-10-27 00:00:00,練馬区,Valencia,12916,Biélorussie
+SUP_10553,4.2,under review,False,True,2023-10-15 00:00:00,2024-10-12 00:00:00,Sainte Agnès,Niedersachsen,16794,Niederlande
+SUP_10617,  2.26  ,suspended,False,True,2024-09-22 00:00:00,2027-06-06 00:00:00,MILTENBERG,Santa Cruz de Tenerife,98314,スワジランド王国
+SUP_10972,4.91,on hold,False,True,2025-05-08 00:00:00,2026-12-26 00:00:00,Clareport,Kentucky,212-1765,Gabon
+SUP_10613,2.11,active,False,True,2025-07-23 00:00:00,2026-10-06 00:00:00,琳市,Georgia,776-9499,南アフリカ共和国
+SUP_10165,-0.99,active,TBD,True,2024-09-24 00:00:00,2024-09-24 00:00:00,Port Clairemouth,,745-6948,  GBR  
+SUP_10331,3.83,active,False,True,2024-07-28 00:00:00,  2026-06-11  ,Regensburg,Niedersachsen,997-1959,Mexiko
+SUP_10465,4.4,active,True,true,2023-05-15 00:00:00,  2026-02-04  ,La Rioja,New York,20899,パナマ
+SUP_10761,2.5,active,True,False,2023-09-21 00:00:00,2025-06-21 00:00:00,日野市,Cádiz,22020,Kongo
+SUP_10309,4.99,suspended,False,True,2024-04-19,2026-05-14 00:00:00,Baron,Illinois,20059,梵蒂冈
+SUP_10216,3.33,INACTIVE,False,True,2023-06-29 00:00:00,2026-03-10 00:00:00,東大和市,Cáceres,  58988  ,Christmas Island
+SUP_10033,2.12,active,False,True,2025-06-14 00:00:00,  2027-02-01  ,Gay,Washington,630-8817,リビア国
+SUP_10961,4.83,suspended,False,True,2024-02-27 00:00:00,2025-04-17 00:00:00,Spremberg,La Rioja,242-3407,沙特阿拉伯
+SUP_10745,2.09,active,False,True,2025-09-22 00:00:00,2026-05-05 00:00:00,West Kellyhaven,Sachsen,910-8602,Pitcairn (Îles)
+SUP_10644%,3.65,active,False,True,2025-08-27 00:00:00,2026-03-16 00:00:00,Taylorfort,Wisconsin,  51781  ,ケイマン諸島
+  PARTNER_10240  ,3.91,,True,,,2025-10-05 00:00:00,,California,,Mongolie
+SUP_10592,4.55,suspended,False,True,2025-03-17 00:00:00,2028-02-20 00:00:00,夷隅郡御宿町,Michigan,092-8409,クロアチア
+SUP_10786,3.95,pending,False,False,2023-03-05 00:00:00,2024-06-04 00:00:00,Sainte Maurice,Barcelona,15951,  斯里兰卡  
+SUP_10987,3.87,suspended,False,False,2024-10-13 00:00:00,2026-06-01 00:00:00,Euskirchen,Washington,29734,蒙特塞拉特岛
+SUP_10724,4.42,active,False,True,2025-02-27 00:00:00,2026-03-03 00:00:00,Sainte Luce,Badajoz,485-0549,Lesotho
+SUP_10323,4.66,inactive,False,True,2023-09-06 00:00:00,2025-01-17 00:00:00,Velazquezberg,Rheinland-Pfalz,01063,莫桑比克
+SUP_10558,3.14,active,False,True,2024-02-22 00:00:00,2025-01-09 00:00:00,  台北县  ,La Rioja,081-5766,Pakistán
+SUP_10220,7.2,,False,False,,,,florida,,US
+SUP_10469,2.35,active,FALSE,True,2024-07-19 00:00:00,2026-03-09 00:00:00,福州市,MONTANA,36396,Vanuatu
+SUP_10373,3.53,inactive,False,True,2023-01-13 00:00:00,2024-04-20 00:00:00,葛飾区,New Mexico,022-1908,United Kingdom
+SUP_10717,3.38,on hold,False,True,2024-09-29 00:00:00,2026-11-10 00:00:00,Verdier,Sachsen-Anhalt,30098,波多黎各
+SUP_10631,2.41,active,False,True,2023-09-21 00:00:00,2024-05-10 00:00:00,East Leon,Nevada,238-3559,ギニアビサウ
+SUP_10887,4.11,active,False,True,2025-05-16 00:00:00,2028-04-06 00:00:00,LeblancVille,  León  ,786-5225,Congo
+SUP_10860,2.41,,False,True,,2025-06-27 00:00:00,,Hamburg,,トルクメニスタン
+SUP_10752,2.76,  inactive  ,True,False,2025-07-09 00:00:00,2026-09-27 00:00:00,Clarkmouth,Saarland,978-4228,República de Corea
+SUP_10751,3.89,pending,false,True,2023-03-17 00:00:00,2025-06-19 00:00:00,横浜市都筑区,Colorado,  282-6461  ,Armenia
+SUP_10964,4.05,on hold,False,True,2025-06-06 00:00:00,2026-09-15 00:00:00,Velasquezfurt,Sachsen-Anhalt,34177,グレナダ
+SUP_10929,4.98,active,True,True,2023-11-01 00:00:00,2026-03-23 00:00:00,Melilla,Madrid,90468,Nicaragua
+SUP_10769,3.55,active,False,True,2024-09-08 00:00:00,2027-08-17 00:00:00,国立市,Tarragona,98103,Syrian Arab Republic
+SUP_10520,3.98079,,False,N,,12/29/2026,,,,Yugoslavia
+SUP_10160,0.31,,False,false,,2027-12-03 00:00:00,,Brandenburg,,Western Sahara
+SUP_10394,2.8,under review,False,True,2025-08-07 00:00:00,2027-07-30 00:00:00,East Johnshire,New York,972-1885,Aserbaidschan
+SUP_10478,3.9,on hold,True,False,2023-05-24 00:00:00,2025-07-26 00:00:00,Germain,Hessen,159-7308,Saint Lucia
+sup_10075,,active,,False,2023-10-20 00:00:00,,立川市,,30194,
+SUP_10311,4.03,under review,FALSE,True,2023-04-21 00:00:00,2024-01-06 00:00:00,鎌ケ谷市,Brandenburg,31342,利比里亚
+SUP_10232,4.47,pending,False,True,2023-08-01 00:00:00,2026-07-01 00:00:00,汕尾市,West Virginia,35288,Denmark
+SUP_10467,3.6,suspended,False,False,2024-04-13 00:00:00,2025-11-20 00:00:00,建华市,Alaska,20888,Mauretanien
+SUP_10493,4.58,suspended,False,True,2025-01-24 00:00:00,2026-12-20 00:00:00,Denis,Madrid,48142,  フランス領ギアナ  
+SUP_10726,2.7,pending,False,  True  ,2023-06-22 00:00:00,2023-12-30 00:00:00,Aaronfurt,Mississippi,67373,アメリカ領サモア
+sup_10633,2.91,under review,False,True,  2024-04-20  ,2025-01-24 00:00:00,Saint Alex,Sachsen,46989,Ägypten
+SUP_10888,2.76,active,False,True,2024-09-03 00:00:00,2025-09-21 00:00:00,  Ceuta  ,Alabama,164-3059,China
+SUP_10189,4.54,pending,False,True,2024-02-09 00:00:00,2025-02-16 00:00:00,Thomasberg,Vermont,39968,Portugal
+SUP_10071,4.85,active,False,True,2025-01-20 00:00:00,2025-11-21 00:00:00,Weiss-sur-Bousquet,Guadalajara,154-7205,Latvia
+SUP_10639@,  3.91  ,inactive,False,True,2022-12-02 00:00:00,2023-09-26 00:00:00,North Gareth,Alicante,21719,Guinée
+sup_10750,,PENDING,,,20240522,,Unknown,,TBD,
+SUP_10989,4.56,active,False,True,2023-09-14,2025-06-30 00:00:00,Strasburg,Arizona,181-9339,Omán
+sup_10525,,  pending  ,,True,2023-01-28 00:00:00,,  神津島村  ,,463-8039,
+SUP_10401,4.46,on hold,False,False,2023-02-28 00:00:00,2024-09-30 00:00:00,West Sarah,North Dakota,196-0378,圣皮埃尔岛及密克隆岛
+SUP_10928,  1.89  ,on hold,False,True,2023-11-20 00:00:00,2026-07-12 00:00:00,Asturias,Schleswig-Holstein,911-0404,诺福克岛
+SUP_10583,4.94,  suspended  ,False,True,2023-09-30 00:00:00,2026-03-03 00:00:00,New Lindsay,Thüringen,309-8198,イギリス領インド洋地域
+SUP_10202&,4.7!,suspended,False,true,2024-10-14 00:00:00,2025-06-27 00:00:00,Shaunport,Córdoba,08631,多哥
+SUP_10105,Fair,pending,N,False,2023-04-04 00:00:00,2023-02-22 00:00:00,欢县,IN,63177,PH
+SUP_10911,3.91,  on hold  ,False,True,2022-11-15 00:00:00,2025-09-22 00:00:00,Wheelertown,New Mexico,927-1419,República Democrática Popular Lao
+SUP_10349,3.42,suspended,False,True,2023-12-25 00:00:00,2024-09-19 00:00:00,Lake Rosemaryville,Guipúzcoa,068-9280,マーシャル諸島
+SUP_10727,3.74,  inactive  ,False,False,2024-06-08 00:00:00,2026-01-08 00:00:00,武汉市,Burgos,63112,Bélgica
+SUP_10235,3.72,active,False,False,2023-10-02 00:00:00,  2025-12-04  ,Cádiz,Córdoba,35812,Ouganda
+  SUP_10577  ,4.31@,inactive,False,True,2023-05-28 00:00:00,2024-07-08 00:00:00,Murcia,Rheinland-Pfalz,42684,Sahara Occidental
+SUP_10385,5 stars,suspended,true,True,2024-06-29 00:00:00,2023-11-19 00:00:00,Reynoldsbury,Massachusetts,47853,BZ
+SUP_10304,3.31,inactive,False,True,2024-09-01 00:00:00,2027-05-06 00:00:00,Borna,León,18843,Congo
+SUP_10063,3.04,  on hold  ,False,True,2024-10-09 00:00:00,2026-05-02 00:00:00,北区,Almería,614-5119,Bhutan
+SUP_10457,3.01,active,True,True,2024-04-23 00:00:00,2027-02-24 00:00:00,Fullermouth,Sachsen,79617,Belarus
+SUP_10058,3.85,  active  ,False,True,  2025-02-19  ,2027-11-26 00:00:00,Port Andreaborough,Castellón,43565,カメルーン
+,,,,, ,,,,,
+SUP_10647,3.93,on hold,False,  False  ,2023-11-12 00:00:00,2024-09-02 00:00:00,横浜市港北区,Madrid,431-0928,博茨瓦纳
+SUP_10417,  4.99  ,under review,  False  ,False,2025-02-18 00:00:00,2027-09-09 00:00:00,葛飾区,Lleida,810-1406,Tonga
+SUP_10659,2.5,active,True,True,2024-11-29 00:00:00,2027-07-11 00:00:00,Bernburg,Asturias,747-2641,古巴
+SUP_10825,,pending,,True,2024-05-02 00:00:00,,Baudry,,752-8049,
+SUP_10083,0.27!,on hold,True,True,2023-05-19 00:00:00,2025-11-04 00:00:00,香取郡東庄町,Massachusetts,527-6524,マヨット
+SUP_10569,4.55,active,False,True,2024-03-26 00:00:00,2024-11-14 00:00:00,Heatherton,Schleswig-Holstein,226-9379,Mauritania
+SUP_10681,  4.76  ,on hold,False,True,2025-06-28 00:00:00,2027-02-22 00:00:00,Maillot-les-Bains,Nordrhein-Westfalen,  74148  ,United Arab Emirates
+SUP_10103,3.59,under review,True,True,2024-05-07 00:00:00,2027-01-22,Sharpeville,Hamburg,  663-4215  ,哥斯达黎加
+10480,1.47,,False,,,2024-04-10 00:00:00,,Baden-Württemberg,,Sweden
+SUP_10384,2.19,active,True,True,2022-10-16 00:00:00,2024-04-15 00:00:00,Wittstock,Ourense,46420,Guernsey
+SUP_10092,4.55,active,False,True,2024-02-04 00:00:00,  2025-08-07  ,Martinsboeuf,  Burgos  ,  882-5231  ,维尔京群岛和圣罗克伊
+  SUP_10452  ,3.26,pending,False,False,2024-12-14 00:00:00,2026-07-26 00:00:00,Soria,Missouri,695-2756,BHUTAN
+SUP_10906,4.34,pending,False,False,2025-08-10 00:00:00,2026-11-27 00:00:00,Barcelona,New Jersey,343-8363,Äußeres Ozeanien
+SUP_10721,1.66,  pending  ,False,True,  2025-01-08  ,2027-12-09,Hancockport,Vizcaya,221-6727,Algeria
+SUP_10795,2.91,under review,  False  ,False,2023-11-20 00:00:00,2026-05-09 00:00:00,Kyleburgh,Jaén,72923,阿鲁巴岛
+SUP_10211,4.39,suspended,False,True,2025-06-09 00:00:00,2027-11-23 00:00:00,横浜市港南区,  Segovia  ,980-0182,República de Corea
+SUP_10352,4.65,  on hold  ,False,True,2024-06-15 00:00:00,2027-01-14 00:00:00,JourdanVille,Hawaii,139-0477,Sudan
+SUP_10206,  3.8  ,active,True,False,2023-12-02 00:00:00,2026-09-05 00:00:00,川崎市中原区,Missouri,  553-4633  ,United States Minor Outlying Islands
+SUP_10098,4.56,active,False,True,2024-01-12 00:00:00,2025-02-15 00:00:00,Bouchet,Vizcaya,893-1020,开曼群岛
+SUP_10489,3.86,on hold,True,False,2025-03-30 00:00:00,2026-03-11 00:00:00,Tarragona,Thüringen,668-6637,ハンガリー
+SUP_10336,3.48,pending,False,true,2023-03-02 00:00:00,2025-04-04 00:00:00,Vazquezville,Alaska,775-7065,Congo
+SUP_10118,1.03,on hold,False,False,2023-11-03 00:00:00,2024-12-07 00:00:00,渋谷区,Mississippi,  470-9256  ,Qatar
+SUP_10615,3.6,suspended,False,False,2024-08-06 00:00:00,2025-07-01 00:00:00,世田谷区,Mecklenburg-Vorpommern,28243,Hungría
+SUP_10443,4.85,active,False,False,2023-12-23,2024-10-17 00:00:00,Huelva,Thüringen,96744,Gibraltar
+SUP_10756,3.1,ACTIVE%,False,TRUE,2023-03-26 00:00:00,2025-03-07 00:00:00,south gregoryberg,Saarland,682-9371,Armenia
+SUP_10763,3.42,suspended,True,True,2024-02-15 00:00:00,2026-02-01 00:00:00,Geithain,Palencia,404-4347,Marshall Islands
+SUP_10131,4.3,active,FALSE,  True  ,2025-02-03 00:00:00,2028-01-22 00:00:00,Huelva,New Mexico,39223,Zaïre
+SUP_10854,2.67,  under review  ,  False  ,True,2023-03-01 00:00:00,2024-03-18 00:00:00,North Marianton,Bremen,677-8669,  ケニア  
+SUP_10858,3.84,pending,False,True,2023-10-03 00:00:00,2026-05-26 00:00:00,Havelberg,Indiana,34495,Tuvalu
+SUP_10626,2.01,under review,False,True,2023-01-15 00:00:00,2024-09-24 00:00:00,Marionside,Córdoba,706-0358,Sierra Leone
+SUP_10812,2.98,on hold,False,True,2023-06-24 00:00:00,2024-09-13 00:00:00,Bamberg,Texas,462-0295,Azerbaiyán
+SUP_10871,2.82,suspended,False,False,2025-08-23 00:00:00,2026-11-07 00:00:00,South Mitchell,New York,584-4360,Djibouti
+SUP_10901,3.76,under review,True,True,2023-12-08 00:00:00,2025-05-24 00:00:00,Port Kennethstad,Berlin,063-3854,Guyana
+SUP_10533,1.13,  active  ,False,True,2023-08-03 00:00:00,2025-09-04 00:00:00,北镇市,Thüringen,885-0997,Saint Vincent and the Grenadines
+SUP_10116,3.81,  suspended  ,False,True,2024-12-22 00:00:00,2027-11-18 00:00:00,Dieburg,Murcia,188-8882,巴林
+SUP_10956,2.82,active,True,False,2025-05-07 00:00:00,2026-07-28 00:00:00,Stade,  Guadalajara  ,02277,白俄罗斯
+SUP_10941,2,suspended,False,False,2024-06-10 00:00:00,2025-11-04 00:00:00,Strasburg,Connecticut,70467,马绍尔群岛
+,,,,,,,,,,
+SUP_10126,2.79,suspended,False,True,2024-04-24 00:00:00,2027-03-28 00:00:00,North Michaelland,Pontevedra,884-6311,French Guiana
+  SUP_10333  ,4.34,active,False,True,2024-05-28 00:00:00,2026-10-15 00:00:00,港区,Zaragoza,277-5939,Martinique
+SUP_10359,2.54,active,False,True,2025-05-06 00:00:00,2027-12-28 00:00:00,Girona,Soria,55332,Ireland
+SUP_10653,4.94,active,  False  ,True,2025-03-21 00:00:00,2028-02-03 00:00:00,安房郡鋸南町,Ourense,42946,Kenya
+,,,,,,,,,,
+SUP_10824,4.65,pending,False,  True  ,2023-08-19 00:00:00,2024-10-12,South Jamie,Brandenburg,481-8752,Vanuatu
+SUP_10283,4.25,active,False,True,2023-05-25 00:00:00,2024-05-02 00:00:00,Großenhain,Virginia,587-4011,Barbados
+SUP_10489,3.86,  on hold  ,True,False,2025-03-30 00:00:00,2026-03-11 00:00:00,Tarragona,Thüringen,668-6637,ハンガリー
+SUP_10571,3.99,inactive,False,False,2025-02-12 00:00:00,2026-09-19 00:00:00,Zeulenroda,Asturias,  68481  ,Guyana
+SUP_10413,2.55,under review,True,False,2025-09-06 00:00:00,2027-09-06,Petitjean,New Mexico,22446,Liberia
+SUP_10070,,under review,,False,2024-01-20 00:00:00,,Córdoba,,578-5990,
+SUP_10598,2.86,on hold,False,True,2024-04-10 00:00:00,2024-12-09 00:00:00,West Ryan,Sachsen,56299,Finland
+SUP_10954,3.99,active,False,True,2024-08-06 00:00:00,2027-03-18 00:00:00,Ilmenau,Sevilla,94526,パラグアイ
+SUP_10402,4.68*,active,False,True,2025-07-13 00:00:00,2028-03-17 00:00:00,Guadalajara,Montana,44371,Turkmenistan
+  SUP_10411  ,2.92,under review,False,True,2024-02-22 00:00:00,2026-12-14 00:00:00,Starnberg,North Dakota,899-1071,Cambodia
+SUP_10151,3.1,under review,True,False,2022-12-13 00:00:00,2025-03-29 00:00:00,Wilsonton,hamburg,02161,开曼群岛
+SUP_10916,1.25,under review,  True  ,True,2025-06-25 00:00:00,2027-06-16 00:00:00,Bad Langensalza,Nordrhein-Westfalen,87805,  Brunei Darussalam  
+SUP_10474,3.99,active,False,True,2024-10-30 00:00:00,2026-07-26 00:00:00,青梅市,Hawaii,768-8344,Myanmar
+  SUP_10261  ,4.08,inactive,False,False,2023-01-17 00:00:00,2024-05-12 00:00:00,玉华县,Hessen,352-9730,安圭拉岛英
+SUP_10725,,inactive,,True,2023-05-03 00:00:00,,Knowlesside,,570-4309,
+,nil,nil,,,nil, ,,,,
+SUP_10856,4.36,active,False,False,2023-01-29 00:00:00,2025-10-04 00:00:00,Rathenow,LA CORUÑA,44692,アルジェリア
+SUP_10708,2.28,active,False,True,2025-06-21 00:00:00,2026-01-08 00:00:00,Sainte CatherineVille,Sachsen,24727,Armenia
+SUP_10264,3.8,active,False,True,2025-09-04 00:00:00,2026-07-30 00:00:00,Alicante,North Dakota,341-8027,Seychelles
+SUP_10621,5,active,False,  true  ,2024-04-18 00:00:00,2027-02-13 00:00:00,Segovia,Niedersachsen,45215,Réunion
+SUP_10372,4.73,active,False,True,2024-10-19 00:00:00,2026-05-18 00:00:00,千代田区,Florida,02319,Bouvet Island (Bouvetoya)
+SUP_10710,0.51,suspended,False,True,2023-12-10 00:00:00,  2025-11-19  ,Königs Wusterhausen,Valladolid,64946,Myanmar
+SUP_10388,3.9,suspended,True,True,2023-11-22 00:00:00,2025-09-26 00:00:00,Halberstadt,Baden-Württemberg,19131,ナミビア
+SUP_10003,3.38,suspended,False,False,2024-12-18 00:00:00,2025-08-01 00:00:00,  Jaén  ,Oklahoma,  849-5925  ,Egipto
+SUP_10879,2.71,active,False,True,2025-02-10 00:00:00,  2026-01-13  ,Peine,Málaga,80989,Turkmenistan
+SUP_10904,2.28,under review,False,False,2023-05-20 00:00:00,  2025-11-09  ,Jaén,Toledo,163-6363,Montenegro
+SUP_10348,2.24,pending,False,False,2023-11-13 00:00:00,2025-10-06 00:00:00,Mahe,Zamora,70733,France
+SUP_10069,3.71*,pending,False,True,  2023-10-18  ,2024-12-11 00:00:00,Bischofswerda,Santa Cruz de Tenerife,70048,Egipto
+SUP_10012,-0.73,suspended,Unknown,True,2022-11-11 00:00:00,2022-11-11 00:00:00,南京县,,  72885  ,DEU
+ ,,,,,,, ,, ,nil
+SUP_10207,3.54,active,False,False,2023-09-27 00:00:00,2024-12-31 00:00:00,East Teresaside,Álava,28128,波兰
+SUP_10289,3.77,  pending  ,True,True,2023-12-12 00:00:00,2025-09-16 00:00:00,Cantabria,Utah,306-9343,アメリカ領ヴァージン諸島
+SUP_10865,2.26,  active  ,False,False,2024-10-21 00:00:00,  2027-07-03  ,Fischernec,Córdoba,  030-3351  ,Monaco
+SUP_10920,3.11,,True,true,,2023-10-28 00:00:00,,Nordrhein-Westfalen,,秘鲁
+SUP_10047,3.68,inactive,False,  True  ,2024-07-15 00:00:00,2026-04-09 00:00:00,建国县,Lugo,340-9042,マヨット
+,NIL,,,,,,,,,    
+SUP_10141,4.97,on hold,False,false,2023-01-01 00:00:00,2024-03-09 00:00:00,横浜市緑区,Montana,711-6046,Malaisie
+SUP_10938,3.74,pending,False,True,2022-12-16 00:00:00,2024-04-01 00:00:00,Vizcaya,Nordrhein-Westfalen,58300,Islande
+SUP_10884,4.91,on hold,False,True,2024-12-10 00:00:00,2027-01-09 00:00:00,  呼和浩特县  ,Mecklenburg-Vorpommern,910-0728,Botsuana
+SUP_10463,4.94,under review,False,True,2023-04-15 00:00:00,2026-01-17 00:00:00,Robinbury,Vizcaya,38520,Mali
+SUP_10680,  2.29  ,,False,false,,2025-05-05 00:00:00,,Hessen,,南昌县
+SUP_10416,3.7,under review,False,False,2022-11-21,2023-12-31 00:00:00,DOMINICMOUTH,Nordrhein-Westfalen,195-9896,Timor-Leste
+SUP_10623,3.87,active,False,True,2024-12-15 00:00:00,2026-03-11 00:00:00,Meganport,Bremen,341-5798,サンマリノ
+SUP_10204,1.42,pending,False,False,2022-12-31 00:00:00,2023-07-30 00:00:00,South Simonchester,Niedersachsen,21594,  Gambia  
+SUP_10378,4.09,suspended,False,False,2025-05-08 00:00:00,2027-02-11 00:00:00,New Danielville,Mississippi,95967,Senegal
+SUP_10190,4.97,  suspended  ,True,False,2025-04-08 00:00:00,2027-05-10 00:00:00,West Danielville,Hessen,34972,TBD
+SUP_10406,4.37,active,False,True,2024-07-21 00:00:00,2025-02-05 00:00:00,香取郡多古町,Barcelona,363-6897,Saint-Marin (Rép. de)
+SUP_10272,3.6,inactive,False,  True  ,2024-09-20 00:00:00,  2025-07-03  ,  济南市  ,Virginia,649-5946,Malta
+SUP_10656,4.21,under review,False,True,2023-08-01 00:00:00,2024-11-16 00:00:00,浦安市,Schleswig-Holstein,605-7146,Zimbabwe
+SUP_10387,4.9,under review,False,True,2023-03-31 00:00:00,2024-12-30 00:00:00,Baleares,La Rioja,16343,Niederländische Antillen
+SUP_10329,4.49,on hold,True,True,2023-09-06 00:00:00,2026-04-27 00:00:00,Madrid,Valencia,229-0439,アフガニスタン
+SUP_10245,Excellent,active,true,True,2024-02-19 00:00:00,  2023-12-17  ,坤县,  AR  ,24872,JM
+SUP_10091,4.95,active,False,True,2025-06-25 00:00:00,2026-05-15 00:00:00,Augsburg,Arizona,666-3453,モントセラト
+SUP_10012,4.31,under review,False,True,2025-09-24 00:00:00,  2027-05-13  ,Güstrow,Thüringen,25391,Fidschi
+SUP_10808,2.14,suspended,False,True,2023-03-01 00:00:00,2023-08-28 00:00:00,横浜市港北区,Arizona,07760,Eritrea
+sup_10573,4.3,active,False,True,2023-06-20 00:00:00,2024-11-13 00:00:00,西多摩郡日の出町,Arizona,767-2025,ソロモン諸島
+,,,,  Y  ,,,,,,
+SUP_10981,4.01,under review,False,True,2024-11-09 00:00:00,2027-04-25 00:00:00,東久留米市,RHODE ISLAND,46706,Namibia
+SUP_10043,2.44,suspended,False,True,2023-06-18 00:00:00,2025-02-22 00:00:00,通辽市,New Mexico,938-4557,Myanmar
+SUP_10266,1.58,pending,False,False,2024-05-26 00:00:00,2027-04-22,香取郡東庄町,MARYLAND,56870,  カメルーン  
+SUP_10913,4.09,inactive,False,True,2022-11-18 00:00:00,2024-10-07 00:00:00,Döbeln,Sachsen,90233,Bangladesh
+SUP_10713,4.37,active,False,True,2023-05-21 00:00:00,2026-02-05 00:00:00,Stollberg,Hessen,90898,Taiwan
+SUP_10117@,  2.18  ,active,False,True,2022-12-16 00:00:00,2025-03-05 00:00:00,桂芝市,Ohio,012-0274,Uganda
+SUP_10620,3.59,,False,True,,2023-10-28 00:00:00,,Brandenburg,,扎伊尔
+SUP_10587,4.29,on hold,  True  ,True,2024-08-26 00:00:00,2027-02-12 00:00:00,Teruel,Schleswig-Holstein,177-7756,西撒哈拉
+SUP_10364,3.04,active,False,True,2023-06-19 00:00:00,2026-03-02 00:00:00,Greenmouth,Brandenburg,041-7233,Senegal
+SUP_10774,2.09,suspended,  False  ,False,2023-12-10 00:00:00,2025-08-16 00:00:00,昭島市,Saarland,53522,Malasia
+SUP_10518,0,  under review  ,False,True,2023-01-19 00:00:00,2024-06-27 00:00:00,安房郡鋸南町,Ávila,571-3971,卡塔尔
+SUP_10224,3.8,active,false,True,2025-02-22 00:00:00,2027-09-04 00:00:00,Melilla,Missouri,90647,ガーナ
+SUP_10453,2.75,active,False,False,2022-10-23 00:00:00,2024-09-12 00:00:00,North Tracyhaven,Alaska,280-1549,ナウル
+SUP_10193,3,active,False,False,2023-04-27 00:00:00,2024-04-08 00:00:00,RAYMOND,Utah,63819,Bosnie-Herzégovine
+SUP_10967,3.9,inactive,False,  True  ,2025-02-24 00:00:00,  2025-08-24  ,Leipziger Land,Pontevedra,99195,Finlandia
+SUP_10760,3.25,,True,true,,2028-01-15 00:00:00,,Sachsen,,TBD
+SUP_10730,2.1,active,False,True,2024-11-06 00:00:00,2027-02-10 00:00:00,Grafenau,Cuenca,895-4734,Panamá
+SUP_10536,3.21,on hold,False,False,2024-07-08 00:00:00,2025-07-24 00:00:00,Williamsstad,New Jersey,283-0149,Guinea-Bissau
+SUP_10436,3.95,suspended#,True,False,2025-02-02 00:00:00,2027-09-14 00:00:00,利島村,Thüringen,713-0945,牙买加
+S10780,1.51077,,False,,,03/13/2027,,,,Czechoslovakia
+SUP_10940,4.55,,False,True,,2024-05-12 00:00:00,,Bremen,,Fidschi
+,,,,,,,,,,
+SUP_10667,3.02,active,False,True,2023-09-27 00:00:00,2026-04-22 00:00:00,汕尾市,Santa Cruz de Tenerife,06429,Croatie
+SUP_10317,3.52,active,False,True,2024-03-02 00:00:00,2024-09-06 00:00:00,乌鲁木齐县,Guipúzcoa,39375,Singapour
+SUP_10843,4.16,  active  %,  False  ,True,2024-11-20 00:00:00,2026-09-29 00:00:00,Freising,North Dakota,23159,莫桑比克
+SUP_10851,  4.93  ,on hold,False,False,2024-10-20 00:00:00,2026-08-29 00:00:00,Port Michael,Zamora,72325,China
+SUP_10244,4.57,on hold,False,True,2023-04-07 00:00:00,2025-04-03 00:00:00,淑珍市,Berlin,640-3924,Santa Lucía
+SUP_10093,3.5,active,False,True,2023-01-25 00:00:00,2025-08-18 00:00:00,Schwabmünchen,Mecklenburg-Vorpommern,43418,Uganda
+SUP_10130,3.40596,active,  True  ,True,2025-06-18 00:00:00,05/03/2028,Port Johnstad,Not Applicable,85304,East Germany
+SUP_10715,8.34,active,True,True,2025-03-21 00:00:00,,横浜市瀬谷区,sachsen-anhalt,79426,U.S.
+SUP_10544,4.54,suspended,False,True,2023-10-25 00:00:00,2024-10-05 00:00:00,Georgeland,Lugo,  35957  ,阿鲁巴岛
+SUP_10572,4.08,active,False,True,2023-08-25 00:00:00,2025-11-20 00:00:00,  Mohamedchester  ,Oklahoma,02288,Tanzania
+SUP_10255,3.46,on hold*,False,True,2024-09-29 00:00:00,2026-07-11 00:00:00,Navarra,Navarra,764-1728,武蔵村山市
+SUP_10143,2.08,suspended,False,False,2023-01-28 00:00:00,2025-11-11 00:00:00,  横浜市金沢区  ,Baden-Württemberg,21208,Libye
+SUP_10939,3.03,active,True,True,2024-10-30 00:00:00,  2027-05-18  ,Teruel,Oregon,352-0139,Polen
+SUP_10643,4.59,active,False,False,2023-03-26 00:00:00,2026-01-06 00:00:00,Cantabria,Bayern,303-6386,Maldivas
+SUP_10157,3.23,inactive,False,False,2023-09-20 00:00:00,2026-02-09 00:00:00,Tamiborough,Nordrhein-Westfalen,271-1964,Cayman Islands
+SUP_10260,2.76613,,False,True,,05/07/2029,,Not Applicable,,Ceylon
+SUP_10565,4.31,ACTIVE,false,False,2024-09-01 00:00:00,2025-10-08 00:00:00,Teruel,  Guadalajara  ,57304,Venezuela
+SUP_10346,4.2,  ACTIVE  ,False,True,2025-07-04 00:00:00,2028-05-21 00:00:00,Dannyburgh,Ohio,038-7551,威克岛
+SUP_10827,4.2,under review,True,False,2022-10-13 00:00:00,2024-05-24 00:00:00,Ávila,Cáceres,29849,冰岛
+SUP_10830,4.05,active,False,False,2023-06-25 00:00:00,2024-07-13 00:00:00,León,Thüringen,  71184  ,  パナマ  
+SUP_10740,3.84,,False,False,,2026-03-02 00:00:00,,Iowa,,ミャンマー
+  SUP_10676  ,  4.54  ,on hold,False,True,2023-10-03 00:00:00,2024-10-12 00:00:00,Ramos,Castellón,28938,克罗地亚
+SUP_10391,3.88,pending,False,True,2024-02-16 00:00:00,2024-12-06 00:00:00,Petitjean,Berlin,396-3814,Guyane française
+SUP_10301,4.72,under review,False,True,2024-02-05 00:00:00,2026-09-30 00:00:00,Bourdon,Hamburg,111-2357,Marruecos
+SUP_10428,3.18,under review,False,True,2025-09-22 00:00:00,2028-08-02 00:00:00,West Susan,Guadalajara,694-2177,Demokratische Volksrepublik Korea
+SUP_10705,3.39,active,False,True,2023-06-15 00:00:00,  2025-04-30  ,East Katherineberg,North Carolina,330-6349,北マリアナ諸島
+SUP_10449,1.52,suspended,False,True,2024-12-21 00:00:00,2026-09-29 00:00:00,山武郡横芝光町,Valencia,23965,リヒテンシュタイン
+SUP_10109,4.66,inactive,False,True,2023-07-09 00:00:00,2025-05-21 00:00:00,Gunzenhausen,Washington,04723,パプアニューギニア
+SUP_10691,4.73,active,False,true,2023-06-07 00:00:00,2025-01-26 00:00:00,Wetzlar,North Dakota,86332,法罗群岛
+SUP_10096,4.77,pending,True,True,2025-09-30 00:00:00,2027-07-02 00:00:00,雪县,Ourense,486-0272,island
+SUP_10813,  0.2  ,suspended,True,True,2024-01-15 00:00:00,2026-06-15 00:00:00,Vizcaya,Girona,091-8555,Burundi
+SUP_10059,-0.99,under review,TBD,True,2025-05-03 00:00:00,2025-05-03 00:00:00,Cameronland,,477-7675,BRA
+SUP_10651,4.14,on hold&,False,True,2024-05-22 00:00:00,2025-04-08 00:00:00,横浜市金沢区,Massachusetts,103-1481,肯尼亚
+SUP_10666,4.16,active,False,True,2023-09-11 00:00:00,2025-03-16 00:00:00,青ヶ島村,Bayern,25152,Gambia
+SUP_10036,2.27,under review,False,False,  2023-06-05  ,2024-12-24 00:00:00,Ramos,  Valladolid  ,102-3180,Französisch-Guayana
+SUP_10449,-0.8,active,,False,2023-04-23 00:00:00,2023-04-23 00:00:00,上海县,,  43594  ,GBR
+SUP_10881,4.04,under review,false,False,2023-05-03 00:00:00,2025-01-03 00:00:00,West Dannyside,Badajoz,  340-0359  ,Guyana
+SUP_10179,3.07,active,False,False,2025-05-15 00:00:00,2028-02-13 00:00:00,西多摩郡瑞穂町,New Mexico,85353,Netherlands Antilles
+SUP_10993,3.31,suspended,True,True,2022-10-13 00:00:00,2024-08-31 00:00:00,Sharonburgh,Guipúzcoa,71800,Cook (Îles)
+SUP_10223,4.36,  active  ,True,False,2024-07-17 00:00:00,2025-07-09 00:00:00,  嘉禾市  ,Thüringen,11487,Nördliche Marianen
+SUP_10340,2.08,,False,True,,2025-08-11 00:00:00,,Utah,,Sainte BrigitteBourg
+SUP_10351,3.06,active,False,True,2024-05-05 00:00:00,2025-04-11 00:00:00,Donaueschingen,Georgia,864-7133,Guatemala
+SUP_10949,0.19,under review,False,False,2025-03-20 00:00:00,2027-10-01 00:00:00,Albacete,Rheinland-Pfalz,05267,Uruguay
+SUP_10142,1.87,active,False,True,2023-01-21 00:00:00,2025-12-29 00:00:00,Andre,La Coruña,56815,キューバ
+SUP_10832,4.52,under review,False,  True  ,2024-02-23 00:00:00,2025-10-22 00:00:00,Lake Davidview,Cádiz,  872-6136  ,Ghana
+SUP_10001,1.78,INACTIVE,False,True,2023-02-10 00:00:00,2025-03-05 00:00:00,丽市,West Virginia,89197,桑给巴尔
+SUP_10564,3.77,on hold,false,False,2023-08-30 00:00:00,2024-08-31 00:00:00,South Pamelafort,Berlin,36998,西萨摩亚
+SUP_10847,2.91,active,True,True,2022-12-19 00:00:00,2023-12-09 00:00:00,拉萨县,Toledo,74489,  尼日尔  
+SUP_10161,3.63,suspended,False,True,  2024-04-06  ,2025-11-30 00:00:00,Giraudboeuf,Idaho,286-7307,  Antigua and Barbuda  
+SUP_10258,4.28,active,False,True,2024-12-23 00:00:00,2027-10-10 00:00:00,秀华市,Brandenburg,038-9441,Bangladesh
+SUP_10771,3.77,pending,False,  True  ,2023-01-01 00:00:00,2024-02-25 00:00:00,Luckenwalde,Alaska,335-3027,不丹
+SUP_10187,3.16,active,True,True,2023-07-10 00:00:00,2025-09-21 00:00:00,婷市,Missouri,171-1069,アルバ
+SUP_10999,3.96,on hold,False,True,2024-02-09 00:00:00,  2026-12-22  ,Roding,Albacete,274-7785,Serbia
+SUP_10829,3.87@,under review,False,False,2022-10-28 00:00:00,2023-05-19 00:00:00,North Mohamed,Rhode Island,87311,モーリシャス
+SUP_10737,  1.9  ,under review,False,True,2025-05-27 00:00:00,2026-01-04 00:00:00,Artern,Sachsen,621-3366,Burkina Faso
+SUP_10021,2.07,pending,True,True,2023-04-24 00:00:00,2025-10-12 00:00:00,Bützow,Las Palmas,746-5139,Oman
+SUP_10381,4.23,under review,False,True,2025-06-21 00:00:00,2027-03-18 00:00:00,府中市,Huesca,58510,Sierra Leone
+SUP_10362,3.55,pending,False,True,2024-04-15 00:00:00,2025-01-31 00:00:00,Delaunay,  Huesca  ,73843,Mozambique
+SUP_10590,2.78,under review,False,True,2023-10-20,2025-06-30 00:00:00,Ourense,Berlin,12371,  Saint Lucia  
+SUP_10556,3.84,inactive,  False  ,True,2023-03-16 00:00:00,2025-11-24 00:00:00,Holzminden,Saarland,965-4817,Argelia
+SUP_10156,3.91,pending,False,True,2023-06-27 00:00:00,  2024-01-26  ,Kötzting,Valencia,325-7417,Französisch-Polynesien
+SUP_10846,4.89,active,True,True,2023-03-16 00:00:00,2024-05-06 00:00:00,Reyesside,Washington,51946,Mexico
+SUP_10483,2.78,under review,False,True,2024-09-28 00:00:00,2027-08-17 00:00:00,Holmesville,Hamburg,29929,  Zimbabwe  
+SUP_10271,4.06,under review,False,True,2023-04-11 00:00:00,2025-08-05 00:00:00,Tirschenreuth,Burgos,849-7400,Saint Helena
+  SUP_10516  ,2.68,suspended,False,True,2025-07-30 00:00:00,2028-06-16 00:00:00,浦安市,Bayern,06792,Bangladesch
+SUP_10124,4.07,inactive,True,False,2024-10-04 00:00:00,2025-07-23 00:00:00,Laurenland,Louisiana,50308,多哥
+SUP_10963,3.87,active,False,True,2022-10-12 00:00:00,2025-09-03 00:00:00,Barthelemynec,Nordrhein-Westfalen,508-6568,Niederländische Antillen
+SUP_10531,3.92,suspended,  True  ,False,2024-06-09 00:00:00,2026-09-07 00:00:00,Borna,Schleswig-Holstein,49779,  トルクメニスタン  
+SUP_10834,4.69,suspended,False,True,2023-10-01 00:00:00,2024-12-02 00:00:00,Valladolid,Nordrhein-Westfalen,229-0124,Gambia
+SUP_10097,2.35,active,False,True,2025-06-22 00:00:00,2027-12-20 00:00:00,西多摩郡日の出町,Albacete,271-9477,Etiopía
+SUP_10867,4.16,active,False,True,2023-12-26 00:00:00,2025-03-13 00:00:00,Sainte VincentVille,Delaware,59081,Nigeria
+SUP_10828,4.48,on hold,True,True,2025-02-08 00:00:00,2026-03-24 00:00:00,Badajoz,Córdoba,583-2463,白俄罗斯
+SUP_10917,3.53,suspended,False,True,  2024-04-19  ,2025-01-30 00:00:00,Saint Guyboeuf,Schleswig-Holstein,055-2902,North Macedonia
+SUP_10081,3.99,active,False,True,2024-07-02 00:00:00,2027-02-09 00:00:00,辛集县,South Carolina,246-9349,Comores
+SUP_10746,4.91,suspended,False,False,2023-02-26 00:00:00,2025-12-01 00:00:00,North Carol,Nordrhein-Westfalen,79720,Irak
+  SUP_10853  ,2.86,pending,False,  True  ,2024-07-03 00:00:00,2027-02-26 00:00:00,Saint Mariannedan,Rhode Island,19530,Argentine
+  SUP_10392  ,3.55,active,False,False,2022-12-07 00:00:00,2025-10-09 00:00:00,Valladolid,Baden-Württemberg,86779,Djibouti
+SUP_10438,-0.21,,,,,,,,,JPN
+SUP_10470,4.52,active,False,False,2025-09-19 00:00:00,2028-07-06 00:00:00,RACHELFORT,North Carolina,659-0846,bosnien und herzegowina
+SUP_10593,3.85,active,FALSE,False,2025-06-24 00:00:00,2027-04-22 00:00:00,Sebnitz,Baden-Württemberg,55735,Guyane
+SUP_10934,2.16,active,False,True,2022-11-19 00:00:00,2023-08-15 00:00:00,West Bethanberg,Florida,  94471  ,Mali
+SUP_10302,3.49,suspended,False,True,2022-11-18 00:00:00,2024-11-15 00:00:00,Kimberlytown,bremen,05460,日本
+Sup_10150,,Inactive,,,20250717,,TBD,,,
+SUP_10026,2.65,inactive,False,False,  2024-06-12  ,2024-12-10 00:00:00,香取市,Bremen,683-8702,Rwanda
+SUP_10197,4.74,active,False,False,2024-12-04 00:00:00,2025-12-02 00:00:00,宁县,Cantabria,16327,インドネシア
+SUP_10521,3.87,under review,True,True,2023-07-10 00:00:00,2024-11-29 00:00:00,North Brian,Oregon,244-1078,Brasil
+SUP_10404,3.63,inactive,True,True,2024-02-07 00:00:00,2026-08-12 00:00:00,Berchtesgaden,Utah,73804,French Polynesia
+SUP_10176,4.24,under review,False,True,2023-05-30,2023-12-27 00:00:00,杉並区,Madrid,840-0920,congo
+SUP_10885,2.68,suspended,False,False,2023-12-17 00:00:00,2025-03-24 00:00:00,Menard,Bremen,67959,Georgia
+SUP_10398,4.5,pending,True,True,2025-06-18 00:00:00,2028-02-18 00:00:00,秀荣市,Segovia,71102,Uganda
+SUP_10429,4.96,active,True,True,2023-09-24 00:00:00,2025-02-09 00:00:00,あきる野市,berlin,018-9970,Micronesia
+SUP_10274,3.51,active,False,True,2024-01-03 00:00:00,2026-06-18 00:00:00,East Nicoleview,Santa Cruz de Tenerife,06912,Cameroon
+SUP_10358,2.89,under review,True,True,2025-06-06 00:00:00,2027-09-28 00:00:00,North Nicolebury,New Jersey,34813,越南
+SUP_10116,3.81,suspended,False,True,2024-12-22 00:00:00,2027-11-18 00:00:00,  Dieburg  ,Murcia,188-8882,巴林
+SUP_10472,3.95,active,False,True,2023-03-03 00:00:00,2026-02-15 00:00:00,长春市,Virginia,947-1616,Western Sahara
+SUP_10512,  1.88  ,suspended,False,False,2022-12-20 00:00:00,2025-02-02 00:00:00,New Howardshire,Nordrhein-Westfalen,407-0490,Cocos (Keeling) Islands
+SUP_10322,1.9,under review,True,False,2025-04-17 00:00:00,2026-06-27 00:00:00,南京市,Arizona,588-2072,Ethiopie
+sup_10356,1.04,inactive,False,True,2024-03-10 00:00:00,2026-09-28 00:00:00,Wagner,Brandenburg,92052,Mauritius
+SUP_10437,2.85,on hold,False,True,2024-07-05 00:00:00,2027-04-23 00:00:00,  上海市  ,Tennessee,407-9603,Maldives
+SUP_10169,4.38,suspended,False,True,2023-05-24 00:00:00,2024-09-17 00:00:00,Harrisonside,Nordrhein-Westfalen,243-1571,India
+SUP_10383,2.58,suspended,False,False,2024-12-13 00:00:00,2027-05-07 00:00:00,柳州县,Colorado,533-5582,北マリアナ諸島
+SUP_10227,3.72,  on hold  ,True,  false  ,2023-11-21 00:00:00,2025-04-23 00:00:00,Toledo,Sachsen,728-9788,Yemen
+  SUP_10625  ,,active,,TRUE,2024-03-27 00:00:00,,Beeskow,,07856,
+SUP_10815,3.42,under review,False,True,2025-03-26 00:00:00,2025-11-01 00:00:00,Illertissen,Brandenburg,91614,Santa Lucía
+SUP_10723,2.78,active,False,True,2023-10-18 00:00:00,2024-06-10,娜县,Baleares,22053,Bulgaria
+SUP_10152,3.71,active,False,True,2023-01-03 00:00:00,2024-11-30 00:00:00,AlvesVille,Hamburg,161-4179,ボスニア・ヘルツェゴビナ
+SUP_10762,4.59,ACTIVE,True,True,2025-10-04 00:00:00,2027-11-30 00:00:00,Las Palmas,Zaragoza,60132,纽埃岛
+SUP_10460,3.95,,False,True,,2027-10-08 00:00:00,,Girona,,Äquatorialguinea
+SUP_10030,3.61,INACTIVE,False,,20210212,2023-12-23 00:00:00,,Kansas,,Taiwan
+S10840,Fair,,TRUE,,,2019-10-26 00:00:00,,Saarland,,TZ
+SUP_10538,3.64,active,true,True,2024-07-12 00:00:00,2025-02-11 00:00:00,中野区,Arizona,96560,  Djibouti  
+SUP_10234,5,suspended*,False,True,2023-12-16 00:00:00,2025-03-29 00:00:00,宜都市,Melilla,323-0137,Peru
+SUP_10241,4.3,active,False,False,2022-11-08 00:00:00,2024-10-31 00:00:00,SalmonBourg,Kentucky,11551,扎伊尔
+SUP_10104,2.38,suspended,False,True,2022-10-18 00:00:00,2025-02-15 00:00:00,Cohen,Rheinland-Pfalz,596-9386,Eritrea
+SUP_10785,2.24,under review,False,True,2025-07-20 00:00:00,2028-07-10 00:00:00,Magdeburg,Huelva,771-7411,Trinidad y Tabago
+SUP_10869,4.5,pending,  False  ,True,2024-04-13 00:00:00,2025-12-16 00:00:00,国立市,Thüringen,802-9930,Nueva Zelandia
+SUP_10370,1.5,on hold,True,False,2024-12-08 00:00:00,2026-06-21 00:00:00,長生郡白子町,Niedersachsen,66488,Brazil
+SUP_10503,2.39,active,False,  TRUE  ,2025-02-23 00:00:00,2025-12-16 00:00:00,横浜市南区,Valencia,343-2792,Marruecos
+SUP_10563,1.14,active,False,false,2023-09-20 00:00:00,2025-06-28 00:00:00,Eckernförde,Maine,498-7191,Turks and Caicos Islands
+SUP_10422,3.33,active,False,True,2023-05-20 00:00:00,2025-06-10 00:00:00,Collinsfurt,Zaragoza,69426,Vereinigte Arabische Emirate
+SUP_10712,3.38,pending,False,True,2023-08-02 00:00:00,2025-05-03 00:00:00,鑫市,California,694-6183,  ARGENTINA  
+SUP_10546,3.79,suspended,True,True,2023-06-16 00:00:00,2024-07-02 00:00:00,上海市,California,17109,Colombie
+SUP_10801,4.91,active,False,True,2022-12-13 00:00:00,2024-03-30 00:00:00,安房郡鋸南町,Indiana,27886,スウェーデン
+SUP_10231,3.31,active,False,True,2023-09-22 00:00:00,2026-07-18 00:00:00,Uelzen,Mecklenburg-Vorpommern,095-6536,苏里南
+SUP_10797,4.32,inactive,False,False,2024-09-19,2026-02-21 00:00:00,Berger,Utah,19047,  哈萨克斯坦  
+SUP_10215,4.35,  active  ,False,True,2024-07-06 00:00:00,2025-12-23 00:00:00,国立市,Arizona,  556-8842  ,Polynésie française
+SUP_10011,2.66,inactive,True,True,2023-01-26 00:00:00,2025-02-11 00:00:00,西宁市,Nebraska,492-3502,イラク
+SUP_10902,4.66,under review,True,True,2024-03-22 00:00:00,2026-03-22 00:00:00,Clerc-les-Bains,massachusetts,418-9645,Thailand
+SUP_10532,3.36,inactive,False,True,2024-02-28 00:00:00,2024-12-17 00:00:00,Vizcaya,Berlin,81137,St. Vincent und die Grenadinen
+SUP_10645,4.95,active,False,False,2025-06-15 00:00:00,2028-05-03 00:00:00,East Scott,Cuenca,011-1921,Indonesia
+sup_10219,2.15,pending,False,  True  ,2025-05-19 00:00:00,2026-02-21 00:00:00,TexierVille,barcelona,169-3768,Malaysia
+SUP_10363,3.98,active,False,False,2024-04-10 00:00:00,2024-12-12 00:00:00,夷隅郡大多喜町,Huesca,289-4312,Ghana
+SUP_10731,2.66,active,False,True,2023-08-12 00:00:00,2026-04-26 00:00:00,Sevilla,Cantabria,90722,Dschibuti
+SUP_10634,4.38,inactive,False,True,2023-02-28 00:00:00,2024-09-23 00:00:00,Lake Pauline,Arkansas,97474,直布罗陀
+SUP_10212,0.47,inactive,  False  ,True,2023-04-30 00:00:00,2024-04-25 00:00:00,Cantabria,Idaho,98941,Mozambique
+SUP_10728,4.09,UNDER REVIEW,FALSE,True,2025-08-03 00:00:00,2027-12-05 00:00:00,長生郡長柄町,Bayern,043-5250,イラン
+SUP_10173,4.4,active,False,False,2025-09-22 00:00:00,2027-12-13 00:00:00,Port Lucyburgh,Indiana,17040,Jamaica
+SUP_10361,3.86,under review,false,True,2024-10-29 00:00:00,2027-01-02 00:00:00,Saint Charlotte-les-Bains,Sachsen,93999,  Sahara Occidental  
+SUP_10332,4.6,active,False,False,2024-01-13 00:00:00,2024-10-18 00:00:00,Hagenow,Berlin,82818,Serbia
+SUP_10014,4.16,active,True,False,2024-05-15 00:00:00,2027-03-17 00:00:00,Port Jacobland,Ciudad,122-9333,Mozambique
+SUP_10790,4.07,pending,False,False,2025-05-08 00:00:00,2027-07-27 00:00:00,Ciudad,Navarra,44949,Qatar
+SUP_10456,2.65,active,False,True,2023-11-08 00:00:00,2025-11-24 00:00:00,Fordview,Sachsen,52937,Belgique
+SUP_10134,  2.67  ,active,False,True,2023-05-24 00:00:00,  2024-07-18  ,西多摩郡奥多摩町,Oregon,70872,Haiti
+SUP_10784,4.34,  under review  ,False,True,2025-07-13 00:00:00,2026-12-04 00:00:00,Sainte Lucydan,COLORADO,945-3878,Cabo Verde
+SUP_10685,3.87,on hold,False,True,2024-11-11 00:00:00,2026-02-15 00:00:00,Holzminden,Sachsen-Anhalt,724-5605,Western Sahara
+10660,5.32,,False,,,,,BRANDENBURG,,U.S.
+SUP_10228,3.97,active,False,  True  ,2025-04-30 00:00:00,2026-08-30 00:00:00,府中市,Hessen,79080,Papua Nueva Guinea
+SUP_10770,5 stars,under review,1,True,2025-09-27 00:00:00,2024-11-05 00:00:00,Lübben,  Álava  ,087-2196,BY
+SUP_10758,2.35,active,False,True,2023-10-17 00:00:00,2025-06-05 00:00:00,Barkerstad,Granada,  669-6571  ,Tadjikistan
+SUP_10842,3.36,inactive,  FALSE  ,True,2023-01-29 00:00:00,2025-03-14 00:00:00,Paderborn,SALAMANCA,395-9608,Ucrania
+sup_10524,3.13,active,False,True,2023-04-16 00:00:00,2023-12-19 00:00:00,横浜市戸塚区,Rhode Island,992-7763,  Afganistán  
+SUP_10050,,,,,  2009-07-29  ,,east crystalport,,26299-8679,
+SUP_10868,2.19,active,False,False,2025-01-30 00:00:00,2026-05-14 00:00:00,Teruel,Valladolid,587-0049,Georgien
+SUP_10618,2.77,on hold,False,True,2025-08-02 00:00:00,2028-02-10 00:00:00,長生郡長生村,Vermont,181-0659,Granada
+SUP_10468,4.74,pending*,  False  ,True,2023-05-03 00:00:00,2025-07-05 00:00:00,Griesbach Rottal,Ciudad,203-7764,多哥
+SUP_10278,4.99,active,false,True,2024-10-31 00:00:00,2025-08-07 00:00:00,Weißenfels,Salamanca,23521,Greenland
+,  NA  , ,,nil,,nil,,,,
+SUP_10894,4.48,under review,False,True,2025-04-04 00:00:00,2027-08-30 00:00:00,Waldmünchen,Cantabria,51175,Etiopía
+SUP_10040,  3.66  ,,False,false,,2026-01-10 00:00:00,,Lugo,,ANGOLA
+SUP_10395,4.19,inactive,False,True,2025-02-17 00:00:00,2026-03-03 00:00:00,Melle,South Dakota,19161,Myanmar
+SUP_10254,4.34,active,True,False,2024-09-28 00:00:00,2026-08-26 00:00:00,印西市,Bayern,571-6814,バチカン市国
+sup_10447,3.6,active,FALSE,False,2024-10-24 00:00:00,2026-02-04 00:00:00,山武市,Sevilla,14471,Albanie
+SUP_10062,2.36,under review,False,True,2024-02-20 00:00:00,  2026-07-01  ,Sainte Aurélieboeuf,Córdoba,976-2500,马来西亚
+SUP_10983,3.63,suspended,False,True,2024-12-30 00:00:00,2026-03-04 00:00:00,East Theresa,Nordrhein-Westfalen,898-0303,Mauretanien
+SUP_10739,3.69,  active  ,  True  ,True,2024-06-28 00:00:00,2026-09-16 00:00:00,Artern,Sachsen-Anhalt,931-6949,Jordan
+sup_10907,4.85,suspended,False,True,2023-03-14 00:00:00,2023-10-28 00:00:00,Blanchet,Asturias,  054-4330  ,圣赫勒拿
+SUP_10950,,NO,,Pending,  2014-12-17  ,,madrid,,56683-8906,
+SUP_10209,2.85,active!,False,True,2022-10-29 00:00:00,2025-08-04 00:00:00,六盘水市,Toledo,99586,尼日尔
+,,,,,,,,,,
+SUP_10330,  9.7  ,inactive,True,,  01/01/2024  ,,,thüringen,99999,United States of America
+SUP_10923,4.15,  active  ,False,True,2024-01-23 00:00:00,2026-06-04 00:00:00,小金井市,California,734-7196,  Falkland (Île)  
+SUP_10640,4.58,,False,0,,2025-12-22 00:00:00,,Cuenca,,塔吉克斯坦
+SUP_10632,2.46,  suspended  ,False,True,2025-07-07 00:00:00,2026-02-20 00:00:00,南京市,New York,767-5191,Cook (Îles)
+SUP_10895,4.15,active,False,True,2023-12-19 00:00:00,2025-09-21 00:00:00,renaultbourg,Saarland,37050,Gibraltar
+SUP_10294,2.92,inactive,False,False,2024-01-15 00:00:00,2025-11-19 00:00:00,安房郡鋸南町,Hamburg,91602,Zambia
+sup_10111,4.04,under review,False,True,2024-10-23 00:00:00,2027-01-07,Almería,Sachsen,713-6821,Canada
+SUP_10051,2.91,active%,False,True,2023-11-25 00:00:00,2025-02-22 00:00:00,New Victoria,Soria,22781,Belgium
+SUP_10407,4.42,active!,False,True,2023-10-21 00:00:00,2025-09-09 00:00:00,Osterode am Harz,  Sevilla  ,08013,Madagascar
+SUP_10107,3.02,under review,True,True,2025-03-13 00:00:00,2027-11-15 00:00:00,巢湖县,West Virginia,76301,Aruba
+SUP_10290,4.53,active,True,False,2024-07-10 00:00:00,2026-09-12 00:00:00,Barcelona,Bayern,922-8992,Afghanistan
+SUP_10108,  0.9  ,active,False,True,2024-02-14 00:00:00,2026-06-08 00:00:00,Faure-les-Bains,Huelva,23893,Libia
+SUP_10198,1.73,under review,True,True,2025-02-03 00:00:00,2027-03-02 00:00:00,Delmas-les-Bains,Baden-Württemberg,73013,  Togo  
+SUP_10692,2.28,suspended,False,False,2025-08-27 00:00:00,2026-06-28 00:00:00,Toledo,Schleswig-Holstein,760-7871,Martinique
+SUP_10306,2.81,active,False,True,2023-06-09 00:00:00,2025-05-19 00:00:00,香取郡東庄町,Rheinland-Pfalz,332-1979,新西兰
+SUP_10213,4.77&,active,False,False,2023-06-25 00:00:00,2025-01-30,Euskirchen,Thüringen,336-5008,尼日尔
+SUP_10738,3.84,active#,  False  ,False,2023-06-06 00:00:00,2025-06-02 00:00:00,Guben,Virginia,920-3782,Nouvelle Calédonie
+SUP_10543,2.99,active,  False  ,True,2024-01-15 00:00:00,2025-02-03 00:00:00,Darrenberg,Oklahoma,946-1021,Lithuania
+SUP_10010,1.89,active,True,  True  ,2023-12-31 00:00:00,2026-01-11 00:00:00,Lake Ryanchester,Schleswig-Holstein,88760,卡塔尔
+SUP_10702,  3.97  ,under review,False,False,2025-06-05 00:00:00,  2026-03-20  ,South Caleb,Florida,13903,Costa Rica
+sup_10596,4.51,under review,True,True,2023-12-16 00:00:00,2026-11-22 00:00:00,Kingmouth,Ciudad,51301,Ghana
+SUP_10343,2.89,suspended,False,False,2024-04-02 00:00:00,2025-12-25 00:00:00,Cousin,Madrid,516-4287,Italia
+  SUP_10167  ,4.8,active,False,True,2024-09-10 00:00:00,2027-06-18 00:00:00,Angermünde,Hessen,91356,Guernsey
+SUP_10794,4.06,active,True,True,2023-08-08 00:00:00,2024-08-21 00:00:00,  Patelville  ,Nebraska,35813,Etiopía
+SUP_10048,4.64,pending,False,True,2023-09-24 00:00:00,2024-09-15 00:00:00,Collin-les-Bains,Bayern,66337,Islas Marshall
+SUP_10886,3.13,under review,False,True,2024-07-23 00:00:00,2026-10-12 00:00:00,亮县,Palencia,183-0769,Vereinigtes Königreich
+SUP_10442,3.91,suspended,True,True,2023-05-04 00:00:00,2026-02-20 00:00:00,勇县,West Virginia,694-7279,New Caledonia
+SUP_10665,Good*,  pending  ,Yes,True,2024-07-02 00:00:00,2023-09-10,Valladolid,ID,328-2219,FJ
+SUP_10065@,3.77789,active,False,False,2023-01-08 00:00:00,09/29/2028,Pichon-sur-Legros,,  220-8394  ,Czechoslovakia
+SUP_10704,3.68,suspended,False,True,2025-02-22 00:00:00,2027-01-17 00:00:00,西宁市,Hamburg,34678,Dominican Republic
+SUP_10031,4.77,under review,False,False,2024-08-21 00:00:00,2026-10-19 00:00:00,South Aimee,Oregon,61453,斐济
+  SUP_10106  ,4.4,under review,False,True,2023-02-10 00:00:00,2026-01-15 00:00:00,小金井市,Cantabria,22067,Tschad
+SUP_10095,  3.18  ,under review,False,True,2022-12-30 00:00:00,2024-07-23 00:00:00,Valladolid,Cuenca,17365,
+SUP_10782,4,active,True,True,  2023-05-04  ,2026-04-03 00:00:00,玉华县,Zaragoza,600-3268,哈萨克斯坦
+SUP_10222,4.31,inactive,False,False,2023-03-16 00:00:00,2025-12-28 00:00:00,Salamanca,  Málaga  ,171-5614,Norvège
+sup_10663,4.99,suspended,False,True,2024-04-09 00:00:00,2025-07-30 00:00:00,Huelva,Utah,79107,Niederländische Antillen
+SUP_10826,2.63,suspended,False,True,2022-11-11 00:00:00,2025-04-12 00:00:00,Hunttown,sachsen-anhalt,697-1949,Macédoine du Nord
+,,,,,,,,,,
+SUP_10046,2.51,under review,True,  True  ,2024-11-22 00:00:00,2026-10-06 00:00:00,Georges-sur-Mer,Bremen,195-9820,Zambia
+SUP_10768,3.91,active,False,True,2024-05-18 00:00:00,2024-12-23 00:00:00,Lugo,Salamanca,804-1364,  St. Vincent und die Grenadinen  
+SUP_10127,  2.45  ,under review,false,True,  2023-01-03  ,2025-09-23 00:00:00,Weimar,Madrid,60513,Burkina Faso
+SUP_10612,4.41,active,False,True,2025-01-08 00:00:00,2025-08-13 00:00:00,桂香县,Nebraska,904-8803,  Saint Barthelemy  
+  SUP_10490  ,Fair,active,0,True,2023-07-01 00:00:00,2022-12-24 00:00:00,new valeriefort,Arkansas,40950,MK
+SUP_10446,2.02,inactive,False,True,2023-06-23 00:00:00,2025-11-05 00:00:00,Hagenow,Delaware,45096,纽埃岛
+SUP_10877,3.71,active,False,False,2024-07-08 00:00:00,2025-09-09 00:00:00,横浜市中区,Sevilla,186-4798,阿森松
+SUP_10764,4.72,inactive,False,True,2025-06-22 00:00:00,2028-06-06 00:00:00,Sainte Pauline,Sevilla,65596,Eslovenia
+SUP_10305,  4.85  ,pending,False,False,2022-11-20 00:00:00,2024-10-23 00:00:00,Lambertfort,Alicante,92421,加那利群岛
+  SUP_10324  ,3.33,active,False,True,2024-08-17 00:00:00,2025-02-28 00:00:00,Evansmouth,Rhode Island,76972,Estados Unidos de América
+SUP_10779,4.61,active,True,True,2023-08-02 00:00:00,2025-03-04 00:00:00,Navarro,Alaska,85071,Iran
+SUP_10192,3.21,active,False,True,2023-10-21 00:00:00,2026-09-01 00:00:00,Rossmouth,Sachsen,819-6909,扎伊尔
+SUP_10247,3.25,on hold,  False  ,True,2023-05-17 00:00:00,2025-04-04 00:00:00,柳州市,Sachsen,958-5293,Norfolk Island
+  SUP_10709  ,4.73,pending,  False  ,True,2025-03-10 00:00:00,2026-02-24 00:00:00,拉萨县,Soria,78260,ガンビア
+SUP_10174,4.54,on hold,False,True,2024-02-25 00:00:00,2025-10-30 00:00:00,我孫子市,Salamanca,115-6790,Cameroon
+SUP_10070,Poor,active,false,True,2023-01-31 00:00:00,2022-09-09 00:00:00,Eilenburg,Burgos,23719,YE
+SUP_10744,3.18,under review,False,True,2023-03-07 00:00:00,2023-12-28 00:00:00,Mooreberg,Rhode Island,587-4575,Érythrée
+SUP_10641,3.66,on hold,False,True,2025-02-14 00:00:00,2027-05-16 00:00:00,Saint Étienne,  New Jersey  ,16266,  Tuvalu  
+SUP_10316,3.77,ON HOLD,False,True,2023-03-05 00:00:00,2024-07-14 00:00:00,Sonneberg,Alaska,685-4994,Romania
+SUP_10711,3.53,inactive,False,True,2023-08-13 00:00:00,2025-07-02 00:00:00,邯郸市,Maryland,34936,Venezuela
+,,,,,,,,,,
+SUP_10433,3.83,pending,True,True,2023-08-04 00:00:00,2026-06-18 00:00:00,八王子市,Mississippi,386-2748,Laos
+SUP_10791,3.62,active,False,True,2025-03-08 00:00:00,2027-07-16 00:00:00,New Seanmouth,  Nevada  ,97198,  ギリシャ  
+SUP_10009,1.08,suspended,false,True,2023-10-16 00:00:00,2025-04-19 00:00:00,Palencia,Alabama,93279,巴林
+SUP_10944,4.23,on hold,False,False,2025-07-27 00:00:00,2027-06-06 00:00:00,Zaragoza,Nevada,37247,Belgium
+SUP_10891,4.33,on hold,True,True,2025-03-18 00:00:00,2026-10-28 00:00:00,Lake Daniel,Arkansas,69806,Französisch-Guayana
+SUP_10671,3.43,active,True,True,2024-12-28 00:00:00,2026-08-14 00:00:00,Lecoq-sur-Dupont,Málaga,28082,危地马拉
+SUP_10850,,TBD,,In Progress,2009-02-01 00:00:00,,瑜市,,90944-9240,
+SUP_10736,4.64,active,False,True,2024-12-30 00:00:00,2027-01-26 00:00:00,Crailsheim,Kansas,226-3965,Ouganda
+SUP_10217,4.8,inactive,True,True,2025-05-23 00:00:00,2028-04-03 00:00:00,Singhton,Wisconsin,237-1029,Kambodscha
+SUP_10007,4.96,active,False,True,2025-01-30 00:00:00,2028-01-21 00:00:00,  Halberstadt  ,Hamburg,003-4315,Dinamarca
+SUP_10957,3.56,active,False,True,2023-08-21 00:00:00,2025-01-09 00:00:00,Masse,Lugo,395-1036,Singapur
+SUP_10804,4.88,active,False,True,2025-08-28 00:00:00,2027-01-20 00:00:00,杉並区,Toledo,01899,Cote d'Ivoire
+SUP_10517,3.95,active,True,True,2025-09-03 00:00:00,2026-04-20 00:00:00,LarocheBourg,Melilla,76245,Portugal
+SUP_10148,,approved,,,01/21/2025,,,,00000,
+SUP_10462,3.95,on hold,False,True,2023-02-24 00:00:00,2024-10-20 00:00:00,Port Julie,Las Palmas,250-8652,帕劳
+SUP_10382,4.24,active,False,True,  2025-06-26  ,2027-08-09 00:00:00,Robertside,Rheinland-Pfalz,008-4583,Santa Lucía
+SUP_10084,1.48,SUSPENDED,False,True,2024-04-06 00:00:00,2026-09-29 00:00:00,Paul,Berlin,080-7055,Djibouti
+SUP_10991,4.86,suspended,False,True,2025-02-06 00:00:00,2026-07-14 00:00:00,Ramseyborough,Hamburg,80522,Saint Barthelemy
+SUP_10374,3.44,suspended,False,True,  2022-12-16  ,2025-06-04 00:00:00,Rayside,Louisiana,910-7755,  Lithuania  
+SUP_10699#,4.07,active,False,true,  2025-06-06  ,2026-10-25 00:00:00,Ciudad,Sachsen-Anhalt,39583,Eritrea
+SUP_10374,3.44,suspended,False,True,2022-12-16 00:00:00,2025-06-04 00:00:00,Rayside,Louisiana,910-7755,  Lithuania  
+SUP_10979,4.3,pending,False,  True  ,2025-08-23 00:00:00,2027-07-06 00:00:00,西多摩郡日の出町,Sachsen,776-8745,Serbien
+SUP_10689,4.59,pending,False,True,2023-05-02 00:00:00,2024-01-31 00:00:00,Meiningen,  North Carolina  ,10928,Congo
+SUP_10163,2.2,on hold,False,True,2023-12-10 00:00:00,2025-05-15 00:00:00,  横浜市港北区  ,Idaho,78163,  Syrien  
+SUP_10604,4.22,inactive,False,False,2024-08-08 00:00:00,2027-02-26 00:00:00,海门市,Nordrhein-Westfalen,410-0366,Zambia
+SUP_10619,4.14,inactive,False,False,2024-07-09 00:00:00,2025-11-13 00:00:00,Saint TimothéeBourg,New Mexico,58421,Lebanon
+SUP_10073,2.16,suspended,  False  ,true,2024-05-07 00:00:00,2025-09-30 00:00:00,Huesca,NORDRHEIN-WESTFALEN,418-5543,挪威
+SUP_10115,0.42,  pending  ,False,  True  ,2024-06-08 00:00:00,2025-08-12 00:00:00,Girona,Illinois,235-6223,Finlandia
+SUP_10694,4.7,pending,False,True,2024-08-06 00:00:00,2025-07-27 00:00:00,Gay-les-Bains,Bayern,984-1736,Zambia
+SUP_10339#,3.3,active,False,True,2023-02-11 00:00:00,2023-10-04 00:00:00,Monschau,North Dakota,65488,ハイチ
+,,,,,,,,,,
+SUP_10703,3.96,active,True,False,2023-10-16 00:00:00,2026-05-15 00:00:00,  Hamel  ,New York,558-1018,Malawi
+SUP_10783,1.05,under review,False,True,2024-04-03 00:00:00,2025-09-10 00:00:00,DurandBourg,Oregon,30818,Turquie
+SUP_10017,4.39,on hold,False,True,2023-08-05 00:00:00,2024-12-20 00:00:00,Teruel,Hessen,517-8004,  Vatikanstadt  
+  SUP_10559  !,3.99,pending,True,True,2023-07-06 00:00:00,2025-07-21 00:00:00,Chartier-sur-Dos Santos,Córdoba,349-5142,Belgium
+SUP_10584,4.04,active,False,True,2023-09-17 00:00:00,2024-12-07 00:00:00,Melilla,Rhode Island,22274,乌拉圭
+SUP_10484,3.75,active,False,False,2024-01-20 00:00:00,2024-08-28 00:00:00,玉兰县,Louisiana,677-6047,São Tomé und Príncipe
+SUP_10502,2.13,active,False,True,2024-03-08 00:00:00,2025-11-03 00:00:00,Tammymouth,Sachsen,49606,デンマーク
+SUP_10201,4.88,on hold,False,  True  ,2025-08-09 00:00:00,2028-03-11 00:00:00,玉兰县,North Dakota,03813,  Cameroun  
+SUP_10652,2.8,on hold,False,False,2025-03-12 00:00:00,2027-12-17 00:00:00,  Eichstätt  ,Baden-Württemberg,25377,Indonesia
+SUP_10455,Poor,active,true,True,2022-11-30 00:00:00,2022-05-21 00:00:00,Sevilla,DC,711-5127,MH
+SUP_10079,2.72,suspended,True,True,2023-11-24 00:00:00,2025-01-08 00:00:00,Sainte MauriceVille,Brandenburg,810-2392,Argentina
+SUP_10268,4.2,active,TRUE,True,2024-03-16 00:00:00,2024-11-03 00:00:00,Teruel,Huesca,51286,Macau
+SUP_10883,4.69,active,True,False,2023-12-24 00:00:00,2025-06-25 00:00:00,小金井市,Connecticut,081-7255,Komoren
+SUP_10529,3.52,active,False,True,2022-11-24 00:00:00,2023-06-01 00:00:00,Bamberg,Nordrhein-Westfalen,56904,Republik Moldau
+SUP_10341,2.86,active,False,True,2025-09-16 00:00:00,2028-02-27 00:00:00,石家庄县,Michigan,78483,  アイルランド共和国  
+SUP_10568,2.03,on hold,True,True,2023-06-03 00:00:00,2023-12-11 00:00:00,横浜市鶴見区,Bayern,267-5203,Islande
+SUP_10649,4.87,pending,False,False,  2024-01-16  ,2024-09-30 00:00:00,Sainte Madeleine,Schleswig-Holstein,52758,  スーダン  
+SUP_10602,4.72,active,False,False,2023-11-19 00:00:00,  2026-10-11  ,Parent,Baden-Württemberg,  183-4804  ,Kongo
+SUP_10308,0.26,pending,False,  True  ,2024-02-16 00:00:00,2027-01-07 00:00:00,New Hazel,Rhode Island,94505,Ouganda
+SUP_10313,1.93,inactive,False,False,2024-11-07 00:00:00,2027-04-23 00:00:00,Derekmouth,Sachsen-Anhalt,  45534  ,Turks and Caicos Islands
+PARTNER_10960#,4.18,,False,,,2024-09-13 00:00:00,,Sachsen,,叙利亚
+SUP_10432,4.6,active,False,True,2024-06-03 00:00:00,  2024-12-25  ,川崎市幸区,Kansas,56369,马达加斯加
+SUP_10066,3.8,suspended,False,False,2024-10-11 00:00:00,2027-08-07 00:00:00,South Tracey,Alabama,40008,Seychelles
+SUP_10580,2.91,,FALSE,True,,2024-09-17 00:00:00,,Badajoz,,Montenegro
+SUP_10064&,4.35#,active,False,False,2024-06-22 00:00:00,2027-04-20 00:00:00,Saint NicoleVille,West Virginia,49809,Libye
+SUP_10409,4.33,active,True,False,2024-12-24 00:00:00,2027-03-31 00:00:00,文京区,Jaén,52970,Sweden
+SUP_10669,3.38,suspended,True,True,2023-02-14 00:00:00,2025-04-22 00:00:00,立川市,Idaho,171-4202,南非
+  SUP_10166  ,3.19,pending,False,True,2023-04-28 00:00:00,2025-10-26 00:00:00,Soest,Badajoz,144-5425,比利时
+SUP_10610,3.2,inactive,False,True,2022-11-04 00:00:00,2024-01-20 00:00:00,Navarra,Cantabria,60501,Sierra Leone
+  SUP_10136  ,4.7,inactive,False,True,2023-11-24 00:00:00,2026-08-06 00:00:00,Fletcherberg,Jaén,190-7973,  蒙特塞拉特岛  
+SUP_10582,4.91#,suspended,False,  True  ,2023-01-03 00:00:00,2025-02-23 00:00:00,Lake Robinview,Kentucky,17108,マリ
+sup_10140,5 stars#,,TRUE,True,,2020-06-06 00:00:00,,IA,,LC
+  SUP_10732  ,2.82,under review@,True,True,2024-09-04 00:00:00,2027-06-28 00:00:00,Sonneberg,Saarland,  51832  ,Saint Vincent et les Grenadines
+SUP_10334,3.74,under review,False,False,2025-01-16 00:00:00,  2027-01-29  ,Stevensland,Florida,63352,Indien
+SUP_10849,3.91,INACTIVE,False,False,2025-05-16 00:00:00,2026-09-09 00:00:00,Salamanca,Toledo,24154,Nouvelle-Zélande
+SUP_10682,3.79,active,false,True,2024-06-07 00:00:00,2025-04-14 00:00:00,Blot,Delaware,58815,Saudi Arabia
+SUP_10866,4.81,active,False,False,2025-04-16 00:00:00,2027-10-22 00:00:00,GérardBourg,Berlin,  18618  ,越南
+SUP_10481,4.06,active,False,True,2025-01-24 00:00:00,2026-12-20 00:00:00,太原市,Louisiana,82733,Andorra
+SUP_10757,4.04,  active  ,False,True,2025-10-03 00:00:00,2028-09-18 00:00:00,Brittneyhaven,South Carolina,141-1064,Oman
+SUP_10552,4.83,  suspended  ,  False  ,True,2025-08-19 00:00:00,2028-03-25 00:00:00,丽华县,Toledo,166-6247,Seychelles
+SUP_10818,4.46,on hold,  False  ,False,2025-10-09 00:00:00,2027-03-18 00:00:00,  Gordonland  ,Texas,80702,Tadschikistan
+SUP_10670,2.7,active,False,False,2023-02-27 00:00:00,2023-10-28 00:00:00,Mendozaville,Arizona,188-1369,  カタール  
+SUP_10955,3.85,suspended,False,True,2022-12-04 00:00:00,2025-07-09 00:00:00,Bousquet,Lugo,09239,パキスタン
+SUP_10296,2.9,suspended,True,True,2023-12-04 00:00:00,2025-06-29,志强市,Toledo,055-4331,スワジランド王国
+SUP_10789,3.3,on hold,False,True,2023-06-19 00:00:00,2025-10-02 00:00:00,  潮州县  ,Palencia,07425,Djibouti
+SUP_10575,,on hold,,False,2024-09-14 00:00:00,,Sebnitz,,13003,
+  SUP_10668  ,2.86,under review,False,True,2024-10-25 00:00:00,2026-08-15 00:00:00,文县,Baden-Württemberg,843-6777,Féroé (Îles)
+SUP_10397,3.69,active,False,True,2025-06-05 00:00:00,2026-08-18 00:00:00,Wolfratshausen,León,251-5269,Estland
+SUP_10243,4.24,active,False,False,2024-11-02 00:00:00,2026-06-18 00:00:00,RibeiroVille,Nordrhein-Westfalen,01447,Kuwait
+,,,,,,,,,,
+SUP_10380,3.74,,True,True,,2024-03-14 00:00:00,,Sachsen-Anhalt,,
+SUP_10743,4.12,under review,False,True,2024-05-18 00:00:00,2025-04-03 00:00:00,葛飾区,Valladolid,740-2931,Martinique
+SUP_10971,4.28,pending,False,True,2023-01-05 00:00:00,2023-12-19 00:00:00,Asturias,saarland,193-4249,几内亚比绍
+SUP_10123,4.44,pending,False,false,2024-08-13 00:00:00,2027-04-14 00:00:00,Vizcaya,Baden-Württemberg,802-7381,Égypte
+PARTNER_10120,2.76,,False,,,2028-08-29 00:00:00,,North Dakota,,Denmark
+SUP_10415,  2.73  ,under review,True,True,2024-02-10 00:00:00,2025-11-19,Rostock,New Jersey,436-7391,Koweit
+SUP_10819%,4.82,on hold,False,  False  ,2025-05-23 00:00:00,2027-06-26 00:00:00,Techer-les-Bains,Washington,225-4584,Amerikanisch-Ozeanien
+SUP_10839,4.03,active,False,False,2024-05-23 00:00:00,2027-01-29 00:00:00,Eggenfelden,New York,522-5526,桑给巴尔
+SUP_10733,0.13,active,  True  ,True,2025-03-20 00:00:00,2025-12-28 00:00:00,Saint Laurent,Thüringen,957-9021,Guatemala
+SUP_10781,2.03,suspended,False,false,2024-06-23 00:00:00,2026-03-28 00:00:00,West Johnny,  Wisconsin  ,82751,Mayotte
+  SUP_10250  ,,YES,,,2006-11-07 00:00:00,,zaragoza,,33969-2865,
+SUP_10677,2.68,on hold,False,FALSE,2024-02-18 00:00:00,2024-12-10 00:00:00,川崎市多摩区,La Rioja,26638,Guadeloupe
+SUP_10114,4.39,active,False,False,2023-08-17 00:00:00,2025-10-24 00:00:00,Delahayeboeuf,Niedersachsen,525-8147,Bhoutan
+SUP_10303,4.9,suspended,False,True,2024-12-16 00:00:00,2025-12-18 00:00:00,横浜市鶴見区,Ohio,00934,Rép. Dém. du Congo
+  SUP_10775  ,,active,,True,2023-02-28 00:00:00,,Lake Frederickberg,,30759,
+SUP_10835,4,pending,FALSE,True,2024-07-28 00:00:00,2027-03-14 00:00:00,East Zoemouth,Ciudad,812-0617,Taiwan
+sup_10121,3.56,under review,False,True,2025-06-24 00:00:00,2028-06-22 00:00:00,桂英市,UTAH,920-8897,Sudán del Sur
+SUP_10138,4.27,  active  ,False,True,2024-05-28 00:00:00,2025-10-05 00:00:00,  Wunsiedel  ,LEÓN,56226,Saint Pierre and Miquelon
+SUP_10953,3.69,active,True,True,2024-10-22 00:00:00,2026-08-21 00:00:00,西宁县,Zamora,945-4294,Georgia
+SUP_10918,1.13,active@,True,False,2023-09-21 00:00:00,2025-07-19 00:00:00,Säckingen,Alabama,87907,Cocos (Keeling) Islands
+SUP_10487,1.86,under review,False,True,2023-11-15 00:00:00,2025-08-20 00:00:00,North Alexander,BREMEN,62074,开曼群岛
+SUP_10408,3.11,active,False,False,2024-07-29 00:00:00,2025-08-31 00:00:00,Schwabmünchen,Sachsen-Anhalt,166-1717,Uruguay
+SUP_10686,3.64,suspended,False,True,2024-12-07 00:00:00,2025-09-16 00:00:00,Madrid,Niedersachsen,59466,贝宁
+SUP_10816,2.04,on hold,True,True,2024-10-04 00:00:00,2027-01-13 00:00:00,Berrystad,Berlin,02458,Niger
+SUP_10251,3.7,active*,True,False,2024-03-07,2026-01-10 00:00:00,横浜市磯子区,Navarra,09528,Comoras
+SUP_10970,4.26,active,False,True,2025-05-09 00:00:00,2028-03-05 00:00:00,East Markton,Niedersachsen,868-4987,Autriche
+SUP_10366,3.81,on hold,False,True,2024-10-21 00:00:00,2026-11-13 00:00:00,Günzburg,Soria,52165,Norfolkinsel
+SUP_10803,4.15,pending,False,true,2024-07-22 00:00:00,2026-06-17 00:00:00,汕尾市,Montana,231-0642,Tunisie
+SUP_10375,,under review,,True,2024-09-30 00:00:00,,Janetchester,,815-7738,
+SUP_10476,3.24,on hold,False,True,2025-07-23 00:00:00,2027-02-09 00:00:00,Soltau,Indiana,00684,匈牙利
+SUP_10838,4.81,under review,False,True,2025-04-23 00:00:00,2025-12-25 00:00:00,La Coruña,Florida,570-7014,Aruba
+SUP_10638,2.76,inactive,False,True,2025-01-20 00:00:00,2025-11-17 00:00:00,Marystad,Burgos,98534,アイスランド
+SUP_10226,4.37,active,False,True,2023-11-20 00:00:00,2024-08-29 00:00:00,Córdoba,Saarland,753-2262,  トリニダード・トバゴ  
+SUP_10280,5 stars,,true,1,,2019-10-22 00:00:00,,NM,,MR
+SUP_10326,3.59,active,  True  ,True,2025-08-25 00:00:00,2027-09-15 00:00:00,  Cantabria  ,Rheinland-Pfalz,87895,Kirgisistan
+SUP_10061,0.2,SUSPENDED,False,True,2024-07-13 00:00:00,2026-01-27 00:00:00,春梅县,Sachsen-Anhalt,  92484  ,Timor-Leste
+SUP_10530,4.51,suspended,False,True,2025-03-18 00:00:00,2027-05-22 00:00:00,玉华县,Kentucky,611-5091,  Mongolia  
+SUP_10952,0.05,under review,False,False,  2024-04-18  ,2026-01-15 00:00:00,Sanderston,Lleida,67537,Iceland
+SUP_10195,4.2968,active,False,True,2025-03-24 00:00:00,07/13/2027,東村山市,,090-8166,  Burma  
+SUP_10199,4.6,inactive,True,False,2023-07-10 00:00:00,2024-01-30 00:00:00,Cousin,Bremen,54600,Túnez
+SUP_10328,4.87,active,False,True,2024-11-27 00:00:00,2027-09-12 00:00:00,横浜市都筑区,Illinois,50540,Nepal
+SUP_10175,,under review,,True,2025-01-05 00:00:00,,Artern,,837-4965,
+SUP_10845,3.12961,active,False,False,2023-04-09 00:00:00,03/14/2027,宜都市,,46387,USSR
+SUP_10259,0.38,active,False,True,2023-09-25 00:00:00,2026-01-26 00:00:00,Guadalajara,Tarragona,20580,Peru
+SUP_10995,4.14,active,False,True,2023-09-09 00:00:00,2024-07-07 00:00:00,南房総市,California,20824,毛里求斯
+SUP_10678,4.49,pending,False,False,2025-09-23 00:00:00,2028-08-15 00:00:00,  马鞍山市  ,Nebraska,479-4025,サモア
+SUP_10492,2.72,pending,False,True,  2023-11-09  ,2025-03-05 00:00:00,川崎市中原区,Bayern,244-3421,san marino
+SUP_10039,2.36,active,False,True,2025-02-23 00:00:00,2025-10-03 00:00:00,Pricemouth,  Sachsen-Anhalt  ,582-0986,Vietman
+SUP_10992,3.71,pending,True,True,2023-08-15 00:00:00,2026-02-09 00:00:00,DuhamelBourg,New Mexico,157-6656,Santa Lucía
+SUP_10265,3.84,on hold,False,False,2025-08-16 00:00:00,2028-05-09 00:00:00,  West Lisa  ,barcelona,96169,  Maurice  
+  SUP_10488  ,,  pending  ,Yes,True,2025-01-21 00:00:00,2024-05-12 00:00:00,Guadalajara,Sachsen,864-7318,CG
+SUP_10899,  3.48  ,active,False,True,2024-06-04 00:00:00,2026-08-13 00:00:00,Moraburgh,Castellón,68275,マレーシア
+SUP_10969,4.72,  under review  ,False,True,2022-11-27 00:00:00,2024-08-10 00:00:00,OSTERODE AM HARZ,Hessen,645-6763,Israel
+SUP_10238,3.94,under review,True,True,2023-05-17 00:00:00,2025-06-29 00:00:00,Vizcaya,Saarland,689-8363,Suisse
+SUP_10903,2.15,suspended,False,False,2025-04-12 00:00:00,  2027-04-23  ,Teterow,Nevada,995-6388,Fidji (République des)
+SUP_10164,3.04,on hold,False,True,2024-07-31 00:00:00,2027-01-08 00:00:00,Smithborough,Michigan,42914,Angola
+SUP_10154,2.79,on hold,True,False,2023-08-26 00:00:00,2025-06-06 00:00:00,千代田区,Salamanca,61308,Norfolkinsel
+SUP_10286,2.97,suspended,False,False,2025-01-29 00:00:00,2027-06-04 00:00:00,Málaga,Montana,43213,sudáfrica
+SUP_10282,2.32,under review,False,True,2022-10-15 00:00:00,2024-05-18 00:00:00,West Steventon,North Dakota,023-9462,ドイツ
+SUP_10787,4.41,inactive,False,False,2024-05-17 00:00:00,2026-11-20 00:00:00,宁市,Indiana,20651,Bolivie
+SUP_10852,2.81,under review,True,False,2024-05-19 00:00:00,2025-10-13 00:00:00,East Andreport,Missouri,75561,サウスジョージア・サウスサンドウィッチ諸島
+SUP_10112,4.46,suspended,True,False,2023-09-05 00:00:00,2025-09-18 00:00:00,佛山市,La Rioja,570-8683,Iceland
+SUP_10545,3.04,  under review  ,False,False,2024-01-24 00:00:00,2025-06-26,Dos SantosBourg,Brandenburg,360-3172,Lesotho
+SUP_10706,3.34,active,False,False,2022-11-05 00:00:00,2025-04-19 00:00:00,波市,Pennsylvania,27873,Myanmar
+SUP_10082,3.92,under review,False,True,2024-12-22 00:00:00,2026-01-31 00:00:00,北镇市,Minnesota,833-2868,スロベニア
+SUP_10696,3.91,on hold,True,False,2023-10-19 00:00:00,2025-09-03 00:00:00,文京区,Cantabria,42684,ノーフォーク島
+SUP_10038,  4.05  ,active,False,True,2024-04-01 00:00:00,2025-08-12 00:00:00,Burgos,Oregon,087-4066,Moldova
+SUP_10698,4.05,active,  False  ,False,2023-03-20 00:00:00,  2024-06-07  ,Neuruppin,Hessen,78827,Cabo Verde
+SUP_10162,2.4,pending,False,True,2024-09-14 00:00:00,2025-05-30 00:00:00,昭島市,South Dakota,50635,サン・バルテルミー島
+SUP_10792,4.03,suspended,False,False,2023-05-07 00:00:00,2026-03-14 00:00:00,富里市,Saarland,83187,阿曼
+SUP_10496,3.52,ACTIVE,False,True,2023-12-25 00:00:00,2026-04-18 00:00:00,Matthewfort,Vermont,117-4560,Antigua et Barbuda
+SUP_10122,4.0&,under review,False,True,2025-02-23 00:00:00,2027-12-05 00:00:00,东莞县,Connecticut,237-1245,Oman
+SUP_10507,4.06,suspended,False,True,2023-02-01 00:00:00,2025-09-09 00:00:00,Rivière-sur-Gautier,Maine,916-2959,Belarus
+SUP_10893,4.58,inactive,False,True,2023-03-13 00:00:00,2023-11-02 00:00:00,Lake Lucy,Thüringen,59581,VIETNAM
+SUP_10943,2.26,active,True,True,2024-12-16 00:00:00,2026-03-18 00:00:00,瑜县,Sachsen,  739-5496  ,Guyana
+SUP_10695,3.51,active,False,True,2023-04-02 00:00:00,  2025-03-28  ,琳市,Barcelona,349-6117,プエルトリコ
+SUP_10508,3.51,active,TRUE,True,2023-01-02 00:00:00,2025-08-29 00:00:00,淑珍县,León,  24068  ,Albanien
+SUP_10024,3.23,inactive,False,True,2025-06-24 00:00:00,2026-03-02 00:00:00,神津島村,Texas,37697,Suecia
+SUP_10403,0.8,suspended,True,True,2022-12-09 00:00:00,2025-07-30 00:00:00,Bersenbrück,Salamanca,782-1567,利比亚
+  SUP_10959  ,3.82,pending,False,True,2023-09-12 00:00:00,2025-04-11 00:00:00,Port Sharon,La Coruña,544-9282,立陶宛
+SUP_10002,4.71,suspended,False,True,2025-03-12 00:00:00,2027-10-29 00:00:00,慧县,Indiana,104-1519,Bermudes (Les)
+SUP_10237,3.89,active,False,False,2025-05-08 00:00:00,2027-09-05 00:00:00,Garciaburgh,Indiana,487-1577,Seychelles
+SUP_10357,3.94,active,  False  ,  True  ,2023-01-09 00:00:00,2023-10-08 00:00:00,New Francesca,Rhode Island,811-5233,Macédoine du Nord
+SUP_10110,9.99,suspended,False,False,2023-07-01 00:00:00,,New Arthurton,montana,239-8843,U.S.
+SUP_10912,2.11,under review,True,True,2024-07-22 00:00:00,2025-07-08 00:00:00,La Rioja,Bremen,285-7736,ブラジル
+SUP_10933,2.64,suspended,False,True,2023-03-04 00:00:00,2025-01-12 00:00:00,石家庄县,Hessen,88729,Saint Pierre and Miquelon
+SUP_10998,3.11,under review,True,TRUE,2024-08-11 00:00:00,2026-03-30 00:00:00,DESSAU,Schleswig-Holstein,40877,Pakistán
+SUP_10936,0.01,active,False,True,2023-11-05 00:00:00,2024-11-16 00:00:00,Salamanca,Ceuta,09812,  安哥拉  
+SUP_10365,  3.69  ,under review,False,True,2024-07-13 00:00:00,2026-09-25 00:00:00,Melilla,Cádiz,942-1258,Seychelles
+SUP_10506,4.25,active,False,True,2024-09-05 00:00:00,  2025-07-23  ,江東区,Kansas,39419,Mauritania
+SUP_10951,4.94,active,False,True,2025-03-21 00:00:00,2028-03-11 00:00:00,New Mandy,Cádiz,38161,  Tschad  
+SUP_10113,2.19,  suspended  ,False,True,2023-05-05 00:00:00,2025-04-15 00:00:00,国立市,Sevilla,63336,Trinidad and Tobago
+SUP_10755,4.61,suspended#,FALSE,True,2024-08-10 00:00:00,2026-09-25 00:00:00,Sammouth,JAÉN,13694,Belize
+SUP_10345,  2.31  ,under review,False,False,2024-07-19,2026-12-27 00:00:00,  Damienshire  ,Wisconsin,389-1594,Géorgie du Sud et Sandwich du Sud (Îles)
+SUP_10510,2.93,Pending,False,,26-03-2024,2025-02-10 00:00:00,,Hessen,00000,Jeanport
+SUP_10662,3.28,under review,True,True,2023-06-16 00:00:00,2025-12-17 00:00:00,阜新县,North Dakota,020-9931,Moldova
+SUP_10870,3.25,active,False,,20221106,  2026-07-23  ,,Brandenburg,XXXXX,Yemen
+SUP_10139,4.84,under review,True,True,2024-08-09 00:00:00,2027-04-03 00:00:00,Chauvet,Indiana,08281,Japón
+SUP_10528,  5.0  ,inactive,False,False,2025-08-12 00:00:00,2026-12-30 00:00:00,Erfurt,Pennsylvania,854-2014,Syrie
+SUP_10775,-0.22,A,TBD,,  09-10-2022  ,09-10-2022,,TBD,XXXXX,GBR
+SUP_10147,2.88,inactive,False,True,2023-09-20 00:00:00,2024-04-02 00:00:00,West Leah,Kansas,797-0439,タイ
+SUP_10172,2.01,active,  False  ,  False  ,2024-11-02 00:00:00,  2026-11-01  ,Huet-sur-Ollivier,Berlin,924-0568,República Democrática Popular Lao
+SUP_10802,3.94,pending,True,  True  ,2023-05-11 00:00:00,2024-11-13 00:00:00,Palencia,Brandenburg,745-3635,カンボジア
+SUP_10445,3.62,active,True,False,2024-11-07 00:00:00,2027-06-20 00:00:00,山武郡横芝光町,VIZCAYA,84909,Kanada
+SUP_10461,4.71,active,False,True,2023-12-30 00:00:00,2026-02-23 00:00:00,Senftenberg,  California  ,12773,Morocco
+SUP_10288,4.4,active,False,False,2024-10-03 00:00:00,2027-07-21 00:00:00,Port Dominic,Valladolid,99732,Panama
+SUP_10807,4.37,active,  False  ,False,2025-10-07 00:00:00,2028-09-28 00:00:00,Port Charles,Rhode Island,  10134  ,Korea
+SUP_10968,4.4,under review,False,True,2025-04-15 00:00:00,2026-10-27 00:00:00,武汉市,Pennsylvania,512-6883,Netherlands
+SUP_10637,2.25,on hold,False,True,2023-02-28 00:00:00,2024-03-02 00:00:00,帆县,Hessen,29246,Canadá
+SUP_10170,3.65,  under review  ,False,True,  2024-03-13  ,2026-12-17 00:00:00,Kristenfort,Niedersachsen,84631,Cádiz
+SUP_10547,2.29,active,True,True,2024-08-01 00:00:00,2026-02-20 00:00:00,Callumfurt,Brandenburg,10512,  Zentralafrikanische Republik  
+SUP_10281,3.76,pending,False,  True  ,2024-02-09 00:00:00,2026-02-09 00:00:00,Steinberg,Michigan,  750-8579  ,St. Lucia
+SUP_10089,  4.41  ,active,False,False,2024-04-14 00:00:00,2027-02-15 00:00:00,四街道市,North Dakota,40363,CENTRAL AFRICAN REPUBLIC
+SUP_10688,4.61,inactive,False,True,2022-10-15 00:00:00,2024-09-24 00:00:00,西多摩郡瑞穂町,INDIANA,94476,Iceland
+SUP_10742,2.54,pending,False,False,  2023-06-19  ,2024-10-10 00:00:00,Paderborn,Iowa,81889,Montserrat
+SUP_10570,1.82,active,False,,10/20/2023,2028-07-11 00:00:00,Unknown,Missouri,,
+SUP_10607,2.67,active,False,True,2023-05-26 00:00:00,2025-04-26 00:00:00,Granada,Rheinland-Pfalz,690-7657,Cape Verde
+SUP_10560,Poor,,  1  ,No,,2020-03-11 00:00:00,,Teruel,,BZ
+SUP_10275,,active,,True,2024-10-04 00:00:00,,宜都县,,12707,
+SUP_10806,4.16,on hold,False,True,2024-07-02 00:00:00,2025-09-04 00:00:00,Jeremiahfurt,Lugo,858-0432,Chile
+SUP_10975,,under review,,True,2023-05-19 00:00:00,,Salamanca,,01722,
+SUP_10418,4.85,active,True,True,2024-06-14 00:00:00,2027-02-06 00:00:00,Rockenhausen,Maryland,66010,パナマ
+SUP_10003,,under review,,  False  ,2024-01-27,,Bad Langensalza,,420-8871,
+SUP_10006,2.88,inactive,  False  ,True,2023-12-03 00:00:00,2025-10-18 00:00:00,DeschampsVille,Toledo,89854,Zimbabwe
+SUP_10614&,4.47%,active,  False  ,True,  2023-10-21  ,2026-07-03 00:00:00,玉英县,Córdoba,  608-0585  ,ブルンジ
+SUP_10796,2.82,active,False,True,2025-10-09 00:00:00,2028-08-25 00:00:00,清瀬市,MELILLA,16985,Bahamas
+SUP_10137,4.26,active,True,False,2024-04-01 00:00:00,2025-12-24 00:00:00,小红市,Oregon,29406,Angola
+sup_10285,4.07,active,False,True,2025-07-12 00:00:00,2026-08-24 00:00:00,Merseburg,Baden-Württemberg,62804,
+SUP_10376,4.84,under review,False,True,2025-09-09 00:00:00,2028-06-22 00:00:00,West Hollie,Ávila,132-2839,Cayman Islands
+SUP_10229,3.82,under review,False,False,2023-08-18 00:00:00,2026-06-03 00:00:00,小平市,Huelva,986-4530,New Caledonia
+SUP_10551,4.57,pending,False,True,  2024-05-26  ,  2027-02-09  ,Schlüchtern,Niedersachsen,99755,Guam
+SUP_10889,  4.77  ,pending,False,False,2022-11-10 00:00:00,2024-04-04 00:00:00,West Jenna,Colorado,932-8247,赤道ギニア共和国
+nil,,,,,,, ,,,  N/A  
+SUP_10307,3.89,  inactive  ,False,False,2022-11-24 00:00:00,2024-05-08 00:00:00,Stricklandtown,Berlin,01447,Vanuatu
+SUP_10054,2.4,under review,True,False,2023-03-04 00:00:00,2025-05-15 00:00:00,Melilla,CUENCA,  34182  ,イエメン
+SUP_10184,4.18,on hold,False,True,2025-06-22 00:00:00,2026-05-03 00:00:00,广州县,West Virginia,430-5428,Grenada
+SUP_10262,3.8,pending,False,False,2024-08-24 00:00:00,2025-07-05 00:00:00,Saint Luc,Huesca,99818,越南
+SUP_10439,3.6,under review,False,False,2022-12-14 00:00:00,2025-03-16 00:00:00,West Michelle,Brandenburg,10961,Belarus
+SUP_10477,4.43,active,True,True,  2025-03-23  ,2027-04-22 00:00:00,  江東区  ,Washington,180-4194,Mauritania
+SUP_10076,2.48,suspended,False,True,2025-02-01 00:00:00,2026-05-28 00:00:00,神津島村,Alicante,897-2147,Lesotho
+SUP_10655,2.89,active,True,True,2025-01-06,2027-02-07 00:00:00,燕县,Saarland,42464,Kazajstán
+SUP_10806,4.16,  on hold  ,False,True,  2024-07-02  ,2025-09-04 00:00:00,  Jeremiahfurt  ,Lugo,858-0432,Chile
+SUP_10844,4.63,under review,False,True,2023-03-06 00:00:00,2025-01-08 00:00:00,袖ケ浦市,Illinois,85061,Niue
+  SUP_10747  ,4.33,  pending  ,False,False,2025-01-10 00:00:00,2026-10-26 00:00:00,Russellberg,Bremen,405-4005,Andorra
+,,,,1,,,,,,
+SUP_10242,4.08,active,True,True,2025-05-15 00:00:00,2026-09-04 00:00:00,Maillarddan,Vermont,77942,Mongolia
+SUP_10549,4.45,inactive,False,True,2025-04-20 00:00:00,2026-03-18 00:00:00,Granada,Navarra,16589,Sierra Leone
+SUP_10566,4.67,active,False,True,2024-01-30 00:00:00,2025-11-13 00:00:00,BOURDON-SUR-MER,Cádiz,55309,法国
+SUP_10880,9.94,,False,1,,,,INDIANA,,  États-Unis  
+SUP_10203,2.47,inactive,False,True,2025-08-24 00:00:00,2028-07-11 00:00:00,鹏市,Córdoba,81839,スロベニア
+SUP_10253,5 stars,approved,No,,20230611,2019-10-25 00:00:00,Unknown,Ohio,,LR
+SUP_10055,6.2,active,  False  ,False,2024-10-21 00:00:00,,云市,BADEN-WÜRTTEMBERG,  377-4295  ,États-Unis
+SUP_10068,4.07,suspended,  True  ,True,2024-09-11 00:00:00,2025-04-04 00:00:00,Luckau,Massachusetts,81519,Thailande
+SUP_10687,2.68,active,False,True,2023-02-05 00:00:00,2025-12-26 00:00:00,West Calvin,Zaragoza,11954,ベラルーシ
+  SUP_10292  ,4.86,  active  ,False,True,2024-08-03 00:00:00,2027-03-25 00:00:00,Toledo,Virginia,420-8948,Kirguistán
+SUP_10312,4.45,active,TRUE,True,2024-03-10 00:00:00,2025-07-24 00:00:00,Sainte William,South Carolina,182-6346,Brunei Darussalam
+SUP_10042,3.92,pending,false,True,2023-04-10 00:00:00,2024-04-19 00:00:00,Marktheidenfeld,New Jersey,716-6594,Mauretanien
+SUP_10434,4.92,suspended,  False  ,False,2024-05-21 00:00:00,2026-01-28 00:00:00,Córdoba,Schleswig-Holstein,464-4640,Myanmar
+  SUP_10321  ,3.73,suspended,False,False,2024-09-16 00:00:00,2026-08-07 00:00:00,Le Goff-sur-Bègue,Zamora,497-9721,新加坡
+SUP_10080,3.05,,True,Yes,,2024-01-06 00:00:00,,Schleswig-Holstein,,Bouvet Island (Bouvetoya)
+SUP_10965,4.69,under review,True,True,2025-08-31 00:00:00,2028-03-10 00:00:00,Saint Luceboeuf,  Oregon  ,228-5260,Australia
+SUP_10144,3.76,under review,True,True,2023-04-03 00:00:00,2025-07-19 00:00:00,Stadtroda,Niedersachsen,49239,中国
+SUP_10754,4.48,pending,False,True,2025-07-22 00:00:00,2026-03-04 00:00:00,Sullivanchester,Nebraska,031-5468,Bouvetinsel
+SUP_10673,  4.87  ,active,False,False,2025-09-01 00:00:00,  2026-09-19  ,Lake Cameronhaven,Albacete,95407,Kambodscha
+SUP_10276,4.7,pending,False,True,2023-05-28 00:00:00,2025-10-17 00:00:00,North Alexandrahaven,New Mexico,437-9975,ジブラルタル
+SUP_10183,3.24,pending,False,True,2023-03-13 00:00:00,2025-04-10 00:00:00,Brightview,Sachsen,754-0578,Turquía
+SUP_10371,4.87,active,False,False,2024-07-15 00:00:00,2025-06-17 00:00:00,Ferrand-la-Forêt,  Hamburg  ,24760,San Marino
+SUP_10574,1.38,active,False,True,  2023-09-07  ,2025-03-31 00:00:00,Roussel,Thüringen,298-7037,Cyprus
+SUP_10624,1.87,under review,False,False,2025-02-23 00:00:00,2025-10-19 00:00:00,Fulda,  Málaga  ,876-4488,Belarus
+  SUP_10018  ,3.97,active,True,True,2025-08-11 00:00:00,2027-09-06 00:00:00,关岭市,Bremen,130-0685,Kaimaninseln
+SUP_10318,4.7,inactive,False,True,2025-02-04 00:00:00,2026-09-11 00:00:00,Shaneside,Tennessee,  755-9504  ,ルーマニア
+SUP_10233,4.57,pending,False,True,2025-04-27 00:00:00,2026-10-16 00:00:00,Neustrelitz,Cuenca,187-8374,Kirgisistan
+SUP_10353,4.64,pending,False,True,2023-06-26 00:00:00,2025-08-24 00:00:00,Melilla,Palencia,508-1478,Netherlands Antilles
+SUP_10498,3.51,on hold,False,False,2023-03-18 00:00:00,2025-10-07 00:00:00,洋市,Bremen,885-5184,Somalia
+SUP_10874,2.03,active,False,True,2024-05-24 00:00:00,  2025-01-07  ,Juliendan,Ávila,25262,Namibie
+SUP_10997,4.63,SUSPENDED,False,True,2024-02-10 00:00:00,  2026-02-25  ,Sainte ConstanceBourg,Sachsen-Anhalt,71413,  希腊  
+SUP_10837,4.62,ON HOLD,False,False,  2023-09-23  ,2025-03-08 00:00:00,Stephanieberg,Segovia,  37657  ,南アフリカ共和国
+SUP_10777,2.59,active,False,True,2025-09-16 00:00:00,2026-10-21 00:00:00,Bazin-la-Forêt,Hessen,27604,  Heard et McDonald (Îles)  
+SUP_10214,3.33,active,False,False,2025-02-18 00:00:00,2026-06-14 00:00:00,丹县,Utah,898-7863,Lettonie
+,,nil,,,,,,,,
+SUP_10057,4.37,active,False,True,2025-08-17 00:00:00,2027-01-19 00:00:00,品川区,Utah,557-5876,Indonesia
+SUP_10178,3.65,inactive,False,False,2023-10-29 00:00:00,2025-07-30 00:00:00,Charleneland,Baden-Württemberg,  050-2669  ,モントセラト
+SUP_10966,2.72,active,False,True,2025-05-03 00:00:00,2025-12-07 00:00:00,Melilla,Navarra,626-6446,Vietnam
+SUP_10798,3.6,active,False,True,2023-02-02 00:00:00,2024-10-28 00:00:00,長生郡白子町,NEW JERSEY,51643,  Ägypten  
+SUP_10988,3.3,on hold,False,False,2025-01-09 00:00:00,2025-12-16 00:00:00,  Teruel  ,Bremen,556-6834,Omán
+SUP_10567,2.29,ACTIVE,False,False,2023-02-11 00:00:00,2024-12-18 00:00:00,八丈島八丈町,Sachsen-Anhalt,333-4053,吉尔吉斯斯坦
+sup_10473,4.61,suspended,False,FALSE,2023-08-07 00:00:00,2026-05-22 00:00:00,Jordanshire,Vermont,97588,イラン
+SUP_10654,3.86,  active  @,False,True,2023-06-04 00:00:00,2025-11-12 00:00:00,Johntown,  Lugo  ,424-9114,República Democrática del Congo
+SUP_10426,2.22,active,False,False,2023-11-25 00:00:00,2025-11-28 00:00:00,North Andrew,Baden-Württemberg,44687,コンゴ共和国
+SUP_10594,3.55,active,False,True,2022-11-23 00:00:00,2024-12-03 00:00:00,South Rachelview,La Coruña,22000,Côte d'Ivoire
+SUP_10719,  4.2  ,under review,  True  ,True,2024-09-06 00:00:00,2027-04-29 00:00:00,Soria,Bayern,327-5758,Equatorial Guinea
+SUP_10509,4.96,pending,False,  True  ,2024-03-24 00:00:00,2025-09-07 00:00:00,Cáceres,Valencia,948-1992,New Caledonia
+SUP_10805,5 stars,suspended,Y,True,2024-12-18 00:00:00,2024-04-18 00:00:00,福生市,PW,938-0050,  KZ  
+SUP_10586,4.63,active,True,True,2025-10-06 00:00:00,2028-06-28 00:00:00,Evansborough,Pennsylvania,336-1541,Vereinigte Staaten
+SUP_10424,2.73,pending,false,True,2023-04-09 00:00:00,2025-08-25 00:00:00,South Richardland,Tarragona,390-5630,哈萨克斯坦
+SUP_10612,4.41,active,False,True,2025-01-08 00:00:00,2025-08-13,桂香县,  Nebraska  ,904-8803,  Saint Barthelemy  
+SUP_10793,2.66,active,False,True,2024-04-01 00:00:00,2025-09-19 00:00:00,八街市,Idaho,513-0695,Kap Verde
+SUP_10919,4.22,under review,False,True,2023-02-09 00:00:00,2024-01-02 00:00:00,  West Abbie  ,Soria,450-5567,Kazakhstan
+sup_10922,4.21,under review,False,False,2025-06-02 00:00:00,2028-01-31 00:00:00,Murcia,Saarland,49495,  荷属安的列斯群岛  
+SUP_10133,4.6,inactive,True,False,2023-04-20 00:00:00,2024-12-05 00:00:00,Yvonnechester,Mecklenburg-Vorpommern,644-3022,Northern Mariana Islands
+sup_10482,3.97,under review,False,False,2023-03-12,2025-10-12 00:00:00,日野市,Hamburg,339-7846,Ecuador
+SUP_10227,3.72,on hold,True,False,2023-11-21 00:00:00,2025-04-23 00:00:00,Toledo,  Sachsen  ,728-9788,Yemen
+SUP_10037,4.67,active,False,True,  2024-06-08  ,2024-12-25 00:00:00,惠州市,Oregon,480-7843,Géorgie
+SUP_10591,4.42,suspended,False,True,2025-04-15 00:00:00,2028-03-21 00:00:00,太原县,  Missouri  ,182-4570,Mongolia
+SUP_10605,9.31,on hold,False,True,2023-08-08 00:00:00,,兴安盟市,LA CORUÑA,279-0082,United States
+SUP_10335,2.83,under review,False,True,2023-04-17 00:00:00,2025-10-26 00:00:00,Wittstock,Iowa,  91496  ,Portugal
+SUP_10861,4.07,on hold,True,False,2025-07-08 00:00:00,2027-08-31 00:00:00,洁县,Berlin,453-9668,阿拉伯联合酋长国
+SUP_10857,3.92,active,False,True,2023-05-11 00:00:00,2025-08-31 00:00:00,品川区,Sachsen,97771,罗马尼亚
+SUP_10609,4.3,under review,True,False,2024-03-02 00:00:00,2026-03-03 00:00:00,South Kimberleychester,Sachsen-Anhalt,83917,Niger
+SUP_10327,3.7,under review,FALSE,True,2024-07-15 00:00:00,2026-07-20 00:00:00,East Kevin,Guipúzcoa,77922,香港
+SUP_10926,3.82,suspended,False,True,2024-06-11 00:00:00,2027-04-05 00:00:00,Fleury-sur-Mer,Georgia,12085,Islande
+sup_10205,0.2,inactive,True,False,  2025-02-18  ,2026-09-02 00:00:00,Freemanfurt,Minnesota,28465,圭亚那
+SUP_10032,2.71,pending,False,True,2023-12-19 00:00:00,2026-03-19 00:00:00,乌鲁木齐市,Vermont,870-9837,イギリス領インド洋地域
+SUP_10973,3.37,on hold,False,TRUE,2023-12-03 00:00:00,2026-03-15 00:00:00,burgos,Ávila,448-4686,LAO PEOPLE'S DEMOCRATIC REPUBLIC
+SUP_10008,-0.97,active,,False,2024-10-03,2024-10-03 00:00:00,Reyeschester,,45015,IND
+ , ,,,nil,,  nil  ,,,,
+  SUP_10169  ,-0.7,I,Unknown,,20241130,20241130,TBD,,00000,JPN
+SUP_10208,4.13,inactive,False,False,2025-03-24 00:00:00,2027-12-12 00:00:00,  North Stephen  ,Bayern,  10101  ,Christmas Island
+SUP_10088,0.9,active,False,True,2023-02-21 00:00:00,2024-12-05 00:00:00,East Valerie,Mississippi,478-9038,New Zealand
+SUP_10729,0.7,active,False,True,2023-01-01 00:00:00,2024-11-22 00:00:00,La Rioja,Oklahoma,92837,カメルーン
+SUP_10486,3.77,inactive,False,True,2025-07-16,2028-07-08 00:00:00,Michaelberg,Schleswig-Holstein,72787,Érythrée
+  SUP_10423  ,4.61,inactive,False,False,  2023-04-30  ,2024-09-19 00:00:00,La Coruña,Alicante,  21201  ,Uganda
+SUP_10905,4.55,inactive,  False  ,True,2024-11-08 00:00:00,2027-06-27 00:00:00,North Nicholas,Nevada,465-8552,República de Macedonia del Norte
+SUP_10022,4.05,active,False,True,2024-12-26 00:00:00,2026-03-06 00:00:00,Sharonland,Guipúzcoa,679-2041,中华人民共和国
+SUP_10099,3.57,under review,True,False,2025-02-02 00:00:00,2026-12-25 00:00:00,惠州县,Saarland,294-1996,Tailandia
+SUP_10494,4.51,pending,False,False,2023-01-10,2025-10-15 00:00:00,Lebreton-la-Forêt,Alicante,97630,  エジプト  
+SUP_10430,3.72,active,false,True,2022-12-15 00:00:00,2023-07-08 00:00:00,Haldensleben,Georgia,209-0621,Uzbekistan
+SUP_10548,3.76,on hold,False,True,2024-09-26 00:00:00,2025-08-19 00:00:00,Guadalajara,  Murcia  ,07578,Vanuatu
+SUP_10802,3.94,pending,  True  ,True,2023-05-11 00:00:00,2024-11-13 00:00:00,palencia,Brandenburg,745-3635,カンボジア
+SUP_10623,3.87,active,False,True,2024-12-15 00:00:00,2026-03-11 00:00:00,Meganport,Bremen,341-5798,サンマリノ
+SUP_10414,2.89,suspended,False,True,2025-08-23 00:00:00,2026-10-10 00:00:00,Blin,Bayern,29274,Korea
+SUP_10298,4.04,active,True,True,2022-10-24 00:00:00,2024-06-04 00:00:00,Lake Seanbury,Girona,197-0557,Niger
+SUP_10324,3.33,active,False,true,2024-08-17 00:00:00,2025-02-28 00:00:00,Evansmouth,Rhode Island,76972,Estados Unidos de América
+SUP_10833,4.1,active,False,False,2024-10-25 00:00:00,2026-09-28 00:00:00,Peine,Thüringen,45504,Chine (Rép. pop.)
+SUP_10293,2.78,inactive,False,  True  ,2025-09-23 00:00:00,2027-03-27 00:00:00,小笠原村,  Schleswig-Holstein  ,69098,Bolivia
+INC-10060,4.58,,False,,,2026-10-25 00:00:00,,Florida,,Panama
+SUP_10650,,,,,2008-12-29 00:00:00,,VALETTE,,24832-8003,
+SUP_10188,4.63,ON HOLD,False,True,2025-02-02 00:00:00,  2027-10-20  ,Pontevedra,Texas,86165,アンゴラ
+SUP_10921,2.58,ON HOLD,True,True,2024-08-11 00:00:00,2025-10-16 00:00:00,夷隅郡御宿町,California,641-1536,Palau
+SUP_10501,4.53,under review,True,True,2024-08-20 00:00:00,2027-02-14 00:00:00,富里市,Connecticut,85648,Nicaragua
+SUP_10044,3.97,active,True,False,2024-04-06 00:00:00,  2025-07-13  ,明县,Massachusetts,331-1899,アイルランド共和国
+SUP_10338,4.86,pending,True,False,2024-05-12 00:00:00,2025-12-03 00:00:00,太原市,Álava,28552,Turquía
+SUP_10149,4.12,inactive,False,True,2023-12-21 00:00:00,2026-01-05 00:00:00,Lüdinghausen,La Coruña,84457,Qatar
+SUP_10217,4.8,inactive,  True  ,True,2025-05-23 00:00:00,2028-04-03 00:00:00,Singhton,Wisconsin,237-1029,Kambodscha
+SUP_10165,8.95,suspended,True,False,2024-12-23 00:00:00,,Eisenach,ÁLAVA,871-9297,Estados Unidos
+  SUP_10181  ,3.05,suspended,False,False,2022-10-20 00:00:00,2025-03-10 00:00:00,Vohenstrauß,Segovia,433-6168,ギニア
+SUP_10279,2.43,under review,False,  True  ,2023-09-21 00:00:00,  2025-01-26  ,Castellón,Soria,818-5793,Canada
+SUP_10419,3.04,suspended,False,True,2025-02-17 00:00:00,2025-11-16 00:00:00,West Kirsty,Zaragoza,390-3345,Autriche
+sup_10910,Poor,active,Yes,True,2025-10-04 00:00:00,2025-05-30 00:00:00,Davidside,NJ,08223,MG
+SUP_10027,2.93,pending,False,True,2025-06-15 00:00:00,2026-11-11 00:00:00,East Jesse,Burgos,08919,Japon
+SUP_10098,-0.65,pending,Unknown,,20240710,20240710,,,XXXXX,IND
+SUP_10379,4.36,on hold,False,False,2023-11-13 00:00:00,2025-04-09 00:00:00,いすみ市,Illinois,992-6811,シエラレオネ
+SUP_10976,4.7,active,False,true,2023-07-15 00:00:00,2026-06-30 00:00:00,MercierBourg,Las Palmas,373-0175,Turkménistan
+SUP_10269,4.56,active,False,False,2025-08-05 00:00:00,2026-07-14 00:00:00,Melilla,New Hampshire,846-0694,Maldives
+SUP_10658,1.65,  under review  ,False,True,2024-07-27 00:00:00,  2026-03-13  ,Delaunay,Texas,317-8821,圣马力诺
+SUP_10682,3.79,active,False,True,2024-06-07 00:00:00,2025-04-14 00:00:00,Blot,Delaware,58815,Saudi Arabia
+SUP_10393,2.32,pending,False,True,2023-03-17 00:00:00,2024-03-02 00:00:00,Döbeln,Sachsen-Anhalt,08222,Islandia
+SUP_10386,5,active,True,True,2024-06-14 00:00:00,2025-05-07 00:00:00,渋谷区,Thüringen,450-8020,韩国
+SUP_10753,2.17,suspended,False,True,2023-09-05 00:00:00,2024-05-15 00:00:00,鹏县,Brandenburg,73247,Tanzania
+SUP_10772,4.23,on hold,False,True,2022-12-03 00:00:00,2024-03-29 00:00:00,Vohenstrauß,Ourense,928-9049,希腊
+SUP_10342,2.92,active,False,True,2025-01-29 00:00:00,2027-06-29 00:00:00,West Tracybury,Barcelona,13556,奥地利
+SUP_10389,3.63,active,False,  True  ,2023-04-29 00:00:00,2025-06-10 00:00:00,伟市,Huelva,06357,Madagascar
+SUP_10642,3.21,inactive,False,True,2022-12-01 00:00:00,2023-10-28 00:00:00,Murcia,Vermont,49583,Bolivia
+SUP_10841,2.67,active,False,True,2025-05-30 00:00:00,2026-08-03 00:00:00,East Dawn,Massachusetts,070-3413,Gibraltar
+  SUP_10707  ,4.39,active,True,False,2024-04-21 00:00:00,2026-07-17 00:00:00,印旛郡本埜村,Hessen,70785,United States Virgin Islands
+SUP_10257,3.83,under review,False,True,2023-06-03 00:00:00,2025-03-07 00:00:00,Tirschenreuth,Bremen,05447,Honduras
+SUP_10239,3.58,active,False,True,2023-01-05,2025-02-06 00:00:00,Heinsberg,Nordrhein-Westfalen,619-6479,Ungarn
+SUP_10908,4.26,suspended,False,True,2024-03-26 00:00:00,2025-04-29 00:00:00,富津市,Sachsen-Anhalt,00879,モロッコ
+SUP_10589,4.22,active,True,True,2023-12-26 00:00:00,2024-06-30 00:00:00,あきる野市,Almería,25790,セルビア
+SUP_10897,4.66,active,True,False,2023-12-08 00:00:00,2026-06-21 00:00:00,Palencia,  Málaga  ,91019,Bangladesh
+SUP_10475,,active,,False,2023-06-06 00:00:00,,梧州县,,310-3609,
+SUP_10776#,3.43,suspended,False,False,2023-05-29 00:00:00,2025-06-13 00:00:00,South Danielborough,  Bremen  ,95438,托克劳群岛
+SUP_10985,0.27,active,True,True,2023-04-15 00:00:00,2025-06-02 00:00:00,Apolda,Berlin,357-8892,Cambodia
+SUP_10519,3.63,on hold,False,False,2025-02-11 00:00:00,2026-07-23 00:00:00,West Maryburgh,Granada,19806,Uruguay
+SUP_10319,4.71,pending,False,True,2025-06-14 00:00:00,2026-09-12 00:00:00,Saint Anaïs-les-Bains,Berlin,22097,Bosnien und Herzegowina
+SUP_10396,4.12,under review,False,False,2022-12-26 00:00:00,2024-03-07 00:00:00,Haleberg,Navarra,899-7077,New Zealand
+SUP_10267,3.79,active,True,True,2024-08-17 00:00:00,2026-07-24 00:00:00,Pontevedra,Iowa,  47590  ,  Portugal  
+  SUP_10778  ,  4.45  ,active,False,True,  2024-02-02  ,2026-10-11 00:00:00,Malchin,Hamburg,  08311  ,  卢森堡  
+SUP_10690,4.58,1,False,,01-10-2022,2026-09-26, ,La Rioja,99999,Singapur
+SUP_10557,4.91,under review,False,True,2024-06-02 00:00:00,2025-12-17 00:00:00,PeronBourg,Zaragoza,80075,Porto Rico
+SUP_10491,4.42,on hold,True,True,2023-12-31 00:00:00,2025-10-15 00:00:00,东莞市,Pennsylvania,488-9606,トーゴ
+  SUP_10994  ,2.56,active,True,False,  2025-03-17  ,2027-02-01 00:00:00,North Barbarafurt,Tarragona,167-7493,カザフスタン
+SUP_10367,2.17,active,False,True,2025-03-07 00:00:00,2028-01-04,Bautzen,Asturias,094-6534,Deutschland
+SUP_10102,3.66,suspended,true,TRUE,2023-08-19 00:00:00,2025-01-26 00:00:00,Lake Audreyside,Toledo,23447,Vanuatu
+SUP_10049,4.53,inactive,False,True,  2025-05-22  ,2027-09-12 00:00:00,South Arthurmouth,Tarragona,665-1315,グレナダ
+SUP_10464,2.55,pending,False,True,2023-11-04 00:00:00,2026-09-29 00:00:00,Guipúzcoa,Saarland,01176,Ungarn
+SUP_10087,4.35,suspended,False,True,  2024-04-09  ,2025-03-09 00:00:00,Lemaire-la-Forêt,Schleswig-Holstein,80700,San Marino
+SUP_10511,1.04,pending,False,False,2025-01-04 00:00:00,2027-07-16 00:00:00,Blanchetnec,Kentucky,26437,梵蒂冈
+SUP_10603,0.95,pending,False,False,2024-05-19 00:00:00,2026-11-02 00:00:00,Lake Valerie,Niedersachsen,995-7504,巴拉圭
+SUP_10541,,,,,,,,,,
+SUP_10864,3.87,active,False,True,2024-11-20 00:00:00,2026-09-12 00:00:00,Saint DanielleVille,Schleswig-Holstein,32810,Kyrgyz Republic
+,,,,1,,,,,,
+SUP_10876,3.44,on hold,False,True,  2025-02-22  ,2026-01-07 00:00:00,Sainte AurélieVille,Mecklenburg-Vorpommern,64399,Russische Föderation
+SUP_10579,2.47,active,False,True,2024-05-06 00:00:00,2026-06-15 00:00:00,Maureenview,Schleswig-Holstein,43777,西班牙
+  SUP_10588  ,4.62,inactive,False,False,2024-02-08 00:00:00,2025-09-28 00:00:00,辽阳市,Cuenca,86366,Venezuela
+SUP_10924,4.61,under review,False,False,2024-03-31 00:00:00,2026-06-16 00:00:00,Daniel,Baden-Württemberg,21561,冰岛
+SUP_10741,2.52,pending,True,True,2024-11-11 00:00:00,2027-03-14 00:00:00,Christianview,Bremen,145-7141,Turks- und Caicosinseln
+SUP_10683,2.35,active,False,False,2024-02-13 00:00:00,2026-12-22 00:00:00,Pottsshire,Rheinland-Pfalz,48993,Christmas Island
+SUP_10617,2.26,suspended,  False  ,True,2024-09-22 00:00:00,2027-06-06 00:00:00,Miltenberg,  Santa Cruz de Tenerife  ,98314,スワジランド王国
+SUP_10601,5,under review,False,True,2024-01-19 00:00:00,2025-05-11 00:00:00,大冶县,Rheinland-Pfalz,114-2930,Mexique
+SUP_10221,2.4,suspended,False,True,2024-04-24 00:00:00,2026-01-20 00:00:00,Almería,Kentucky,  68218  ,Nouvelle Calédonie
+SUP_10722,4.51,pending,False,  False  ,2024-04-01 00:00:00,2024-10-04 00:00:00,Goncalves,Maine,436-1796,圣诞岛
+  SUP_10942  ,4.63,active,False,False,2025-08-14 00:00:00,2027-03-07 00:00:00,Dorothyton,Mecklenburg-Vorpommern,32682,Äquatorialguinea
+SUP_10023,4,inactive,False,False,2024-08-15 00:00:00,2025-06-01 00:00:00,Pritzwalk,Maryland,215-7043,モザンビーク
+SUP_10576,4.89,under review,False,True,  2023-03-14  ,2024-06-20 00:00:00,Melilla,Ourense,08225,ルクセンブルク
+SUP_10029,3.35*,active,  False  ,True,2023-10-14 00:00:00,2026-01-05 00:00:00,志强县,South Carolina,52146,República de Moldova
+SUP_10595,5 stars,active,N,True,2023-05-01 00:00:00,2023-04-16 00:00:00,山武郡九十九里町,Berlin,20704,TH
+SUP_10657,4.33,pending,False,True,2024-03-16 00:00:00,2025-02-19 00:00:00,石家庄县,Washington,583-4128,安提瓜和巴布达
+SUP_10210*,Good,inactive,N,,07/05/2024,2020-07-28 00:00:00,Unknown,Girona,XXXXX,KG
+SUP_10915,4.01,active,  False  ,True,2025-03-23 00:00:00,2027-07-10 00:00:00,Kötzting,Schleswig-Holstein,360-1311,Äußeres Ozeanien
+SUP_10354,3.28,inactive,False,True,2024-02-04 00:00:00,2024-08-17 00:00:00,Neustadtner Waldnaab,Huesca,41983,Mali
+SUP_10648,4.84,  active  ,False,True,2024-07-14 00:00:00,2025-07-14 00:00:00,Kingville,Madrid,621-8502,バヌアツ
+SUP_10499,4.9,under review,False,True,2025-03-20 00:00:00,2025-10-05 00:00:00,  Peggyhaven  ,Vermont,664-7471,Jordanie
+SUP_10947,2.31,suspended,False,False,2025-06-27 00:00:00,2027-04-25 00:00:00,South Shelbystad,Georgia,10908,Simbabwe
+SUP_10622,4.82,inactive,True,True,  2023-09-26  ,2024-08-07 00:00:00,Badajoz,Granada,75344,圣诞岛
+SUP_10524,-0.66,,,,,,,,,CHN
+SUP_10521,3.87,under review,  True  ,True,2023-07-10 00:00:00,2024-11-29 00:00:00,North Brian,Oregon,244-1078,Brasil
+SUP_10471,4.88,pending,False,  True  ,2025-08-15 00:00:00,2028-01-29 00:00:00,Hannoversch Münden,Connecticut,90018,Canadá
+SUP_10148,2.83,suspended,False,True,2022-12-09 00:00:00,2025-11-26 00:00:00,川崎市多摩区,New York,115-3949,Pays-Bas
+SUP_10974,3.16,active,False,True,2024-05-21 00:00:00,2026-01-03 00:00:00,横浜市磯子区,  Bayern  ,21732,モナコ公国
+SUP_10129,2.84,INACTIVE,False,True,2025-02-21 00:00:00,2027-02-14 00:00:00,Ewingfort,La Coruña,556-0602,ハイチ
+SUP_10958,4.55,active,  False  ,True,2024-07-03 00:00:00,2025-08-22,Lecomte-sur-Maury,Schleswig-Holstein,366-3028,Lesotho
+SUP_10811,4.04&,active,False,False,2023-02-14 00:00:00,2023-10-31 00:00:00,Passau,Hessen,305-3889,Turks et Caïques (Îles)
+sup_10074,-0.74,,,,,,,,,GBR
+SUP_10679,4.62,active,False,True,2024-08-12 00:00:00,2027-05-14 00:00:00,西安市,Alaska,  07415  ,Tschad
+SUP_10863,2.6,pending,False,True,2022-11-09 00:00:00,  2025-09-22  ,娜市,Sachsen,781-1474,Chili
+SUP_10693,2.35,inactive,False,True,2024-03-02 00:00:00,2025-06-09 00:00:00,Brunet-les-Bains,Valladolid,429-0401,ブルンジ
+SUP_10448,3.66,on hold,False,True,2025-03-07 00:00:00,2026-10-25 00:00:00,辽阳县,Tarragona,36342,ロシア
+SUP_10831,4.98,  under review  ,  False  ,True,  2023-03-24  ,2025-05-30 00:00:00,Málaga,Bremen,  42459  ,República Dominicana
+SUP_10822,2.84,under review,True,False,2025-08-21 00:00:00,2027-07-12 00:00:00,Wanzleben,Illinois,937-6575,Lao People's Democratic Republic
+SUP_10157,-0.72,,TBD,,,,,,,  DEU  
+SUP_10714,4.95,active,False,True,2024-05-29 00:00:00,2027-02-21 00:00:00,Weißwasser,Murcia,42537,巴基斯坦
+SUP_10599,3.69,inactive,True,True,2023-04-25 00:00:00,2026-03-12 00:00:00,Gautierdan,Minnesota,86467,アイルランド共和国
+SUP_10497,2.22,active,False,True,2023-12-28 00:00:00,2025-11-03 00:00:00,Lübz,Castellón,188-0880,Ukraine
+SUP_10186,4.73,on hold,False,True,2025-02-04 00:00:00,2026-03-25 00:00:00,Madrid,Florida,648-7035,Kiribati
+SUP_10684,3.52,active,True,False,2025-09-21 00:00:00,2026-06-08 00:00:00,Floresburgh,Tennessee,  92318  ,Griechenland
+SUP_10935,9.85,suspended,True,True,2022-11-25 00:00:00,,八丈島八丈町,north carolina,907-0770,USA
+  SUP_10390  ,2.10508,I,False,,2024-08-02,08/05/2028,Unknown,International,,Zaire
+SUP_10627,3.33,pending,True,True,2023-05-17 00:00:00,2025-12-13 00:00:00,霞市,Delaware,437-6493,リヒテンシュタイン
+SUP_10466,2.24,pending,False,True,2022-10-17 00:00:00,2025-09-03 00:00:00,  西多摩郡奥多摩町  ,Delaware,37843,Burkina Faso
+SUP_10636,4.13,  active  ,True,True,2023-04-15 00:00:00,2024-02-21 00:00:00,West Phyllisland,Berlin,62850,Kazakhstan
+SUP_10059,0.66,under review,True,True,2023-02-07 00:00:00,2026-01-13 00:00:00,Salamanca,Washington,469-0510,Lesotho
+SUP_10817,2.8,under review,False,True,2023-07-30 00:00:00,2025-05-09 00:00:00,Ciudad,Zamora,870-8339,Papua-Neuguinea
+SUP_10377,3.64,under review,True,True,2025-10-04 00:00:00,2028-01-21 00:00:00,江東区,Wyoming,917-2476,プエルトリコ
+SUP_10629,4.01,active,False,True,2024-12-29 00:00:00,2026-11-06 00:00:00,Sainte Hortense,Baden-Württemberg,019-0139,Gibraltar
+SUP_10599,3.69,inactive,True,True,2023-04-25 00:00:00,2026-03-12 00:00:00,Gautierdan,Minnesota,86467,アイルランド共和国
+SUP_10561,4.09,active,False,True,2025-06-28 00:00:00,2026-03-05 00:00:00,Lippstadt,  Navarra  ,93822,  Bouvetinsel  
+SUP_10823,4.45,suspended,True,False,2023-06-07 00:00:00,2025-05-29 00:00:00,Kurtshire,Washington,76366,ARGENTINIEN
+SUP_10016,3.1,active,False,True,2024-02-03 00:00:00,2026-12-22 00:00:00,Salamanca,Melilla,88039,ミクロネシア連邦
+SUP_10344,3.63,inactive,False,False,2024-06-08 00:00:00,2027-05-13 00:00:00,lugo,Cáceres,51800,Marshallinseln
+SUP_10125,,under review&,,False,2024-02-10 00:00:00,,長生郡長南町,,  17868  ,
+SUP_10788,3.47,active,False,True,2024-01-19 00:00:00,2024-09-17 00:00:00,Cuenca,Niedersachsen,96631,シンガポール
+SUP_10526,3.87,under review,True,False,2024-10-07 00:00:00,2027-08-02 00:00:00,横浜市泉区,Lugo,35882,密克罗尼西亚
+SUP_10749,3.88,active,True,True,2024-08-12 00:00:00,2026-01-02 00:00:00,Günzburg,Bayern,57962,リヒテンシュタイン
+SUP_10132,2.16,under review,False,True,2024-02-03 00:00:00,2025-12-30 00:00:00,玉珍市,  Bayern  ,03461,グアテマラ
+SUP_10277,2.82,suspended,False,False,2023-10-29 00:00:00,2026-09-14 00:00:00,武蔵村山市,Alabama,90942,Gibraltar
+SUP_10766,4.85,inactive,True,False,2024-12-20 00:00:00,2025-07-14 00:00:00,Vanessaview,Hamburg,208-2685,Benin
+SUP_10646,0.33,pending,False,True,2024-08-09 00:00:00,2027-05-30 00:00:00,Port Mauriceview,Missouri,115-7643,Nigeria
+SUP_10032,2.71,pending,False,True,2023-12-19 00:00:00,2026-03-19 00:00:00,乌鲁木齐市,Vermont,870-9837,イギリス領インド洋地域
+SUP_10608,4.08,on hold,False,True,2023-06-07 00:00:00,2024-11-01 00:00:00,Gregoryburgh,La Coruña,360-3567,Vietnam
+,,,,,,,,,,
+SUP_10759,4.45,active,False,True,2022-12-30 00:00:00,2023-10-29 00:00:00,  文京区  ,Guadalajara,94694,La Barbad
+SUP_10932,2.02,inactive,False,True,  2023-04-07  ,2023-11-09 00:00:00,New Jason,  Bremen  ,18231,圣诞岛
+SUP_10504,2.07,active,False,False,2022-12-06 00:00:00,2025-02-11 00:00:00,Barcelona,Jaén,53338,Mikronesien
+SUP_10079,-0.38,pending,,True,2023-07-25 00:00:00,2023-07-25 00:00:00,立川市,,611-6367,DEU
+SUP_10878%,2.34,on hold,True,False,2024-12-08 00:00:00,2027-04-25 00:00:00,Albacete,Schleswig-Holstein,155-1061,Albanie
+SUP_10445,3.62,active,True,False,2024-11-07 00:00:00,2027-06-20 00:00:00,山武郡横芝光町,Vizcaya,84909,Kanada
+S.C-10420,Excellent,,false,,,  2019-12-22  ,,IL,,JP
+SUP_10534,4.52,under review,True,True,2024-03-13,2026-07-30 00:00:00,三鷹市,Sachsen,16467,Kokosinseln
+SUP_10748,3.86,  pending  ,False,False,2024-04-24 00:00:00,2025-01-16 00:00:00,Sainte Daniel,Rheinland-Pfalz,41178,Côte d'Ivoire
+  SUP_10515  ,4.9,on hold,False,True,2023-01-06 00:00:00,2023-11-12 00:00:00,港区,Bayern,305-7447,Trinité et Tobago
+SUP_10253,  4.36  ,suspended,False,True,2024-05-06 00:00:00,  2026-07-28  ,  Port Sharonburgh  ,Illinois,64119,Bolivia
+SUP_10072,4,inactive,True,False,2024-03-01 00:00:00,2025-03-28 00:00:00,León,Segovia,42644,Nauru
+SUP_10664,1.92,  active  ,True,False,2023-04-26 00:00:00,2025-05-05 00:00:00,Badajoz,Hessen,80873,Zentralafrikanische Republik
+SUP_10028,3.35,active,False,True,  2024-01-14  ,2026-09-24 00:00:00,国分寺市,Albacete,488-0096,Haiti
+SUP_10937,1.72,inactive,False,False,  2022-11-11  ,2024-12-19 00:00:00,Josephfurt,  Hamburg  ,74882,Spain
+,,,,,,,,,,

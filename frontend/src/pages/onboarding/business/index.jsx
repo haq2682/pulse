@@ -6,10 +6,6 @@ import Heading from '@/components/global/Typography/Heading';
 import Text from '@/components/global/Typography/Text';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import { useNavigate } from 'react-router';
-import { AutoComplete } from 'primereact/autocomplete';
-import axiosInstance from '@/services/api/axiosInstance';
-import { useAuth } from '@/context/AuthContext';
-import { useLocation } from 'react-router-dom';
 
 const AddBusiness = () => {
     const navigate = useNavigate();
@@ -18,14 +14,23 @@ const AddBusiness = () => {
     const [region, setRegion] = useState(null);
     const [loading, setLoading] = useState(false);
 
-    const { pathname } = useLocation();
+    const currencyOptions = [
+        { label: 'USD', value: 'USD' },
+        { label: 'EUR', value: 'EUR' },
+        { label: 'AUD', value: 'AUD' },
+        { label: 'GBP', value: 'GBP' },
+        { label: 'CAD', value: 'CAD' },
+        { label: 'JPY', value: 'JPY' },
+    ];
 
-    const { user } = useAuth();
-
-    const [errors, setErrors] = useState({form: '', businessName: '', businessCurrency: '', businessRegion: ''});
-
-    const [currencySuggestions, setCurrencySuggestions] = useState([]);
-    const [regionSuggestions, setRegionSuggestions] = useState([]);
+    const regionOptions = [
+        { label: 'US', value: 'US' },
+        { label: 'EU', value: 'EU' },
+        { label: 'AU', value: 'AU' },
+        { label: 'UK', value: 'UK' },
+        { label: 'CA', value: 'CA' },
+        { label: 'Asia', value: 'Asia' },
+    ];
 
     const breadcrumbItems = [
         {
@@ -52,63 +57,30 @@ const AddBusiness = () => {
 
     const handleContinue = async (e) => {
         e.preventDefault();
-        setErrors({form: '', businessName: '', businessCurrency: '', businessRegion: ''});
+
+        if (!businessName || !currency || !region) {
+            // TODO: Show validation error
+            return;
+        }
+
         setLoading(true);
-        const nameRegex = /^[A-Za-z\s]+$/;
 
-        if (!businessName) {
-            setErrors((prev) => ({ ...prev, businessName: 'Business Name is required' }));
+        // TODO: Add your API call here
+        setTimeout(() => {
             setLoading(false);
-            return;
-        }
-
-        if (!nameRegex.test(businessName)) {
-            setErrors((prev) => ({
-                ...prev,
-                businessName: 'Business Name must contain only letters and spaces (no numbers or special characters)'
-            }));
-            setLoading(false);
-            return;
-        }
-
-        if (!currency) {
-            setErrors((prev) => ({ ...prev, currency: 'Currency is required' }));
-            setLoading(false);
-            return;
-        }
-
-        if (!region) {
-            setErrors((prev) => ({ ...prev, region: 'Region is required' }));
-            setLoading(false);
-            return;
-        }
-
-        try {
-            const response = await axiosInstance.post('/onboarding/create-business', {
-                userId: user.user_id,
-                businessName,
-                businessCurrency: currency,
-                businessRegion: region,
-            });
-            navigate(`/onboarding/data-type/${pathname.split('/')[3]}`);
-        }
-        catch (e) {
-            setErrors((prev) => ({ ...prev, form: e.message || 'An error occurred. Please try again.' }));
-        }
-        finally {
-            setLoading(false);
-        }
+            // Navigate to next step
+            navigate('/onboarding/data-type');
+        }, 1500);
     };
-
 
     const isFormValid = businessName && currency && region;
 
     return (
         <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
             {/* Breadcrumb and Step Indicator */}
-            <div className="max-w-6xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start gap-4">
+            <div className="max-w-6xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <Breadcrumb items={breadcrumbItems} />
-                <Text className="text-sm text-gray-500 m-0 font-medium w-24 mt-4">
+                <Text className="text-sm text-gray-500 m-0 font-medium">
                     Step 1 of 4
                 </Text>
             </div>
@@ -127,7 +99,7 @@ const AddBusiness = () => {
                     </div>
 
                     {/* Form */}
-                    <form onSubmit={handleContinue} className="space-y-6 w-full">
+                    <form onSubmit={handleContinue} className="space-y-6">
                         {/* Business Name */}
                         <div className="space-y-2">
                             <label
@@ -144,69 +116,47 @@ const AddBusiness = () => {
                                 required
                                 className="w-full"
                                 disabled={loading}
-                                aria-describedby="businessName-error"
-                                invalid={errors.businessName ? true : false}
                             />
-                            {errors.businessName && (
-                                <p className="text-red-600 text-sm">{errors.businessName}</p>
-                            )}
                         </div>
+
                         {/* Currency and Region Row */}
-                        <div className="flex flex-col md:flex-row md:space-x-6 space-y-6 md:space-y-0 w-full">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                             {/* Currency */}
-                            <div className="space-y-2 w-1/2">
+                            <div className="space-y-2">
                                 <label
                                     htmlFor="currency"
                                     className="block text-sm font-medium text-[var(--color-text-primary)]"
                                 >
                                     Currency
                                 </label>
-                                <AutoComplete
+                                <Dropdown
                                     id="currency"
                                     value={currency}
                                     onChange={(e) => setCurrency(e.value)}
-                                    suggestions={currencySuggestions}
-                                    completeMethod={async (e) => {
-                                        const res = await axiosInstance.get(`http://localhost:8000/onboarding/api/currencies?query=${e.query}`);
-                                        setCurrencySuggestions(res.data);
-                                    }}
-                                    placeholder="Currency"
-                                    className="w-full p-invalid"
+                                    options={currencyOptions}
+                                    placeholder="USD / EUR / AUD"
+                                    className="w-full"
                                     disabled={loading}
-                                    field="label"
-                                    inputClassName={errors.businessCurrency ? 'p-invalid' : ''}
                                 />
-                                {errors.businessCurrency && (
-                                    <p className="text-red-600 text-sm">{errors.businessCurrency}</p>
-                                )}
                             </div>
 
                             {/* Region */}
-                            <div className="space-y-2 w-1/2">
+                            <div className="space-y-2">
                                 <label
                                     htmlFor="region"
                                     className="block text-sm font-medium text-[var(--color-text-primary)]"
                                 >
                                     Region
                                 </label>
-                                <AutoComplete
+                                <Dropdown
                                     id="region"
                                     value={region}
                                     onChange={(e) => setRegion(e.value)}
-                                    suggestions={regionSuggestions}
-                                    completeMethod={async (e) => {
-                                        const res = await axiosInstance.get(`http://localhost:8000/onboarding/api/regions?query=${e.query}`);
-                                        setRegionSuggestions(res.data);
-                                    }}
-                                    placeholder="Country/Region"
+                                    options={regionOptions}
+                                    placeholder="US / EU / AU"
                                     className="w-full"
                                     disabled={loading}
-                                    field="label"
-                                    inputClassName={errors.businessRegion ? 'p-invalid' : ''}
                                 />
-                                {errors.businessRegion && (
-                                    <p className="text-red-600 text-sm">{errors.businessRegion}</p>
-                                )}
                             </div>
                         </div>
 
@@ -220,9 +170,6 @@ const AddBusiness = () => {
                                 className="px-8"
                             />
                         </div>
-                        {errors.form && (
-                            <p className="text-red-600 text-sm text-center">{errors.form}</p>
-                        )}
                     </form>
                 </div>
             </div>

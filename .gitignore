@@ -3,6 +3,7 @@
 *.docx
 *.txt
 *gpt
+*.md
 !requirements.txt
 !packages.txt
 .vscode

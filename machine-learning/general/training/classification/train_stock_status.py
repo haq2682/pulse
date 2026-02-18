@@ -1,5 +1,4 @@
 import os
-import sys
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when, lit
 from pyspark.ml.feature import VectorAssembler, StringIndexer, StandardScaler
@@ -12,24 +11,12 @@ import findspark
 
 findspark.init()
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from utils.multi_bucket_loader import (
-    load_data_from_all_buckets,
-    validate_training_data,
-    get_general_model_output_path,
-    get_training_window,
-    GENERAL_MODEL_BUCKET
-)
-
-# Configuration - General models output to pulse-bucket-1
-MODEL_NAME = "stock_status"
-INPUT_RELATIVE_PATH = "transformed/agg_product_inventory_health.parquet"
-INPUT_INVENTORY_RELATIVE_PATH = "transformed/agg_inventory.parquet"
-MODEL_OUTPUT_DIR = get_general_model_output_path("classification", MODEL_NAME)
-
-# Training record window (min, max records for training)
-MIN_RECORDS, MAX_RECORDS = get_training_window(MODEL_NAME)
+# Configuration
+BUCKET_NAME = "pulse-bucket-1"
+INPUT_PATH_INVENTORY_HEALTH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
+INPUT_PATH_INVENTORY = f"s3a://{BUCKET_NAME}/transformed/agg_inventory.parquet"
+MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/stock_status"
+MIN_LABELED_RECORDS = 100
 
 # CRITICAL: Exclude derived metrics to prevent leakage
 NUMERICAL_FEATURES = [
@@ -419,9 +406,6 @@ def main():
     print("=" * 60)
     print("Stock Status Classification - Training Pipeline")
     print("=" * 60)
-    print(f"Training window: {MIN_RECORDS} - {MAX_RECORDS} records")
-    print(f"Model output: {MODEL_OUTPUT_DIR}")
-    print("=" * 60)
     
     # CONFIGURATION
     ADD_LABEL_NOISE = True
@@ -429,48 +413,18 @@ def main():
     
     spark = create_spark_session()
     
-    # Load data from all buckets
-    print("\nStep 1: Loading data from all MinIO buckets...")
-    health_df, health_count = load_data_from_all_buckets(
-        spark,
-        INPUT_RELATIVE_PATH,
-        required_columns=NUMERICAL_FEATURES,
-        filter_nulls=False
-    )
+    # Load data
+    health_df = load_data(spark, INPUT_PATH_INVENTORY_HEALTH)
+    inventory_df = load_data(spark, INPUT_PATH_INVENTORY)
     
-    if health_df is None:
-        print("⚠️  No inventory health data available. Skipping training.")
-        spark.stop()
-        return
-    
-    # Validate training data window
-    is_valid, health_df = validate_training_data(
-        health_df, health_count, MIN_RECORDS, MAX_RECORDS, MODEL_NAME
-    )
-    
-    if not is_valid:
-        print("⚠️  Training skipped due to insufficient data.")
-        spark.stop()
-        return
-    
-    # Load inventory data from all buckets
-    inventory_df, _ = load_data_from_all_buckets(
-        spark,
-        INPUT_INVENTORY_RELATIVE_PATH,
-        required_columns=["inventory_id", "product_id"],
-        filter_nulls=False
-    )
-    
-    if inventory_df is None:
-        print("⚠️  Training skipped: Failed to load inventory data")
-        spark.stop()
+    if health_df is None or inventory_df is None:
+        print("✗ Training stopped: Failed to load data")
         return
     
     # Join
     df = join_datasets(health_df, inventory_df)
     if df is None:
-        print("⚠️  Training skipped: Failed to join datasets")
-        spark.stop()
+        print("✗ Training stopped: Failed to join")
         return
     
     # Generate/clean labels
@@ -484,14 +438,12 @@ def main():
     all_required_cols = NUMERICAL_FEATURES + CATEGORICAL_FEATURES + [TARGET_COLUMN]
     is_valid, message = validate_dataset(df, all_required_cols)
     if not is_valid:
-        print(f"⚠️  Training skipped: {message}")
-        spark.stop()
+        print(f"✗ Training stopped: {message}")
         return
     
     labeled_count = df.filter(col(TARGET_COLUMN).isNotNull()).count()
-    if labeled_count < MIN_RECORDS:
-        print(f"⚠️  Training skipped: Insufficient data ({labeled_count} < {MIN_RECORDS})")
-        spark.stop()
+    if labeled_count < MIN_LABELED_RECORDS:
+        print(f"✗ Insufficient data ({labeled_count} < {MIN_LABELED_RECORDS})")
         return
     
     print(f"✓ Dataset validated: {labeled_count} records")

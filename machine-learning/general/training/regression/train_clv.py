@@ -4,21 +4,10 @@ Trains multiple regression models to predict customer lifetime value
 """
 
 import os
-import sys
 import findspark
 from dotenv import load_dotenv
 
 findspark.init()
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from utils.multi_bucket_loader import (
-    load_data_from_all_buckets,
-    validate_training_data,
-    get_general_model_output_path,
-    get_training_window,
-    GENERAL_MODEL_BUCKET
-)
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
@@ -30,13 +19,11 @@ from datetime import datetime
 # Load environment variables
 load_dotenv()
 
-# Configuration - General models output to pulse-bucket-1
-MODEL_NAME = "clv"
-INPUT_RELATIVE_PATH = "transformed/agg_customers.parquet"
-MODEL_OUTPUT_DIR = get_general_model_output_path("regression", MODEL_NAME)
-
-# Training record window (min, max records for training)
-MIN_RECORDS, MAX_RECORDS = get_training_window(MODEL_NAME)
+# Constants
+BUCKET_NAME = "pulse-bucket-1"
+INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
+MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/clv/"
+MIN_RECORDS_THRESHOLD = 100
 
 # Feature columns (avoiding leakage - no total_revenue or customer_lifetime_value)
 FEATURE_COLUMNS = [
@@ -271,7 +258,7 @@ def evaluate_model(predictions, model_name):
 
 def save_model(model, model_name):
     """Save trained model to MinIO"""
-    model_path = f"{MODEL_OUTPUT_DIR}/{model_name}"
+    model_path = f"{MODEL_OUTPUT_PATH}{model_name}"
     
     # Overwrite existing model
     model.write().overwrite().save(model_path)
@@ -281,61 +268,41 @@ def save_model(model, model_name):
 def main():
     """Main training pipeline"""
     print("\n" + "="*60)
-    print("CLV Prediction Model Training - General Model")
+    print("CLV Prediction Model Training")
     print("="*60)
-    print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Training window: {MIN_RECORDS} - {MAX_RECORDS} records")
-    print(f"Model output: {MODEL_OUTPUT_DIR}")
-    print("="*60 + "\n")
+    print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     
     # Initialize Spark
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
     
-    # Step 1: Load data from all buckets
-    print("Step 1: Loading data from all MinIO buckets...")
+    # Step 1: Validate dataset
+    print("Step 1: Dataset Validation")
     print("-" * 60)
-    all_required_columns = FEATURE_COLUMNS + [TARGET_COLUMN]
-    df, record_count = load_data_from_all_buckets(
-        spark,
-        INPUT_RELATIVE_PATH,
-        required_columns=all_required_columns,
-        filter_nulls=True
-    )
+    df, record_count = validate_dataset(spark, INPUT_PATH)
     
     if df is None:
-        print("⚠️  No data available. Skipping training.")
+        print("\n✗ Training aborted: Dataset not found")
         spark.stop()
         return
     
-    # Step 2: Validate training data window
-    print("\nStep 2: Validate Training Data Window")
+    # Step 2: Validate columns
+    print("\nStep 2: Column Validation")
     print("-" * 60)
-    is_valid, df = validate_training_data(
-        df, record_count, MIN_RECORDS, MAX_RECORDS, MODEL_NAME
-    )
-    
-    if not is_valid:
-        print("⚠️  Training skipped due to insufficient data.")
-        spark.stop()
-        return
-    
-    # Step 3: Validate columns
-    print("\nStep 3: Column Validation")
-    print("-" * 60)
+    all_required_columns = FEATURE_COLUMNS + [TARGET_COLUMN]
     
     if not validate_columns(df, all_required_columns):
-        print("⚠️  Training skipped due to required columns missing or invalid")
+        print("\n✗ Training aborted: Required columns missing or invalid")
         spark.stop()
         return
     
-    # Step 4: Prepare training data
-    print("\nStep 4: Data Preparation")
+    # Step 3: Prepare training data
+    print("\nStep 3: Data Preparation")
     print("-" * 60)
     df_prepared = prepare_training_data(df)
     
     if df_prepared is None:
-        print("⚠️  Training skipped due to insufficient training data")
+        print("\n✗ Training aborted: Insufficient training data")
         spark.stop()
         return
     
