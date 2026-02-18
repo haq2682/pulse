@@ -209,7 +209,9 @@ services:
     restart: always
 
   debezium:
-    image: debezium/connect:2.5
+    build:
+      context: .docker/debezium
+      dockerfile: Dockerfile
     container_name: debezium
     depends_on:
       - kafka
@@ -232,6 +234,10 @@ services:
       VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
       CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
       CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      GOOGLE_APPLICATION_CREDENTIALS: /etc/gcp/credentials.json
+    volumes:
+      - ./jars/gcp-credentials.json:/etc/gcp/credentials.json
+      - ./jars/ojdbc8.jar:/kafka/connect/debezium-connector-oracle/ojdbc8.jar
     networks:
       spark-network:
         ipv4_address: 10.5.0.10
