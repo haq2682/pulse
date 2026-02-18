@@ -230,37 +230,37 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis }) => {
     }
     
     // Show completed status
-    if (isCompleted) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
-                <div className="text-center max-w-2xl">
-                    <div className="mb-6 place-self-center">
-                        <Knob
-                            value={100}
-                            readOnly
-                            size={180}
-                            valueColor="#22c55e"
-                            rangeColor="#e5e7eb"
-                            textColor="#22c55e"
-                            strokeWidth={10}
-                            valueTemplate={'{value}%'}
-                        />
-                    </div>
+    // if (isCompleted) {
+    //     return (
+    //         <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
+    //             <div className="text-center max-w-2xl">
+    //                 <div className="mb-6 place-self-center">
+    //                     <Knob
+    //                         value={100}
+    //                         readOnly
+    //                         size={180}
+    //                         valueColor="#22c55e"
+    //                         rangeColor="#e5e7eb"
+    //                         textColor="#22c55e"
+    //                         strokeWidth={10}
+    //                         valueTemplate={'{value}%'}
+    //                     />
+    //                 </div>
                     
-                    <div className="mb-4">
-                        <i className="pi pi-check-circle text-5xl text-green-600"></i>
-                    </div>
+    //                 <div className="mb-4">
+    //                     <i className="pi pi-check-circle text-5xl text-green-600"></i>
+    //                 </div>
                     
-                    <Heading level={3} className="text-green-600 mb-2">
-                        Analysis Complete!
-                    </Heading>
-                    <Text className="text-gray-600">
-                        Your data has been successfully processed and is ready for visualization.
-                    </Text>
-                </div>
-            </div>
-        );
-    }
+    //                 <Heading level={3} className="text-green-600 mb-2">
+    //                     Analysis Complete!
+    //                 </Heading>
+    //                 <Text className="text-gray-600">
+    //                     Your data has been successfully processed and is ready for visualization.
+    //                 </Text>
+    //             </div>
+    //         </div>
+    //     );
+    // }
     
     // Show failed status with retry button
     if (isFailed) {

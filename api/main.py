@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from middleware import auth_middleware
 from minio import Minio
 import os
+from urllib.parse import urlparse
 
 # Import your configuration (if you use .env and frontend URL there)
 try:
@@ -75,12 +76,15 @@ async def startup_event():
     
     # Get MinIO credentials from environment
     minio_endpoint = os.getenv("MINIO_ENDPOINT", "minio:9000")
+    
+    parsed = urlparse(minio_endpoint)
+    host_port = parsed.netloc if parsed.scheme else minio_endpoint
     minio_access_key = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
     minio_secret_key = os.getenv("MINIO_SECRET_KEY", "minioadmin")
     
     # Initialize MinIO client
     minio_client = Minio(
-        minio_endpoint,
+        host_port,
         access_key=minio_access_key,
         secret_key=minio_secret_key,
         secure=False  # Set to True if using HTTPS

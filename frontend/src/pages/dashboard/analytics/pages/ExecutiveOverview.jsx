@@ -274,7 +274,7 @@ const ExecutiveOverview = () => {
     
     // Format percentage
     const formatPercentage = (value) => {
-        return `${value.toFixed(1)}%`;
+        return `${value?.toFixed(1)}%`;
     };
     
     // Revenue chart data
@@ -485,7 +485,7 @@ const ExecutiveOverview = () => {
                         <div className="flex flex-col gap-4">
                             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                                 <span className="text-gray-700 font-medium">Avg Fulfillment Time</span>
-                                <span className="text-gray-900 font-semibold text-lg">{operationsData.avgFulfillmentTime.toFixed(1)} days</span>
+                                <span className="text-gray-900 font-semibold text-lg">{operationsData.avgFulfillmentTime?.toFixed(1)} days</span>
                             </div>
                             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                                 <span className="text-gray-700 font-medium">On-Time Delivery</span>
