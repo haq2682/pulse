@@ -7,7 +7,6 @@ import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import { useAnalyticsWebSocket } from '../../../../hooks/useAnalyticsWebSocket';
 import ChartWrapper from '../components/ChartWrapper';
-import './ExecutiveOverview.css';
 
 // Register Chart.js components
 ChartJS.register(
@@ -352,93 +351,94 @@ const ExecutiveOverview = () => {
     
     if (loading) {
         return (
-            <div className="executive-overview-loading">
+            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
                 <ProgressSpinner />
-                <p>Loading executive overview...</p>
+                <p className="text-gray-500 text-base">Loading executive overview...</p>
             </div>
         );
     }
     
     return (
-        <div className="executive-overview">
+        <div className="p-6 bg-gray-50 min-h-[calc(100vh-120px)]">
             <Toast ref={toastRef} />
             
             {/* KPI Cards */}
-            <div className="kpi-grid">
-                <Card className="kpi-card">
-                    <div className="kpi-content">
-                        <i className="pi pi-dollar kpi-icon" style={{ color: '#10b981' }}></i>
-                        <div className="kpi-details">
-                            <h3>{formatCurrency(kpiData.totalRevenue)}</h3>
-                            <p className="kpi-label">Total Revenue</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <Card className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-0 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+                    <div className="flex items-center gap-5 p-6">
+                        <i className="pi pi-dollar text-4xl p-4 bg-green-50 text-green-500 rounded-xl"></i>
+                        <div>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2">{formatCurrency(kpiData.totalRevenue)}</h3>
+                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Revenue</p>
                         </div>
                     </div>
                 </Card>
                 
-                <Card className="kpi-card">
-                    <div className="kpi-content">
-                        <i className="pi pi-shopping-cart kpi-icon" style={{ color: '#3b82f6' }}></i>
-                        <div className="kpi-details">
-                            <h3>{formatNumber(kpiData.totalOrders)}</h3>
-                            <p className="kpi-label">Total Orders</p>
+                <Card className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-0 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+                    <div className="flex items-center gap-5 p-6">
+                        <i className="pi pi-shopping-cart text-4xl p-4 bg-blue-50 text-blue-500 rounded-xl"></i>
+                        <div>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2">{formatNumber(kpiData.totalOrders)}</h3>
+                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Orders</p>
                         </div>
                     </div>
                 </Card>
                 
-                <Card className="kpi-card">
-                    <div className="kpi-content">
-                        <i className="pi pi-chart-line kpi-icon" style={{ color: '#f59e0b' }}></i>
-                        <div className="kpi-details">
-                            <h3>{formatCurrency(kpiData.avgOrderValue)}</h3>
-                            <p className="kpi-label">Average Order Value</p>
+                <Card className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-0 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+                    <div className="flex items-center gap-5 p-6">
+                        <i className="pi pi-chart-line text-4xl p-4 bg-orange-50 text-orange-500 rounded-xl"></i>
+                        <div>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2">{formatCurrency(kpiData.avgOrderValue)}</h3>
+                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Average Order Value</p>
                         </div>
                     </div>
                 </Card>
                 
-                <Card className="kpi-card">
-                    <div className="kpi-content">
-                        <i className="pi pi-users kpi-icon" style={{ color: '#8b5cf6' }}></i>
-                        <div className="kpi-details">
-                            <h3>{formatNumber(customerData.totalCustomers)}</h3>
-                            <p className="kpi-label">Total Customers</p>
+                <Card className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-0 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+                    <div className="flex items-center gap-5 p-6">
+                        <i className="pi pi-users text-4xl p-4 bg-purple-50 text-purple-500 rounded-xl"></i>
+                        <div>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2">{formatNumber(customerData.totalCustomers)}</h3>
+                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Customers</p>
                         </div>
                     </div>
                 </Card>
                 
-                <Card className="kpi-card">
-                    <div className="kpi-content">
-                        <i className="pi pi-percentage kpi-icon" style={{ color: '#ef4444' }}></i>
-                        <div className="kpi-details">
-                            <h3>{formatPercentage(kpiData.profitMargin)}</h3>
-                            <p className="kpi-label">Profit Margin</p>
+                <Card className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-0 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+                    <div className="flex items-center gap-5 p-6">
+                        <i className="pi pi-percentage text-4xl p-4 bg-red-50 text-red-500 rounded-xl"></i>
+                        <div>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2">{formatPercentage(kpiData.profitMargin)}</h3>
+                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Profit Margin</p>
                         </div>
                     </div>
                 </Card>
                 
-                <Card className="kpi-card">
-                    <div className="kpi-content">
-                        <i className="pi pi-chart-bar kpi-icon" style={{ color: '#06b6d4' }}></i>
-                        <div className="kpi-details">
-                            <h3>{formatPercentage(kpiData.growthRate)}</h3>
-                            <p className="kpi-label">Growth Rate</p>
+                <Card className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-0 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+                    <div className="flex items-center gap-5 p-6">
+                        <i className="pi pi-chart-bar text-4xl p-4 bg-cyan-50 text-cyan-500 rounded-xl"></i>
+                        <div>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2">{formatPercentage(kpiData.growthRate)}</h3>
+                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Growth Rate</p>
                         </div>
                     </div>
                 </Card>
             </div>
             
             {/* Charts Section */}
-            <div className="charts-grid">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 {/* Revenue Trend Chart */}
                 {revenueData.length > 0 && (
-                    <ChartWrapper 
-                        title="Revenue Trend"
-                        showUpdateBadge={false}
-                        className="chart-full-width"
-                    >
-                        <div style={{ height: '300px' }}>
-                            <Line data={revenueChartData} options={revenueChartOptions} />
-                        </div>
-                    </ChartWrapper>
+                    <div className="col-span-1 lg:col-span-2">
+                        <ChartWrapper 
+                            title="Revenue Trend"
+                            showUpdateBadge={false}
+                        >
+                            <div className="h-[300px]">
+                                <Line data={revenueChartData} options={revenueChartOptions} />
+                            </div>
+                        </ChartWrapper>
+                    </div>
                 )}
                 
                 {/* Top Products Chart */}
@@ -447,69 +447,75 @@ const ExecutiveOverview = () => {
                         title="Top Products"
                         showUpdateBadge={false}
                     >
-                        <div style={{ height: '300px' }}>
+                        <div className="h-[300px]">
                             <Doughnut data={productChartData} options={productChartOptions} />
                         </div>
                     </ChartWrapper>
                 )}
                 
                 {/* Customer Metrics Card */}
-                <Card className="metrics-card">
-                    <h3>Customer Metrics</h3>
-                    <div className="metrics-list">
-                        <div className="metric-item">
-                            <span className="metric-label">Total Customers</span>
-                            <span className="metric-value">{formatNumber(customerData.totalCustomers)}</span>
-                        </div>
-                        <div className="metric-item">
-                            <span className="metric-label">New Customers</span>
-                            <span className="metric-value">{formatNumber(customerData.newCustomers)}</span>
-                        </div>
-                        <div className="metric-item">
-                            <span className="metric-label">Returning Customers</span>
-                            <span className="metric-value">{formatNumber(customerData.returningCustomers)}</span>
-                        </div>
-                        <div className="metric-item">
-                            <span className="metric-label">Churn Rate</span>
-                            <span className="metric-value">{formatPercentage(customerData.churnRate)}</span>
+                <Card className="bg-white border border-gray-200 rounded-xl p-0 shadow-sm">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-6 pb-3 border-b-2 border-gray-200">Customer Metrics</h3>
+                        <div className="flex flex-col gap-4">
+                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                <span className="text-gray-700 font-medium">Total Customers</span>
+                                <span className="text-gray-900 font-semibold text-lg">{formatNumber(customerData.totalCustomers)}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                <span className="text-gray-700 font-medium">New Customers</span>
+                                <span className="text-gray-900 font-semibold text-lg">{formatNumber(customerData.newCustomers)}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                <span className="text-gray-700 font-medium">Returning Customers</span>
+                                <span className="text-gray-900 font-semibold text-lg">{formatNumber(customerData.returningCustomers)}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                <span className="text-gray-700 font-medium">Churn Rate</span>
+                                <span className="text-gray-900 font-semibold text-lg">{formatPercentage(customerData.churnRate)}</span>
+                            </div>
                         </div>
                     </div>
                 </Card>
                 
                 {/* Operations Metrics Card */}
-                <Card className="metrics-card">
-                    <h3>Operations Metrics</h3>
-                    <div className="metrics-list">
-                        <div className="metric-item">
-                            <span className="metric-label">Avg Fulfillment Time</span>
-                            <span className="metric-value">{operationsData.avgFulfillmentTime.toFixed(1)} days</span>
-                        </div>
-                        <div className="metric-item">
-                            <span className="metric-label">On-Time Delivery</span>
-                            <span className="metric-value">{formatPercentage(operationsData.onTimeDelivery)}</span>
-                        </div>
-                        <div className="metric-item">
-                            <span className="metric-label">Inventory Health</span>
-                            <span className="metric-value">{formatPercentage(operationsData.inventoryHealth)}</span>
+                <Card className="bg-white border border-gray-200 rounded-xl p-0 shadow-sm">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-6 pb-3 border-b-2 border-gray-200">Operations Metrics</h3>
+                        <div className="flex flex-col gap-4">
+                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                <span className="text-gray-700 font-medium">Avg Fulfillment Time</span>
+                                <span className="text-gray-900 font-semibold text-lg">{operationsData.avgFulfillmentTime.toFixed(1)} days</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                <span className="text-gray-700 font-medium">On-Time Delivery</span>
+                                <span className="text-gray-900 font-semibold text-lg">{formatPercentage(operationsData.onTimeDelivery)}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                <span className="text-gray-700 font-medium">Inventory Health</span>
+                                <span className="text-gray-900 font-semibold text-lg">{formatPercentage(operationsData.inventoryHealth)}</span>
+                            </div>
                         </div>
                     </div>
                 </Card>
                 
                 {/* Marketing Metrics Card */}
-                <Card className="metrics-card">
-                    <h3>Marketing Performance</h3>
-                    <div className="metrics-list">
-                        <div className="metric-item">
-                            <span className="metric-label">Total Campaigns</span>
-                            <span className="metric-value">{formatNumber(marketingData.totalCampaigns)}</span>
-                        </div>
-                        <div className="metric-item">
-                            <span className="metric-label">Active Campaigns</span>
-                            <span className="metric-value">{formatNumber(marketingData.activeCampaigns)}</span>
-                        </div>
-                        <div className="metric-item">
-                            <span className="metric-label">Average ROI</span>
-                            <span className="metric-value">{formatPercentage(marketingData.avgROI)}</span>
+                <Card className="bg-white border border-gray-200 rounded-xl p-0 shadow-sm">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-6 pb-3 border-b-2 border-gray-200">Marketing Performance</h3>
+                        <div className="flex flex-col gap-4">
+                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                <span className="text-gray-700 font-medium">Total Campaigns</span>
+                                <span className="text-gray-900 font-semibold text-lg">{formatNumber(marketingData.totalCampaigns)}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                <span className="text-gray-700 font-medium">Active Campaigns</span>
+                                <span className="text-gray-900 font-semibold text-lg">{formatNumber(marketingData.activeCampaigns)}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                <span className="text-gray-700 font-medium">Average ROI</span>
+                                <span className="text-gray-900 font-semibold text-lg">{formatPercentage(marketingData.avgROI)}</span>
+                            </div>
                         </div>
                     </div>
                 </Card>
@@ -517,9 +523,9 @@ const ExecutiveOverview = () => {
             
             {/* Connection Status */}
             {isConnected && (
-                <div className="live-indicator">
-                    <i className="pi pi-circle-fill" style={{ color: '#10b981' }}></i>
-                    <span>Live Updates Active</span>
+                <div className="fixed bottom-8 right-8 flex items-center gap-2 px-5 py-3 bg-white border border-green-500 rounded-full shadow-lg z-50">
+                    <i className="pi pi-circle-fill text-[0.625rem] text-green-500 animate-pulse"></i>
+                    <span className="text-sm font-semibold text-green-500">Live Updates Active</span>
                 </div>
             )}
         </div>
