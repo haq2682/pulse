@@ -13,6 +13,7 @@ import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import axiosInstance from '@/services/api/axiosInstance';
 import { useNavigate, useParams } from 'react-router-dom';
 import InlinePipelineProgress from '@/components/global/InlinePipelineProgress';
+import ExecutiveOverview from './analytics/pages/ExecutiveOverview';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
@@ -334,10 +335,14 @@ const Dashboard = () => {
                     
                     {/* Show inline pipeline progress when business is selected */}
                     {businessId ? (
-                        <InlinePipelineProgress 
-                            businessId={businessId}
-                            onStartAnalysis={handleStartAnalysis}
-                        />
+                        <>
+                            <InlinePipelineProgress 
+                                businessId={businessId}
+                                onStartAnalysis={handleStartAnalysis}
+                            />
+                            {/* Render Executive Overview if on analytics route */}
+                            <ExecutiveOverview />
+                        </>
                     ) : (
                         <div className="flex items-center justify-center min-h-[60vh]">
                             <div className="text-center max-w-md">
