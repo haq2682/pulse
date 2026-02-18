@@ -221,11 +221,26 @@ async def login_google():
     # Redirect the user there
     return RedirectResponse(url=auth_url)
 @router.get("/google/callback")
-async def google_callback(code: str, state: str, db=Depends(get_db)):
+async def google_callback(
+    code: str = None,      
+    state: str = None,     
+    error: str = None,     
+    db=Depends(get_db)
+):
     """
     Handles Google Login matching YOUR specific schema.
     Schema: user_id, username, email, password_hash (NULL), reset_token, etc.
     """
+    
+    if error:
+        print(f"Google OAuth cancelled or denied: {error}")
+        return RedirectResponse(url=f"{settings.frontend_url}/login?error=google_auth_cancelled")
+    
+    
+    if not code:
+        print("Missing authorization code")
+        return RedirectResponse(url=f"{settings.frontend_url}/login?error=missing_code")
+    
     try:
         # 1. Exchange the code for an Access Token
         tokens = await google_oauth_service.get_tokens(code)
@@ -261,8 +276,7 @@ async def google_callback(code: str, state: str, db=Depends(get_db)):
             user_id = str(uuid.uuid4())
             print(f"Registering new Google user: {google_email}")
             
-            # STRICT INSERT: Only columns that exist in your provided schema
-            # We explicitly pass None for password_hash since your schema allows NULL
+            
             db.execute(
                 text("""
                     INSERT INTO users (user_id, username, email, password_hash) 
@@ -298,7 +312,7 @@ async def google_callback(code: str, state: str, db=Depends(get_db)):
         print(f"Google Login Error: {e}")
         # On failure, redirect to login page with error
         return RedirectResponse(url=f"{settings.frontend_url}/login?error=google_auth_failed")
-    
+        
 @router.post("/business")
 def create_business(user_id: str, business_name: str, region: str, currency: str, db=Depends(get_db)):
     # 1. Generate a unique Business ID
