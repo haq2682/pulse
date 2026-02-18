@@ -31,7 +31,7 @@ const PrimaryButton = ({
       // This removes the text, allowing the spinner to automatically center.
       label={loading ? null : label} 
       
-      icon={icon}
+      icon={icon + " mr-2"}
       onClick={onClick}
       disabled={disabled}
       loading={loading}

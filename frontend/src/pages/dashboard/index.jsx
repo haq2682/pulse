@@ -285,20 +285,14 @@ const Dashboard = () => {
                     <div className="flex items-center justify-between">
                         <div className="mx-10 flex items-center gap-2">
                             {/* Add Business Button */}
-                            <Button
+                            <SecondaryButton
                                 onClick={handleAddBusiness}
-                                className="bg-white text-gray-700 border border-gray-300 hover:border-[var(--color-g2)] hover:bg-gray-50 transition-all p-2"
-                                style={{
-                                    background: 'white',
-                                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-                                }}
+                                icon="pi pi-building"
                                 disabled={isAddBusinessLoading}
+                                label={isAddBusinessLoading ? 'Adding...' : 'Add Business'}
+                                black
                             >
-                                <div style={{ opacity: isAddBusinessLoading ? 0.5 : 1 }} className="flex items-center">
-                                    <i className="pi pi-building mr-2"></i>
-                                    <span className="font-medium text-xs sm:text-sm">Add Business/Organization</span>
-                                </div>
-                            </Button>
+                            </SecondaryButton>
                             
                             {/* Delete Business Button (Icon Only) */}
                             {selectedBusiness && (

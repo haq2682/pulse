@@ -153,7 +153,7 @@ export const PipelineProgressProvider = ({ children }) => {
     // Fetch current pipeline status from REST API
     const fetchPipelineStatus = useCallback(async (businessId) => {
         if (!businessId) return;
-        
+        setPipelineStatus('loading');
         try {
             const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
             const response = await fetch(`${apiUrl}/pipeline/status?business_id=${businessId}`);
@@ -168,6 +168,7 @@ export const PipelineProgressProvider = ({ children }) => {
             }
         } catch (err) {
             console.error('Error fetching pipeline status:', err);
+            setPipelineStatus(null);
         }
     }, []);
     

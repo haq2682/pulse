@@ -60,7 +60,7 @@ const SecondaryButton = ({
       {...props}
     >
       <span className="btn-text">
-        {icon && <i className={icon}></i>}
+        {icon && <i className={icon + " mr-2"}></i>}
         {label}
       </span>
     </Button>
