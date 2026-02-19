@@ -27,6 +27,7 @@ from transformation.streaming_transformation import (
     create_all_transformation_streams,
     monitor_transformation_queries
 )
+from analysis.streaming_analysis import create_analysis_stream
 from machine_learning.streaming_ml_inference import create_all_ml_inference_streams
 
 
@@ -34,6 +35,7 @@ def start_streaming_pipeline(spark, bucket_name="pulse-bucket-1",
                             trigger_interval="10 seconds",
                             enable_cleaning=True,
                             enable_transformation=True,
+                            enable_analysis=False,
                             enable_ml=False):
     """
     Start complete streaming pipeline.
@@ -45,6 +47,7 @@ def start_streaming_pipeline(spark, bucket_name="pulse-bucket-1",
         trigger_interval: Micro-batch trigger interval
         enable_cleaning: Start cleaning streams
         enable_transformation: Start transformation streams
+        enable_analysis: Start analysis streams
         enable_ml: Start ML inference streams
         
     Returns:
@@ -53,6 +56,7 @@ def start_streaming_pipeline(spark, bucket_name="pulse-bucket-1",
     queries = {
         'cleaning': [],
         'transformation': [],
+        'analysis': [],
         'ml_inference': []
     }
     
@@ -70,6 +74,13 @@ def start_streaming_pipeline(spark, bucket_name="pulse-bucket-1",
     if enable_transformation:
         print("\n📊 Starting transformation streams...")
         queries['transformation'] = create_all_transformation_streams(
+            spark, bucket_name, trigger_interval
+        )
+    
+    # Start analysis streams
+    if enable_analysis:
+        print("\n📈 Starting analysis streams...")
+        queries['analysis'] = create_analysis_stream(
             spark, bucket_name, trigger_interval
         )
     
