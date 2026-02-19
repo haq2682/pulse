@@ -196,6 +196,7 @@ def join_all_tables(orders_df, order_items_df, products_df, inventory_df, suppli
         .join(products_df.select("product_id", "supplier_id"), on="product_id", how="left") \
         .select("order_id", "supplier_id") \
         .distinct()
+
     supplier_info = order_suppliers.join(
         suppliers_df.select(
             "supplier_id",
@@ -273,6 +274,7 @@ def generate_simulated_features(df):
         "is_peak_shopping_season",
         when(month(col("order_placed_at")).isin(11, 12, 6, 7), 1).otherwise(0)
     )
+
     print("✓ Generated simulated features")
     return df
 
@@ -435,14 +437,17 @@ def prepare_features(train_df, test_df, numerical_features, categorical_features
         test_clean = indexer_model.transform(test_clean)
         categorical_indexed_cols.append(f"{cat_col}_indexed")
         categorical_indexers.append(indexer_model)
+
     all_numerical = numerical_features + boolean_features
     numerical_assembler = VectorAssembler(inputCols=all_numerical, outputCol="numerical_features")
     train_clean = numerical_assembler.transform(train_clean)
     test_clean = numerical_assembler.transform(test_clean)
+
     scaler = StandardScaler(inputCol="numerical_features", outputCol="scaled_numerical_features")
     scaler_model = scaler.fit(train_clean)
     train_clean = scaler_model.transform(train_clean)
     test_clean = scaler_model.transform(test_clean)
+
     all_feature_cols = ["scaled_numerical_features"] + categorical_indexed_cols
     final_assembler = VectorAssembler(inputCols=all_feature_cols, outputCol="features")
     train_vector = final_assembler.transform(train_clean)
@@ -528,6 +533,7 @@ def evaluate_model(model, test_df, model_name):
         "recall": recall,
         "f1_score": f1
     }
+
     print(f"\n{model_name} Metrics:")
     print(f"  Accuracy:  {accuracy:.4f}")
     print(f"  Precision: {precision:.4f}")

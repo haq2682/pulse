@@ -20,7 +20,8 @@ ANALYTICS_CATEGORIES = {
         "new_customers_geo_acquisition_monthly", "customer_age_group_distribution",
         "customer_city_distribution", "customer_state_distribution", "customer_country_distribution",
         "customer_age_group_spending", "new_vs_returning_customer_country",
-        "new_vs_returning_customer_city", "customer_engagement", "session_conversion_distribution",
+        "new_vs_returning_customer_city", "new_vs_returning_customer_state",  # added
+        "customer_engagement", "session_conversion_distribution",
         "cart_abandonment_distribution", "top_customers_by_revenue", "top_customers_by_profit",
         "discount_customers", "discount_customers_summary", "correlation_discount_vs_clv",
         "high_discount_customers", "cart_behavior_summary", "high_value_abandoners",
@@ -29,6 +30,7 @@ ANALYTICS_CATEGORIES = {
         "customer_cohort_retention", "rfm_churn_crosstab", "seg_referrer_crosstab",
         "seg_device_crosstab", "payment_method_vs_clv_churn", "payment_method_summary",
         "referrer_source_summary", "referrer_churn_summary", "customer_profit_per_segment",
+        "gender_category_preference", "gender_product_preference",  # added
     ],
     "product_analytics": [
         "best_selling_products", "product_monthly_trends", "category_monthly_trends",
@@ -43,11 +45,14 @@ ANALYTICS_CATEGORIES = {
         "supplier_product_performance", "stockout_rate_by_product", "supplier_ranking_core",
         "supplier_stockout_impact_on_products", "category_affinity_pairs",
         "category_affinity_top_per_category", "product_affinity_pairs",
-        "product_affinity_top_per_product", "product_affinity_top5_candidates",
+        "product_affinity_top_per_product",
+        # "product_affinity_top5_candidates",  # not yet implemented in pipeline
         "precomputed_product_recommendations", "precomputed_reco_coverage",
         "inventory_stock_status", "days_of_supply", "sku_reorder_urgency",
         "reorder_point_breach_frequency", "overstock_analysis", "reserved_vs_available",
-        "excess_inventory_not_selling", "aging_inventory_slow_movers", "margin_erosion_risk",
+        "excess_inventory_not_selling",
+        # "aging_inventory_slow_movers",  # not yet implemented in pipeline
+        "margin_erosion_risk", "inventory_carrying_cost_by_product",  # added (moved from revenue_analytics)
     ],
     "supplier_analytics": [
         "stockout_rate_by_supplier", "storage_cost_efficiency_by_supplier",
@@ -64,7 +69,7 @@ ANALYTICS_CATEGORIES = {
         "low_margin_categories", "rev_by_country_city", "rev_by_customer_segment",
         "rev_by_rfm_segment", "rev_by_segment_label", "rev_by_referrer", "rev_by_device",
         "aov_trend_daily", "aov_trend_weekly", "aov_trend_monthly", "segment_aov_by_rfm",
-        "inventory_carrying_cost_overall", "inventory_carrying_cost_by_product",
+        "inventory_carrying_cost_overall",
     ],
     "funnel_analytics": [
         "high_value_funnel", "high_value_vs_regular", "funnel_by_device", "funnel_by_referrer",
@@ -89,17 +94,22 @@ ANALYTICS_CATEGORIES = {
         "delivery_days_by_state", "delivery_days_by_city", "ontime_delivery_by_country",
         "ontime_delivery_by_state", "ontime_delivery_by_city", "shipping_efficiency_by_country",
         "shipping_efficiency_by_state", "shipping_efficiency_by_city", "processing_by_season",
-        "processing_by_season_and_status", "shipping_cost_outliers",
+        "processing_by_season_and_status",
+        # "shipping_cost_outliers",  # not yet implemented in pipeline
     ],
     "wishlist_analytics": [
-        "wishlist_overall_summary", "wishlist_by_product", "wishlist_time_to_purchase_stats",
-        "wishlist_time_to_purchase_distribution", "abandoned_wishlist_items",
-        "abandoned_wishlist_by_customer", "abandoned_wishlist_by_product", "wishlist_adds_by_month",
+        "wishlist_overall_summary", "wishlist_by_product", "wishlist_by_customer",  # added
+        "wishlist_time_to_purchase_stats", "wishlist_time_to_purchase_distribution",
+        "abandoned_wishlist_items", "abandoned_wishlist_by_customer",
+        "abandoned_wishlist_by_product", "wishlist_adds_by_month",
     ],
     "cart_analytics": [
         "cart_overall_stats", "cart_status_distribution", "cart_value_stats",
         "high_value_abandoned_carts", "time_to_purchase_overall", "time_to_purchase_by_tier",
         "time_to_purchase_buckets",
+    ],
+    "geo_analytics": [
+        "geo_acquisition",  # added (was missing entirely from categories)
     ],
 }
 

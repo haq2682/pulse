@@ -601,6 +601,7 @@ def main(BUCKET_NAME):
         print("\n✓ Inference completed successfully")
     else:
         print("\n✗ Inference failed")
+
     spark.stop()
 
 
