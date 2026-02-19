@@ -5,6 +5,7 @@
 *gpt
 !requirements.txt
 !packages.txt
+!ANALYTICS_SCHEMA.txt
 .vscode
 
 # dependencies
