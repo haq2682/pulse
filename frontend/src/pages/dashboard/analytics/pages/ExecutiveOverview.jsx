@@ -113,6 +113,7 @@ const ExecutiveOverview = () => {
     
     const processAnalyticsData = (categories) => {
         // Extract and process different analytics categories
+        // Note: API response structure is now nested with .analytics property
         
         // KPIs - Business health metrics (includes revenue trend)
         if (categories.kpis) {
@@ -120,8 +121,9 @@ const ExecutiveOverview = () => {
             setKpiData(kpis);
             
             // Extract revenue trend from business_health_daily
-            if (categories.kpis.business_health_daily && Array.isArray(categories.kpis.business_health_daily)) {
-                const revenueTrend = categories.kpis.business_health_daily.map(item => ({
+            const bhData = categories.kpis?.analytics?.business_health_daily?.data;
+            if (bhData && Array.isArray(bhData)) {
+                const revenueTrend = bhData.map(item => ({
                     date: item.grain_date,
                     revenue: item.total_revenue || 0
                 }));
@@ -156,6 +158,7 @@ const ExecutiveOverview = () => {
     
     const extractKPIs = (kpisCategory) => {
         // Extract key KPIs from the business health data
+        // Note: API response structure is now nested with .analytics.{file_name}.data
         const kpis = {
             totalRevenue: 0,
             totalOrders: 0,
@@ -169,8 +172,9 @@ const ExecutiveOverview = () => {
         };
         
         // Process business_health_daily data if available (most recent data)
-        if (kpisCategory.business_health_daily && Array.isArray(kpisCategory.business_health_daily)) {
-            const latestData = kpisCategory.business_health_daily[kpisCategory.business_health_daily.length - 1] || {};
+        const bhData = kpisCategory?.analytics?.business_health_daily?.data;
+        if (bhData && Array.isArray(bhData) && bhData.length > 0) {
+            const latestData = bhData[bhData.length - 1] || {};
             kpis.totalRevenue = latestData.total_revenue || 0;
             kpis.totalOrders = latestData.total_orders || 0;
             kpis.avgOrderValue = latestData.aov || 0;
@@ -180,16 +184,18 @@ const ExecutiveOverview = () => {
         }
         
         // Get CLV from clv_summary
-        if (kpisCategory.clv_summary && Array.isArray(kpisCategory.clv_summary)) {
-            const clvData = kpisCategory.clv_summary[0] || {};
-            kpis.avgCLV = clvData.avg_clv || 0;
-            kpis.totalCustomers = clvData.customers || 0;
+        const clvData = kpisCategory?.analytics?.clv_summary?.data;
+        if (clvData && Array.isArray(clvData) && clvData.length > 0) {
+            const clvItem = clvData[0] || {};
+            kpis.avgCLV = clvItem.avg_clv || 0;
+            kpis.totalCustomers = clvItem.customers || 0;
         }
         
         // Get conversion rate from funnel_summary
-        if (kpisCategory.funnel_summary && Array.isArray(kpisCategory.funnel_summary)) {
-            const funnelData = kpisCategory.funnel_summary[0] || {};
-            kpis.conversionRate = funnelData.overall_conversion_rate || 0;
+        const funnelData = kpisCategory?.analytics?.funnel_summary?.data;
+        if (funnelData && Array.isArray(funnelData) && funnelData.length > 0) {
+            const funnelItem = funnelData[0] || {};
+            kpis.conversionRate = funnelItem.overall_conversion_rate || 0;
         }
         
         return kpis;
@@ -203,6 +209,7 @@ const ExecutiveOverview = () => {
     
     const extractCustomerData = (customerCategory) => {
         // Extract customer metrics
+        // Note: API response structure is now nested with .analytics.{file_name}.data
         const data = {
             totalCustomers: 0,
             newCustomers: 0,
@@ -211,8 +218,9 @@ const ExecutiveOverview = () => {
         };
         
         // Get latest new customers data
-        if (customerCategory.new_customers_daily && Array.isArray(customerCategory.new_customers_daily)) {
-            const recentData = customerCategory.new_customers_daily.slice(-30); // Last 30 days
+        const newCustData = customerCategory?.analytics?.new_customers_daily?.data;
+        if (newCustData && Array.isArray(newCustData)) {
+            const recentData = newCustData.slice(-30); // Last 30 days
             data.newCustomersTrend = recentData.map(item => ({
                 date: item.grain_date,
                 count: item.new_customers || 0
@@ -225,8 +233,9 @@ const ExecutiveOverview = () => {
         }
         
         // Get cumulative customers (total)
-        if (customerCategory.cumulative_customers_daily && Array.isArray(customerCategory.cumulative_customers_daily)) {
-            const latest = customerCategory.cumulative_customers_daily[customerCategory.cumulative_customers_daily.length - 1];
+        const cumCustData = customerCategory?.analytics?.cumulative_customers_daily?.data;
+        if (cumCustData && Array.isArray(cumCustData) && cumCustData.length > 0) {
+            const latest = cumCustData[cumCustData.length - 1];
             if (latest) {
                 data.cumulativeCustomers = latest.cumulative_customers || 0;
                 data.totalCustomers = latest.cumulative_customers || 0;
@@ -238,10 +247,12 @@ const ExecutiveOverview = () => {
     
     const extractProductData = (productCategory) => {
         // Extract top products from best_selling_products
+        // Note: API response structure is now nested with .analytics.{file_name}.data
         const products = [];
         
-        if (productCategory.best_selling_products && Array.isArray(productCategory.best_selling_products)) {
-            return productCategory.best_selling_products.slice(0, 10).map(item => ({
+        const bspData = productCategory?.analytics?.best_selling_products?.data;
+        if (bspData && Array.isArray(bspData)) {
+            return bspData.slice(0, 10).map(item => ({
                 name: item.product_name || 'Unknown Product',
                 sales: item.total_units_sold || 0,
                 revenue: item.total_revenue || 0,
@@ -254,6 +265,7 @@ const ExecutiveOverview = () => {
     
     const extractOperationsData = (operationsCategory) => {
         // Extract operations metrics
+        // Note: API response structure is now nested with .analytics.{file_name}.data
         const data = {
             avgFulfillmentTime: 0,
             onTimeDeliveryRate: 0,
@@ -263,31 +275,25 @@ const ExecutiveOverview = () => {
         
         // Process operations data based on actual schema
         // Look for delivery and processing metrics
-        if (operationsCategory.processing_by_status && Array.isArray(operationsCategory.processing_by_status)) {
+        const procData = operationsCategory?.analytics?.processing_by_status?.data;
+        if (procData && Array.isArray(procData) && procData.length > 0) {
             // Aggregate processing data
-            const processingData = operationsCategory.processing_by_status;
-            if (processingData.length > 0) {
-                const totalProcessing = processingData.reduce((sum, item) => sum + (item.avg_processing_duration_hours || 0), 0);
-                data.processingTime = totalProcessing / processingData.length;
-            }
+            const totalProcessing = procData.reduce((sum, item) => sum + (item.avg_processing_duration_hours || 0), 0);
+            data.processingTime = totalProcessing / procData.length;
         }
         
         // Look for delivery metrics
-        if (operationsCategory.ontime_delivery_by_country && Array.isArray(operationsCategory.ontime_delivery_by_country)) {
-            const deliveryData = operationsCategory.ontime_delivery_by_country;
-            if (deliveryData.length > 0) {
-                const totalOnTime = deliveryData.reduce((sum, item) => sum + (item.ontime_delivery_rate || 0), 0);
-                data.onTimeDeliveryRate = totalOnTime / deliveryData.length;
-            }
+        const delivData = operationsCategory?.analytics?.ontime_delivery_by_country?.data;
+        if (delivData && Array.isArray(delivData) && delivData.length > 0) {
+            const totalOnTime = delivData.reduce((sum, item) => sum + (item.ontime_delivery_rate || 0), 0);
+            data.onTimeDeliveryRate = totalOnTime / delivData.length;
         }
         
         // Look for delivery days
-        if (operationsCategory.delivery_days_by_country && Array.isArray(operationsCategory.delivery_days_by_country)) {
-            const deliveryData = operationsCategory.delivery_days_by_country;
-            if (deliveryData.length > 0) {
-                const totalDays = deliveryData.reduce((sum, item) => sum + (item.avg_delivery_days || 0), 0);
-                data.deliveryDays = totalDays / deliveryData.length;
-            }
+        const daysData = operationsCategory?.analytics?.delivery_days_by_country?.data;
+        if (daysData && Array.isArray(daysData) && daysData.length > 0) {
+            const totalDays = daysData.reduce((sum, item) => sum + (item.avg_delivery_days || 0), 0);
+            data.deliveryDays = totalDays / daysData.length;
         }
         
         return data;
@@ -295,6 +301,7 @@ const ExecutiveOverview = () => {
     
     const extractMarketingData = (marketingCategory) => {
         // Extract marketing metrics
+        // Note: API response structure is now nested with .analytics.{file_name}.data
         const data = {
             totalCampaigns: 0,
             avgROI: 0,
@@ -303,19 +310,17 @@ const ExecutiveOverview = () => {
         };
         
         // Process campaign_performance_summary if available
-        if (marketingCategory.campaign_performance_summary && Array.isArray(marketingCategory.campaign_performance_summary)) {
-            const campaigns = marketingCategory.campaign_performance_summary;
-            data.totalCampaigns = campaigns.length;
+        const campData = marketingCategory?.analytics?.campaign_performance_summary?.data;
+        if (campData && Array.isArray(campData) && campData.length > 0) {
+            data.totalCampaigns = campData.length;
             
-            if (campaigns.length > 0) {
-                const totalROI = campaigns.reduce((sum, item) => sum + (item.campaign_roi || 0), 0);
-                const totalRevenue = campaigns.reduce((sum, item) => sum + (item.total_revenue || 0), 0);
-                const totalCost = campaigns.reduce((sum, item) => sum + (item.total_cost || 0), 0);
-                
-                data.avgROI = totalROI / campaigns.length;
-                data.totalCampaignRevenue = totalRevenue;
-                data.avgCampaignCost = totalCost / campaigns.length;
-            }
+            const totalROI = campData.reduce((sum, item) => sum + (item.campaign_roi || 0), 0);
+            const totalRevenue = campData.reduce((sum, item) => sum + (item.total_revenue || 0), 0);
+            const totalCost = campData.reduce((sum, item) => sum + (item.total_cost || 0), 0);
+            
+            data.avgROI = totalROI / campData.length;
+            data.totalCampaignRevenue = totalRevenue;
+            data.avgCampaignCost = totalCost / campData.length;
         }
         
         return data;
