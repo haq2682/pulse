@@ -7,6 +7,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import { useAnalyticsWebSocket } from '../../../../hooks/useAnalyticsWebSocket';
 import ChartWrapper from '../components/ChartWrapper';
+import { usePipelineProgress } from '@/context/PipelineProgressContext';
 
 // Register Chart.js components
 ChartJS.register(
@@ -24,6 +25,8 @@ ChartJS.register(
 const ExecutiveOverview = () => {
     const { businessId } = useParams();
     const toastRef = useRef(null);
+
+    const { pipelineStatus } = usePipelineProgress();
     
     const [loading, setLoading] = useState(true);
     const [kpiData, setKpiData] = useState({});
@@ -410,7 +413,7 @@ const ExecutiveOverview = () => {
         }
     };
     
-    if (loading) {
+    if (loading && pipelineStatus !== 'loading') {
         return (
             <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
                 <ProgressSpinner />
@@ -437,7 +440,7 @@ const ExecutiveOverview = () => {
     };
     
     // If no data at all, show message
-    if (!hasAnyData()) {
+    if (!hasAnyData() && pipelineStatus !== 'loading') {
         return (
             <div className="p-6 min-h-[calc(100vh-120px)]">
                 <Toast ref={toastRef} />

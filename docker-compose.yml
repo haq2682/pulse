@@ -59,6 +59,8 @@ services:
       - ./cleaning:/app/cleaning
       - ./mapping:/app/mapping
       - ./transformation:/app/transformation
+      - ./analysis:/app/analysis
+      - ./machine-learning:/app/machine-learning
     ports:
       - "8000:8000"
     networks:

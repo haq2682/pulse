@@ -8,6 +8,33 @@ from services.pipeline_service import PipelineService
 from services.websocket_manager import WebSocketManager
 from services.analytics_service import AnalyticsService
 from services.analytics_watcher_service import get_analytics_watcher
+from fastapi.responses import Response
+import numpy as np
+import json
+import pandas as pd
+from datetime import datetime, date
+
+class AnalyticsJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (datetime, date, pd.Timestamp)):
+            return obj.isoformat()
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, (np.floating,)):
+            f = float(obj)
+            if np.isnan(f) or np.isinf(f):
+                return None
+            return f
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, float) and (np.isnan(obj) or np.isinf(obj)):
+            return None
+        try:
+            if pd.isna(obj):
+                return None
+        except (TypeError, ValueError):
+            pass
+        return super().default(obj)
 
 redis = aioredis.from_url("redis://redis:6379", decode_responses=True)
 
@@ -149,7 +176,10 @@ async def get_all_analytics(
             category_list = [c.strip() for c in categories.split(",")]
         
         result = await analytics_service.fetch_all_analytics(business_id, category_list)
-        return result
+        
+        # Use allow_nan=False to catch any remaining bad floats, replace them first
+        json_str = json.dumps(result, cls=AnalyticsJSONEncoder, allow_nan=False)
+        return Response(content=json_str, media_type="application/json")
         
     except Exception as e:
         print(f"Error fetching analytics: {e}")
