@@ -209,8 +209,12 @@ const Dashboard = () => {
             return {
                 borderColor: 'border-purple-500',
                 dotColor: 'bg-purple-500',
+                glow: 'shadow-[0_0_5px_2px_rgba(168,85,247,0.7)]',
                 text: 'Batch',
-                showRefresh: false
+                showRefresh: false,
+                rotating: false,
+                disabled: false,
+                pulse: true
             };
             }
 
@@ -220,10 +224,12 @@ const Dashboard = () => {
             return {
                 borderColor: 'border-yellow-500',
                 dotColor: 'bg-yellow-500',
+                glow: 'shadow-[0_0_10px_3px_rgba(234,179,8,0.9)]',
                 text,
                 showRefresh: true,
                 rotating: true,
-                disabled: true
+                disabled: true,
+                pulse: false
             };
             }
 
@@ -231,20 +237,24 @@ const Dashboard = () => {
             return {
                 borderColor: 'border-red-500',
                 dotColor: 'bg-red-500',
+                glow: 'shadow-[0_0_8px_2px_rgba(239,68,68,0.8)]',
                 text,
                 showRefresh: true,
                 rotating: false,
-                disabled: false
+                disabled: false,
+                pulse: true
             };
             }
 
             return {
             borderColor: 'border-green-500',
             dotColor: 'bg-green-500',
+            glow: 'shadow-[0_0_8px_2px_rgba(34,197,94,0.8)]',
             text,
             showRefresh: true,
             rotating: false,
-            disabled: false
+            disabled: false,
+            pulse: true
             };
         };
 
@@ -255,15 +265,18 @@ const Dashboard = () => {
             className={`
                 border-2 ${config.borderColor}
                 rounded-lg px-3 py-2 
-                flex items-center gap-2 
+                flex items-center gap-2
                 transition-all duration-300
             `}
             >
-            {/* Status Dot */}
+            {/* Glowing Status Dot */}
             <div
                 className={`
-                w-2.5 h-2.5 rounded-full ${config.dotColor}
-                ${config.borderColor.includes('yellow') ? '' : 'animate-pulse'}
+                w-2.5 h-2.5 rounded-full
+                ${config.dotColor}
+                ${config.glow}
+                ${config.pulse ? 'animate-pulse' : ''}
+                transition-all duration-300
                 `}
             />
 
@@ -276,7 +289,8 @@ const Dashboard = () => {
                 onClick={onTriggerPipeline}
                 disabled={config.disabled}
                 className={`
-                    ml-1 p-1 hover:bg-gray-100 rounded transition-colors
+                    ml-1 p-1 hover:bg-gray-100 rounded
+                    transition-colors duration-200
                     ${config.rotating ? 'animate-spin' : ''}
                     ${config.disabled ? 'opacity-50 cursor-not-allowed' : ''}
                 `}
