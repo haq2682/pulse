@@ -6,13 +6,15 @@ import { InputText } from 'primereact/inputtext';
 import { Button } from 'primereact/button';
 import { Dropdown } from 'primereact/dropdown';
 import { Dialog } from 'primereact/dialog';
+import { Toast } from 'primereact/toast';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import SecondaryButton from '@/components/global/Button/SecondaryButton';
 import { useAuth } from '@/context/AuthContext';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import axiosInstance from '@/services/api/axiosInstance';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import InlinePipelineProgress from '@/components/global/InlinePipelineProgress';
+import ExecutiveOverview from './analytics/pages/ExecutiveOverview';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
@@ -30,6 +32,10 @@ const Dashboard = () => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     // NEW: Ref to detect clicks outside the menu to close it
     const profileRef = useRef(null);
+    // NEW: Pipeline status for streaming modes
+    const [pipelineStatus, setPipelineStatus] = useState('idle');
+    // NEW: Toast ref for notifications
+    const toastRef = useRef(null);
 
     // Mock data
     const [businesses, setBusinesses] = useState([]);
@@ -156,6 +162,147 @@ const Dashboard = () => {
         }
     };
 
+    // Function to trigger streaming pipeline
+    const triggerStreamingPipeline = async () => {
+        setPipelineStatus('running');
+        
+        try {
+            const response = await axiosInstance.post('/pipeline/trigger-streaming', {
+                businessId: businessId
+            });
+            
+            if (response.data.success) {
+                setPipelineStatus('success');
+                toastRef.current?.show({
+                    severity: 'success',
+                    summary: 'Success',
+                    detail: 'Streaming pipeline triggered successfully',
+                    life: 3000
+                });
+                // Return to idle after 3 seconds
+                setTimeout(() => setPipelineStatus('idle'), 3000);
+            } else {
+                throw new Error('Pipeline trigger failed');
+            }
+        } catch (error) {
+            setPipelineStatus('failed');
+            toastRef.current?.show({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'Failed to trigger streaming pipeline',
+                life: 5000
+            });
+            // Return to idle after 5 seconds
+            setTimeout(() => setPipelineStatus('idle'), 5000);
+        }
+    };
+
+    // Ingestion Status Indicator Component
+    const IngestionStatusIndicator = ({
+        ingestionType,
+        pipelineStatus,
+        onTriggerPipeline
+    }) => {
+
+        const getStatusConfig = () => {
+            if (ingestionType === 'batch') {
+            return {
+                borderColor: 'border-purple-500',
+                dotColor: 'bg-purple-500',
+                glow: 'shadow-[0_0_5px_2px_rgba(168,85,247,0.7)]',
+                text: 'Batch',
+                showRefresh: false,
+                rotating: false,
+                disabled: false,
+                pulse: true
+            };
+            }
+
+            const text = ingestionType === 'api' ? 'API' : 'Database';
+
+            if (pipelineStatus === 'running') {
+            return {
+                borderColor: 'border-yellow-500',
+                dotColor: 'bg-yellow-500',
+                glow: 'shadow-[0_0_10px_3px_rgba(234,179,8,0.9)]',
+                text,
+                showRefresh: true,
+                rotating: true,
+                disabled: true,
+                pulse: false
+            };
+            }
+
+            if (pipelineStatus === 'failed') {
+            return {
+                borderColor: 'border-red-500',
+                dotColor: 'bg-red-500',
+                glow: 'shadow-[0_0_8px_2px_rgba(239,68,68,0.8)]',
+                text,
+                showRefresh: true,
+                rotating: false,
+                disabled: false,
+                pulse: true
+            };
+            }
+
+            return {
+            borderColor: 'border-green-500',
+            dotColor: 'bg-green-500',
+            glow: 'shadow-[0_0_8px_2px_rgba(34,197,94,0.8)]',
+            text,
+            showRefresh: true,
+            rotating: false,
+            disabled: false,
+            pulse: true
+            };
+        };
+
+        const config = getStatusConfig();
+
+        return (
+            <div
+            className={`
+                border-2 ${config.borderColor}
+                rounded-lg px-3 py-2 
+                flex items-center gap-2
+                transition-all duration-300
+            `}
+            >
+            {/* Glowing Status Dot */}
+            <div
+                className={`
+                w-2.5 h-2.5 rounded-full
+                ${config.dotColor}
+                ${config.glow}
+                ${config.pulse ? 'animate-pulse' : ''}
+                transition-all duration-300
+                `}
+            />
+
+            <span className="text-sm font-medium text-gray-700">
+                {config.text}
+            </span>
+
+            {config.showRefresh && (
+                <button
+                onClick={onTriggerPipeline}
+                disabled={config.disabled}
+                className={`
+                    ml-1 p-1 hover:bg-gray-100 rounded
+                    transition-colors duration-200
+                    ${config.rotating ? 'animate-spin' : ''}
+                    ${config.disabled ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+                title="Trigger streaming pipeline"
+                >
+                <i className="pi pi-refresh text-sm text-gray-600" />
+                </button>
+            )}
+            </div>
+        );
+    };
+
     const businessName = businesses.find(b => b.business_id === selectedBusiness)?.business_name || 'this business';
 
     const deleteDialogFooter = (
@@ -176,8 +323,92 @@ const Dashboard = () => {
         </div>
     );
 
+    // Get current location for route-based rendering
+    const location = useLocation();
+    const pathname = location.pathname;
+
+    // Render appropriate analytics content based on route
+    const renderAnalyticsContent = () => {
+        if (!businessId) return null;
+
+        // Executive Overview - exact match
+        if (pathname === `/analytics/${businessId}` || pathname === `/analytics/${businessId}/`) {
+            return <ExecutiveOverview />;
+        }
+
+        // Customers routes
+        if (pathname.includes('/customers/overview')) {
+            return (
+                <div className="p-6">
+                    <h2 className="text-2xl font-bold mb-4 text-gray-800">Customers Overview</h2>
+                    <p className="text-gray-500">This section is under development.</p>
+                </div>
+            );
+        }
+
+        if (pathname.includes('/customers/segmentation')) {
+            return (
+                <div className="p-6">
+                    <h2 className="text-2xl font-bold mb-4 text-gray-800">Customer Segmentation</h2>
+                    <p className="text-gray-500">This section is under development.</p>
+                </div>
+            );
+        }
+
+        if (pathname.includes('/customers/health')) {
+            return (
+                <div className="p-6">
+                    <h2 className="text-2xl font-bold mb-4 text-gray-800">Customer Health</h2>
+                    <p className="text-gray-500">This section is under development.</p>
+                </div>
+            );
+        }
+
+        if (pathname.includes('/customers/value')) {
+            return (
+                <div className="p-6">
+                    <h2 className="text-2xl font-bold mb-4 text-gray-800">Customer Value</h2>
+                    <p className="text-gray-500">This section is under development.</p>
+                </div>
+            );
+        }
+
+        // Products routes
+        if (pathname.includes('/products/performance')) {
+            return (
+                <div className="p-6">
+                    <h2 className="text-2xl font-bold mb-4 text-gray-800">Product Performance</h2>
+                    <p className="text-gray-500">This section is under development.</p>
+                </div>
+            );
+        }
+
+        if (pathname.includes('/products/profitability')) {
+            return (
+                <div className="p-6">
+                    <h2 className="text-2xl font-bold mb-4 text-gray-800">Product Profitability</h2>
+                    <p className="text-gray-500">This section is under development.</p>
+                </div>
+            );
+        }
+
+        // Default fallback for unrecognized routes
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="text-center max-w-md">
+                    <p className="text-gray-500 text-lg">
+                        This analytics section is under development.
+                    </p>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="flex h-screen overflow-hidden bg-gray-50">
+            {/* Toast for notifications */}
+            <Toast ref={toastRef} />
+            
             {/* Delete Business Dialog */}
             <Dialog
                 visible={showDeleteDialog}
@@ -209,7 +440,7 @@ const Dashboard = () => {
             {/* Main Content */}
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Top Header */}
-                <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 flex items-center justify-between">
+                <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 flex items-center justify-between gap-4">
                     <button
                         onClick={() => setSidebarOpen(true)}
                         className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -217,10 +448,19 @@ const Dashboard = () => {
                         <i className="pi pi-bars text-xl text-gray-700"></i>
                     </button>
 
-                    <Heading level={3} gradient={true} className="hidden md:block text-xl md:text-2xl m-0">
-                        Dashboard
-                    </Heading>
-
+                    <div className="flex items-center gap-4">
+                        <Heading level={3} gradient={true} className="hidden md:block text-xl md:text-2xl m-0">
+                            Dashboard
+                        </Heading>
+                        {/* Ingestion Status Indicator */}
+                        {businessId && businessIngestionType && (
+                            <IngestionStatusIndicator 
+                                ingestionType={businessIngestionType}
+                                pipelineStatus={pipelineStatus}
+                                onTriggerPipeline={triggerStreamingPipeline}
+                            />
+                        )}
+                    </div>
                     <InputText type="text" className="p-inputtext-sm w-2/4" placeholder="Search Insight..." />
 
                     {/* Right Side - Notifications & Avatar */}
@@ -284,20 +524,14 @@ const Dashboard = () => {
                     <div className="flex items-center justify-between">
                         <div className="mx-10 flex items-center gap-2">
                             {/* Add Business Button */}
-                            <Button
+                            <SecondaryButton
                                 onClick={handleAddBusiness}
-                                className="bg-white text-gray-700 border border-gray-300 hover:border-[var(--color-g2)] hover:bg-gray-50 transition-all p-2"
-                                style={{
-                                    background: 'white',
-                                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-                                }}
+                                icon="pi pi-building"
                                 disabled={isAddBusinessLoading}
+                                label={isAddBusinessLoading ? 'Adding...' : 'Add Business'}
+                                black
                             >
-                                <div style={{ opacity: isAddBusinessLoading ? 0.5 : 1 }} className="flex items-center">
-                                    <i className="pi pi-building mr-2"></i>
-                                    <span className="font-medium text-xs sm:text-sm">Add Business/Organization</span>
-                                </div>
-                            </Button>
+                            </SecondaryButton>
                             
                             {/* Delete Business Button (Icon Only) */}
                             {selectedBusiness && (
@@ -334,10 +568,14 @@ const Dashboard = () => {
                     
                     {/* Show inline pipeline progress when business is selected */}
                     {businessId ? (
-                        <InlinePipelineProgress 
-                            businessId={businessId}
-                            onStartAnalysis={handleStartAnalysis}
-                        />
+                        <>
+                            <InlinePipelineProgress 
+                                businessId={businessId}
+                                onStartAnalysis={handleStartAnalysis}
+                            />
+                            {/* Render appropriate analytics content based on route */}
+                            {renderAnalyticsContent()}
+                        </>
                     ) : (
                         <div className="flex items-center justify-center min-h-[60vh]">
                             <div className="text-center max-w-md">

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSo
 from database import get_db
 from sqlalchemy import text
 from services.pipeline_service import PipelineService
+from services.streaming_pipeline_service import StreamingPipelineService
 from services.websocket_manager import WebSocketManager
 
 
@@ -26,11 +27,15 @@ async def start_pipeline(request: Request, db=Depends(get_db)):
     Request body:
         - userId: User ID
         - businessId: Business ID (used as bucket name)
+        - mode: Pipeline mode - "batch" (default), "streaming" 
+        - ingestionMode: Data ingestion mode - "batch", "db" (CDC), or "api" (for streaming)
     """
     try:
         body = await request.json()
         user_id = body.get("userId")
         business_id = body.get("businessId")
+        pipeline_mode = body.get("mode", "batch")  # batch or streaming
+        ingestion_mode = body.get("ingestionMode", "batch")  # batch, db, or api
         
         if not user_id or not business_id:
             raise HTTPException(status_code=400, detail="userId and businessId are required")
@@ -60,14 +65,25 @@ async def start_pipeline(request: Request, db=Depends(get_db)):
                 detail="Pipeline is already running for this business"
             )
         
-        # Start pipeline
-        pipeline_service = PipelineService(db, websocket_manager)
-        pipeline_id = await pipeline_service.start_pipeline(business_id, user_id)
+        # Start appropriate pipeline based on mode
+        if pipeline_mode == "streaming":
+            # Start streaming pipeline
+            streaming_service = StreamingPipelineService(db, websocket_manager)
+            pipeline_id = await streaming_service.start_streaming_pipeline(
+                business_id, user_id, mode=ingestion_mode
+            )
+            message = f"Streaming pipeline started successfully (mode: {ingestion_mode})"
+        else:
+            # Start traditional batch pipeline
+            pipeline_service = PipelineService(db, websocket_manager)
+            pipeline_id = await pipeline_service.start_pipeline(business_id, user_id)
+            message = "Batch pipeline started successfully"
         
         return {
             "status": 200,
-            "message": "Pipeline started successfully",
-            "pipeline_id": pipeline_id
+            "message": message,
+            "pipeline_id": pipeline_id,
+            "pipeline_mode": pipeline_mode
         }
         
     except HTTPException:

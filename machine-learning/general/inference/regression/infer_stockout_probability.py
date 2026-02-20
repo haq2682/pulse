@@ -661,7 +661,7 @@ def main(BUCKET_NAME):
     # Create features
     print("\nStep 4: Feature Engineering")
     print("-" * 80)
-    df_features = create_inference_features(products_df, inventory_df, suppliers_df, demand_stats)
+    df_features = create_inference_features(products_df, inventory_df, suppliers_df, demand_stats, DEFAULT_SERVICE_LEVEL, Z_SCORE_95, Z_SCORE_99)
     
     # Prepare data
     print("\nStep 5: Data Preparation & Encoding")

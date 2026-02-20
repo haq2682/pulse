@@ -1,0 +1,1776 @@
+============================================================
+📋 ANALYTICS SCHEMA BY CATEGORY
+============================================================
+{
+    "kpis": {
+        "business_health_daily": [
+            "grain_date",
+            "total_orders",
+            "total_units_sold",
+            "total_revenue",
+            "gross_profit",
+            "net_profit",
+            "aov",
+            "margin_pct"
+        ],
+        "business_health_weekly": [
+            "grain_year",
+            "grain_week",
+            "total_orders",
+            "total_units_sold",
+            "total_revenue",
+            "gross_profit",
+            "net_profit",
+            "aov",
+            "margin_pct"
+        ],
+        "business_health_monthly": [
+            "grain_year",
+            "grain_month",
+            "total_orders",
+            "total_units_sold",
+            "total_revenue",
+            "gross_profit",
+            "net_profit",
+            "aov",
+            "margin_pct"
+        ],
+        "clv_summary": [
+            "customers",
+            "avg_clv",
+            "clv_percentiles",
+            "avg_total_revenue",
+            "avg_order_value_overall",
+            "total_revenue_all_customers"
+        ],
+        "funnel_summary": [
+            "total_sessions",
+            "sessions_with_views",
+            "sessions_with_cart",
+            "sessions_with_orders",
+            "high_value_sessions",
+            "avg_products_viewed",
+            "avg_items_added_to_cart",
+            "avg_orders_per_session",
+            "avg_session_value",
+            "total_session_value",
+            "view_to_cart_conversion",
+            "cart_to_order_conversion",
+            "overall_conversion_rate"
+        ],
+        "cart_abandon_summary": [
+            "total_carts_tracked",
+            "abandoned_carts",
+            "converted_carts",
+            "abandonment_rate",
+            "purchase_rate"
+        ],
+        "session_to_order_analysis": [
+            "avg_session_conversion_rate",
+            "avg_cart_abandonment_rate"
+        ],
+        "customer_engagement_summary": [
+            "total_sessions_all_customers",
+            "avg_sessions_per_customer",
+            "total_pages_viewed_all_customers",
+            "avg_pages_viewed_per_customer",
+            "total_products_viewed_all_customers",
+            "avg_products_viewed_per_customer"
+        ]
+    },
+    "customer_analytics": {
+        "customer_account_status_distribution_daily": [
+            "grain_date",
+            "account_status",
+            "customer_count"
+        ],
+        "customer_account_status_distribution_weekly": [
+            "grain_year",
+            "grain_week",
+            "account_status",
+            "customer_count"
+        ],
+        "customer_account_status_distribution_monthly": [
+            "grain_year",
+            "grain_month",
+            "account_status",
+            "customer_count"
+        ],
+        "new_customers_daily": [
+            "grain_date",
+            "new_customers"
+        ],
+        "new_customers_weekly": [
+            "grain_year",
+            "grain_week",
+            "new_customers"
+        ],
+        "new_customers_monthly": [
+            "grain_year",
+            "grain_month",
+            "new_customers"
+        ],
+        "cumulative_customers_daily": [
+            "grain_date",
+            "new_customers",
+            "cumulative_customers"
+        ],
+        "cumulative_customers_weekly": [
+            "grain_year",
+            "grain_week",
+            "new_customers",
+            "cumulative_customers"
+        ],
+        "cumulative_customers_monthly": [
+            "grain_year",
+            "grain_month",
+            "new_customers",
+            "cumulative_customers"
+        ],
+        "new_customers_geo_acquisition_daily": [
+            "grain_date",
+            "country",
+            "state_province",
+            "city",
+            "new_customers"
+        ],
+        "new_customers_geo_acquisition_monthly": [
+            "grain_year",
+            "grain_month",
+            "country",
+            "state_province",
+            "city",
+            "new_customers"
+        ],
+        "customer_age_group_distribution": [
+            "customer_age_group",
+            "customer_count"
+        ],
+        "customer_city_distribution": [
+            "country",
+            "state_province",
+            "city",
+            "customer_count"
+        ],
+        "customer_state_distribution": [
+            "country",
+            "state_province",
+            "customer_count"
+        ],
+        "customer_country_distribution": [
+            "country",
+            "customer_count"
+        ],
+        "customer_age_group_spending": [
+            "customer_age_group",
+            "customer_count",
+            "avg_order_total_spent",
+            "avg_clv",
+            "total_spent",
+            "total_revenue_age_group"
+        ],
+        "new_vs_returning_customer_country": [
+            "country",
+            "customer_type",
+            "customer_count"
+        ],
+        "new_vs_returning_customer_city": [
+            "country",
+            "state_province",
+            "city",
+            "customer_type",
+            "customer_count"
+        ],
+        "new_vs_returning_customer_state": [
+            "country",
+            "state_province",
+            "customer_type",
+            "customer_count"
+        ],
+        "customer_engagement": [
+            "customer_id",
+            "total_sessions",
+            "total_pages_viewed",
+            "total_products_viewed"
+        ],
+        "session_conversion_distribution": [
+            "session_conversion_percentage",
+            "customer_count"
+        ],
+        "cart_abandonment_distribution": [
+            "cart_abandonment_percentage",
+            "customer_count"
+        ],
+        "top_customers_by_revenue": [
+            "customer_id",
+            "total_revenue",
+            "customer_lifetime_value",
+            "customer_segment",
+            "rfm_segment"
+        ],
+        "top_customers_by_profit": [
+            "customer_id",
+            "total_order_profit",
+            "total_net_profit",
+            "orders_count",
+            "customer_segment",
+            "rfm_segment",
+            "total_revenue",
+            "customer_lifetime_value"
+        ],
+        "discount_customers": [
+            "customer_id",
+            "total_revenue",
+            "total_discount_received",
+            "discount_share_of_revenue",
+            "avg_discount_per_order",
+            "customer_lifetime_value",
+            "total_orders",
+            "is_discount_hunter"
+        ],
+        "discount_customers_summary": [
+            "is_discount_hunter",
+            "customer_count",
+            "avg_discount_share",
+            "avg_discount_per_order",
+            "avg_clv",
+            "avg_revenue"
+        ],
+        "correlation_discount_vs_clv": [
+            "corr_discount_share_clv",
+            "corr_avg_discount_clv"
+        ],
+        "high_discount_customers": [
+            "customer_id",
+            "total_revenue",
+            "total_discount_received",
+            "discount_to_revenue_ratio",
+            "avg_discount_per_order",
+            "customer_lifetime_value"
+        ],
+        "cart_behavior_summary": [
+            "total_carts_created",
+            "total_abandoned_carts",
+            "total_purchased_carts",
+            "avg_cart_abandonment_rate",
+            "total_abandoned_value",
+            "avg_time_in_cart_days"
+        ],
+        "high_value_abandoners": [
+            "customer_id",
+            "total_abandoned_carts",
+            "total_abandoned_value",
+            "cart_abandonment_rate",
+            "total_revenue",
+            "customer_lifetime_value"
+        ],
+        "churn_risk_summary": [
+            "churn_risk",
+            "num_customers",
+            "total_revenue",
+            "avg_clv",
+            "avg_recency_days"
+        ],
+        "high_clv_at_risk": [
+            "customer_id",
+            "customer_lifetime_value",
+            "churn_risk",
+            "customer_activity_score",
+            "order_recency_days",
+            "days_since_last_purchase",
+            "days_since_last_login",
+            "customer_segment_label",
+            "rfm_segment",
+            "rfm_category"
+        ],
+        "rfm_segment_summary": [
+            "rfm_segment",
+            "num_customers",
+            "total_revenue",
+            "avg_clv",
+            "avg_recency_days",
+            "avg_total_orders",
+            "avg_aov"
+        ],
+        "high_intent_non_buyers": [
+            "customer_id",
+            "total_products_viewed",
+            "wishlist_items_count",
+            "total_carts_created",
+            "total_purchased_carts",
+            "cart_abandonment_rate",
+            "session_conversion_rate"
+        ],
+        "customer_overall_health_summary": [
+            "customer_id",
+            "account_created_at",
+            "account_status",
+            "is_active",
+            "is_repeat_customer",
+            "total_orders",
+            "total_items_purchased",
+            "total_cancelled_orders",
+            "total_reviews_written",
+            "total_sessions",
+            "total_pages_viewed",
+            "total_products_viewed",
+            "wishlist_items_count",
+            "total_carts_created",
+            "total_abandoned_carts",
+            "total_purchased_carts",
+            "order_frequency",
+            "gender",
+            "customer_age_group",
+            "city",
+            "state_province",
+            "country",
+            "order_recency_days",
+            "customer_tenure_days",
+            "days_since_last_login",
+            "customer_activity_status",
+            "customer_segment",
+            "customer_segment_label",
+            "rfm_segment",
+            "rfm_category",
+            "churn_risk",
+            "customer_lifetime_value",
+            "total_revenue",
+            "avg_order_value",
+            "avg_items_per_order",
+            "total_discount_received",
+            "avg_discount_per_order",
+            "avg_session_duration",
+            "session_conversion_rate",
+            "cart_abandonment_rate",
+            "preferred_device_type",
+            "preferred_referrer_source",
+            "preferred_payment_method",
+            "wishlist_conversion_rate",
+            "days_since_last_purchase",
+            "cancellation_rate",
+            "customer_activity_score",
+            "total_abandoned_value",
+            "avg_time_in_cart_days",
+            "customer_abandonment_rate",
+            "customer_purchase_rate"
+        ],
+        "customers_cohorts": [
+            "customer_id",
+            "signup_date",
+            "first_order_date",
+            "signup_cohort_month",
+            "first_order_month"
+        ],
+        "signup_cohort_summary": [
+            "signup_cohort_month",
+            "cohort_customers"
+        ],
+        "customer_cohort_retention": [
+            "signup_cohort_month",
+            "months_since_signup",
+            "active_customers",
+            "cohort_customers",
+            "retention_rate"
+        ],
+        "rfm_churn_crosstab": [
+            "rfm_segment",
+            "churn_risk",
+            "customer_count",
+            "segment_revenue",
+            "avg_clv"
+        ],
+        "seg_referrer_crosstab": [
+            "customer_segment_label",
+            "preferred_referrer_source",
+            "customer_count",
+            "segment_revenue",
+            "avg_revenue_per_customer"
+        ],
+        "seg_device_crosstab": [
+            "customer_segment_label",
+            "preferred_device_type",
+            "customer_count",
+            "segment_revenue",
+            "avg_revenue_per_customer"
+        ],
+        "payment_method_vs_clv_churn": [
+            "preferred_payment_method",
+            "churn_risk",
+            "customer_count",
+            "avg_clv",
+            "avg_revenue_per_customer",
+            "total_revenue"
+        ],
+        "payment_method_summary": [
+            "preferred_payment_method",
+            "customer_count",
+            "avg_clv",
+            "avg_revenue_per_customer",
+            "total_revenue"
+        ],
+        "referrer_source_summary": [
+            "preferred_referrer_source",
+            "customer_count",
+            "avg_clv",
+            "total_revenue",
+            "avg_revenue_per_customer",
+            "avg_discount_share"
+        ],
+        "referrer_churn_summary": [
+            "preferred_referrer_source",
+            "churn_risk",
+            "customer_count",
+            "avg_clv",
+            "avg_discount_share"
+        ],
+        "customer_profit_per_segment": [
+            "customer_segment_label",
+            "customer_count",
+            "total_revenue",
+            "total_order_profit",
+            "total_net_profit",
+            "avg_clv",
+            "avg_profit_per_customer"
+        ],
+        "gender_category_preference": [
+            "gender",
+            "category",
+            "total_units",
+            "distinct_products",
+            "orders_count"
+        ],
+        "gender_product_preference": [
+            "gender",
+            "product_id",
+            "product_name",
+            "category",
+            "total_units",
+            "orders_count"
+        ]
+    },
+    "product_analytics": {
+        "best_selling_products": [
+            "product_id",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "total_units_sold",
+            "total_orders",
+            "total_revenue"
+        ],
+        "product_monthly_trends": [
+            "product_id",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "grain_year",
+            "grain_month",
+            "units_sold",
+            "orders_count"
+        ],
+        "category_monthly_trends": [
+            "category",
+            "grain_year",
+            "grain_month",
+            "units_sold",
+            "orders_count"
+        ],
+        "product_calendar_month_seasonality": [
+            "product_id",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "calendar_month",
+            "units_sold",
+            "orders_count"
+        ],
+        "category_calendar_month_seasonality": [
+            "category",
+            "calendar_month",
+            "units_sold",
+            "orders_count"
+        ],
+        "highest_margin_products": [
+            "product_id",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "profit_margin",
+            "total_revenue",
+            "total_units_sold",
+            "total_orders"
+        ],
+        "low_margin_high_traffic_products": [
+            "product_id",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "profit_margin",
+            "total_revenue",
+            "total_units_sold",
+            "total_orders",
+            "view_to_purchase_rate",
+            "revenue_per_view",
+            "total_wishlist_adds",
+            "total_cart_adds",
+            "traffic_score"
+        ],
+        "out_of_stock_products": [
+            "product_id",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "current_stock_level",
+            "total_units_sold",
+            "total_orders",
+            "total_revenue"
+        ],
+        "low_conversion_products": [
+            "product_id",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "view_to_purchase_rate",
+            "cart_to_purchase_rate",
+            "wishlist_to_purchase_rate",
+            "total_units_sold",
+            "total_orders",
+            "total_wishlist_adds",
+            "total_cart_adds",
+            "total_revenue"
+        ],
+        "product_rating_summary": [
+            "product_id",
+            "total_reviews",
+            "avg_rating"
+        ],
+        "category_view_patterns": [
+            "category",
+            "products_in_category",
+            "total_units_sold",
+            "total_orders",
+            "avg_view_to_purchase_rate",
+            "avg_revenue_per_view",
+            "total_revenue"
+        ],
+        "top_view_to_purchase_products": [
+            "product_id",
+            "product_name",
+            "category",
+            "view_to_purchase_rate",
+            "revenue_per_view",
+            "total_units_sold",
+            "total_orders"
+        ],
+        "product_performance_score": [
+            "product_id",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "total_units_sold",
+            "total_orders",
+            "total_revenue",
+            "avg_rating",
+            "view_to_purchase_rate",
+            "revenue_score",
+            "volume_score",
+            "rating_score",
+            "view_to_purchase_score",
+            "product_performance_score_computed"
+        ],
+        "category_revenue_share": [
+            "category",
+            "category_revenue",
+            "products_in_category",
+            "total_units_sold",
+            "revenue_per_product",
+            "revenue_share"
+        ],
+        "low_performing_categories": [
+            "category",
+            "products_in_category",
+            "total_units_sold",
+            "total_orders",
+            "total_revenue",
+            "avg_view_to_purchase_rate",
+            "avg_revenue_per_view",
+            "avg_profit_margin",
+            "revenue_share"
+        ],
+        "category_popularity_score": [
+            "category",
+            "products_in_category",
+            "total_units_sold",
+            "total_orders",
+            "total_revenue",
+            "total_wishlist_adds",
+            "total_cart_adds",
+            "units_score",
+            "orders_score",
+            "revenue_score",
+            "wishlist_score",
+            "cart_score",
+            "category_popularity_score"
+        ],
+        "category_profitability": [
+            "category",
+            "products_in_category",
+            "category_revenue",
+            "category_profit",
+            "avg_profit_margin",
+            "total_units_sold",
+            "total_orders",
+            "profit_per_product",
+            "revenue_per_product",
+            "profit_share"
+        ],
+        "category_monthly_seasonality": [
+            "category",
+            "calendar_month",
+            "units_sold",
+            "orders_count",
+            "total_revenue_month"
+        ],
+        "category_peak_season": [
+            "category",
+            "peak_season_month",
+            "units_sold",
+            "orders_count",
+            "peak_season_revenue"
+        ],
+        "product_lifecycle_segments": [
+            "product_id",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "launch_date",
+            "days_since_launch",
+            "total_units_sold",
+            "total_orders",
+            "total_revenue",
+            "view_to_purchase_rate",
+            "avg_rating",
+            "current_stock_level",
+            "current_stock",
+            "days_of_supply",
+            "inventory_turnover_rate",
+            "lifecycle_stage"
+        ],
+        "product_lifecycle_summary": [
+            "lifecycle_stage",
+            "products_count",
+            "avg_view_to_purchase_rate",
+            "avg_rating",
+            "avg_units_sold",
+            "avg_revenue",
+            "avg_inventory_turnover_rate"
+        ],
+        "product_stockout_risk": [
+            "product_id",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "current_stock_level",
+            "days_of_supply",
+            "total_units_sold",
+            "total_orders",
+            "total_revenue",
+            "is_high_seller",
+            "is_low_stock",
+            "stockout_risk_flag"
+        ],
+        "product_stockout_replenishment": [
+            "product_id",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "stockout_occurrences",
+            "stockout_days",
+            "total_units_sold",
+            "total_orders",
+            "total_revenue",
+            "replenishment_priority_score"
+        ],
+        "product_dead_stock": [
+            "product_id",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "current_stock_level",
+            "total_units_sold",
+            "total_orders",
+            "total_revenue",
+            "inventory_turnover_rate",
+            "days_of_supply",
+            "dead_stock_score"
+        ],
+        "product_inventory_health": [
+            "product_id",
+            "current_stock",
+            "available_stock",
+            "reorder_point_breach_count",
+            "stockout_frequency",
+            "avg_stock_quantity",
+            "days_of_supply",
+            "inventory_turnover_ratio",
+            "reorder_urgency",
+            "stock_health_score",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "total_units_sold",
+            "total_orders",
+            "total_revenue"
+        ],
+        "product_inventory_critical": [
+            "product_id",
+            "current_stock",
+            "available_stock",
+            "reorder_point_breach_count",
+            "stockout_frequency",
+            "avg_stock_quantity",
+            "days_of_supply",
+            "inventory_turnover_ratio",
+            "reorder_urgency",
+            "stock_health_score",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "total_units_sold",
+            "total_orders",
+            "total_revenue",
+            "is_low_days_of_supply",
+            "criticality_score"
+        ],
+        "supplier_product_performance": [
+            "product_id",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "supplier_id",
+            "total_units_sold",
+            "total_orders",
+            "total_revenue",
+            "total_profit",
+            "profit_margin",
+            "supplier_status",
+            "is_preferred",
+            "is_verified",
+            "sup_total_products_supplied",
+            "sup_total_units_sold",
+            "sup_total_orders_fulfilled",
+            "sup_total_reviews",
+            "sup_total_stockouts",
+            "sup_total_revenue_generated",
+            "sup_avg_profit_margin",
+            "sup_avg_product_rating",
+            "supplier_performance_score",
+            "supplier_reliability_score",
+            "stock_efficiency_ratio",
+            "sup_stockout_rate",
+            "sup_inventory_health_score",
+            "inv_total_products",
+            "inv_total_current_stock",
+            "inv_total_available_stock",
+            "inv_total_reorder_breaches",
+            "inv_total_stockouts",
+            "inv_total_storage_cost",
+            "inv_avg_stock_per_product",
+            "inv_stockout_rate",
+            "inv_inventory_health_score"
+        ],
+        "stockout_rate_by_product": [
+            "product_id",
+            "supplier_id",
+            "stockout_frequency",
+            "reorder_point_breach_count",
+            "current_stock",
+            "available_stock",
+            "days_of_supply",
+            "stock_status",
+            "product_name",
+            "category"
+        ],
+        "supplier_ranking_core": [
+            "supplier_id",
+            "supplier_status",
+            "is_preferred",
+            "is_verified",
+            "total_products_supplied",
+            "total_units_sold",
+            "total_orders_fulfilled",
+            "total_stockouts",
+            "total_revenue_generated",
+            "avg_profit_margin",
+            "stockout_rate",
+            "supplier_inventory_health_score",
+            "supplier_performance_score",
+            "supplier_reliability_score",
+            "stock_efficiency_ratio"
+        ],
+        "supplier_stockout_impact_on_products": [
+            "product_id",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "supplier_id",
+            "supplier_status",
+            "is_preferred",
+            "is_verified",
+            "total_revenue",
+            "total_units_sold",
+            "total_orders",
+            "profit_margin",
+            "sup_total_stockouts",
+            "sup_stockout_rate",
+            "sup_inventory_health_score",
+            "supplier_performance_score",
+            "supplier_reliability_score"
+        ],
+        "category_affinity_pairs": [
+            "product_a_category",
+            "product_b_category",
+            "pair_count",
+            "total_co_occurrences",
+            "avg_lift_between_categories",
+            "avg_support"
+        ],
+        "category_affinity_top_per_category": [
+            "base_category",
+            "affinity_category",
+            "pair_count",
+            "total_co_occurrences",
+            "avg_lift",
+            "avg_support"
+        ],
+        "product_affinity_pairs": [
+            "product_a_id",
+            "product_a_name",
+            "product_a_category",
+            "product_b_id",
+            "product_b_name",
+            "product_b_category",
+            "co_occurrence_count",
+            "support",
+            "confidence_a_to_b",
+            "confidence_b_to_a",
+            "lift_a_to_b",
+            "lift_b_to_a",
+            "avg_lift",
+            "affinity_strength",
+            "affinity_score"
+        ],
+        "product_affinity_top_per_product": [
+            "product_a_id",
+            "product_a_name",
+            "product_a_category",
+            "recommended_product_id",
+            "recommended_product_name",
+            "recommended_product_category",
+            "co_occurrence_count",
+            "support",
+            "confidence_a_to_b",
+            "lift_a_to_b",
+            "avg_lift",
+            "affinity_strength",
+            "affinity_score"
+        ],
+        "precomputed_product_recommendations": [
+            "product_a_id",
+            "recommended_products",
+            "avg_affinity_score",
+            "has_recommendations"
+        ],
+        "precomputed_reco_coverage": [
+            "total_products",
+            "products_with_recommendations",
+            "coverage_rate"
+        ],
+        "inventory_stock_status": [
+            "product_id",
+            "supplier_id",
+            "available_stock",
+            "current_stock",
+            "minimum_stock_level",
+            "days_of_supply",
+            "stock_status_computed"
+        ],
+        "days_of_supply": [
+            "product_id",
+            "supplier_id",
+            "available_stock",
+            "avg_daily_sales",
+            "days_of_supply"
+        ],
+        "sku_reorder_urgency": [
+            "product_id",
+            "product_name",
+            "category",
+            "available_stock",
+            "current_stock",
+            "minimum_stock_level",
+            "reorder_point_breach_count",
+            "days_of_supply",
+            "reorder_urgency_score",
+            "reorder_urgency_tier"
+        ],
+        "reorder_point_breach_frequency": [
+            "product_id",
+            "supplier_id",
+            "reorder_point_breach_count",
+            "stock_health_score",
+            "reorder_urgency",
+            "current_stock",
+            "available_stock",
+            "days_of_supply",
+            "stock_status",
+            "product_name",
+            "category",
+            "total_units_sold",
+            "total_revenue"
+        ],
+        "overstock_analysis": [
+            "product_id",
+            "supplier_id",
+            "stock_health_score",
+            "storage_cost",
+            "storage_cost_per_unit",
+            "current_stock",
+            "available_stock",
+            "days_of_supply",
+            "stock_status",
+            "product_name",
+            "category",
+            "total_units_sold",
+            "total_revenue"
+        ],
+        "reserved_vs_available": [
+            "product_id",
+            "product_name",
+            "category",
+            "supplier_id",
+            "available_stock",
+            "reserved_quantity",
+            "total_stock",
+            "reserved_share"
+        ],
+        "excess_inventory_not_selling": [
+            "product_id",
+            "product_name",
+            "category",
+            "supplier_id",
+            "available_stock",
+            "current_stock",
+            "avg_daily_sales_effective",
+            "days_of_supply_effective",
+            "total_units_sold",
+            "total_revenue",
+            "days_since_launch",
+            "stock_health_score",
+            "reorder_urgency"
+        ],
+        "margin_erosion_risk": [
+            "product_id",
+            "product_name",
+            "category",
+            "supplier_id",
+            "storage_cost",
+            "storage_cost_per_unit",
+            "available_stock",
+            "current_stock",
+            "stock_health_score",
+            "total_units_sold",
+            "total_revenue",
+            "avg_order_value_product",
+            "storage_cost_to_revenue",
+            "storage_cost_per_unit_to_price"
+        ],
+        "inventory_carrying_cost_by_product": [
+            "product_id",
+            "product_name",
+            "category",
+            "supplier_id",
+            "storage_cost",
+            "available_stock",
+            "current_stock",
+            "storage_cost_per_unit"
+        ]
+    },
+    "supplier_analytics": {
+        "stockout_rate_by_supplier": [
+            "supplier_id",
+            "supplier_status",
+            "total_stockouts",
+            "supplier_stockout_rate",
+            "inv_total_stockouts",
+            "inv_stockout_rate",
+            "inv_total_products",
+            "inv_total_current_stock",
+            "inv_total_available_stock",
+            "supplier_reliability_score",
+            "supplier_inventory_health_score"
+        ],
+        "storage_cost_efficiency_by_supplier": [
+            "supplier_id",
+            "total_storage_cost",
+            "total_available_stock",
+            "total_current_stock",
+            "avg_storage_cost_per_unit",
+            "supplier_inventory_health_score",
+            "storage_cost_efficiency"
+        ],
+        "inventory_carrying_cost_by_supplier": [
+            "supplier_id",
+            "total_storage_cost",
+            "total_available_stock"
+        ],
+        "supplier_reliability": [
+            "supplier_id",
+            "supplier_status",
+            "supplier_reliability_score_effective",
+            "supplier_performance_score",
+            "stock_efficiency_ratio"
+        ],
+        "supplier_stockouts": [
+            "supplier_id",
+            "total_stockouts",
+            "supplier_stockout_rate",
+            "inv_total_stockouts",
+            "inv_stockout_rate",
+            "inv_total_products",
+            "inv_total_current_stock",
+            "inv_total_available_stock"
+        ],
+        "supplier_fulfillment_performance": [
+            "supplier_id",
+            "supplier_status",
+            "total_orders_fulfilled",
+            "total_units_sold",
+            "avg_restock_lead_time",
+            "supplier_performance_score",
+            "stock_efficiency_ratio",
+            "supplier_reliability_score_effective"
+        ],
+        "supplier_revenue_contribution": [
+            "supplier_id",
+            "total_revenue_generated",
+            "total_orders_fulfilled",
+            "avg_order_value",
+            "revenue_contribution_share"
+        ],
+        "supplier_profit_margin": [
+            "supplier_id",
+            "avg_profit_margin",
+            "total_revenue_generated",
+            "total_orders_fulfilled"
+        ],
+        "supplier_days_since_last_restock": [
+            "supplier_id",
+            "days_since_last_restock",
+            "inv_total_products",
+            "inv_total_current_stock",
+            "inv_total_available_stock"
+        ],
+        "supplier_contract_expiry": [
+            "supplier_id",
+            "supplier_status",
+            "contract_start_date",
+            "contract_end_date",
+            "days_until_contract_expiry",
+            "contract_status_flag",
+            "supplier_reliability_score_effective",
+            "supplier_performance_score"
+        ]
+    },
+    "marketing_analytics": {
+        "campaign_performance_summary": [
+            "campaign_id",
+            "campaign_name",
+            "campaign_type",
+            "start_date",
+            "end_date",
+            "campaign_status",
+            "impressions",
+            "clicks",
+            "orders_from_campaign",
+            "revenue_generated",
+            "avg_order_value",
+            "conversion_rate",
+            "roas",
+            "roi",
+            "campaign_efficiency_score",
+            "spent_amount",
+            "budget",
+            "revenue_per_click",
+            "roi_per_spend"
+        ],
+        "campaign_product_contribution": [
+            "campaign_id",
+            "product_id",
+            "product_name",
+            "category",
+            "sub_category",
+            "brand",
+            "units_sold",
+            "product_revenue",
+            "orders_count",
+            "avg_product_margin",
+            "campaign_revenue",
+            "product_revenue_share"
+        ],
+        "campaign_ltv": [
+            "campaign_id",
+            "distinct_customers",
+            "campaign_revenue_from_orders",
+            "avg_customer_lifetime_value",
+            "num_customers_with_clv",
+            "high_clv_customers",
+            "high_clv_share"
+        ],
+        "campaign_customer_ltv_summary": [
+            "campaign_id",
+            "distinct_customers",
+            "campaign_revenue_from_orders",
+            "avg_customer_lifetime_value",
+            "num_customers_with_clv",
+            "high_clv_customers",
+            "high_clv_share"
+        ],
+        "campaign_wasteful_campaigns": [
+            "campaign_id",
+            "campaign_name",
+            "campaign_type",
+            "start_date",
+            "end_date",
+            "campaign_status",
+            "impressions",
+            "clicks",
+            "orders_from_campaign",
+            "revenue_generated",
+            "avg_order_value",
+            "conversion_rate",
+            "roas",
+            "roi",
+            "campaign_efficiency_score",
+            "spent_amount",
+            "budget",
+            "revenue_per_click",
+            "roi_per_spend",
+            "revenue_per_click_recalc",
+            "is_low_efficiency"
+        ],
+        "campaign_margin_profile": [
+            "campaign_id",
+            "campaign_avg_product_margin",
+            "campaign_products_revenue",
+            "campaign_units_sold"
+        ],
+        "campaign_performance": [
+            "campaign_id",
+            "campaign_name",
+            "campaign_type",
+            "campaign_status",
+            "performance_tier",
+            "budget",
+            "spent_amount",
+            "effective_impressions",
+            "effective_clicks",
+            "effective_conversions",
+            "revenue_generated",
+            "avg_order_value",
+            "ctr_effective",
+            "conversion_rate_effective",
+            "roas_effective",
+            "roi_effective"
+        ]
+    },
+    "revenue_analytics": {
+        "low_margin_categories": [
+            "category",
+            "avg_profit_margin",
+            "total_category_profit",
+            "total_category_revenue",
+            "units_sold"
+        ],
+        "rev_by_country_city": [
+            "country",
+            "city",
+            "customer_count",
+            "segment_revenue",
+            "revenue_per_customer",
+            "revenue_share"
+        ],
+        "rev_by_customer_segment": [
+            "customer_segment",
+            "customer_count",
+            "segment_revenue",
+            "revenue_per_customer",
+            "revenue_share"
+        ],
+        "rev_by_rfm_segment": [
+            "rfm_segment",
+            "customer_count",
+            "segment_revenue",
+            "revenue_per_customer",
+            "revenue_share"
+        ],
+        "rev_by_segment_label": [
+            "customer_segment_label",
+            "customer_count",
+            "segment_revenue",
+            "revenue_per_customer",
+            "revenue_share"
+        ],
+        "rev_by_referrer": [
+            "preferred_referrer_source",
+            "customer_count",
+            "segment_revenue",
+            "revenue_per_customer",
+            "revenue_share"
+        ],
+        "rev_by_device": [
+            "preferred_device_type",
+            "customer_count",
+            "segment_revenue",
+            "revenue_per_customer",
+            "revenue_share"
+        ],
+        "aov_trend_daily": [
+            "order_date",
+            "order_year",
+            "order_month",
+            "total_orders",
+            "total_revenue",
+            "avg_order_value"
+        ],
+        "aov_trend_weekly": [
+            "year_week",
+            "order_year",
+            "order_week",
+            "total_orders",
+            "total_revenue",
+            "avg_order_value"
+        ],
+        "aov_trend_monthly": [
+            "year_month",
+            "order_year",
+            "order_month",
+            "total_orders",
+            "total_revenue",
+            "avg_order_value"
+        ],
+        "segment_aov_by_rfm": [
+            "rfm_segment",
+            "orders",
+            "total_revenue",
+            "avg_order_value_segment",
+            "unique_customers"
+        ],
+        "inventory_carrying_cost_overall": [
+            "total_inventory_carrying_cost"
+        ]
+    },
+    "funnel_analytics": {
+        "high_value_funnel": [
+            "session_id",
+            "customer_id",
+            "session_start",
+            "device_type",
+            "referrer_source",
+            "products_viewed",
+            "total_products_viewed",
+            "items_added_to_cart",
+            "orders_from_session",
+            "converted",
+            "abandoned",
+            "cart_value",
+            "session_engagement_score",
+            "session_type",
+            "conversion_flag",
+            "cart_abandonment_flag",
+            "reached_view",
+            "reached_cart",
+            "reached_order",
+            "session_monetary_value",
+            "is_high_value_session",
+            "view_to_cart_rate",
+            "cart_to_order_rate",
+            "view_to_order_rate"
+        ],
+        "high_value_vs_regular": [
+            "is_high_value_session",
+            "session_count",
+            "avg_products_viewed",
+            "avg_items_in_cart",
+            "avg_orders",
+            "avg_session_value",
+            "total_value",
+            "avg_view_to_cart_rate",
+            "avg_cart_to_order_rate",
+            "avg_view_to_order_rate"
+        ],
+        "funnel_by_device": [
+            "device_type",
+            "total_sessions",
+            "sessions_with_views",
+            "sessions_with_cart",
+            "sessions_with_orders",
+            "avg_session_value",
+            "high_value_sessions",
+            "conversion_rate"
+        ],
+        "funnel_by_referrer": [
+            "referrer_source",
+            "total_sessions",
+            "sessions_with_views",
+            "sessions_with_cart",
+            "sessions_with_orders",
+            "avg_session_value",
+            "high_value_sessions",
+            "conversion_rate"
+        ],
+        "abandoned_vs_converted": [
+            "converted",
+            "session_count",
+            "avg_products_viewed",
+            "avg_items_in_cart",
+            "avg_cart_value",
+            "total_cart_value"
+        ],
+        "checkout_dropoff_reasons": [
+            "cart_abandonment_reason",
+            "dropoff_count",
+            "avg_abandonment_risk_score",
+            "conversion_after_abandonment_rate"
+        ],
+        "checkout_dropoff_buckets": [
+            "dropoff_bucket",
+            "dropoff_count",
+            "avg_abandonment_risk_score"
+        ],
+        "checkout_dropoff_by_device_and_reason": [
+            "device_type",
+            "dropoff_bucket",
+            "dropoff_count",
+            "avg_abandonment_risk_score",
+            "avg_session_engagement_score"
+        ],
+        "device_conversion_rates": [
+            "device_used",
+            "carts",
+            "converted_carts",
+            "abandoned_carts",
+            "conversion_rate",
+            "abandonment_rate"
+        ]
+    },
+    "payment_analytics": {
+        "payment_counts_by_country_method": [
+            "country",
+            "payment_method",
+            "payment_count",
+            "order_count"
+        ],
+        "payment_counts_by_state_method": [
+            "country",
+            "state_province",
+            "payment_method",
+            "payment_count",
+            "order_count"
+        ],
+        "payment_method_success_rates": [
+            "payment_method",
+            "total_payments",
+            "completed_payments",
+            "distinct_orders",
+            "success_rate"
+        ],
+        "payment_method_success_rates_by_country": [
+            "country",
+            "payment_method",
+            "total_payments",
+            "completed_payments",
+            "distinct_orders",
+            "success_rate"
+        ],
+        "payment_method_aov": [
+            "payment_method",
+            "payment_count",
+            "order_count",
+            "total_revenue",
+            "avg_order_value_method"
+        ],
+        "refund_rate_by_payment_method": [
+            "payment_method",
+            "total_payments",
+            "total_refund_amount",
+            "payments_with_refund",
+            "refund_rate_payments",
+            "avg_refund_per_payment"
+        ],
+        "refund_rate_by_product": [
+            "product_id",
+            "product_name",
+            "category",
+            "orders_for_product",
+            "orders_with_refund",
+            "total_refund_amount",
+            "refund_rate_orders"
+        ],
+        "refund_rate_by_month": [
+            "order_placed_year",
+            "order_placed_month",
+            "orders",
+            "orders_with_refund",
+            "total_refund_amount",
+            "total_order_amount",
+            "refund_rate_orders",
+            "refund_rate_amount"
+        ],
+        "time_to_refund_by_payment_method": [
+            "payment_method",
+            "refunded_payments",
+            "total_refund_amount",
+            "avg_days_to_refund",
+            "days_to_refund_percentiles",
+            "min_days_to_refund",
+            "max_days_to_refund"
+        ]
+    },
+    "review_analytics": {
+        "review_velocity_daily": [
+            "product_id",
+            "review_date",
+            "daily_reviews",
+            "avg_rating_daily"
+        ],
+        "review_velocity_weekly": [
+            "product_id",
+            "year_week",
+            "review_year",
+            "review_week",
+            "weekly_reviews",
+            "avg_rating_weekly"
+        ],
+        "review_velocity_monthly": [
+            "product_id",
+            "year_month",
+            "review_year",
+            "review_month",
+            "monthly_reviews",
+            "avg_rating_monthly"
+        ],
+        "sentiment_by_category": [
+            "category",
+            "total_reviews",
+            "avg_rating",
+            "positive_reviews",
+            "negative_reviews",
+            "neutral_reviews",
+            "avg_sentiment_score",
+            "positive_share",
+            "negative_share"
+        ],
+        "product_monthly_rating_trends": [
+            "product_id",
+            "product_name",
+            "category",
+            "total_units_sold",
+            "total_revenue",
+            "year_month",
+            "review_year",
+            "review_month",
+            "monthly_reviews",
+            "avg_rating_month"
+        ],
+        "low_rated_product_monthly_trends_rating_only": [
+            "product_id",
+            "product_name",
+            "category",
+            "total_units_sold",
+            "total_revenue",
+            "year_month",
+            "review_year",
+            "review_month",
+            "monthly_reviews",
+            "avg_rating_month"
+        ],
+        "rating_tier_per_product": [
+            "product_id",
+            "product_name",
+            "category",
+            "total_reviews",
+            "avg_rating_product",
+            "total_units_sold",
+            "total_revenue",
+            "rating_tier"
+        ],
+        "rating_tier_sales_velocity": [
+            "rating_tier",
+            "products_in_tier",
+            "total_units_sold_tier",
+            "total_revenue_tier",
+            "avg_units_sold_per_product",
+            "avg_revenue_per_product",
+            "avg_rating_in_tier",
+            "avg_reviews_per_product"
+        ]
+    },
+    "operations_analytics": {
+        "processing_by_category": [
+            "category",
+            "orders",
+            "total_units",
+            "avg_processing_days",
+            "avg_delivery_days",
+            "avg_total_fulfillment_days",
+            "median_processing_days",
+            "max_processing_days"
+        ],
+        "processing_by_subcategory": [
+            "category",
+            "sub_category",
+            "orders",
+            "avg_processing_days",
+            "avg_delivery_days",
+            "median_processing_days"
+        ],
+        "processing_by_hour": [
+            "order_hour",
+            "orders",
+            "avg_processing_days",
+            "avg_delivery_days",
+            "total_revenue"
+        ],
+        "processing_by_day_of_week": [
+            "order_dow",
+            "order_dow_name",
+            "orders",
+            "avg_processing_days",
+            "avg_delivery_days",
+            "total_revenue"
+        ],
+        "weekend_vs_weekday": [
+            "day_type",
+            "orders",
+            "avg_processing_days",
+            "avg_delivery_days",
+            "total_revenue"
+        ],
+        "delivery_days_by_country": [
+            "country",
+            "delivered_orders",
+            "avg_delivery_days",
+            "median_delivery_days",
+            "max_delivery_days"
+        ],
+        "delivery_days_by_state": [
+            "country",
+            "state_province",
+            "delivered_orders",
+            "avg_delivery_days",
+            "median_delivery_days",
+            "max_delivery_days"
+        ],
+        "delivery_days_by_city": [
+            "country",
+            "state_province",
+            "city",
+            "delivered_orders",
+            "avg_delivery_days",
+            "median_delivery_days",
+            "max_delivery_days"
+        ],
+        "ontime_delivery_by_country": [
+            "country",
+            "delivered_orders",
+            "on_time_orders",
+            "on_time_rate",
+            "avg_delivery_days"
+        ],
+        "ontime_delivery_by_state": [
+            "country",
+            "state_province",
+            "delivered_orders",
+            "on_time_orders",
+            "on_time_rate",
+            "avg_delivery_days"
+        ],
+        "ontime_delivery_by_city": [
+            "country",
+            "state_province",
+            "city",
+            "delivered_orders",
+            "on_time_orders",
+            "on_time_rate",
+            "avg_delivery_days"
+        ],
+        "shipping_efficiency_by_country": [
+            "country",
+            "orders",
+            "total_shipping_cost",
+            "total_subtotal",
+            "avg_shipping_pct_of_subtotal",
+            "median_shipping_pct_of_subtotal",
+            "shipping_pct_of_subtotal_overall"
+        ],
+        "shipping_efficiency_by_state": [
+            "country",
+            "state_province",
+            "orders",
+            "total_shipping_cost",
+            "total_subtotal",
+            "avg_shipping_pct_of_subtotal",
+            "median_shipping_pct_of_subtotal",
+            "shipping_pct_of_subtotal_overall"
+        ],
+        "shipping_efficiency_by_city": [
+            "country",
+            "state_province",
+            "city",
+            "orders",
+            "total_shipping_cost",
+            "total_subtotal",
+            "avg_shipping_pct_of_subtotal",
+            "median_shipping_pct_of_subtotal",
+            "shipping_pct_of_subtotal_overall"
+        ],
+        "processing_by_season": [
+            "season",
+            "orders",
+            "avg_processing_days",
+            "median_processing_days",
+            "max_processing_days"
+        ],
+        "processing_by_season_and_status": [
+            "season",
+            "order_status",
+            "orders",
+            "avg_processing_days",
+            "median_processing_days"
+        ]
+    },
+    "wishlist_analytics": {
+        "wishlist_overall_summary": [
+            "total_wishlist_items",
+            "customers_using_wishlist",
+            "products_in_wishlist",
+            "wishlist_purchased_items",
+            "wishlist_conversion_rate"
+        ],
+        "wishlist_by_product": [
+            "product_id",
+            "wishlist_adds",
+            "wishlist_purchases",
+            "wishlist_conversion_rate"
+        ],
+        "wishlist_by_customer": [
+            "customer_id",
+            "wishlist_adds",
+            "wishlist_purchases",
+            "wishlist_conversion_rate"
+        ],
+        "wishlist_time_to_purchase_stats": [
+            "records",
+            "avg_time",
+            "median_time",
+            "p90_time",
+            "max_time"
+        ],
+        "wishlist_time_to_purchase_distribution": [
+            "time_bucket",
+            "count",
+            "share"
+        ],
+        "abandoned_wishlist_items": [
+            "wishlist_id",
+            "customer_id",
+            "product_id",
+            "added_date",
+            "purchased_date",
+            "removed_date"
+        ],
+        "abandoned_wishlist_by_customer": [
+            "customer_id",
+            "abandoned_wishlist_count"
+        ],
+        "abandoned_wishlist_by_product": [
+            "product_id",
+            "abandoned_wishlist_count"
+        ],
+        "wishlist_adds_by_month": [
+            "year_month",
+            "wishlist_adds"
+        ]
+    },
+    "cart_analytics": {
+        "cart_overall_stats": [
+            "total_carts",
+            "total_cart_lines"
+        ],
+        "cart_status_distribution": [
+            "cart_status",
+            "carts_count",
+            "cart_lines_count"
+        ],
+        "cart_value_stats": [
+            "cart_status",
+            "carts_count",
+            "avg_cart_value",
+            "avg_cart_items",
+            "avg_time_in_cart_days",
+            "avg_recovery_potential_score"
+        ],
+        "high_value_abandoned_carts": [
+            "cart_id",
+            "customer_id",
+            "cart_total_value",
+            "cart_items_count",
+            "time_in_cart_days",
+            "recovery_potential_score",
+            "abandonment_risk_score"
+        ],
+        "time_to_purchase_overall": [
+            "completed_carts",
+            "avg_time_in_cart_days",
+            "avg_time_in_cart_hours",
+            "time_in_cart_days_percentiles"
+        ],
+        "time_to_purchase_by_tier": [
+            "cart_value_tier",
+            "completed_carts",
+            "avg_time_in_cart_days",
+            "avg_time_in_cart_hours",
+            "avg_cart_items_count"
+        ],
+        "time_to_purchase_buckets": [
+            "time_to_purchase_bucket",
+            "completed_carts",
+            "avg_time_in_cart_days"
+        ]
+    },
+    "geo_analytics": {
+        "geo_acquisition": [
+            "country",
+            "state_province",
+            "city",
+            "new_customers"
+        ]
+    }
+}
