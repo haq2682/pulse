@@ -6,6 +6,7 @@ import { InputText } from 'primereact/inputtext';
 import { Button } from 'primereact/button';
 import { Dropdown } from 'primereact/dropdown';
 import { Dialog } from 'primereact/dialog';
+import { Toast } from 'primereact/toast';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import SecondaryButton from '@/components/global/Button/SecondaryButton';
 import { useAuth } from '@/context/AuthContext';
@@ -31,6 +32,10 @@ const Dashboard = () => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     // NEW: Ref to detect clicks outside the menu to close it
     const profileRef = useRef(null);
+    // NEW: Pipeline status for streaming modes
+    const [pipelineStatus, setPipelineStatus] = useState('idle');
+    // NEW: Toast ref for notifications
+    const toastRef = useRef(null);
 
     // Mock data
     const [businesses, setBusinesses] = useState([]);
@@ -157,6 +162,111 @@ const Dashboard = () => {
         }
     };
 
+    // Function to trigger streaming pipeline
+    const triggerStreamingPipeline = async () => {
+        setPipelineStatus('running');
+        
+        try {
+            const response = await axiosInstance.post('/pipeline/trigger-streaming', {
+                businessId: businessId
+            });
+            
+            if (response.data.success) {
+                setPipelineStatus('success');
+                toastRef.current?.show({
+                    severity: 'success',
+                    summary: 'Success',
+                    detail: 'Streaming pipeline triggered successfully',
+                    life: 3000
+                });
+                // Return to idle after 3 seconds
+                setTimeout(() => setPipelineStatus('idle'), 3000);
+            } else {
+                throw new Error('Pipeline trigger failed');
+            }
+        } catch (error) {
+            setPipelineStatus('failed');
+            toastRef.current?.show({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'Failed to trigger streaming pipeline',
+                life: 5000
+            });
+            // Return to idle after 5 seconds
+            setTimeout(() => setPipelineStatus('idle'), 5000);
+        }
+    };
+
+    // Ingestion Status Indicator Component
+    const IngestionStatusIndicator = ({ ingestionType, pipelineStatus, onTriggerPipeline }) => {
+        const getStatusConfig = () => {
+            if (ingestionType === 'batch') {
+                return {
+                    color: 'purple',
+                    text: 'Batch',
+                    showRefresh: false
+                };
+            }
+            
+            const text = ingestionType === 'api' ? 'API' : 'Database';
+            
+            if (pipelineStatus === 'running') {
+                return { 
+                    color: 'yellow', 
+                    text, 
+                    showRefresh: true, 
+                    rotating: true,
+                    disabled: true 
+                };
+            } else if (pipelineStatus === 'failed') {
+                return { 
+                    color: 'red', 
+                    text, 
+                    showRefresh: true,
+                    rotating: false,
+                    disabled: false
+                };
+            } else {
+                return { 
+                    color: 'green', 
+                    text, 
+                    showRefresh: true,
+                    rotating: false,
+                    disabled: false
+                };
+            }
+        };
+        
+        const config = getStatusConfig();
+        
+        return (
+            <div className={`
+                border-2 border-${config.color}-500 rounded-lg px-3 py-2 
+                flex items-center gap-2 transition-all duration-300
+            `}>
+                <div className={`
+                    w-2.5 h-2.5 rounded-full bg-${config.color}-500 
+                    ${config.color === 'yellow' ? '' : 'animate-pulse'}
+                `} />
+                <span className="text-sm font-medium text-gray-700">{config.text}</span>
+                {config.showRefresh && (
+                    <button 
+                        onClick={onTriggerPipeline}
+                        disabled={config.disabled}
+                        className={`
+                            ml-1 p-1 hover:bg-gray-100 rounded transition-colors
+                            ${config.rotating ? 'animate-spin' : ''}
+                            ${config.disabled ? 'opacity-50 cursor-not-allowed' : ''}
+                        `}
+                        title="Trigger streaming pipeline"
+                    >
+                        <i className="pi pi-refresh text-sm text-gray-600" />
+                    </button>
+                )}
+            </div>
+        );
+    };
+
     const businessName = businesses.find(b => b.business_id === selectedBusiness)?.business_name || 'this business';
 
     const deleteDialogFooter = (
@@ -179,6 +289,9 @@ const Dashboard = () => {
 
     return (
         <div className="flex h-screen overflow-hidden bg-gray-50">
+            {/* Toast for notifications */}
+            <Toast ref={toastRef} />
+            
             {/* Delete Business Dialog */}
             <Dialog
                 visible={showDeleteDialog}
@@ -210,7 +323,7 @@ const Dashboard = () => {
             {/* Main Content */}
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Top Header */}
-                <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 flex items-center justify-between">
+                <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 flex items-center justify-between gap-4">
                     <button
                         onClick={() => setSidebarOpen(true)}
                         className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -221,6 +334,15 @@ const Dashboard = () => {
                     <Heading level={3} gradient={true} className="hidden md:block text-xl md:text-2xl m-0">
                         Dashboard
                     </Heading>
+
+                    {/* Ingestion Status Indicator */}
+                    {businessId && businessIngestionType && (
+                        <IngestionStatusIndicator 
+                            ingestionType={businessIngestionType}
+                            pipelineStatus={pipelineStatus}
+                            onTriggerPipeline={triggerStreamingPipeline}
+                        />
+                    )}
 
                     <InputText type="text" className="p-inputtext-sm w-2/4" placeholder="Search Insight..." />
 
