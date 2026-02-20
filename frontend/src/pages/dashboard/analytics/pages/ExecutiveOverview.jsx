@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { Card } from 'primereact/card';
 import { ProgressSpinner } from 'primereact/progressspinner';
 import { Toast } from 'primereact/toast';
+import { Button } from 'primereact/button';
+import { Calendar } from 'primereact/calendar';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Title, Tooltip, Legend } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import { useAnalyticsWebSocket } from '../../../../hooks/useAnalyticsWebSocket';
@@ -35,6 +37,10 @@ const ExecutiveOverview = () => {
     const [productData, setProductData] = useState([]);
     const [operationsData, setOperationsData] = useState({});
     const [marketingData, setMarketingData] = useState({});
+    
+    // Date filtering state
+    const [dateRange, setDateRange] = useState({ from: null, to: null });
+    const [quickFilter, setQuickFilter] = useState(null);
     
     // Connect to WebSocket for real-time updates
     const { lastUpdate, isConnected } = useAnalyticsWebSocket(businessId);
@@ -109,6 +115,34 @@ const ExecutiveOverview = () => {
         } finally {
             setLoading(false);
         }
+    };
+    
+    // Date filtering functions
+    const applyQuickFilter = (days) => {
+        const to = new Date();
+        const from = new Date();
+        from.setDate(from.getDate() - days);
+        setDateRange({ from, to });
+        setQuickFilter(days);
+    };
+    
+    const resetFilters = () => {
+        setDateRange({ from: null, to: null });
+        setQuickFilter(null);
+    };
+    
+    const filterDataByDate = (data, dateField = 'grain_date') => {
+        if (!dateRange.from || !dateRange.to || !data) return data;
+        
+        if (Array.isArray(data)) {
+            return data.filter(item => {
+                if (!item[dateField]) return true;
+                const itemDate = new Date(item[dateField]);
+                return itemDate >= dateRange.from && itemDate <= dateRange.to;
+            });
+        }
+        
+        return data;
     };
     
     const processAnalyticsData = (categories) => {
@@ -452,13 +486,6 @@ const ExecutiveOverview = () => {
                 <div className="flex items-center justify-center min-h-[60vh]">
                     <p className="text-gray-500 text-lg">No data to display</p>
                 </div>
-                {/* Connection Status */}
-                {isConnected && (
-                    <div className="fixed bottom-8 right-8 flex items-center gap-2 px-5 py-3 bg-white border border-green-500 rounded-full shadow-lg z-50">
-                        <i className="pi pi-circle-fill text-[0.625rem] text-green-500 animate-pulse"></i>
-                        <span className="text-sm font-semibold text-green-500">Live Updates Active</span>
-                    </div>
-                )}
             </div>
         );
     }
@@ -466,6 +493,73 @@ const ExecutiveOverview = () => {
     return (
         <div className="p-6 bg-gray-50 min-h-[calc(100vh-120px)]">
             <Toast ref={toastRef} />
+            
+            {/* Date Filtering UI */}
+            <div className="mb-6 p-4 bg-white rounded-lg shadow-sm">
+                <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-sm font-medium text-gray-700">Filter by:</span>
+                    
+                    {/* Quick filters */}
+                    <Button 
+                        label="1d" 
+                        size="small" 
+                        outlined 
+                        onClick={() => applyQuickFilter(1)}
+                        className={quickFilter === 1 ? 'p-button-primary' : ''}
+                    />
+                    <Button 
+                        label="3d" 
+                        size="small" 
+                        outlined 
+                        onClick={() => applyQuickFilter(3)}
+                        className={quickFilter === 3 ? 'p-button-primary' : ''}
+                    />
+                    <Button 
+                        label="7d" 
+                        size="small" 
+                        outlined 
+                        onClick={() => applyQuickFilter(7)}
+                        className={quickFilter === 7 ? 'p-button-primary' : ''}
+                    />
+                    <Button 
+                        label="30d" 
+                        size="small" 
+                        outlined 
+                        onClick={() => applyQuickFilter(30)}
+                        className={quickFilter === 30 ? 'p-button-primary' : ''}
+                    />
+                    
+                    <span className="mx-2 text-gray-400">|</span>
+                    
+                    {/* Date pickers */}
+                    <Calendar 
+                        value={dateRange.from} 
+                        onChange={(e) => setDateRange({...dateRange, from: e.value})} 
+                        placeholder="From Date" 
+                        showIcon 
+                        dateFormat="yy-mm-dd"
+                        className="w-auto"
+                    />
+                    <Calendar 
+                        value={dateRange.to} 
+                        onChange={(e) => setDateRange({...dateRange, to: e.value})} 
+                        placeholder="To Date" 
+                        showIcon 
+                        dateFormat="yy-mm-dd"
+                        className="w-auto"
+                    />
+                    
+                    {/* Reset button */}
+                    {(dateRange.from || dateRange.to) && (
+                        <Button 
+                            label="Reset" 
+                            size="small" 
+                            severity="secondary" 
+                            onClick={resetFilters}
+                        />
+                    )}
+                </div>
+            </div>
             
             {/* KPI Cards - Only show if we have data */}
             {(kpiData.totalRevenue > 0 || kpiData.totalOrders > 0 || kpiData.avgOrderValue > 0 || 
@@ -677,14 +771,6 @@ const ExecutiveOverview = () => {
                     </Card>
                 )}
             </div>
-            
-            {/* Connection Status */}
-            {isConnected && (
-                <div className="fixed bottom-8 right-8 flex items-center gap-2 px-5 py-3 bg-white border border-green-500 rounded-full shadow-lg z-50">
-                    <i className="pi pi-circle-fill text-[0.625rem] text-green-500 animate-pulse"></i>
-                    <span className="text-sm font-semibold text-green-500">Live Updates Active</span>
-                </div>
-            )}
         </div>
     );
 };
