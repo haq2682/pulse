@@ -198,71 +198,93 @@ const Dashboard = () => {
     };
 
     // Ingestion Status Indicator Component
-    const IngestionStatusIndicator = ({ ingestionType, pipelineStatus, onTriggerPipeline }) => {
+    const IngestionStatusIndicator = ({
+        ingestionType,
+        pipelineStatus,
+        onTriggerPipeline
+    }) => {
+
         const getStatusConfig = () => {
             if (ingestionType === 'batch') {
-                return {
-                    color: 'purple',
-                    text: 'Batch',
-                    showRefresh: false
-                };
+            return {
+                borderColor: 'border-purple-500',
+                dotColor: 'bg-purple-500',
+                text: 'Batch',
+                showRefresh: false
+            };
             }
-            
+
             const text = ingestionType === 'api' ? 'API' : 'Database';
-            
+
             if (pipelineStatus === 'running') {
-                return { 
-                    color: 'yellow', 
-                    text, 
-                    showRefresh: true, 
-                    rotating: true,
-                    disabled: true 
-                };
-            } else if (pipelineStatus === 'failed') {
-                return { 
-                    color: 'red', 
-                    text, 
-                    showRefresh: true,
-                    rotating: false,
-                    disabled: false
-                };
-            } else {
-                return { 
-                    color: 'green', 
-                    text, 
-                    showRefresh: true,
-                    rotating: false,
-                    disabled: false
-                };
+            return {
+                borderColor: 'border-yellow-500',
+                dotColor: 'bg-yellow-500',
+                text,
+                showRefresh: true,
+                rotating: true,
+                disabled: true
+            };
             }
+
+            if (pipelineStatus === 'failed') {
+            return {
+                borderColor: 'border-red-500',
+                dotColor: 'bg-red-500',
+                text,
+                showRefresh: true,
+                rotating: false,
+                disabled: false
+            };
+            }
+
+            return {
+            borderColor: 'border-green-500',
+            dotColor: 'bg-green-500',
+            text,
+            showRefresh: true,
+            rotating: false,
+            disabled: false
+            };
         };
-        
+
         const config = getStatusConfig();
-        
+
         return (
-            <div className={`
-                border-2 border-${config.color}-500 rounded-lg px-3 py-2 
-                flex items-center gap-2 transition-all duration-300
-            `}>
-                <div className={`
-                    w-2.5 h-2.5 rounded-full bg-${config.color}-500 
-                    ${config.color === 'yellow' ? '' : 'animate-pulse'}
-                `} />
-                <span className="text-sm font-medium text-gray-700">{config.text}</span>
-                {config.showRefresh && (
-                    <button 
-                        onClick={onTriggerPipeline}
-                        disabled={config.disabled}
-                        className={`
-                            ml-1 p-1 hover:bg-gray-100 rounded transition-colors
-                            ${config.rotating ? 'animate-spin' : ''}
-                            ${config.disabled ? 'opacity-50 cursor-not-allowed' : ''}
-                        `}
-                        title="Trigger streaming pipeline"
-                    >
-                        <i className="pi pi-refresh text-sm text-gray-600" />
-                    </button>
-                )}
+            <div
+            className={`
+                border-2 ${config.borderColor}
+                rounded-lg px-3 py-2 
+                flex items-center gap-2 
+                transition-all duration-300
+            `}
+            >
+            {/* Status Dot */}
+            <div
+                className={`
+                w-2.5 h-2.5 rounded-full ${config.dotColor}
+                ${config.borderColor.includes('yellow') ? '' : 'animate-pulse'}
+                `}
+            />
+
+            <span className="text-sm font-medium text-gray-700">
+                {config.text}
+            </span>
+
+            {config.showRefresh && (
+                <button
+                onClick={onTriggerPipeline}
+                disabled={config.disabled}
+                className={`
+                    ml-1 p-1 hover:bg-gray-100 rounded transition-colors
+                    ${config.rotating ? 'animate-spin' : ''}
+                    ${config.disabled ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+                title="Trigger streaming pipeline"
+                >
+                <i className="pi pi-refresh text-sm text-gray-600" />
+                </button>
+            )}
             </div>
         );
     };
