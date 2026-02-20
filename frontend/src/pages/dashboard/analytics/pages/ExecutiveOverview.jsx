@@ -611,13 +611,13 @@ const ExecutiveOverview = () => {
             />
 
             {/* ---- KPI Cards ---- */}
-            {(kpis.totalRevenue > 0 ||
-                kpis.totalOrders > 0 ||
-                kpis.avgOrderValue > 0 ||
-                kpis.totalCustomers > 0 ||
-                kpis.profitMargin > 0 ||
-                kpis.avgCLV > 0 ||
-                kpis.conversionRate > 0) && (
+            {(kpis?.totalRevenue > 0 ||
+                kpis?.totalOrders > 0 ||
+                kpis?.avgOrderValue > 0 ||
+                kpis?.totalCustomers > 0 ||
+                kpis?.profitMargin > 0 ||
+                kpis?.avgCLV > 0 ||
+                kpis?.conversionRate > 0) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                     {kpis.totalRevenue > 0 && (
                         <KPICard
