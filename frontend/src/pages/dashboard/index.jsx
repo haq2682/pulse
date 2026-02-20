@@ -23,6 +23,10 @@ import ProductPerformance from './analytics/pages/ProductPerformance';
 import ProductProfitability from './analytics/pages/ProductProfitability';
 import ProductEngagement from './analytics/pages/ProductEngagement';
 import ProductTrends from './analytics/pages/ProductTrends';
+import InventoryHealth from './analytics/pages/InventoryHealth';
+import InventoryReorderManagement from './analytics/pages/InventoryReorderManagement';
+import InventoryEfficiency from './analytics/pages/InventoryEfficiency';
+import InventorySupplier from './analytics/pages/InventorySupplier';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
@@ -376,6 +380,23 @@ const Dashboard = () => {
 
         if (pathname.includes('/products/trends')) {
             return <ProductTrends />;
+        }
+
+        // Inventory routes
+        if (pathname.includes('/inventory/health')) {
+            return <InventoryHealth />;
+        }
+
+        if (pathname.includes('/inventory/reorder')) {
+            return <InventoryReorderManagement />;
+        }
+
+        if (pathname.includes('/inventory/efficiency')) {
+            return <InventoryEfficiency />;
+        }
+
+        if (pathname.includes('/inventory/supplier')) {
+            return <InventorySupplier />;
         }
 
         // Default fallback for unrecognized routes
