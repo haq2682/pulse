@@ -608,6 +608,7 @@ const ExecutiveOverview = () => {
                 onDateChange={setDateRange}
                 onReset={resetFilters}
                 dataMode={dataMode}
+                hidden={loading && pipelineStatus === 'loading'}
             />
 
             {/* ---- KPI Cards ---- */}
@@ -784,8 +785,9 @@ const DateFilterBar = ({
     onDateChange,
     onReset,
     dataMode,
+    hidden = true,
 }) => (
-    <div className="mb-6 p-4 bg-white rounded-lg shadow-sm">
+    <div className={`mb-6 p-4 bg-white rounded-lg shadow-sm ${hidden ? 'hidden' : ''}`}>
         <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-medium text-gray-700">Filter by:</span>
 

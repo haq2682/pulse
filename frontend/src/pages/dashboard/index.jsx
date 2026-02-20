@@ -448,19 +448,19 @@ const Dashboard = () => {
                         <i className="pi pi-bars text-xl text-gray-700"></i>
                     </button>
 
-                    <Heading level={3} gradient={true} className="hidden md:block text-xl md:text-2xl m-0">
-                        Dashboard
-                    </Heading>
-
-                    {/* Ingestion Status Indicator */}
-                    {businessId && businessIngestionType && (
-                        <IngestionStatusIndicator 
-                            ingestionType={businessIngestionType}
-                            pipelineStatus={pipelineStatus}
-                            onTriggerPipeline={triggerStreamingPipeline}
-                        />
-                    )}
-
+                    <div className="flex items-center gap-4">
+                        <Heading level={3} gradient={true} className="hidden md:block text-xl md:text-2xl m-0">
+                            Dashboard
+                        </Heading>
+                        {/* Ingestion Status Indicator */}
+                        {businessId && businessIngestionType && (
+                            <IngestionStatusIndicator 
+                                ingestionType={businessIngestionType}
+                                pipelineStatus={pipelineStatus}
+                                onTriggerPipeline={triggerStreamingPipeline}
+                            />
+                        )}
+                    </div>
                     <InputText type="text" className="p-inputtext-sm w-2/4" placeholder="Search Insight..." />
 
                     {/* Right Side - Notifications & Avatar */}
