@@ -15,6 +15,10 @@ import axiosInstance from '@/services/api/axiosInstance';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import InlinePipelineProgress from '@/components/global/InlinePipelineProgress';
 import ExecutiveOverview from './analytics/pages/ExecutiveOverview';
+import CustomerOverview from './analytics/pages/CustomerOverview';
+import CustomerSegmentation from './analytics/pages/CustomerSegmentation';
+import CustomerHealthRetention from './analytics/pages/CustomerHealthRetention';
+import CustomerValueAnalysis from './analytics/pages/CustomerValueAnalysis';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
@@ -338,39 +342,19 @@ const Dashboard = () => {
 
         // Customers routes
         if (pathname.includes('/customers/overview')) {
-            return (
-                <div className="p-6">
-                    <h2 className="text-2xl font-bold mb-4 text-gray-800">Customers Overview</h2>
-                    <p className="text-gray-500">This section is under development.</p>
-                </div>
-            );
+            return <CustomerOverview />;
         }
 
         if (pathname.includes('/customers/segmentation')) {
-            return (
-                <div className="p-6">
-                    <h2 className="text-2xl font-bold mb-4 text-gray-800">Customer Segmentation</h2>
-                    <p className="text-gray-500">This section is under development.</p>
-                </div>
-            );
+            return <CustomerSegmentation />;
         }
 
         if (pathname.includes('/customers/health')) {
-            return (
-                <div className="p-6">
-                    <h2 className="text-2xl font-bold mb-4 text-gray-800">Customer Health</h2>
-                    <p className="text-gray-500">This section is under development.</p>
-                </div>
-            );
+            return <CustomerHealthRetention />;
         }
 
         if (pathname.includes('/customers/value')) {
-            return (
-                <div className="p-6">
-                    <h2 className="text-2xl font-bold mb-4 text-gray-800">Customer Value</h2>
-                    <p className="text-gray-500">This section is under development.</p>
-                </div>
-            );
+            return <CustomerValueAnalysis />;
         }
 
         // Products routes
