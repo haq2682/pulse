@@ -19,6 +19,10 @@ import CustomerOverview from './analytics/pages/CustomerOverview';
 import CustomerSegmentation from './analytics/pages/CustomerSegmentation';
 import CustomerHealthRetention from './analytics/pages/CustomerHealthRetention';
 import CustomerValueAnalysis from './analytics/pages/CustomerValueAnalysis';
+import ProductPerformance from './analytics/pages/ProductPerformance';
+import ProductProfitability from './analytics/pages/ProductProfitability';
+import ProductEngagement from './analytics/pages/ProductEngagement';
+import ProductTrends from './analytics/pages/ProductTrends';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
@@ -359,21 +363,19 @@ const Dashboard = () => {
 
         // Products routes
         if (pathname.includes('/products/performance')) {
-            return (
-                <div className="p-6">
-                    <h2 className="text-2xl font-bold mb-4 text-gray-800">Product Performance</h2>
-                    <p className="text-gray-500">This section is under development.</p>
-                </div>
-            );
+            return <ProductPerformance />;
         }
 
         if (pathname.includes('/products/profitability')) {
-            return (
-                <div className="p-6">
-                    <h2 className="text-2xl font-bold mb-4 text-gray-800">Product Profitability</h2>
-                    <p className="text-gray-500">This section is under development.</p>
-                </div>
-            );
+            return <ProductProfitability />;
+        }
+
+        if (pathname.includes('/products/engagement')) {
+            return <ProductEngagement />;
+        }
+
+        if (pathname.includes('/products/trends')) {
+            return <ProductTrends />;
         }
 
         // Default fallback for unrecognized routes
