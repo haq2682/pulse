@@ -275,13 +275,14 @@ export default function InventoryEfficiency() {
     // Render
     // -------------------------------------------------------------------------
 
-    if (loading && pipelineStatus !== 'running') {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <ProgressSpinner />
-            </div>
-        );
-    }
+    if (loading && pipelineStatus !== 'loading') {
+            return (
+                <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+                    <ProgressSpinner />
+                    <p className="text-gray-500 text-base">Loading inventory efficiency…</p>
+                </div>
+            );
+        }
 
     if (!hasData) {
         return (

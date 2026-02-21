@@ -336,10 +336,11 @@ export default function SupplierEconomics() {
     // Render states
     // -------------------------------------------------------------------------
 
-    if (loading && pipelineStatus !== 'running') {
+    if (loading && pipelineStatus !== 'loading') {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
                 <ProgressSpinner />
+                <p className="text-gray-500 text-base">Loading supplier economics…</p>
             </div>
         );
     }
@@ -382,7 +383,11 @@ export default function SupplierEconomics() {
                     dataMode={dataMode}
                 />
                 <div className="flex items-center justify-center min-h-[50vh]">
-                    <p className="text-gray-500 text-lg">No data to display. Run the analytics pipeline first.</p>
+                    <p className="text-gray-500 text-lg">
+                        {isFiltered
+                            ? 'No data found for the selected date range.'
+                            : 'No data to display.'}
+                    </p>
                 </div>
             </div>
         );

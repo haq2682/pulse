@@ -283,10 +283,11 @@ export default function MarketingAttribution() {
 
     const hasData = derived !== null;
 
-    if (loading && pipelineStatus !== 'running') {
+    if (loading && pipelineStatus !== 'loading') {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <ProgressSpinner style={{ width: '48px', height: '48px' }} />
+            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+                <ProgressSpinner />
+                <p className="text-gray-500 text-base">Loading marketing attribution…</p>
             </div>
         );
     }
@@ -313,11 +314,11 @@ export default function MarketingAttribution() {
                     dataMode={dataMode}
                 />
                 <div className="flex items-center justify-center min-h-[50vh]">
-                    <div className="text-center max-w-md">
-                        <i className="pi pi-chart-bar text-5xl text-gray-300 mb-4" />
-                        <p className="text-gray-500 text-lg font-medium">No data to display</p>
-                        <p className="text-gray-400 text-sm mt-2">Run the analytics pipeline first.</p>
-                    </div>
+                    <p className="text-gray-500 text-lg">
+                        {isFiltered
+                            ? 'No data found for the selected date range.'
+                            : 'No data to display.'}
+                    </p>
                 </div>
             </div>
         );

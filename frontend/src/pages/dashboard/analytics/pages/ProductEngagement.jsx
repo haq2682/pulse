@@ -308,7 +308,11 @@ const ProductEngagement = () => {
                 <Toast ref={toastRef} />
                 <DateFilterBar quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered} onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters} dataMode={dataMode} />
                 <div className="flex items-center justify-center min-h-[50vh]">
-                    <p className="text-gray-500 text-lg">{isFiltered ? 'No data found for the selected date range.' : 'No data to display. Run the analytics pipeline first.'}</p>
+                    <p className="text-gray-500 text-lg">
+                        {isFiltered
+                            ? 'No data found for the selected date range.'
+                            : 'No data to display.'}
+                    </p>
                 </div>
             </div>
         );

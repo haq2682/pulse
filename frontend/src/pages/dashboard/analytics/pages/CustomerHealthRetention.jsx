@@ -416,7 +416,7 @@ const CustomerHealthRetention = () => {
                     <p className="text-gray-500 text-lg">
                         {isFiltered
                             ? 'No data found for the selected date range.'
-                            : 'No data to display. Run the analytics pipeline first.'}
+                            : 'No data to display.'}
                     </p>
                 </div>
             </div>
