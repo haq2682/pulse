@@ -46,6 +46,9 @@ import OperationsShipping from './analytics/pages/OperationsShipping';
 import RecommendationsProductAffinity from './analytics/pages/RecommendationsProductAffinity';
 import RecommendationsCategoryAffinity from './analytics/pages/RecommendationsCategoryAffinity';
 import RecommendationsCoverage from './analytics/pages/RecommendationsCoverage';
+import ReviewsOverview from './analytics/pages/ReviewsOverview';
+import ReviewsSentiment from './analytics/pages/ReviewsSentiment';
+import ReviewsImpact from './analytics/pages/ReviewsImpact';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
@@ -498,6 +501,19 @@ const Dashboard = () => {
 
         if (pathname.includes('/recommendations/coverage')) {
             return <RecommendationsCoverage />;
+        }
+
+        // Reviews & Sentiment routes
+        if (pathname.includes('/reviews/overview')) {
+            return <ReviewsOverview />;
+        }
+
+        if (pathname.includes('/reviews/sentiment')) {
+            return <ReviewsSentiment />;
+        }
+
+        if (pathname.includes('/reviews/impact')) {
+            return <ReviewsImpact />;
         }
 
         // Default fallback for unrecognized routes
