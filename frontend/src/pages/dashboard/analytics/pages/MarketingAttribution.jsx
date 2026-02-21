@@ -61,6 +61,7 @@ const KPICard = ({ icon, iconBg, iconColor, value, label }) => (
 const barOpts = (horizontal = false) => ({
     indexAxis: horizontal ? 'y' : 'x',
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { display: false }, title: { display: false } },
     scales: {
         x: { grid: { color: 'rgba(0,0,0,0.05)' } },
@@ -70,6 +71,7 @@ const barOpts = (horizontal = false) => ({
 
 const groupedBarOpts = () => ({
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { position: 'top' }, title: { display: false } },
     scales: {
         x: { grid: { color: 'rgba(0,0,0,0.05)' } },
@@ -79,6 +81,7 @@ const groupedBarOpts = () => ({
 
 const doughnutOpts = () => ({
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { position: 'right' }, title: { display: false } },
 });
 
@@ -115,11 +118,6 @@ export default function MarketingAttribution() {
             setFetchError(false);
             const res = await fetch(buildUrl());
             if (!res.ok) {
-                toastRef.current?.show({
-                    severity: 'warn', summary: 'No Data',
-                    detail: 'Analytics data not available. Run the analytics pipeline first.',
-                    life: 5000,
-                });
                 setRawMarketing(null);
                 return;
             }
@@ -130,7 +128,6 @@ export default function MarketingAttribution() {
             console.error('[MarketingAttribution] fetch error');
             setFetchError(true);
             setRawMarketing(null);
-            toastRef.current?.show({ severity: 'error', summary: 'Error', detail: 'Unable to load attribution data.', life: 5000 });
         } finally {
             setLoading(false);
         }
@@ -278,7 +275,7 @@ export default function MarketingAttribution() {
     }, [rawMarketing]);
 
     // -------------------------------------------------------------------------
-    // Render
+    // Render states
     // -------------------------------------------------------------------------
 
     const hasData = derived !== null;
@@ -294,23 +291,39 @@ export default function MarketingAttribution() {
 
     if (fetchError) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="text-center max-w-md">
-                    <i className="pi pi-exclamation-triangle text-5xl text-red-400 mb-4" />
-                    <p className="text-gray-600 text-lg font-medium">Something went wrong</p>
-                    <p className="text-gray-400 text-sm mt-2">Please try refreshing the page.</p>
+            <div className="p-6 min-h-[calc(100vh-120px)]">
+                <Toast ref={toastRef} />
+                <DateFilterBar
+                    quickFilter={quickFilter}
+                    dateRange={dateRange}
+                    isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
+                    onReset={resetFilters}
+                    dataMode={dataMode}
+                />
+                <div className="flex items-center justify-center min-h-[50vh]">
+                    <div className="text-center">
+                        <i className="pi pi-exclamation-circle text-5xl text-red-400 mb-3 block" />
+                        <p className="text-gray-700 font-medium text-lg">Something went wrong</p>
+                        <p className="text-gray-500 text-sm mt-1">Unable to load data. Please try again later.</p>
+                    </div>
                 </div>
             </div>
         );
     }
 
-    if (!hasData) {
+    if (!hasData && !loading && pipelineStatus !== 'loading') {
         return (
-            <div className="p-6 space-y-4">
+            <div className="p-6 min-h-[calc(100vh-120px)]">
                 <Toast ref={toastRef} />
                 <DateFilterBar
-                    quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
-                    onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
+                    quickFilter={quickFilter}
+                    dateRange={dateRange}
+                    isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
+                    onReset={resetFilters}
                     dataMode={dataMode}
                 />
                 <div className="flex items-center justify-center min-h-[50vh]">
@@ -332,14 +345,31 @@ export default function MarketingAttribution() {
         <div className="p-6 space-y-8">
             <Toast ref={toastRef} />
 
-            {/* Date Filter */}
-            <DateFilterBar
-                quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
-                onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
-                dataMode={dataMode}
-            />
+            {/* ── Header ─────────────────────────────────────────────────── */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Marketing Attribution</h1>
+                    <p className="text-gray-500 mt-1">Customer lifetime value attribution, product contribution, and margin profiling by campaign</p>
+                </div>
+                <DateFilterBar
+                    quickFilter={quickFilter}
+                    dateRange={dateRange}
+                    isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
+                    onReset={resetFilters}
+                    dataMode={dataMode}
+                />
+            </div>
 
-            {/* KPIs */}
+            {/* ── Static-data notice ─────────────────────────────────────── */}
+            {isFiltered && (
+                <p className="mb-4 text-xs text-gray-400 italic">
+                    * All analytics on this page are static aggregates computed over all available data and do not change with the date filter.
+                </p>
+            )}
+
+            {/* ── KPI Cards ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <KPICard icon="pi-chart-line"  iconBg="bg-blue-50"   iconColor="text-blue-600"   value={`$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(kpis.totalAttributedRevenue)}`} label="Attributed Revenue" />
                 <KPICard icon="pi-users"       iconBg="bg-green-50"  iconColor="text-green-600"  value={`$${(+(kpis.avgCLV ?? 0)).toFixed(2)}`} label="Avg Customer LTV" />
@@ -347,128 +377,145 @@ export default function MarketingAttribution() {
                 <KPICard icon="pi-box"         iconBg="bg-orange-50" iconColor="text-orange-600" value={kpis.topContribName} label="Top Contributing Product" />
             </div>
 
-            {/* CLV + High-CLV Share */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {clvBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg Customer LTV by Campaign (Top 12)</h3>
-                        <ChartWrapper><Bar data={clvBarData} options={barOpts(true)} /></ChartWrapper>
-                    </Card>
-                )}
-                {highClvBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">High-CLV Customer Share % (Top 12)</h3>
-                        <ChartWrapper><Bar data={highClvBarData} options={barOpts(true)} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
+            {/* ── CLV Analysis ───────────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-blue-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">CLV Analysis</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {clvBarData.labels.length > 0 && (
+                        <ChartWrapper title="Avg Customer LTV by Campaign (Top 12)" height={340}>
+                            <Bar data={clvBarData} options={barOpts(true)} />
+                        </ChartWrapper>
+                    )}
+                    {highClvBarData.labels.length > 0 && (
+                        <ChartWrapper title="High-CLV Customer Share % (Top 12)" height={340}>
+                            <Bar data={highClvBarData} options={barOpts(true)} />
+                        </ChartWrapper>
+                    )}
+                    {attributedRevBarData.labels.length > 0 && (
+                        <ChartWrapper title="Attributed Revenue by Campaign (Top 12)" height={340}>
+                            <Bar data={attributedRevBarData} options={barOpts(true)} />
+                        </ChartWrapper>
+                    )}
+                    {custBarData.labels.length > 0 && (
+                        <ChartWrapper title="Distinct Customers by Campaign (Top 12)" height={340}>
+                            <Bar data={custBarData} options={barOpts(true)} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
 
-            {/* Attributed Revenue + Customers */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {attributedRevBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Attributed Revenue by Campaign (Top 12)</h3>
-                        <ChartWrapper><Bar data={attributedRevBarData} options={barOpts(true)} /></ChartWrapper>
+            {/* ── Product Contribution ───────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-green-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Product Contribution</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {topProdsBarData.labels.length > 0 && (
+                        <ChartWrapper title="Top Products by Revenue (Top 12)" height={340}>
+                            <Bar data={topProdsBarData} options={barOpts(true)} />
+                        </ChartWrapper>
+                    )}
+                    {catRevDoughnutData.labels.length > 0 && (
+                        <ChartWrapper title="Revenue by Category (Top 8)" height={280}>
+                            <Doughnut data={catRevDoughnutData} options={doughnutOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {catRevBarData.labels.length > 0 && (
+                        <ChartWrapper title="Revenue by Category (Top 10)" height={340}>
+                            <Bar data={catRevBarData} options={barOpts(true)} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
+
+            {/* ── Margin Profile ─────────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-purple-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Margin Profile</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {marginBarData.labels.length > 0 && (
+                        <ChartWrapper title="Avg Product Margin % by Campaign (Top 12)" height={340}>
+                            <Bar data={marginBarData} options={barOpts(true)} />
+                        </ChartWrapper>
+                    )}
+                    {marginRevBarData.labels.length > 0 && (
+                        <ChartWrapper title="Campaign Products Revenue (Top 12)" height={340}>
+                            <Bar data={marginRevBarData} options={barOpts(true)} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
+
+            {/* ── Attribution Tables ─────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-orange-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Attribution Tables</h2>
+                </div>
+
+                {/* CLV Attribution Table */}
+                {clvTableData.length > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Customer LTV Attribution by Campaign</h3>
+                            <DataTable value={clvTableData} paginator rows={10} scrollable stripedRows
+                                emptyMessage="No LTV attribution data" className="text-sm">
+                                <Column field="_name"                       header="Campaign"           sortable />
+                                <Column field="distinct_customers"          header="Customers"          sortable body={(r) => fmt.number(r.distinct_customers)} />
+                                <Column field="campaign_revenue_from_orders" header="Revenue"           sortable body={(r) => fmt.currency(r.campaign_revenue_from_orders)} />
+                                <Column field="avg_customer_lifetime_value" header="Avg CLV"            sortable body={(r) => fmt.currency(r.avg_customer_lifetime_value)} />
+                                <Column field="num_customers_with_clv"      header="Customers w/ CLV"  sortable body={(r) => fmt.number(r.num_customers_with_clv)} />
+                                <Column field="high_clv_customers"          header="High-CLV Customers" sortable body={(r) => fmt.number(r.high_clv_customers)} />
+                                <Column field="high_clv_share"              header="High-CLV Share %"  sortable body={(r) => fmt.pct(r.high_clv_share)} />
+                            </DataTable>
+                        </div>
                     </Card>
                 )}
-                {custBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Distinct Customers by Campaign (Top 12)</h3>
-                        <ChartWrapper><Bar data={custBarData} options={barOpts(true)} /></ChartWrapper>
+
+                {/* Product Contribution Table */}
+                {contribution.length > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Product Contribution by Campaign</h3>
+                            <DataTable value={contribution} paginator rows={15} scrollable stripedRows
+                                emptyMessage="No product contribution data" className="text-sm">
+                                <Column field="campaign_id"          header="Campaign"       sortable body={(r) => nameMap[r.campaign_id] || `Campaign ${r.campaign_id}`} />
+                                <Column field="product_name"         header="Product"        sortable body={(r) => r.product_name || `Product ${r.product_id}`} />
+                                <Column field="category"             header="Category"       sortable />
+                                <Column field="brand"                header="Brand"          sortable />
+                                <Column field="units_sold"           header="Units Sold"     sortable body={(r) => fmt.number(r.units_sold)} />
+                                <Column field="product_revenue"      header="Revenue"        sortable body={(r) => fmt.currency(r.product_revenue)} />
+                                <Column field="orders_count"         header="Orders"         sortable body={(r) => fmt.number(r.orders_count)} />
+                                <Column field="avg_product_margin"   header="Avg Margin %"   sortable body={(r) => fmt.pct(r.avg_product_margin)} />
+                                <Column field="campaign_revenue"     header="Campaign Rev."  sortable body={(r) => fmt.currency(r.campaign_revenue)} />
+                                <Column field="product_revenue_share" header="Rev. Share %"  sortable body={(r) => fmt.pct(r.product_revenue_share)} />
+                            </DataTable>
+                        </div>
                     </Card>
                 )}
-            </div>
 
-            {/* Product Contribution */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {topProdsBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Top Products by Revenue (Top 12)</h3>
-                        <ChartWrapper><Bar data={topProdsBarData} options={barOpts(true)} /></ChartWrapper>
+                {/* Margin Profile Table */}
+                {margin.length > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Campaign Margin Profile</h3>
+                            <DataTable value={margin} paginator rows={10} scrollable stripedRows
+                                emptyMessage="No margin data" className="text-sm">
+                                <Column field="campaign_id"                header="Campaign"       sortable body={(r) => nameMap[r.campaign_id] || `Campaign ${r.campaign_id}`} />
+                                <Column field="campaign_avg_product_margin" header="Avg Margin %"  sortable body={(r) => fmt.pct(r.campaign_avg_product_margin)} />
+                                <Column field="campaign_products_revenue"  header="Products Rev."  sortable body={(r) => fmt.currency(r.campaign_products_revenue)} />
+                                <Column field="campaign_units_sold"        header="Units Sold"     sortable body={(r) => fmt.number(r.campaign_units_sold)} />
+                            </DataTable>
+                        </div>
                     </Card>
                 )}
-                {catRevDoughnutData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Revenue by Category (Top 8)</h3>
-                        <ChartWrapper><Doughnut data={catRevDoughnutData} options={doughnutOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
-
-            {/* Category Revenue + Margin Profile */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {catRevBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Revenue by Category (Top 10)</h3>
-                        <ChartWrapper><Bar data={catRevBarData} options={barOpts(true)} /></ChartWrapper>
-                    </Card>
-                )}
-                {marginBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg Product Margin % by Campaign (Top 12)</h3>
-                        <ChartWrapper><Bar data={marginBarData} options={barOpts(true)} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
-
-            {/* Margin Revenue */}
-            {marginRevBarData.labels.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Campaign Products Revenue (Top 12)</h3>
-                    <ChartWrapper><Bar data={marginRevBarData} options={barOpts(true)} /></ChartWrapper>
-                </Card>
-            )}
-
-            {/* CLV Attribution Table */}
-            {clvTableData.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Customer LTV Attribution by Campaign</h3>
-                    <DataTable value={clvTableData} paginator rows={10} scrollable stripedRows
-                        emptyMessage="No LTV attribution data" className="text-sm">
-                        <Column field="_name"                       header="Campaign"           sortable />
-                        <Column field="distinct_customers"          header="Customers"          sortable body={(r) => fmt.number(r.distinct_customers)} />
-                        <Column field="campaign_revenue_from_orders" header="Revenue"           sortable body={(r) => fmt.currency(r.campaign_revenue_from_orders)} />
-                        <Column field="avg_customer_lifetime_value" header="Avg CLV"            sortable body={(r) => fmt.currency(r.avg_customer_lifetime_value)} />
-                        <Column field="num_customers_with_clv"      header="Customers w/ CLV"  sortable body={(r) => fmt.number(r.num_customers_with_clv)} />
-                        <Column field="high_clv_customers"          header="High-CLV Customers" sortable body={(r) => fmt.number(r.high_clv_customers)} />
-                        <Column field="high_clv_share"              header="High-CLV Share %"  sortable body={(r) => fmt.pct(r.high_clv_share)} />
-                    </DataTable>
-                </Card>
-            )}
-
-            {/* Product Contribution Table */}
-            {contribution.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Product Contribution by Campaign</h3>
-                    <DataTable value={contribution} paginator rows={15} scrollable stripedRows
-                        emptyMessage="No product contribution data" className="text-sm">
-                        <Column field="campaign_id"          header="Campaign"       sortable body={(r) => nameMap[r.campaign_id] || `Campaign ${r.campaign_id}`} />
-                        <Column field="product_name"         header="Product"        sortable body={(r) => r.product_name || `Product ${r.product_id}`} />
-                        <Column field="category"             header="Category"       sortable />
-                        <Column field="brand"                header="Brand"          sortable />
-                        <Column field="units_sold"           header="Units Sold"     sortable body={(r) => fmt.number(r.units_sold)} />
-                        <Column field="product_revenue"      header="Revenue"        sortable body={(r) => fmt.currency(r.product_revenue)} />
-                        <Column field="orders_count"         header="Orders"         sortable body={(r) => fmt.number(r.orders_count)} />
-                        <Column field="avg_product_margin"   header="Avg Margin %"   sortable body={(r) => fmt.pct(r.avg_product_margin)} />
-                        <Column field="campaign_revenue"     header="Campaign Rev."  sortable body={(r) => fmt.currency(r.campaign_revenue)} />
-                        <Column field="product_revenue_share" header="Rev. Share %"  sortable body={(r) => fmt.pct(r.product_revenue_share)} />
-                    </DataTable>
-                </Card>
-            )}
-
-            {/* Margin Profile Table */}
-            {margin.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Campaign Margin Profile</h3>
-                    <DataTable value={margin} paginator rows={10} scrollable stripedRows
-                        emptyMessage="No margin data" className="text-sm">
-                        <Column field="campaign_id"                header="Campaign"       sortable body={(r) => nameMap[r.campaign_id] || `Campaign ${r.campaign_id}`} />
-                        <Column field="campaign_avg_product_margin" header="Avg Margin %"  sortable body={(r) => fmt.pct(r.campaign_avg_product_margin)} />
-                        <Column field="campaign_products_revenue"  header="Products Rev."  sortable body={(r) => fmt.currency(r.campaign_products_revenue)} />
-                        <Column field="campaign_units_sold"        header="Units Sold"     sortable body={(r) => fmt.number(r.campaign_units_sold)} />
-                    </DataTable>
-                </Card>
-            )}
+            </section>
         </div>
     );
 }

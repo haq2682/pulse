@@ -58,6 +58,7 @@ const KPICard = ({ icon, iconBg, iconColor, value, label }) => (
 const barOpts = (horizontal = false) => ({
     indexAxis: horizontal ? 'y' : 'x',
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { display: false }, title: { display: false } },
     scales: {
         x: { grid: { color: 'rgba(0,0,0,0.05)' } },
@@ -67,6 +68,7 @@ const barOpts = (horizontal = false) => ({
 
 const groupedBarOpts = () => ({
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { position: 'top' }, title: { display: false } },
     scales: {
         x: { grid: { color: 'rgba(0,0,0,0.05)' } },
@@ -76,6 +78,7 @@ const groupedBarOpts = () => ({
 
 const doughnutOpts = () => ({
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { position: 'right' }, title: { display: false } },
 });
 
@@ -296,14 +299,31 @@ export default function FunnelWishlist() {
         <div className="p-6 space-y-8">
             <Toast ref={toastRef} />
 
-            {/* Date Filter */}
-            <DateFilterBar
-                quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
-                onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
-                dataMode={dataMode}
-            />
+            {/* ── Header ─────────────────────────────────────────────────── */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Wishlist Analytics</h1>
+                    <p className="text-gray-500 mt-1">Wishlist adds, purchases, conversion rates, and abandoned wishlist insights by product</p>
+                </div>
+                <DateFilterBar
+                    quickFilter={quickFilter}
+                    dateRange={dateRange}
+                    isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
+                    onReset={resetFilters}
+                    dataMode={dataMode}
+                />
+            </div>
 
-            {/* KPIs */}
+            {/* ── Static-data notice ─────────────────────────────────────── */}
+            {isFiltered && (
+                <p className="mb-4 text-xs text-gray-400 italic">
+                    * Funnel analytics are static aggregates computed over all available data and do not change with the date filter.
+                </p>
+            )}
+
+            {/* ── KPI Cards ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <KPICard icon="pi-heart"       iconBg="bg-pink-50"   iconColor="text-pink-600"   value={fmt.number(kpis.totalItems)}      label="Total Wishlist Items" />
                 <KPICard icon="pi-users"       iconBg="bg-blue-50"   iconColor="text-blue-600"   value={fmt.number(kpis.customersUsing)}  label="Customers Using Wishlist" />
@@ -311,107 +331,125 @@ export default function FunnelWishlist() {
                 <KPICard icon="pi-percentage"  iconBg="bg-green-50"  iconColor="text-green-600"  value={fmt.pct(kpis.convRate)}           label="Wishlist Conv. Rate" />
             </div>
 
-            {/* Adds by month */}
-            {addsByMonthData && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Wishlist Adds by Month</h3>
-                    <ChartWrapper><Bar data={addsByMonthData} options={barOpts()} /></ChartWrapper>
-                </Card>
-            )}
+            {/* ── Wishlist Activity ──────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-pink-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Wishlist Activity</h2>
+                </div>
+                {addsByMonthData && (
+                    <ChartWrapper title="Wishlist Adds by Month" height={340}>
+                        <Bar data={addsByMonthData} options={barOpts()} />
+                    </ChartWrapper>
+                )}
+            </section>
 
-            {/* Top adds + top purchases */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {topAddsBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Top Products by Wishlist Adds (Top 12)</h3>
-                        <ChartWrapper><Bar data={topAddsBarData} options={barOpts(true)} /></ChartWrapper>
+            {/* ── Product Performance ────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-blue-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Product Performance</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {topAddsBarData.labels.length > 0 && (
+                        <ChartWrapper title="Top Products by Wishlist Adds (Top 12)" height={340}>
+                            <Bar data={topAddsBarData} options={barOpts(true)} />
+                        </ChartWrapper>
+                    )}
+                    {topPurchBarData.labels.length > 0 && (
+                        <ChartWrapper title="Top Products by Wishlist Purchases (Top 12)" height={340}>
+                            <Bar data={topPurchBarData} options={barOpts(true)} />
+                        </ChartWrapper>
+                    )}
+                    {convRateBarData.labels.length > 0 && (
+                        <ChartWrapper title="Conversion Rate % by Product (Top 12)" height={340}>
+                            <Bar data={convRateBarData} options={barOpts(true)} />
+                        </ChartWrapper>
+                    )}
+                    {addVsPurchBarData.labels.length > 0 && (
+                        <ChartWrapper title="Wishlist Adds vs Purchases (Top 10)" height={340}>
+                            <Bar data={addVsPurchBarData} options={groupedBarOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+
+                {/* Abandoned products bar */}
+                {abandonProdBarData && (
+                    <ChartWrapper title="Most Abandoned Products (Top 12)" height={340}>
+                        <Bar data={abandonProdBarData} options={barOpts(true)} />
+                    </ChartWrapper>
+                )}
+            </section>
+
+            {/* ── Time Analysis ──────────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-green-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Time Analysis</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {ttpDistData && (
+                        <ChartWrapper title="Time to Purchase Distribution" height={340}>
+                            <Bar data={ttpDistData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {ttpDoughnutData && (
+                        <ChartWrapper title="Time to Purchase Breakdown" height={280}>
+                            <Doughnut data={ttpDoughnutData} options={doughnutOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+
+                {/* Time-to-purchase stats KPI row */}
+                {ttpStats.length > 0 && (() => {
+                    const t = ttpStats[0];
+                    return (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <KPICard icon="pi-database"   iconBg="bg-blue-50"   iconColor="text-blue-600"   value={fmt.number(t.records)}      label="Wishlist Purchase Records" />
+                            <KPICard icon="pi-clock"      iconBg="bg-green-50"  iconColor="text-green-600"  value={fmt.decimal(t.avg_time)}    label="Avg Days to Purchase" />
+                            <KPICard icon="pi-chart-line" iconBg="bg-orange-50" iconColor="text-orange-600" value={fmt.decimal(t.median_time)} label="Median Days to Purchase" />
+                            <KPICard icon="pi-arrow-up"   iconBg="bg-purple-50" iconColor="text-purple-600" value={fmt.decimal(t.p90_time)}    label="P90 Days to Purchase" />
+                        </div>
+                    );
+                })()}
+            </section>
+
+            {/* ── Performance Tables ─────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-purple-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Performance Tables</h2>
+                </div>
+
+                {/* Time-to-purchase distribution table */}
+                {ttpDist.length > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Time-to-Purchase Distribution Detail</h3>
+                            <DataTable value={ttpDist} scrollable stripedRows emptyMessage="No data" className="text-sm">
+                                <Column field="time_bucket" header="Time Bucket"   sortable />
+                                <Column field="count"       header="Count"         sortable body={(r) => fmt.number(r.count)} />
+                                <Column field="share"       header="Share %"       sortable body={(r) => fmt.pct(r.share)} />
+                            </DataTable>
+                        </div>
                     </Card>
                 )}
-                {topPurchBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Top Products by Wishlist Purchases (Top 12)</h3>
-                        <ChartWrapper><Bar data={topPurchBarData} options={barOpts(true)} /></ChartWrapper>
+
+                {/* Wishlist by product table */}
+                {byProduct.length > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Wishlist Performance by Product</h3>
+                            <DataTable value={byProduct} paginator rows={15} scrollable stripedRows emptyMessage="No data" className="text-sm">
+                                <Column field="product_id"              header="Product ID"          sortable />
+                                <Column field="wishlist_adds"           header="Wishlist Adds"       sortable body={(r) => fmt.number(r.wishlist_adds)} />
+                                <Column field="wishlist_purchases"      header="Purchases"           sortable body={(r) => fmt.number(r.wishlist_purchases)} />
+                                <Column field="wishlist_conversion_rate" header="Conv. Rate %"       sortable body={(r) => fmt.pct(r.wishlist_conversion_rate)} />
+                            </DataTable>
+                        </div>
                     </Card>
                 )}
-            </div>
-
-            {/* Conversion rate + adds vs purchases grouped */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {convRateBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Conversion Rate % by Product (Top 12)</h3>
-                        <ChartWrapper><Bar data={convRateBarData} options={barOpts(true)} /></ChartWrapper>
-                    </Card>
-                )}
-                {addVsPurchBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Wishlist Adds vs Purchases (Top 10)</h3>
-                        <ChartWrapper><Bar data={addVsPurchBarData} options={groupedBarOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
-
-            {/* Time-to-purchase distribution */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {ttpDistData && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Time to Purchase Distribution</h3>
-                        <ChartWrapper><Bar data={ttpDistData} options={barOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-                {ttpDoughnutData && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Time to Purchase Breakdown</h3>
-                        <ChartWrapper><Doughnut data={ttpDoughnutData} options={doughnutOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
-
-            {/* Abandoned products bar */}
-            {abandonProdBarData && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Most Abandoned Products (Top 12)</h3>
-                    <ChartWrapper><Bar data={abandonProdBarData} options={barOpts(true)} /></ChartWrapper>
-                </Card>
-            )}
-
-            {/* Time-to-purchase stats KPI row */}
-            {ttpStats.length > 0 && (() => {
-                const t = ttpStats[0];
-                return (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <KPICard icon="pi-database"   iconBg="bg-blue-50"   iconColor="text-blue-600"   value={fmt.number(t.records)}      label="Wishlist Purchase Records" />
-                        <KPICard icon="pi-clock"      iconBg="bg-green-50"  iconColor="text-green-600"  value={fmt.decimal(t.avg_time)}    label="Avg Days to Purchase" />
-                        <KPICard icon="pi-chart-line" iconBg="bg-orange-50" iconColor="text-orange-600" value={fmt.decimal(t.median_time)} label="Median Days to Purchase" />
-                        <KPICard icon="pi-arrow-up"   iconBg="bg-purple-50" iconColor="text-purple-600" value={fmt.decimal(t.p90_time)}    label="P90 Days to Purchase" />
-                    </div>
-                );
-            })()}
-
-            {/* Time-to-purchase distribution table */}
-            {ttpDist.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Time-to-Purchase Distribution Detail</h3>
-                    <DataTable value={ttpDist} scrollable stripedRows emptyMessage="No data" className="text-sm">
-                        <Column field="time_bucket" header="Time Bucket"   sortable />
-                        <Column field="count"       header="Count"         sortable body={(r) => fmt.number(r.count)} />
-                        <Column field="share"       header="Share %"       sortable body={(r) => fmt.pct(r.share)} />
-                    </DataTable>
-                </Card>
-            )}
-
-            {/* Wishlist by product table */}
-            {byProduct.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Wishlist Performance by Product</h3>
-                    <DataTable value={byProduct} paginator rows={15} scrollable stripedRows emptyMessage="No data" className="text-sm">
-                        <Column field="product_id"              header="Product ID"          sortable />
-                        <Column field="wishlist_adds"           header="Wishlist Adds"       sortable body={(r) => fmt.number(r.wishlist_adds)} />
-                        <Column field="wishlist_purchases"      header="Purchases"           sortable body={(r) => fmt.number(r.wishlist_purchases)} />
-                        <Column field="wishlist_conversion_rate" header="Conv. Rate %"       sortable body={(r) => fmt.pct(r.wishlist_conversion_rate)} />
-                    </DataTable>
-                </Card>
-            )}
+            </section>
         </div>
     );
 }

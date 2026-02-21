@@ -71,6 +71,7 @@ const KPICard = ({ icon, iconBg, iconColor, value, label }) => (
 const barOpts = (title, horizontal = false) => ({
     indexAxis: horizontal ? 'y' : 'x',
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { display: false }, title: { display: !!title, text: title } },
     scales: {
         x: { grid: { color: 'rgba(0,0,0,0.05)' } },
@@ -80,6 +81,7 @@ const barOpts = (title, horizontal = false) => ({
 
 const groupedBarOpts = (title) => ({
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { position: 'top' }, title: { display: !!title, text: title } },
     scales: {
         x: { grid: { color: 'rgba(0,0,0,0.05)' } },
@@ -89,6 +91,7 @@ const groupedBarOpts = (title) => ({
 
 const doughnutOpts = (title) => ({
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
         legend: { position: 'right' },
         title: { display: !!title, text: title },
@@ -128,11 +131,6 @@ export default function MarketingCampaigns() {
             setFetchError(false);
             const res = await fetch(buildUrl());
             if (!res.ok) {
-                toastRef.current?.show({
-                    severity: 'warn', summary: 'No Data',
-                    detail: 'Analytics data not available. Run the analytics pipeline first.',
-                    life: 5000,
-                });
                 setRawMarketing(null);
                 return;
             }
@@ -143,7 +141,6 @@ export default function MarketingCampaigns() {
             console.error('[MarketingCampaigns] fetch error');
             setFetchError(true);
             setRawMarketing(null);
-            toastRef.current?.show({ severity: 'error', summary: 'Error', detail: 'Unable to load marketing data.', life: 5000 });
         } finally {
             setLoading(false);
         }
@@ -283,7 +280,7 @@ export default function MarketingCampaigns() {
     }, [rawMarketing]);
 
     // -------------------------------------------------------------------------
-    // Render helpers
+    // Render states
     // -------------------------------------------------------------------------
 
     const hasData = derived !== null;
@@ -299,23 +296,39 @@ export default function MarketingCampaigns() {
 
     if (fetchError) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="text-center max-w-md">
-                    <i className="pi pi-exclamation-triangle text-5xl text-red-400 mb-4" />
-                    <p className="text-gray-600 text-lg font-medium">Something went wrong</p>
-                    <p className="text-gray-400 text-sm mt-2">Please try refreshing the page.</p>
+            <div className="p-6 min-h-[calc(100vh-120px)]">
+                <Toast ref={toastRef} />
+                <DateFilterBar
+                    quickFilter={quickFilter}
+                    dateRange={dateRange}
+                    isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
+                    onReset={resetFilters}
+                    dataMode={dataMode}
+                />
+                <div className="flex items-center justify-center min-h-[50vh]">
+                    <div className="text-center">
+                        <i className="pi pi-exclamation-circle text-5xl text-red-400 mb-3 block" />
+                        <p className="text-gray-700 font-medium text-lg">Something went wrong</p>
+                        <p className="text-gray-500 text-sm mt-1">Unable to load data. Please try again later.</p>
+                    </div>
                 </div>
             </div>
         );
     }
 
-    if (!hasData) {
+    if (!hasData && !loading && pipelineStatus !== 'loading') {
         return (
-            <div className="p-6 space-y-4">
+            <div className="p-6 min-h-[calc(100vh-120px)]">
                 <Toast ref={toastRef} />
                 <DateFilterBar
-                    quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
-                    onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
+                    quickFilter={quickFilter}
+                    dateRange={dateRange}
+                    isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
+                    onReset={resetFilters}
                     dataMode={dataMode}
                 />
                 <div className="flex items-center justify-center min-h-[50vh]">
@@ -337,14 +350,31 @@ export default function MarketingCampaigns() {
         <div className="p-6 space-y-8">
             <Toast ref={toastRef} />
 
-            {/* Date Filter */}
-            <DateFilterBar
-                quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
-                onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
-                dataMode={dataMode}
-            />
+            {/* ── Header ─────────────────────────────────────────────────── */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Marketing Campaigns</h1>
+                    <p className="text-gray-500 mt-1">Campaign performance, ROI, ROAS, conversion rates, and budget efficiency</p>
+                </div>
+                <DateFilterBar
+                    quickFilter={quickFilter}
+                    dateRange={dateRange}
+                    isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
+                    onReset={resetFilters}
+                    dataMode={dataMode}
+                />
+            </div>
 
-            {/* KPIs */}
+            {/* ── Static-data notice ─────────────────────────────────────── */}
+            {isFiltered && (
+                <p className="mb-4 text-xs text-gray-400 italic">
+                    * All analytics on this page are static aggregates computed over all available data and do not change with the date filter.
+                </p>
+            )}
+
+            {/* ── KPI Cards ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <KPICard icon="pi-megaphone"    iconBg="bg-blue-50"   iconColor="text-blue-600"   value={fmt.number(kpis.totalCampaigns)} label="Total Campaigns" />
                 <KPICard icon="pi-dollar"       iconBg="bg-red-50"    iconColor="text-red-600"    value={fmt.currency(kpis.totalSpend)}   label="Total Spend" />
@@ -352,126 +382,153 @@ export default function MarketingCampaigns() {
                 <KPICard icon="pi-percentage"   iconBg="bg-purple-50" iconColor="text-purple-600" value={`${fmt.decimal(kpis.avgROI)}%`}  label="Avg ROI" />
             </div>
 
-            {/* Revenue + Budget vs Spent */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {revenueBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Revenue by Campaign (Top 12)</h3>
-                        <ChartWrapper><Bar data={revenueBarData} options={barOpts('', true)} /></ChartWrapper>
-                    </Card>
-                )}
-                {budgetVsSpentData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Budget vs Spent (Top 10)</h3>
-                        <ChartWrapper><Bar data={budgetVsSpentData} options={groupedBarOpts('')} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
+            {/* ── Revenue & Budget ───────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-blue-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Revenue & Budget</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {revenueBarData.labels.length > 0 && (
+                        <ChartWrapper title="Revenue by Campaign (Top 12)" height={340}>
+                            <Bar data={revenueBarData} options={barOpts('', true)} />
+                        </ChartWrapper>
+                    )}
+                    {budgetVsSpentData.labels.length > 0 && (
+                        <ChartWrapper title="Budget vs Spent (Top 10)" height={340}>
+                            <Bar data={budgetVsSpentData} options={groupedBarOpts('')} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
 
-            {/* ROAS + ROI */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {roasBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Effective ROAS by Campaign (Top 12)</h3>
-                        <ChartWrapper><Bar data={roasBarData} options={barOpts('', true)} /></ChartWrapper>
-                    </Card>
-                )}
-                {roiBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Effective ROI % by Campaign (Top 12)</h3>
-                        <ChartWrapper><Bar data={roiBarData} options={barOpts('', true)} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
+            {/* ── ROAS & ROI ─────────────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-green-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">ROAS & ROI</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {roasBarData.labels.length > 0 && (
+                        <ChartWrapper title="Effective ROAS by Campaign (Top 12)" height={340}>
+                            <Bar data={roasBarData} options={barOpts('', true)} />
+                        </ChartWrapper>
+                    )}
+                    {roiBarData.labels.length > 0 && (
+                        <ChartWrapper title="Effective ROI % by Campaign (Top 12)" height={340}>
+                            <Bar data={roiBarData} options={barOpts('', true)} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
 
-            {/* Conversion Rate + Efficiency Score */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {convBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Conversion Rate % (Top 12)</h3>
-                        <ChartWrapper><Bar data={convBarData} options={barOpts('', true)} /></ChartWrapper>
-                    </Card>
-                )}
-                {effBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Efficiency Score (Top 12)</h3>
-                        <ChartWrapper><Bar data={effBarData} options={barOpts('', true)} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
+            {/* ── Conversion & Efficiency ────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-purple-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Conversion & Efficiency</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {convBarData.labels.length > 0 && (
+                        <ChartWrapper title="Conversion Rate % (Top 12)" height={340}>
+                            <Bar data={convBarData} options={barOpts('', true)} />
+                        </ChartWrapper>
+                    )}
+                    {effBarData.labels.length > 0 && (
+                        <ChartWrapper title="Efficiency Score (Top 12)" height={340}>
+                            <Bar data={effBarData} options={barOpts('', true)} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
 
-            {/* Doughnuts */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {statusDoughnutData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Campaign Status</h3>
-                        <ChartWrapper><Doughnut data={statusDoughnutData} options={doughnutOpts('')} /></ChartWrapper>
-                    </Card>
-                )}
-                {typeDoughnutData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Campaign Types</h3>
-                        <ChartWrapper><Doughnut data={typeDoughnutData} options={doughnutOpts('')} /></ChartWrapper>
-                    </Card>
-                )}
-                {tierDoughnutData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Performance Tiers</h3>
-                        <ChartWrapper><Doughnut data={tierDoughnutData} options={doughnutOpts('')} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
+            {/* ── Campaign Distribution ──────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-orange-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Campaign Distribution</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {statusDoughnutData.labels.length > 0 && (
+                        <ChartWrapper title="Campaign Status" height={280}>
+                            <Doughnut data={statusDoughnutData} options={doughnutOpts('')} />
+                        </ChartWrapper>
+                    )}
+                    {typeDoughnutData.labels.length > 0 && (
+                        <ChartWrapper title="Campaign Types" height={280}>
+                            <Doughnut data={typeDoughnutData} options={doughnutOpts('')} />
+                        </ChartWrapper>
+                    )}
+                    {tierDoughnutData.labels.length > 0 && (
+                        <ChartWrapper title="Performance Tiers" height={280}>
+                            <Doughnut data={tierDoughnutData} options={doughnutOpts('')} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
 
-            {/* Campaign Performance Table */}
-            {perfTable.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Campaign Performance Summary</h3>
-                    <DataTable value={perfTable} paginator rows={10} scrollable stripedRows
-                        emptyMessage="No campaign data" className="text-sm">
-                        <Column field="campaign_name"    header="Campaign"   sortable body={(r) => r.campaign_name || `Campaign ${r.campaign_id}`} />
-                        <Column field="campaign_type"    header="Type"       sortable />
-                        <Column field="campaign_status"  header="Status"     sortable body={(r) => (
-                            <Tag value={r.campaign_status ?? '—'} severity={STATUS_SEVERITY[(r.campaign_status ?? '').toLowerCase()] ?? 'secondary'} />
-                        )} />
-                        <Column field="performance_tier" header="Tier"       sortable body={(r) => (
-                            <Tag value={r.performance_tier ?? '—'} severity={TIER_SEVERITY[(r.performance_tier ?? '').toLowerCase()] ?? 'secondary'} />
-                        )} />
-                        <Column field="budget"           header="Budget"     sortable body={(r) => fmt.currency(r.budget)} />
-                        <Column field="spent_amount"     header="Spent"      sortable body={(r) => fmt.currency(r.spent_amount)} />
-                        <Column field="revenue_generated" header="Revenue"   sortable body={(r) => fmt.currency(r.revenue_generated)} />
-                        <Column field="roas_effective"   header="ROAS"       sortable body={(r) => fmt.decimal(r.roas_effective)} />
-                        <Column field="roi_effective"    header="ROI %"      sortable body={(r) => fmt.pct(r.roi_effective)} />
-                        <Column field="ctr_effective"    header="CTR %"      sortable body={(r) => fmt.pct(r.ctr_effective)} />
-                        <Column field="conversion_rate_effective" header="Conv. Rate %" sortable body={(r) => fmt.pct(r.conversion_rate_effective)} />
-                        <Column field="avg_order_value"  header="AOV"        sortable body={(r) => fmt.currency(r.avg_order_value)} />
-                    </DataTable>
-                </Card>
-            )}
+            {/* ── Performance Tables ─────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-cyan-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Performance Tables</h2>
+                </div>
 
-            {/* Wasteful Campaigns Table */}
-            {wastefulTable.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Wasteful / Low-Efficiency Campaigns</h3>
-                    <p className="text-xs text-gray-400 mb-4">Campaigns flagged as having low efficiency scores or poor returns.</p>
-                    <DataTable value={wastefulTable} paginator rows={10} scrollable stripedRows
-                        emptyMessage="No wasteful campaigns found" className="text-sm">
-                        <Column field="campaign_name"            header="Campaign"    sortable body={(r) => r.campaign_name || `Campaign ${r.campaign_id}`} />
-                        <Column field="campaign_type"            header="Type"        sortable />
-                        <Column field="campaign_status"          header="Status"      sortable body={(r) => (
-                            <Tag value={r.campaign_status ?? '—'} severity={STATUS_SEVERITY[(r.campaign_status ?? '').toLowerCase()] ?? 'secondary'} />
-                        )} />
-                        <Column field="spent_amount"             header="Spent"       sortable body={(r) => fmt.currency(r.spent_amount)} />
-                        <Column field="revenue_generated"        header="Revenue"     sortable body={(r) => fmt.currency(r.revenue_generated)} />
-                        <Column field="roas"                     header="ROAS"        sortable body={(r) => fmt.decimal(r.roas)} />
-                        <Column field="roi"                      header="ROI %"       sortable body={(r) => fmt.pct(r.roi)} />
-                        <Column field="campaign_efficiency_score" header="Eff. Score" sortable body={(r) => fmt.decimal(r.campaign_efficiency_score)} />
-                        <Column field="revenue_per_click_recalc" header="Rev/Click"  sortable body={(r) => fmt.currency(r.revenue_per_click_recalc)} />
-                        <Column field="is_low_efficiency"        header="Low Eff."   sortable body={(r) => (
-                            <Tag value={r.is_low_efficiency ? 'Yes' : 'No'} severity={r.is_low_efficiency ? 'danger' : 'success'} />
-                        )} />
-                    </DataTable>
-                </Card>
-            )}
+                {/* Campaign Performance Table */}
+                {perfTable.length > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Campaign Performance Summary</h3>
+                            <DataTable value={perfTable} paginator rows={10} scrollable stripedRows
+                                emptyMessage="No campaign data" className="text-sm">
+                                <Column field="campaign_name"    header="Campaign"   sortable body={(r) => r.campaign_name || `Campaign ${r.campaign_id}`} />
+                                <Column field="campaign_type"    header="Type"       sortable />
+                                <Column field="campaign_status"  header="Status"     sortable body={(r) => (
+                                    <Tag value={r.campaign_status ?? '—'} severity={STATUS_SEVERITY[(r.campaign_status ?? '').toLowerCase()] ?? 'secondary'} />
+                                )} />
+                                <Column field="performance_tier" header="Tier"       sortable body={(r) => (
+                                    <Tag value={r.performance_tier ?? '—'} severity={TIER_SEVERITY[(r.performance_tier ?? '').toLowerCase()] ?? 'secondary'} />
+                                )} />
+                                <Column field="budget"           header="Budget"     sortable body={(r) => fmt.currency(r.budget)} />
+                                <Column field="spent_amount"     header="Spent"      sortable body={(r) => fmt.currency(r.spent_amount)} />
+                                <Column field="revenue_generated" header="Revenue"   sortable body={(r) => fmt.currency(r.revenue_generated)} />
+                                <Column field="roas_effective"   header="ROAS"       sortable body={(r) => fmt.decimal(r.roas_effective)} />
+                                <Column field="roi_effective"    header="ROI %"      sortable body={(r) => fmt.pct(r.roi_effective)} />
+                                <Column field="ctr_effective"    header="CTR %"      sortable body={(r) => fmt.pct(r.ctr_effective)} />
+                                <Column field="conversion_rate_effective" header="Conv. Rate %" sortable body={(r) => fmt.pct(r.conversion_rate_effective)} />
+                                <Column field="avg_order_value"  header="AOV"        sortable body={(r) => fmt.currency(r.avg_order_value)} />
+                            </DataTable>
+                        </div>
+                    </Card>
+                )}
+
+                {/* Wasteful Campaigns Table */}
+                {wastefulTable.length > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-2 pb-3 border-b border-gray-200">Wasteful / Low-Efficiency Campaigns</h3>
+                            <p className="text-xs text-gray-400 mb-4">Campaigns flagged as having low efficiency scores or poor returns.</p>
+                            <DataTable value={wastefulTable} paginator rows={10} scrollable stripedRows
+                                emptyMessage="No wasteful campaigns found" className="text-sm">
+                                <Column field="campaign_name"            header="Campaign"    sortable body={(r) => r.campaign_name || `Campaign ${r.campaign_id}`} />
+                                <Column field="campaign_type"            header="Type"        sortable />
+                                <Column field="campaign_status"          header="Status"      sortable body={(r) => (
+                                    <Tag value={r.campaign_status ?? '—'} severity={STATUS_SEVERITY[(r.campaign_status ?? '').toLowerCase()] ?? 'secondary'} />
+                                )} />
+                                <Column field="spent_amount"             header="Spent"       sortable body={(r) => fmt.currency(r.spent_amount)} />
+                                <Column field="revenue_generated"        header="Revenue"     sortable body={(r) => fmt.currency(r.revenue_generated)} />
+                                <Column field="roas"                     header="ROAS"        sortable body={(r) => fmt.decimal(r.roas)} />
+                                <Column field="roi"                      header="ROI %"       sortable body={(r) => fmt.pct(r.roi)} />
+                                <Column field="campaign_efficiency_score" header="Eff. Score" sortable body={(r) => fmt.decimal(r.campaign_efficiency_score)} />
+                                <Column field="revenue_per_click_recalc" header="Rev/Click"  sortable body={(r) => fmt.currency(r.revenue_per_click_recalc)} />
+                                <Column field="is_low_efficiency"        header="Low Eff."   sortable body={(r) => (
+                                    <Tag value={r.is_low_efficiency ? 'Yes' : 'No'} severity={r.is_low_efficiency ? 'danger' : 'success'} />
+                                )} />
+                            </DataTable>
+                        </div>
+                    </Card>
+                )}
+            </section>
         </div>
     );
 }

@@ -59,6 +59,7 @@ const KPICard = ({ icon, iconBg, iconColor, value, label }) => (
 const barOpts = (horizontal = false) => ({
     indexAxis: horizontal ? 'y' : 'x',
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { display: false }, title: { display: false } },
     scales: {
         x: { grid: { color: 'rgba(0,0,0,0.05)' } },
@@ -68,6 +69,7 @@ const barOpts = (horizontal = false) => ({
 
 const groupedBarOpts = () => ({
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { position: 'top' }, title: { display: false } },
     scales: {
         x: { grid: { color: 'rgba(0,0,0,0.05)' } },
@@ -77,6 +79,7 @@ const groupedBarOpts = () => ({
 
 const doughnutOpts = () => ({
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { position: 'right' }, title: { display: false } },
 });
 
@@ -328,14 +331,31 @@ export default function FunnelCheckout() {
         <div className="p-6 space-y-8">
             <Toast ref={toastRef} />
 
-            {/* Date Filter */}
-            <DateFilterBar
-                quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
-                onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
-                dataMode={dataMode}
-            />
+            {/* ── Header ─────────────────────────────────────────────────── */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Checkout Funnel</h1>
+                    <p className="text-gray-500 mt-1">Checkout drop-off analysis by reason and device, recovery rates, and conversion patterns</p>
+                </div>
+                <DateFilterBar
+                    quickFilter={quickFilter}
+                    dateRange={dateRange}
+                    isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
+                    onReset={resetFilters}
+                    dataMode={dataMode}
+                />
+            </div>
 
-            {/* KPIs */}
+            {/* ── Static-data notice ─────────────────────────────────────── */}
+            {isFiltered && (
+                <p className="mb-4 text-xs text-gray-400 italic">
+                    * Funnel analytics are static aggregates computed over all available data and do not change with the date filter.
+                </p>
+            )}
+
+            {/* ── KPI Cards ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <KPICard icon="pi-times-circle"  iconBg="bg-red-50"    iconColor="text-red-600"    value={fmt.number(kpis.totalDropoffs)}        label="Total Dropoffs" />
                 <KPICard icon="pi-exclamation-triangle" iconBg="bg-orange-50" iconColor="text-orange-600" value={fmt.decimal(kpis.avgRiskScore, 3)} label="Avg Abandon Risk" />
@@ -343,111 +363,128 @@ export default function FunnelCheckout() {
                 <KPICard icon="pi-info-circle"   iconBg="bg-blue-50"   iconColor="text-blue-600"   value={kpis.topReason}                         label="Top Dropoff Reason" />
             </div>
 
-            {/* Dropoff reasons + recovery rate */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {dropoffReasonsBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Checkout Dropoff by Reason</h3>
-                        <ChartWrapper><Bar data={dropoffReasonsBarData} options={barOpts(true)} /></ChartWrapper>
-                    </Card>
-                )}
-                {recoveryRateBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Recovery Rate After Abandonment by Reason</h3>
-                        <ChartWrapper><Bar data={recoveryRateBarData} options={barOpts(true)} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
+            {/* ── Dropoff Analysis ───────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-red-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Dropoff Analysis</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {dropoffReasonsBarData.labels.length > 0 && (
+                        <ChartWrapper title="Checkout Dropoff by Reason" height={340}>
+                            <Bar data={dropoffReasonsBarData} options={barOpts(true)} />
+                        </ChartWrapper>
+                    )}
+                    {recoveryRateBarData.labels.length > 0 && (
+                        <ChartWrapper title="Recovery Rate After Abandonment by Reason" height={340}>
+                            <Bar data={recoveryRateBarData} options={barOpts(true)} />
+                        </ChartWrapper>
+                    )}
+                    {riskByReasonBarData.labels.length > 0 && (
+                        <ChartWrapper title="Avg Abandonment Risk Score by Reason" height={340}>
+                            <Bar data={riskByReasonBarData} options={barOpts(true)} />
+                        </ChartWrapper>
+                    )}
+                    {dropoffBucketsBarData && (
+                        <ChartWrapper title="Dropoff Volume by Stage Bucket" height={340}>
+                            <Bar data={dropoffBucketsBarData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
 
-            {/* Risk score by reason + dropoff buckets */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {riskByReasonBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg Abandonment Risk Score by Reason</h3>
-                        <ChartWrapper><Bar data={riskByReasonBarData} options={barOpts(true)} /></ChartWrapper>
-                    </Card>
-                )}
-                {dropoffBucketsBarData && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Dropoff Volume by Stage Bucket</h3>
-                        <ChartWrapper><Bar data={dropoffBucketsBarData} options={barOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
+            {/* ── Device Analysis ────────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-blue-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Device Analysis</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {deviceDropoffDoughnutData && (
+                        <ChartWrapper title="Dropoffs by Device" height={280}>
+                            <Doughnut data={deviceDropoffDoughnutData} options={doughnutOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {dropoffByDeviceBarData && (
+                        <ChartWrapper title="Dropoff Stage by Device" height={340}>
+                            <Bar data={dropoffByDeviceBarData} options={groupedBarOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
 
-            {/* Device dropoff doughnut + grouped bar by device & bucket */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {deviceDropoffDoughnutData && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Dropoffs by Device</h3>
-                        <ChartWrapper><Doughnut data={deviceDropoffDoughnutData} options={doughnutOpts()} /></ChartWrapper>
+            {/* ── Recovery Metrics ───────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-green-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Recovery Metrics</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {deviceConvBarData && (
+                        <ChartWrapper title="Conversion vs Abandonment Rate by Device" height={340}>
+                            <Bar data={deviceConvBarData} options={groupedBarOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {deviceConvDoughnutData && (
+                        <ChartWrapper title="Conversion Rate Share by Device" height={280}>
+                            <Doughnut data={deviceConvDoughnutData} options={doughnutOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+
+                {/* Abandoned vs Converted grouped bar */}
+                {abandonBarData && (
+                    <ChartWrapper title="Abandoned vs Converted Session Behaviour" height={340}>
+                        <Bar data={abandonBarData} options={groupedBarOpts()} />
+                    </ChartWrapper>
+                )}
+            </section>
+
+            {/* ── Performance Tables ─────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-purple-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Performance Tables</h2>
+                </div>
+
+                {/* Dropoff Reasons Table */}
+                {dropoffReasonsSorted.length > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Checkout Dropoff Reasons Detail</h3>
+                            <DataTable value={dropoffReasonsSorted} scrollable stripedRows emptyMessage="No data" className="text-sm">
+                                <Column field="cart_abandonment_reason"            header="Reason"                sortable />
+                                <Column field="dropoff_count"                      header="Dropoff Count"         sortable body={(r) => fmt.number(r.dropoff_count)} />
+                                <Column field="avg_abandonment_risk_score"         header="Avg Risk Score"        sortable body={(r) => fmt.decimal(r.avg_abandonment_risk_score, 3)} />
+                                <Column field="conversion_after_abandonment_rate"  header="Recovery Rate %"       sortable body={(r) => fmt.pct(r.conversion_after_abandonment_rate)} />
+                            </DataTable>
+                        </div>
                     </Card>
                 )}
-                {dropoffByDeviceBarData && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Dropoff Stage by Device</h3>
-                        <ChartWrapper><Bar data={dropoffByDeviceBarData} options={groupedBarOpts()} /></ChartWrapper>
+
+                {/* Device Conversion Rates Table */}
+                {deviceConv.length > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Device Conversion Rates</h3>
+                            <DataTable value={deviceConv} scrollable stripedRows emptyMessage="No data" className="text-sm">
+                                <Column field="device_used"       header="Device"             sortable />
+                                <Column field="carts"             header="Total Carts"        sortable body={(r) => fmt.number(r.carts)} />
+                                <Column field="converted_carts"   header="Converted"          sortable body={(r) => fmt.number(r.converted_carts)} />
+                                <Column field="abandoned_carts"   header="Abandoned"          sortable body={(r) => fmt.number(r.abandoned_carts)} />
+                                <Column field="conversion_rate"   header="Conv. Rate %"       sortable body={(r) => (
+                                    <Tag value={fmt.pct(r.conversion_rate)}
+                                        severity={(+(r.conversion_rate ?? 0)) >= 50 ? 'success' : (+(r.conversion_rate ?? 0)) >= 25 ? 'warning' : 'danger'} />
+                                )} />
+                                <Column field="abandonment_rate"  header="Abandon Rate %"     sortable body={(r) => (
+                                    <Tag value={fmt.pct(r.abandonment_rate)}
+                                        severity={(+(r.abandonment_rate ?? 0)) >= 75 ? 'danger' : (+(r.abandonment_rate ?? 0)) >= 50 ? 'warning' : 'success'} />
+                                )} />
+                            </DataTable>
+                        </div>
                     </Card>
                 )}
-            </div>
-
-            {/* Device conversion + abandonment rates */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {deviceConvBarData && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Conversion vs Abandonment Rate by Device</h3>
-                        <ChartWrapper><Bar data={deviceConvBarData} options={groupedBarOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-                {deviceConvDoughnutData && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Conversion Rate Share by Device</h3>
-                        <ChartWrapper><Doughnut data={deviceConvDoughnutData} options={doughnutOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
-
-            {/* Abandoned vs Converted grouped bar */}
-            {abandonBarData && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Abandoned vs Converted Session Behaviour</h3>
-                    <ChartWrapper><Bar data={abandonBarData} options={groupedBarOpts()} /></ChartWrapper>
-                </Card>
-            )}
-
-            {/* Dropoff Reasons Table */}
-            {dropoffReasonsSorted.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Checkout Dropoff Reasons Detail</h3>
-                    <DataTable value={dropoffReasonsSorted} scrollable stripedRows emptyMessage="No data" className="text-sm">
-                        <Column field="cart_abandonment_reason"            header="Reason"                sortable />
-                        <Column field="dropoff_count"                      header="Dropoff Count"         sortable body={(r) => fmt.number(r.dropoff_count)} />
-                        <Column field="avg_abandonment_risk_score"         header="Avg Risk Score"        sortable body={(r) => fmt.decimal(r.avg_abandonment_risk_score, 3)} />
-                        <Column field="conversion_after_abandonment_rate"  header="Recovery Rate %"       sortable body={(r) => fmt.pct(r.conversion_after_abandonment_rate)} />
-                    </DataTable>
-                </Card>
-            )}
-
-            {/* Device Conversion Rates Table */}
-            {deviceConv.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Device Conversion Rates</h3>
-                    <DataTable value={deviceConv} scrollable stripedRows emptyMessage="No data" className="text-sm">
-                        <Column field="device_used"       header="Device"             sortable />
-                        <Column field="carts"             header="Total Carts"        sortable body={(r) => fmt.number(r.carts)} />
-                        <Column field="converted_carts"   header="Converted"          sortable body={(r) => fmt.number(r.converted_carts)} />
-                        <Column field="abandoned_carts"   header="Abandoned"          sortable body={(r) => fmt.number(r.abandoned_carts)} />
-                        <Column field="conversion_rate"   header="Conv. Rate %"       sortable body={(r) => (
-                            <Tag value={fmt.pct(r.conversion_rate)}
-                                severity={(+(r.conversion_rate ?? 0)) >= 50 ? 'success' : (+(r.conversion_rate ?? 0)) >= 25 ? 'warning' : 'danger'} />
-                        )} />
-                        <Column field="abandonment_rate"  header="Abandon Rate %"     sortable body={(r) => (
-                            <Tag value={fmt.pct(r.abandonment_rate)}
-                                severity={(+(r.abandonment_rate ?? 0)) >= 75 ? 'danger' : (+(r.abandonment_rate ?? 0)) >= 50 ? 'warning' : 'success'} />
-                        )} />
-                    </DataTable>
-                </Card>
-            )}
+            </section>
         </div>
     );
 }

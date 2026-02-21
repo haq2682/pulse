@@ -106,11 +106,6 @@ export default function SupplierOperations() {
             setFetchError(false);
             const res = await fetch(buildUrl());
             if (!res.ok) {
-                toastRef.current?.show({
-                    severity: 'warn', summary: 'No Data',
-                    detail: 'Analytics data not available. Run the analytics pipeline first.',
-                    life: 5000,
-                });
                 setRawSupplier(null);
                 return;
             }
@@ -121,7 +116,6 @@ export default function SupplierOperations() {
             console.error('[SupplierOperations] fetch error');
             setFetchError(true);
             setRawSupplier(null);
-            toastRef.current?.show({ severity: 'error', summary: 'Error', detail: 'Unable to load supplier data.', life: 5000 });
         } finally {
             setLoading(false);
         }
@@ -350,7 +344,7 @@ export default function SupplierOperations() {
         );
     }
 
-    if (!hasData) {
+    if (!hasData && !loading && pipelineStatus !== 'loading') {
         return (
             <div className="p-6 min-h-[calc(100vh-120px)]">
                 <Toast ref={toastRef} />
@@ -403,6 +397,13 @@ export default function SupplierOperations() {
                     dataMode={dataMode}
                 />
             </div>
+
+            {/* ── Static-data notice ─────────────────────────────────────── */}
+            {isFiltered && (
+                <p className="mb-4 text-xs text-gray-400 italic">
+                    * Supplier analytics are static aggregates computed over all available data and do not change with the date filter.
+                </p>
+            )}
 
             {/* ── KPI Cards ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
