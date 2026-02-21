@@ -258,38 +258,52 @@ services:
     restart: always
     command: redis-server --appendonly yes
 
-  nifi:
+  airflow-init:
     build:
       context: .
-      dockerfile: .docker/nifi/Dockerfile
-    image: nifi:latest
-    container_name: nifi
+      dockerfile: .docker/airflow/Dockerfile
+    container_name: airflow-init
     depends_on:
-      - kafka
-      - zookeeper
-      - minio
       - postgresql
-      - redis
-    ports:
-      - "8081:8080"   # NiFi UI
-      - "10000:10000" # Site-to-Site protocol port (optional)
-      - "8443:8443" # HTTPS port (optional)
     environment:
-      NIFI_JVM_HEAP_INIT: 8g
-      NIFI_JVM_HEAP_MAX: 16g
-      JAVA_OPTS: >-
-        -Xms8g
-        -Xmx16g
-        -XX:+UseG1GC
-        -XX:MaxGCPauseMillis=500
-        -XX:InitiatingHeapOccupancyPercent=45
-        -XX:G1HeapRegionSize=16m
-      NIFI_WEB_HTTP_PORT: 8080
-      NIFI_WEB_HTTP_HOST: 0.0.0.0
-      NIFI_WEB_HTTPS_PORT: 8443
-      NIFI_SENSITIVE_PROPS_KEY: nifi-sensitive-key
-      NIFI_SENSITIVE_PROPS_ALGORITHM: AES/GCM/NoPadding
-      NIFI_CLUSTER_IS_NODE: "false" # single-node NiFi
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    entrypoint: >
+      bash -c "
+        airflow db migrate &&
+        airflow users create
+          --username ${AIRFLOW_ADMIN_USER:-admin}
+          --password ${AIRFLOW_ADMIN_PASSWORD:-admin}
+          --firstname Pulse
+          --lastname Admin
+          --role Admin
+          --email ${AIRFLOW_ADMIN_EMAIL:-admin@pulse.local}
+      "
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.12
+    restart: on-failure
+
+  airflow-webserver:
+    build:
+      context: .
+      dockerfile: .docker/airflow/Dockerfile
+    container_name: airflow-webserver
+    depends_on:
+      - airflow-init
+      - postgresql
+      - kafka
+      - minio
+      - redis
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__WEBSERVER__BASE_URL: http://0.0.0.0:8080
+      # Pipeline env vars forwarded to DAG tasks
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
@@ -298,16 +312,63 @@ services:
       POSTGRES_DB: ${POSTGRES_DATABASE_NAME}
       POSTGRES_SERVER: ${POSTGRES_SERVER}
       KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
-      SINGLE_USER_CREDENTIALS_USERNAME: admin
-      SINGLE_USER_CREDENTIALS_PASSWORD: adminadminadmin
+      KAFKA_BOOTSTRAP_EXTERNAL: ${KAFKA_BOOTSTRAP_EXTERNAL}
+      SPARK_MASTER_URL: spark://10.5.0.3:7077
+    ports:
+      - "8081:8080"   # Airflow UI (same external port as former NiFi UI)
     volumes:
-      - nifi_data:/opt/nifi/nifi-current/data
-      - ./nifi/custom_processors:/opt/nifi/nifi-current/custom_processors # optional for custom scripts
-      - ./nifi/flows:/opt/nifi/nifi-current/flows # prebuilt flows (optional)
+      - ./airflow/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - ./cleaning:/app/cleaning
+      - ./mapping:/app/mapping
+      - ./transformation:/app/transformation
+      - ./analysis:/app/analysis
+      - ./machine-learning:/app/machine-learning
+      - ./streaming_orchestrator.py:/app/streaming_orchestrator.py
     networks:
       spark-network:
-        ipv4_address: 10.5.0.12
+        ipv4_address: 10.5.0.15
     restart: always
+    command: webserver
+
+  airflow-scheduler:
+    build:
+      context: .
+      dockerfile: .docker/airflow/Dockerfile
+    container_name: airflow-scheduler
+    depends_on:
+      - airflow-init
+      - postgresql
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      # Pipeline env vars forwarded to DAG tasks
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DATABASE_NAME}
+      POSTGRES_SERVER: ${POSTGRES_SERVER}
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+      KAFKA_BOOTSTRAP_EXTERNAL: ${KAFKA_BOOTSTRAP_EXTERNAL}
+      SPARK_MASTER_URL: spark://10.5.0.3:7077
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - ./cleaning:/app/cleaning
+      - ./mapping:/app/mapping
+      - ./transformation:/app/transformation
+      - ./analysis:/app/analysis
+      - ./machine-learning:/app/machine-learning
+      - ./streaming_orchestrator.py:/app/streaming_orchestrator.py
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.14
+    restart: always
+    command: scheduler
 
   nginx:
     build:
@@ -333,7 +394,7 @@ services:
       spark-network:
         ipv4_address: 10.5.0.13
     depends_on:
-      - nifi
+      - api
     restart: always
 
 networks:
@@ -353,4 +414,4 @@ volumes:
   kafka_data:
   app:
   redis_data:
-  nifi_data:
+  airflow_logs:
