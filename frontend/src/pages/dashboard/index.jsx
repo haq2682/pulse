@@ -49,6 +49,9 @@ import RecommendationsCoverage from './analytics/pages/RecommendationsCoverage';
 import ReviewsOverview from './analytics/pages/ReviewsOverview';
 import ReviewsSentiment from './analytics/pages/ReviewsSentiment';
 import ReviewsImpact from './analytics/pages/ReviewsImpact';
+import EngagementMetrics from './analytics/pages/EngagementMetrics';
+import EngagementBehavior from './analytics/pages/EngagementBehavior';
+import EngagementConversion from './analytics/pages/EngagementConversion';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
@@ -514,6 +517,19 @@ const Dashboard = () => {
 
         if (pathname.includes('/reviews/impact')) {
             return <ReviewsImpact />;
+        }
+
+        // Engagement routes
+        if (pathname.includes('/engagement/metrics')) {
+            return <EngagementMetrics />;
+        }
+
+        if (pathname.includes('/engagement/behavior')) {
+            return <EngagementBehavior />;
+        }
+
+        if (pathname.includes('/engagement/conversion')) {
+            return <EngagementConversion />;
         }
 
         // Default fallback for unrecognized routes
