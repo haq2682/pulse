@@ -457,7 +457,7 @@ const Dashboard = () => {
             <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="text-center max-w-md">
                     <p className="text-gray-500 text-lg">
-                        This analytics section is under development.
+                        Page not fond. Please select a valid analytics page from the sidebar.
                     </p>
                 </div>
             </div>
