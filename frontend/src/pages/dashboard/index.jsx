@@ -33,6 +33,10 @@ import SupplierEconomics from './analytics/pages/SupplierEconomics';
 import MarketingCampaigns from './analytics/pages/MarketingCampaigns';
 import MarketingAttribution from './analytics/pages/MarketingAttribution';
 import MarketingChannels from './analytics/pages/MarketingChannels';
+import FunnelOverview from './analytics/pages/FunnelOverview';
+import FunnelCart from './analytics/pages/FunnelCart';
+import FunnelCheckout from './analytics/pages/FunnelCheckout';
+import FunnelWishlist from './analytics/pages/FunnelWishlist';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
@@ -429,6 +433,23 @@ const Dashboard = () => {
 
         if (pathname.includes('/marketing/channels')) {
             return <MarketingChannels />;
+        }
+
+        // Funnel routes
+        if (pathname.includes('/funnel/overview')) {
+            return <FunnelOverview />;
+        }
+
+        if (pathname.includes('/funnel/cart')) {
+            return <FunnelCart />;
+        }
+
+        if (pathname.includes('/funnel/checkout')) {
+            return <FunnelCheckout />;
+        }
+
+        if (pathname.includes('/funnel/wishlist')) {
+            return <FunnelWishlist />;
         }
 
         // Default fallback for unrecognized routes

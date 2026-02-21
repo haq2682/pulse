@@ -1,0 +1,452 @@
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
+import { Card } from 'primereact/card';
+import { ProgressSpinner } from 'primereact/progressspinner';
+import { Toast } from 'primereact/toast';
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
+import { Tag } from 'primereact/tag';
+import {
+    Chart as ChartJS,
+    CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend,
+} from 'chart.js';
+import { Bar, Doughnut } from 'react-chartjs-2';
+import { useAnalyticsWebSocket } from '../../../../hooks/useAnalyticsWebSocket';
+import ChartWrapper from '../components/ChartWrapper';
+import { usePipelineProgress } from '@/context/PipelineProgressContext';
+import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
+import DateFilterBar from '../components/DateFilterBar';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const PALETTE = [
+    'rgba(59,130,246,0.82)', 'rgba(34,197,94,0.82)',  'rgba(249,115,22,0.82)',
+    'rgba(239,68,68,0.82)',  'rgba(139,92,246,0.82)', 'rgba(6,182,212,0.82)',
+    'rgba(234,179,8,0.82)',  'rgba(236,72,153,0.82)', 'rgba(20,184,166,0.82)',
+    'rgba(168,85,247,0.82)',
+];
+
+// ---------------------------------------------------------------------------
+// Formatters
+// ---------------------------------------------------------------------------
+
+const fmt = {
+    number:   (v) => new Intl.NumberFormat('en-US').format(Math.round(v ?? 0)),
+    decimal:  (v, d = 2) => (+(v ?? 0)).toFixed(d),
+    pct:      (v) => `${(+(v ?? 0)).toFixed(1)}%`,
+};
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+const KPICard = ({ icon, iconBg, iconColor, value, label }) => (
+    <Card className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-0 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+        <div className="flex items-center gap-5 p-6">
+            <i className={`pi ${icon} text-4xl p-4 ${iconBg} ${iconColor} rounded-xl`} />
+            <div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">{value}</h3>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label}</p>
+            </div>
+        </div>
+    </Card>
+);
+
+const barOpts = (horizontal = false) => ({
+    indexAxis: horizontal ? 'y' : 'x',
+    responsive: true,
+    plugins: { legend: { display: false }, title: { display: false } },
+    scales: {
+        x: { grid: { color: 'rgba(0,0,0,0.05)' } },
+        y: { grid: { color: 'rgba(0,0,0,0.05)' } },
+    },
+});
+
+const groupedBarOpts = () => ({
+    responsive: true,
+    plugins: { legend: { position: 'top' }, title: { display: false } },
+    scales: {
+        x: { grid: { color: 'rgba(0,0,0,0.05)' } },
+        y: { grid: { color: 'rgba(0,0,0,0.05)' } },
+    },
+});
+
+const doughnutOpts = () => ({
+    responsive: true,
+    plugins: { legend: { position: 'right' }, title: { display: false } },
+});
+
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
+
+export default function FunnelCheckout() {
+    const { businessId } = useParams();
+    const toastRef = useRef(null);
+    const { pipelineStatus } = usePipelineProgress();
+    const { dateRange, setDateRange, quickFilter, isFiltered, applyQuickFilter, resetFilters } = useAnalyticsDateFilter();
+    const { lastUpdate } = useAnalyticsWebSocket(businessId);
+
+    const [rawFunnel, setRawFunnel] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [fetchError, setFetchError] = useState(false);
+    const [dataMode, setDataMode] = useState('unknown');
+
+    // -------------------------------------------------------------------------
+    // Fetch
+    // -------------------------------------------------------------------------
+
+    const buildUrl = useCallback(() => {
+        const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const params = new URLSearchParams({ categories: 'funnel_analytics' });
+        return `${base}/analytics/data/${businessId}?${params.toString()}`;
+    }, [businessId]);
+
+    const fetchData = useCallback(async () => {
+        if (!businessId) return;
+        try {
+            setLoading(true);
+            setFetchError(false);
+            const res = await fetch(buildUrl());
+            if (!res.ok) {
+                toastRef.current?.show({
+                    severity: 'warn', summary: 'No Data',
+                    detail: 'Analytics data not available. Run the analytics pipeline first.',
+                    life: 5000,
+                });
+                setRawFunnel(null);
+                return;
+            }
+            const json = await res.json();
+            if (json.mode) setDataMode(json.mode);
+            setRawFunnel(json.categories?.funnel_analytics ?? null);
+        } catch {
+            console.error('[FunnelCheckout] fetch error');
+            setFetchError(true);
+            setRawFunnel(null);
+            toastRef.current?.show({ severity: 'error', summary: 'Error', detail: 'Unable to load checkout data.', life: 5000 });
+        } finally {
+            setLoading(false);
+        }
+    }, [buildUrl, businessId]);
+
+    useEffect(() => { fetchData(); }, [businessId]); // eslint-disable-line
+    useEffect(() => {
+        if (!lastUpdate) return;
+        fetchData();
+        toastRef.current?.show({ severity: 'info', summary: 'Data Updated', detail: 'Analytics pipeline completed — refreshing data.', life: 3000 });
+    }, [lastUpdate]); // eslint-disable-line
+
+    // -------------------------------------------------------------------------
+    // Derived data
+    // -------------------------------------------------------------------------
+
+    const derived = useMemo(() => {
+        if (!rawFunnel) return null;
+        const a = rawFunnel.analytics ?? {};
+
+        const dropoffReasons   = a.checkout_dropoff_reasons?.data                 ?? [];
+        const dropoffBuckets   = a.checkout_dropoff_buckets?.data                 ?? [];
+        const dropoffByDevice  = a.checkout_dropoff_by_device_and_reason?.data    ?? [];
+        const deviceConv       = a.device_conversion_rates?.data                  ?? [];
+        const abandonVsConv    = a.abandoned_vs_converted?.data                   ?? [];
+
+        if (dropoffReasons.length === 0 && deviceConv.length === 0 && dropoffBuckets.length === 0) return null;
+
+        // ---- KPIs -----------------------------------------------------------
+        const totalDropoffs    = dropoffReasons.reduce((s, r) => s + (+(r.dropoff_count ?? 0)), 0);
+        const avgRiskScore     = dropoffReasons.length > 0
+            ? dropoffReasons.reduce((s, r) => s + (+(r.avg_abandonment_risk_score ?? 0)), 0) / dropoffReasons.length
+            : 0;
+        const avgConvAfterAband = dropoffReasons.length > 0
+            ? dropoffReasons.reduce((s, r) => s + (+(r.conversion_after_abandonment_rate ?? 0)), 0) / dropoffReasons.length
+            : 0;
+        const topReason        = dropoffReasons.length > 0
+            ? [...dropoffReasons].sort((a, b) => (+(b.dropoff_count ?? 0)) - (+(a.dropoff_count ?? 0)))[0]?.cart_abandonment_reason ?? '—'
+            : '—';
+
+        // ---- Dropoff reasons horizontal bar ---------------------------------
+        const dropoffReasonsSorted = [...dropoffReasons]
+            .sort((a, b) => (+(b.dropoff_count ?? 0)) - (+(a.dropoff_count ?? 0)));
+        const dropoffReasonsBarData = {
+            labels: dropoffReasonsSorted.map((r) => r.cart_abandonment_reason ?? 'Unknown'),
+            datasets: [{
+                label: 'Dropoff Count',
+                data: dropoffReasonsSorted.map((r) => +(r.dropoff_count ?? 0)),
+                backgroundColor: 'rgba(239,68,68,0.82)',
+            }],
+        };
+
+        // ---- Recovery rate after abandonment bar ----------------------------
+        const recoveryRateBarData = {
+            labels: dropoffReasonsSorted.map((r) => r.cart_abandonment_reason ?? 'Unknown'),
+            datasets: [{
+                label: 'Conv. After Abandonment %',
+                data: dropoffReasonsSorted.map((r) => +(r.conversion_after_abandonment_rate ?? 0).toFixed(2)),
+                backgroundColor: 'rgba(34,197,94,0.82)',
+            }],
+        };
+
+        // ---- Avg risk score by reason bar -----------------------------------
+        const riskByReasonBarData = {
+            labels: dropoffReasonsSorted.map((r) => r.cart_abandonment_reason ?? 'Unknown'),
+            datasets: [{
+                label: 'Avg Abandonment Risk Score',
+                data: dropoffReasonsSorted.map((r) => +(r.avg_abandonment_risk_score ?? 0).toFixed(3)),
+                backgroundColor: 'rgba(249,115,22,0.82)',
+            }],
+        };
+
+        // ---- Dropoff buckets bar --------------------------------------------
+        const dropoffBucketsBarData = dropoffBuckets.length > 0 ? {
+            labels: dropoffBuckets.map((r) => r.dropoff_bucket ?? 'Unknown'),
+            datasets: [{
+                label: 'Dropoff Count',
+                data: dropoffBuckets.map((r) => +(r.dropoff_count ?? 0)),
+                backgroundColor: PALETTE,
+            }],
+        } : null;
+
+        // ---- Dropoff by device doughnut -------------------------------------
+        const deviceDropoffMap = {};
+        dropoffByDevice.forEach((r) => {
+            const d = r.device_type ?? 'Unknown';
+            deviceDropoffMap[d] = (deviceDropoffMap[d] ?? 0) + (+(r.dropoff_count ?? 0));
+        });
+        const deviceDropoffDoughnutData = Object.keys(deviceDropoffMap).length > 0 ? {
+            labels: Object.keys(deviceDropoffMap),
+            datasets: [{ data: Object.values(deviceDropoffMap), backgroundColor: PALETTE }],
+        } : null;
+
+        // ---- Dropoff by device grouped bar (top devices x buckets) ----------
+        const devices   = [...new Set(dropoffByDevice.map((r) => r.device_type ?? 'Unknown'))];
+        const buckets   = [...new Set(dropoffByDevice.map((r) => r.dropoff_bucket ?? 'Unknown'))];
+        const dropoffByDeviceBarData = (devices.length > 0 && buckets.length > 0) ? {
+            labels: devices,
+            datasets: buckets.map((bucket, i) => ({
+                label: bucket,
+                data: devices.map((dev) => {
+                    const row = dropoffByDevice.find((r) => r.device_type === dev && r.dropoff_bucket === bucket);
+                    return row ? +(row.dropoff_count ?? 0) : 0;
+                }),
+                backgroundColor: PALETTE[i % PALETTE.length],
+            })),
+        } : null;
+
+        // ---- Device conversion + abandonment rates grouped bar --------------
+        const deviceConvBarData = deviceConv.length > 0 ? {
+            labels: deviceConv.map((r) => r.device_used ?? 'Unknown'),
+            datasets: [
+                { label: 'Conversion Rate %',  data: deviceConv.map((r) => +(r.conversion_rate ?? 0).toFixed(2)),  backgroundColor: 'rgba(34,197,94,0.82)' },
+                { label: 'Abandonment Rate %', data: deviceConv.map((r) => +(r.abandonment_rate ?? 0).toFixed(2)), backgroundColor: 'rgba(239,68,68,0.82)' },
+            ],
+        } : null;
+
+        // ---- Device conversion rate doughnut --------------------------------
+        const deviceConvDoughnutData = deviceConv.length > 0 ? {
+            labels: deviceConv.map((r) => r.device_used ?? 'Unknown'),
+            datasets: [{ data: deviceConv.map((r) => +(r.conversion_rate ?? 0).toFixed(2)), backgroundColor: PALETTE }],
+        } : null;
+
+        // ---- Abandoned vs Converted bar -------------------------------------
+        const abandonBarData = abandonVsConv.length > 0 ? {
+            labels: abandonVsConv.map((r) => r.converted ? 'Converted' : 'Abandoned'),
+            datasets: [
+                { label: 'Session Count',       data: abandonVsConv.map((r) => +(r.session_count ?? 0)),                          backgroundColor: 'rgba(59,130,246,0.82)' },
+                { label: 'Avg Products Viewed', data: abandonVsConv.map((r) => +(r.avg_products_viewed ?? 0).toFixed(2)),          backgroundColor: 'rgba(34,197,94,0.82)' },
+                { label: 'Avg Items in Cart',   data: abandonVsConv.map((r) => +(r.avg_items_in_cart ?? 0).toFixed(2)),            backgroundColor: 'rgba(249,115,22,0.82)' },
+                { label: 'Avg Cart Value ($)',  data: abandonVsConv.map((r) => +(r.avg_cart_value ?? 0).toFixed(2)),               backgroundColor: 'rgba(139,92,246,0.82)' },
+            ],
+        } : null;
+
+        return {
+            kpis: { totalDropoffs, avgRiskScore, avgConvAfterAband, topReason },
+            dropoffReasonsBarData, recoveryRateBarData, riskByReasonBarData,
+            dropoffBucketsBarData, deviceDropoffDoughnutData, dropoffByDeviceBarData,
+            deviceConvBarData, deviceConvDoughnutData, abandonBarData,
+            dropoffReasonsSorted, deviceConv,
+        };
+    }, [rawFunnel]);
+
+    // -------------------------------------------------------------------------
+    // Render
+    // -------------------------------------------------------------------------
+
+    const hasData = derived !== null;
+
+    if (loading && pipelineStatus !== 'running') {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <ProgressSpinner style={{ width: '48px', height: '48px' }} />
+            </div>
+        );
+    }
+
+    if (fetchError) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="text-center max-w-md">
+                    <i className="pi pi-exclamation-triangle text-5xl text-red-400 mb-4" />
+                    <p className="text-gray-600 text-lg font-medium">Something went wrong</p>
+                    <p className="text-gray-400 text-sm mt-2">Please try refreshing the page.</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!hasData) {
+        return (
+            <div className="p-6 space-y-4">
+                <Toast ref={toastRef} />
+                <DateFilterBar
+                    quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
+                    dataMode={dataMode}
+                />
+                <div className="flex items-center justify-center min-h-[50vh]">
+                    <div className="text-center max-w-md">
+                        <i className="pi pi-chart-bar text-5xl text-gray-300 mb-4" />
+                        <p className="text-gray-500 text-lg font-medium">No data to display</p>
+                        <p className="text-gray-400 text-sm mt-2">Run the analytics pipeline first.</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    const { kpis, dropoffReasonsBarData, recoveryRateBarData, riskByReasonBarData,
+            dropoffBucketsBarData, deviceDropoffDoughnutData, dropoffByDeviceBarData,
+            deviceConvBarData, deviceConvDoughnutData, abandonBarData,
+            dropoffReasonsSorted, deviceConv } = derived;
+
+    return (
+        <div className="p-6 space-y-8">
+            <Toast ref={toastRef} />
+
+            {/* Date Filter */}
+            <DateFilterBar
+                quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
+                onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
+                dataMode={dataMode}
+            />
+
+            {/* KPIs */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <KPICard icon="pi-times-circle"  iconBg="bg-red-50"    iconColor="text-red-600"    value={fmt.number(kpis.totalDropoffs)}        label="Total Dropoffs" />
+                <KPICard icon="pi-exclamation-triangle" iconBg="bg-orange-50" iconColor="text-orange-600" value={fmt.decimal(kpis.avgRiskScore, 3)} label="Avg Abandon Risk" />
+                <KPICard icon="pi-refresh"       iconBg="bg-green-50"  iconColor="text-green-600"  value={fmt.pct(kpis.avgConvAfterAband)}        label="Avg Recovery Rate" />
+                <KPICard icon="pi-info-circle"   iconBg="bg-blue-50"   iconColor="text-blue-600"   value={kpis.topReason}                         label="Top Dropoff Reason" />
+            </div>
+
+            {/* Dropoff reasons + recovery rate */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {dropoffReasonsBarData.labels.length > 0 && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Checkout Dropoff by Reason</h3>
+                        <ChartWrapper><Bar data={dropoffReasonsBarData} options={barOpts(true)} /></ChartWrapper>
+                    </Card>
+                )}
+                {recoveryRateBarData.labels.length > 0 && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Recovery Rate After Abandonment by Reason</h3>
+                        <ChartWrapper><Bar data={recoveryRateBarData} options={barOpts(true)} /></ChartWrapper>
+                    </Card>
+                )}
+            </div>
+
+            {/* Risk score by reason + dropoff buckets */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {riskByReasonBarData.labels.length > 0 && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg Abandonment Risk Score by Reason</h3>
+                        <ChartWrapper><Bar data={riskByReasonBarData} options={barOpts(true)} /></ChartWrapper>
+                    </Card>
+                )}
+                {dropoffBucketsBarData && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Dropoff Volume by Stage Bucket</h3>
+                        <ChartWrapper><Bar data={dropoffBucketsBarData} options={barOpts()} /></ChartWrapper>
+                    </Card>
+                )}
+            </div>
+
+            {/* Device dropoff doughnut + grouped bar by device & bucket */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {deviceDropoffDoughnutData && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Dropoffs by Device</h3>
+                        <ChartWrapper><Doughnut data={deviceDropoffDoughnutData} options={doughnutOpts()} /></ChartWrapper>
+                    </Card>
+                )}
+                {dropoffByDeviceBarData && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Dropoff Stage by Device</h3>
+                        <ChartWrapper><Bar data={dropoffByDeviceBarData} options={groupedBarOpts()} /></ChartWrapper>
+                    </Card>
+                )}
+            </div>
+
+            {/* Device conversion + abandonment rates */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {deviceConvBarData && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Conversion vs Abandonment Rate by Device</h3>
+                        <ChartWrapper><Bar data={deviceConvBarData} options={groupedBarOpts()} /></ChartWrapper>
+                    </Card>
+                )}
+                {deviceConvDoughnutData && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Conversion Rate Share by Device</h3>
+                        <ChartWrapper><Doughnut data={deviceConvDoughnutData} options={doughnutOpts()} /></ChartWrapper>
+                    </Card>
+                )}
+            </div>
+
+            {/* Abandoned vs Converted grouped bar */}
+            {abandonBarData && (
+                <Card className="rounded-xl shadow-sm border border-gray-200">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Abandoned vs Converted Session Behaviour</h3>
+                    <ChartWrapper><Bar data={abandonBarData} options={groupedBarOpts()} /></ChartWrapper>
+                </Card>
+            )}
+
+            {/* Dropoff Reasons Table */}
+            {dropoffReasonsSorted.length > 0 && (
+                <Card className="rounded-xl shadow-sm border border-gray-200">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Checkout Dropoff Reasons Detail</h3>
+                    <DataTable value={dropoffReasonsSorted} scrollable stripedRows emptyMessage="No data" className="text-sm">
+                        <Column field="cart_abandonment_reason"            header="Reason"                sortable />
+                        <Column field="dropoff_count"                      header="Dropoff Count"         sortable body={(r) => fmt.number(r.dropoff_count)} />
+                        <Column field="avg_abandonment_risk_score"         header="Avg Risk Score"        sortable body={(r) => fmt.decimal(r.avg_abandonment_risk_score, 3)} />
+                        <Column field="conversion_after_abandonment_rate"  header="Recovery Rate %"       sortable body={(r) => fmt.pct(r.conversion_after_abandonment_rate)} />
+                    </DataTable>
+                </Card>
+            )}
+
+            {/* Device Conversion Rates Table */}
+            {deviceConv.length > 0 && (
+                <Card className="rounded-xl shadow-sm border border-gray-200">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Device Conversion Rates</h3>
+                    <DataTable value={deviceConv} scrollable stripedRows emptyMessage="No data" className="text-sm">
+                        <Column field="device_used"       header="Device"             sortable />
+                        <Column field="carts"             header="Total Carts"        sortable body={(r) => fmt.number(r.carts)} />
+                        <Column field="converted_carts"   header="Converted"          sortable body={(r) => fmt.number(r.converted_carts)} />
+                        <Column field="abandoned_carts"   header="Abandoned"          sortable body={(r) => fmt.number(r.abandoned_carts)} />
+                        <Column field="conversion_rate"   header="Conv. Rate %"       sortable body={(r) => (
+                            <Tag value={fmt.pct(r.conversion_rate)}
+                                severity={(+(r.conversion_rate ?? 0)) >= 50 ? 'success' : (+(r.conversion_rate ?? 0)) >= 25 ? 'warning' : 'danger'} />
+                        )} />
+                        <Column field="abandonment_rate"  header="Abandon Rate %"     sortable body={(r) => (
+                            <Tag value={fmt.pct(r.abandonment_rate)}
+                                severity={(+(r.abandonment_rate ?? 0)) >= 75 ? 'danger' : (+(r.abandonment_rate ?? 0)) >= 50 ? 'warning' : 'success'} />
+                        )} />
+                    </DataTable>
+                </Card>
+            )}
+        </div>
+    );
+}
