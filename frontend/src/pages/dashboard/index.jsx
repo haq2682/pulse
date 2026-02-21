@@ -40,6 +40,9 @@ import FunnelWishlist from './analytics/pages/FunnelWishlist';
 import PaymentMethods from './analytics/pages/PaymentMethods';
 import PaymentRefunds from './analytics/pages/PaymentRefunds';
 import PaymentFinancialMetrics from './analytics/pages/PaymentFinancialMetrics';
+import OperationsProcessing from './analytics/pages/OperationsProcessing';
+import OperationsDelivery from './analytics/pages/OperationsDelivery';
+import OperationsShipping from './analytics/pages/OperationsShipping';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
@@ -466,6 +469,19 @@ const Dashboard = () => {
 
         if (pathname.includes('/payments/metrics')) {
             return <PaymentFinancialMetrics />;
+        }
+
+        // Operations routes
+        if (pathname.includes('/operations/processing')) {
+            return <OperationsProcessing />;
+        }
+
+        if (pathname.includes('/operations/delivery')) {
+            return <OperationsDelivery />;
+        }
+
+        if (pathname.includes('/operations/shipping')) {
+            return <OperationsShipping />;
         }
 
         // Default fallback for unrecognized routes
