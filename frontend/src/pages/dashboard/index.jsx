@@ -43,6 +43,9 @@ import PaymentFinancialMetrics from './analytics/pages/PaymentFinancialMetrics';
 import OperationsProcessing from './analytics/pages/OperationsProcessing';
 import OperationsDelivery from './analytics/pages/OperationsDelivery';
 import OperationsShipping from './analytics/pages/OperationsShipping';
+import RecommendationsProductAffinity from './analytics/pages/RecommendationsProductAffinity';
+import RecommendationsCategoryAffinity from './analytics/pages/RecommendationsCategoryAffinity';
+import RecommendationsCoverage from './analytics/pages/RecommendationsCoverage';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
@@ -482,6 +485,19 @@ const Dashboard = () => {
 
         if (pathname.includes('/operations/shipping')) {
             return <OperationsShipping />;
+        }
+
+        // Recommendations routes
+        if (pathname.includes('/recommendations/product')) {
+            return <RecommendationsProductAffinity />;
+        }
+
+        if (pathname.includes('/recommendations/category')) {
+            return <RecommendationsCategoryAffinity />;
+        }
+
+        if (pathname.includes('/recommendations/coverage')) {
+            return <RecommendationsCoverage />;
         }
 
         // Default fallback for unrecognized routes
