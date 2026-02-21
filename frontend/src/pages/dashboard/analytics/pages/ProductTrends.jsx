@@ -102,12 +102,13 @@ export default function ProductTrends() {
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();
-    const { clientFilter, dateRange, isFiltered, applyQuickFilter, resetFilters, toISODate } = useAnalyticsDateFilter();
+    const { clientFilter, dateRange, setDateRange, quickFilter, isFiltered, applyQuickFilter, resetFilters, toISODate } = useAnalyticsDateFilter();
     const { lastUpdate } = useAnalyticsWebSocket(businessId);
 
     const [raw, setRaw] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [dataMode, setDataMode] = useState('unknown');
 
     // -------------------------------------------------------------------------
     // Fetch
@@ -124,12 +125,23 @@ export default function ProductTrends() {
             setLoading(true);
             setError(null);
             const res = await fetch(buildUrl());
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            if (!res.ok) {
+                toastRef.current?.show({
+                    severity: 'warn', summary: 'No Data',
+                    detail: 'Analytics data not available. Run the analytics pipeline first.',
+                    life: 5000,
+                });
+                setRaw(null);
+                return;
+            }
             const json = await res.json();
+            if (json.mode) setDataMode(json.mode);
             setRaw(json);
         } catch (err) {
-            setError(err.message);
-            toastRef.current?.show({ severity: 'error', summary: 'Load Error', detail: err.message, life: 5000 });
+            console.error('[ProductTrends] fetch error');
+            setError(true);
+            setRaw(null);
+            toastRef.current?.show({ severity: 'error', summary: 'Error', detail: 'Unable to load analytics data.', life: 5000 });
         } finally {
             setLoading(false);
         }
@@ -337,16 +349,48 @@ export default function ProductTrends() {
 
     if (error) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <p className="text-red-500">Failed to load analytics: {error}</p>
+            <div className="p-6 min-h-[calc(100vh-120px)]">
+                <Toast ref={toastRef} />
+                <DateFilterBar
+                    quickFilter={quickFilter}
+                    dateRange={dateRange}
+                    isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
+                    onReset={resetFilters}
+                    dataMode={dataMode}
+                />
+                <div className="flex items-center justify-center min-h-[50vh]">
+                    <div className="text-center">
+                        <i className="pi pi-exclamation-circle text-5xl text-red-400 mb-3 block" />
+                        <p className="text-gray-700 font-medium text-lg">Something went wrong</p>
+                        <p className="text-gray-500 text-sm mt-1">Unable to load analytics data. Please try again later.</p>
+                    </div>
+                </div>
             </div>
         );
     }
 
     if (!hasData) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <p className="text-gray-500">No product trend data available yet. Run the analytics pipeline to populate this view.</p>
+            <div className="p-6 min-h-[calc(100vh-120px)]">
+                <Toast ref={toastRef} />
+                <DateFilterBar
+                    quickFilter={quickFilter}
+                    dateRange={dateRange}
+                    isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
+                    onReset={resetFilters}
+                    dataMode={dataMode}
+                />
+                <div className="flex items-center justify-center min-h-[50vh]">
+                    <p className="text-gray-500 text-lg">
+                        {isFiltered
+                            ? 'No data found for the selected date range.'
+                            : 'No data to display. Run the analytics pipeline first.'}
+                    </p>
+                </div>
             </div>
         );
     }
@@ -377,10 +421,13 @@ export default function ProductTrends() {
                     </p>
                 </div>
                 <DateFilterBar
+                    quickFilter={quickFilter}
                     dateRange={dateRange}
+                    isFiltered={isFiltered}
                     onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
                     onReset={resetFilters}
-                    toISODate={toISODate}
+                    dataMode={dataMode}
                 />
             </div>
 

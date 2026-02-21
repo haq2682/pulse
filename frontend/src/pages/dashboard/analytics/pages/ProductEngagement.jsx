@@ -124,6 +124,7 @@ const ProductEngagement = () => {
     const { pipelineStatus } = usePipelineProgress();
 
     const [loading, setLoading]   = useState(true);
+    const [fetchError, setFetchError] = useState(false);
     const [rawData, setRawData]   = useState(null);
     const [dataMode, setDataMode] = useState('unknown');
 
@@ -145,6 +146,7 @@ const ProductEngagement = () => {
     const fetchData = useCallback(async (from, to) => {
         if (!businessId) return;
         setLoading(true);
+            setFetchError(false);
         try {
             const res = await fetch(buildUrl(from, to));
             if (!res.ok) {
@@ -156,8 +158,9 @@ const ProductEngagement = () => {
             if (json.mode) setDataMode(json.mode);
             setRawData(json.categories?.product_analytics ?? null);
         } catch (err) {
-            console.error('[ProductEngagement] fetch error:', err);
-            toastRef.current?.show({ severity: 'error', summary: 'Error', detail: 'Failed to load engagement data', life: 5000 });
+            console.error('[fetch] Analytics load error');
+            setFetchError(true);
+            setRawData(null);
         } finally {
             setLoading(false);
         }
@@ -274,6 +277,21 @@ const ProductEngagement = () => {
     // -----------------------------------------------------------------------
     // Render
     // -----------------------------------------------------------------------
+
+    if (fetchError && !loading) {
+        return (
+            <div className="p-6 min-h-[calc(100vh-120px)]">
+                <Toast ref={toastRef} />
+                <div className="flex items-center justify-center min-h-[50vh]">
+                    <div className="text-center">
+                        <i className="pi pi-exclamation-circle text-5xl text-red-400 mb-3 block" />
+                        <p className="text-gray-700 font-medium text-lg">Something went wrong</p>
+                        <p className="text-gray-500 text-sm mt-1">Unable to load analytics data. Please try again later.</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (loading && pipelineStatus !== 'loading') {
         return (
