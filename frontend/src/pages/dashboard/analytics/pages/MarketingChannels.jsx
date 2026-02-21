@@ -1,0 +1,484 @@
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
+import { Card } from 'primereact/card';
+import { ProgressSpinner } from 'primereact/progressspinner';
+import { Toast } from 'primereact/toast';
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
+import {
+    Chart as ChartJS,
+    CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend,
+} from 'chart.js';
+import { Bar, Doughnut } from 'react-chartjs-2';
+import { useAnalyticsWebSocket } from '../../../../hooks/useAnalyticsWebSocket';
+import ChartWrapper from '../components/ChartWrapper';
+import { usePipelineProgress } from '@/context/PipelineProgressContext';
+import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
+import DateFilterBar from '../components/DateFilterBar';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const PALETTE = [
+    'rgba(59,130,246,0.82)', 'rgba(34,197,94,0.82)',  'rgba(249,115,22,0.82)',
+    'rgba(239,68,68,0.82)',  'rgba(139,92,246,0.82)', 'rgba(6,182,212,0.82)',
+    'rgba(234,179,8,0.82)',  'rgba(236,72,153,0.82)', 'rgba(20,184,166,0.82)',
+    'rgba(168,85,247,0.82)',
+];
+
+// ---------------------------------------------------------------------------
+// Formatters
+// ---------------------------------------------------------------------------
+
+const fmt = {
+    number:   (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
+    currency: (v) => `$${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v ?? 0)}`,
+    decimal:  (v, d = 2) => (+(v ?? 0)).toFixed(d),
+    pct:      (v) => `${(+(v ?? 0)).toFixed(1)}%`,
+    short:    (v) => {
+        const n = +(v ?? 0);
+        if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+        if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`;
+        return String(n);
+    },
+};
+
+// ---------------------------------------------------------------------------
+// Aggregation helper — group campaign_performance_summary by campaign_type
+// ---------------------------------------------------------------------------
+
+function aggregateByType(rows) {
+    const map = {};
+    rows.forEach((r) => {
+        const t = r.campaign_type ?? 'unknown';
+        if (!map[t]) {
+            map[t] = {
+                channel: t,
+                campaigns: 0,
+                totalImpressions: 0,
+                totalClicks: 0,
+                totalOrders: 0,
+                totalRevenue: 0,
+                totalSpend: 0,
+                totalBudget: 0,
+                roasSum: 0, roasCount: 0,
+                roiSum:  0, roiCount:  0,
+                cvrSum:  0, cvrCount:  0,
+                aovSum:  0, aovCount:  0,
+                effSum:  0, effCount:  0,
+            };
+        }
+        const e = map[t];
+        e.campaigns       += 1;
+        e.totalImpressions += +(r.impressions ?? 0);
+        e.totalClicks      += +(r.clicks ?? 0);
+        e.totalOrders      += +(r.orders_from_campaign ?? 0);
+        e.totalRevenue     += +(r.revenue_generated ?? 0);
+        e.totalSpend       += +(r.spent_amount ?? 0);
+        e.totalBudget      += +(r.budget ?? 0);
+        if (r.roas != null)                     { e.roasSum += +(r.roas); e.roasCount++; }
+        if (r.roi  != null)                     { e.roiSum  += +(r.roi);  e.roiCount++;  }
+        if (r.conversion_rate != null)          { e.cvrSum  += +(r.conversion_rate); e.cvrCount++; }
+        if (r.avg_order_value != null)          { e.aovSum  += +(r.avg_order_value); e.aovCount++; }
+        if (r.campaign_efficiency_score != null){ e.effSum  += +(r.campaign_efficiency_score); e.effCount++; }
+    });
+
+    return Object.values(map).map((e) => ({
+        channel: e.channel,
+        campaigns: e.campaigns,
+        total_impressions: e.totalImpressions,
+        total_clicks: e.totalClicks,
+        total_orders: e.totalOrders,
+        total_revenue: e.totalRevenue,
+        total_spend: e.totalSpend,
+        total_budget: e.totalBudget,
+        avg_roas: e.roasCount > 0 ? e.roasSum / e.roasCount : null,
+        avg_roi:  e.roiCount  > 0 ? e.roiSum  / e.roiCount  : null,
+        avg_cvr:  e.cvrCount  > 0 ? e.cvrSum  / e.cvrCount  : null,
+        avg_aov:  e.aovCount  > 0 ? e.aovSum  / e.aovCount  : null,
+        avg_eff:  e.effCount  > 0 ? e.effSum  / e.effCount  : null,
+        ctr: e.totalImpressions > 0 ? (e.totalClicks / e.totalImpressions) * 100 : 0,
+    })).sort((a, b) => b.total_revenue - a.total_revenue);
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+const KPICard = ({ icon, iconBg, iconColor, value, label }) => (
+    <Card className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-0 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300">
+        <div className="flex items-center gap-5 p-6">
+            <i className={`pi ${icon} text-4xl p-4 ${iconBg} ${iconColor} rounded-xl`} />
+            <div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">{value}</h3>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label}</p>
+            </div>
+        </div>
+    </Card>
+);
+
+const barOpts = (horizontal = false) => ({
+    indexAxis: horizontal ? 'y' : 'x',
+    responsive: true,
+    plugins: { legend: { display: false }, title: { display: false } },
+    scales: {
+        x: { grid: { color: 'rgba(0,0,0,0.05)' } },
+        y: { grid: { color: 'rgba(0,0,0,0.05)' } },
+    },
+});
+
+const groupedBarOpts = () => ({
+    responsive: true,
+    plugins: { legend: { position: 'top' }, title: { display: false } },
+    scales: {
+        x: { grid: { color: 'rgba(0,0,0,0.05)' } },
+        y: { grid: { color: 'rgba(0,0,0,0.05)' } },
+    },
+});
+
+const doughnutOpts = () => ({
+    responsive: true,
+    plugins: { legend: { position: 'right' }, title: { display: false } },
+});
+
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
+
+export default function MarketingChannels() {
+    const { businessId } = useParams();
+    const toastRef = useRef(null);
+    const { pipelineStatus } = usePipelineProgress();
+    const { dateRange, setDateRange, quickFilter, isFiltered, applyQuickFilter, resetFilters } = useAnalyticsDateFilter();
+    const { lastUpdate } = useAnalyticsWebSocket(businessId);
+
+    const [rawMarketing, setRawMarketing] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [fetchError, setFetchError] = useState(false);
+    const [dataMode, setDataMode] = useState('unknown');
+
+    // -------------------------------------------------------------------------
+    // Fetch
+    // -------------------------------------------------------------------------
+
+    const buildUrl = useCallback(() => {
+        const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const params = new URLSearchParams({ categories: 'marketing_analytics' });
+        return `${base}/analytics/data/${businessId}?${params.toString()}`;
+    }, [businessId]);
+
+    const fetchData = useCallback(async () => {
+        if (!businessId) return;
+        try {
+            setLoading(true);
+            setFetchError(false);
+            const res = await fetch(buildUrl());
+            if (!res.ok) {
+                toastRef.current?.show({
+                    severity: 'warn', summary: 'No Data',
+                    detail: 'Analytics data not available. Run the analytics pipeline first.',
+                    life: 5000,
+                });
+                setRawMarketing(null);
+                return;
+            }
+            const json = await res.json();
+            if (json.mode) setDataMode(json.mode);
+            setRawMarketing(json.categories?.marketing_analytics ?? null);
+        } catch {
+            console.error('[MarketingChannels] fetch error');
+            setFetchError(true);
+            setRawMarketing(null);
+            toastRef.current?.show({ severity: 'error', summary: 'Error', detail: 'Unable to load channel data.', life: 5000 });
+        } finally {
+            setLoading(false);
+        }
+    }, [buildUrl, businessId]);
+
+    useEffect(() => { fetchData(); }, [businessId]); // eslint-disable-line
+    useEffect(() => {
+        if (!lastUpdate) return;
+        fetchData();
+        toastRef.current?.show({ severity: 'info', summary: 'Data Updated', detail: 'Analytics pipeline completed — refreshing data.', life: 3000 });
+    }, [lastUpdate]); // eslint-disable-line
+
+    // -------------------------------------------------------------------------
+    // Derived data
+    // -------------------------------------------------------------------------
+
+    const derived = useMemo(() => {
+        if (!rawMarketing) return null;
+        const a = rawMarketing.analytics ?? {};
+
+        const summary = a.campaign_performance_summary?.data ?? [];
+        const perf    = a.campaign_performance?.data ?? [];
+
+        if (summary.length === 0 && perf.length === 0) return null;
+
+        // Aggregate by channel type using summary (richer base data)
+        const channels = aggregateByType(summary);
+
+        if (channels.length === 0) return null;
+
+        const labels = channels.map((c) => c.channel);
+
+        // ---- KPIs -----------------------------------------------------------
+        const totalChannels   = channels.length;
+        const totalImpressions = channels.reduce((s, c) => s + c.total_impressions, 0);
+        const totalClicks      = channels.reduce((s, c) => s + c.total_clicks, 0);
+        const bestROI          = channels.reduce(
+            (best, c) => (!best || (c.avg_roi ?? -Infinity) > (best.avg_roi ?? -Infinity)) ? c : best,
+            null,
+        );
+
+        // ---- Revenue by channel bar ----------------------------------------
+        const revenueBarData = {
+            labels,
+            datasets: [{ label: 'Total Revenue ($)', data: channels.map((c) => +c.total_revenue.toFixed(2)), backgroundColor: PALETTE }],
+        };
+
+        // ---- ROAS by channel ------------------------------------------------
+        const roasBarData = {
+            labels,
+            datasets: [{ label: 'Avg ROAS', data: channels.map((c) => +(c.avg_roas ?? 0).toFixed(2)), backgroundColor: 'rgba(34,197,94,0.82)' }],
+        };
+
+        // ---- ROI by channel -------------------------------------------------
+        const roiBarData = {
+            labels,
+            datasets: [{ label: 'Avg ROI %', data: channels.map((c) => +(c.avg_roi ?? 0).toFixed(2)), backgroundColor: 'rgba(59,130,246,0.82)' }],
+        };
+
+        // ---- CTR by channel -------------------------------------------------
+        const ctrBarData = {
+            labels,
+            datasets: [{ label: 'CTR %', data: channels.map((c) => +c.ctr.toFixed(2)), backgroundColor: 'rgba(249,115,22,0.82)' }],
+        };
+
+        // ---- Conversion rate by channel -------------------------------------
+        const cvrBarData = {
+            labels,
+            datasets: [{ label: 'Avg Conv. Rate %', data: channels.map((c) => +(c.avg_cvr ?? 0).toFixed(2)), backgroundColor: 'rgba(139,92,246,0.82)' }],
+        };
+
+        // ---- Efficiency score by channel ------------------------------------
+        const effBarData = {
+            labels,
+            datasets: [{ label: 'Avg Efficiency Score', data: channels.map((c) => +(c.avg_eff ?? 0).toFixed(2)), backgroundColor: 'rgba(6,182,212,0.82)' }],
+        };
+
+        // ---- Budget vs Spend grouped bar ------------------------------------
+        const budgetVsSpendData = {
+            labels,
+            datasets: [
+                { label: 'Total Budget ($)',  data: channels.map((c) => +c.total_budget.toFixed(2)),  backgroundColor: 'rgba(59,130,246,0.7)' },
+                { label: 'Total Spend ($)',   data: channels.map((c) => +c.total_spend.toFixed(2)),   backgroundColor: 'rgba(249,115,22,0.7)' },
+            ],
+        };
+
+        // ---- Impressions vs Clicks grouped bar --------------------------------
+        const impVsClicksData = {
+            labels,
+            datasets: [
+                { label: 'Impressions', data: channels.map((c) => c.total_impressions), backgroundColor: 'rgba(59,130,246,0.7)' },
+                { label: 'Clicks',      data: channels.map((c) => c.total_clicks),      backgroundColor: 'rgba(34,197,94,0.7)' },
+            ],
+        };
+
+        // ---- Revenue doughnut by channel ------------------------------------
+        const revDoughnutData = {
+            labels,
+            datasets: [{ data: channels.map((c) => +c.total_revenue.toFixed(2)), backgroundColor: PALETTE }],
+        };
+
+        // ---- Orders doughnut by channel -------------------------------------
+        const ordersDoughnutData = {
+            labels,
+            datasets: [{ data: channels.map((c) => c.total_orders), backgroundColor: PALETTE }],
+        };
+
+        return {
+            kpis: { totalChannels, totalImpressions, totalClicks, bestROIChannel: bestROI?.channel ?? '—', bestROI: bestROI?.avg_roi ?? 0 },
+            revenueBarData, roasBarData, roiBarData, ctrBarData, cvrBarData, effBarData,
+            budgetVsSpendData, impVsClicksData, revDoughnutData, ordersDoughnutData,
+            channelTable: channels,
+        };
+    }, [rawMarketing]);
+
+    // -------------------------------------------------------------------------
+    // Render
+    // -------------------------------------------------------------------------
+
+    const hasData = derived !== null;
+
+    if (loading && pipelineStatus !== 'running') {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <ProgressSpinner style={{ width: '48px', height: '48px' }} />
+            </div>
+        );
+    }
+
+    if (fetchError) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="text-center max-w-md">
+                    <i className="pi pi-exclamation-triangle text-5xl text-red-400 mb-4" />
+                    <p className="text-gray-600 text-lg font-medium">Something went wrong</p>
+                    <p className="text-gray-400 text-sm mt-2">Please try refreshing the page.</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!hasData) {
+        return (
+            <div className="p-6 space-y-4">
+                <Toast ref={toastRef} />
+                <DateFilterBar
+                    quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
+                    dataMode={dataMode}
+                />
+                <div className="flex items-center justify-center min-h-[50vh]">
+                    <div className="text-center max-w-md">
+                        <i className="pi pi-chart-bar text-5xl text-gray-300 mb-4" />
+                        <p className="text-gray-500 text-lg font-medium">No data to display</p>
+                        <p className="text-gray-400 text-sm mt-2">Run the analytics pipeline first.</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    const { kpis, revenueBarData, roasBarData, roiBarData, ctrBarData, cvrBarData, effBarData,
+            budgetVsSpendData, impVsClicksData, revDoughnutData, ordersDoughnutData, channelTable } = derived;
+
+    return (
+        <div className="p-6 space-y-8">
+            <Toast ref={toastRef} />
+
+            {/* Date Filter */}
+            <DateFilterBar
+                quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
+                onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
+                dataMode={dataMode}
+            />
+
+            {/* KPIs */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <KPICard icon="pi-sitemap"    iconBg="bg-blue-50"   iconColor="text-blue-600"   value={fmt.number(kpis.totalChannels)}    label="Channel Types" />
+                <KPICard icon="pi-eye"        iconBg="bg-green-50"  iconColor="text-green-600"  value={fmt.short(kpis.totalImpressions)}  label="Total Impressions" />
+                <KPICard icon="pi-link"       iconBg="bg-orange-50" iconColor="text-orange-600" value={fmt.short(kpis.totalClicks)}       label="Total Clicks" />
+                <KPICard icon="pi-trophy"     iconBg="bg-purple-50" iconColor="text-purple-600" value={kpis.bestROIChannel}               label="Best ROI Channel" />
+            </div>
+
+            {/* Revenue + ROAS */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {revenueBarData.labels.length > 0 && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Total Revenue by Channel</h3>
+                        <ChartWrapper><Bar data={revenueBarData} options={barOpts()} /></ChartWrapper>
+                    </Card>
+                )}
+                {roasBarData.labels.length > 0 && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg ROAS by Channel</h3>
+                        <ChartWrapper><Bar data={roasBarData} options={barOpts()} /></ChartWrapper>
+                    </Card>
+                )}
+            </div>
+
+            {/* ROI + CTR */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {roiBarData.labels.length > 0 && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg ROI % by Channel</h3>
+                        <ChartWrapper><Bar data={roiBarData} options={barOpts()} /></ChartWrapper>
+                    </Card>
+                )}
+                {ctrBarData.labels.length > 0 && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Click-Through Rate % by Channel</h3>
+                        <ChartWrapper><Bar data={ctrBarData} options={barOpts()} /></ChartWrapper>
+                    </Card>
+                )}
+            </div>
+
+            {/* Conversion + Efficiency */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {cvrBarData.labels.length > 0 && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg Conversion Rate % by Channel</h3>
+                        <ChartWrapper><Bar data={cvrBarData} options={barOpts()} /></ChartWrapper>
+                    </Card>
+                )}
+                {effBarData.labels.length > 0 && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg Efficiency Score by Channel</h3>
+                        <ChartWrapper><Bar data={effBarData} options={barOpts()} /></ChartWrapper>
+                    </Card>
+                )}
+            </div>
+
+            {/* Budget vs Spend + Impressions vs Clicks */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {budgetVsSpendData.labels.length > 0 && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Budget vs Total Spend by Channel</h3>
+                        <ChartWrapper><Bar data={budgetVsSpendData} options={groupedBarOpts()} /></ChartWrapper>
+                    </Card>
+                )}
+                {impVsClicksData.labels.length > 0 && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Impressions vs Clicks by Channel</h3>
+                        <ChartWrapper><Bar data={impVsClicksData} options={groupedBarOpts()} /></ChartWrapper>
+                    </Card>
+                )}
+            </div>
+
+            {/* Doughnuts */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {revDoughnutData.labels.length > 0 && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Revenue Share by Channel</h3>
+                        <ChartWrapper><Doughnut data={revDoughnutData} options={doughnutOpts()} /></ChartWrapper>
+                    </Card>
+                )}
+                {ordersDoughnutData.labels.length > 0 && (
+                    <Card className="rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Orders Share by Channel</h3>
+                        <ChartWrapper><Doughnut data={ordersDoughnutData} options={doughnutOpts()} /></ChartWrapper>
+                    </Card>
+                )}
+            </div>
+
+            {/* Channel Summary Table */}
+            {channelTable.length > 0 && (
+                <Card className="rounded-xl shadow-sm border border-gray-200">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Channel Performance Summary</h3>
+                    <DataTable value={channelTable} scrollable stripedRows
+                        emptyMessage="No channel data" className="text-sm">
+                        <Column field="channel"           header="Channel Type"   sortable />
+                        <Column field="campaigns"         header="Campaigns"      sortable body={(r) => fmt.number(r.campaigns)} />
+                        <Column field="total_impressions" header="Impressions"    sortable body={(r) => fmt.short(r.total_impressions)} />
+                        <Column field="total_clicks"      header="Clicks"         sortable body={(r) => fmt.short(r.total_clicks)} />
+                        <Column field="ctr"               header="CTR %"          sortable body={(r) => fmt.pct(r.ctr)} />
+                        <Column field="total_orders"      header="Orders"         sortable body={(r) => fmt.number(r.total_orders)} />
+                        <Column field="avg_cvr"           header="Conv. Rate %"   sortable body={(r) => r.avg_cvr != null ? fmt.pct(r.avg_cvr) : '—'} />
+                        <Column field="total_revenue"     header="Revenue"        sortable body={(r) => fmt.currency(r.total_revenue)} />
+                        <Column field="total_spend"       header="Spend"          sortable body={(r) => fmt.currency(r.total_spend)} />
+                        <Column field="total_budget"      header="Budget"         sortable body={(r) => fmt.currency(r.total_budget)} />
+                        <Column field="avg_roas"          header="Avg ROAS"       sortable body={(r) => r.avg_roas != null ? fmt.decimal(r.avg_roas) : '—'} />
+                        <Column field="avg_roi"           header="Avg ROI %"      sortable body={(r) => r.avg_roi  != null ? fmt.pct(r.avg_roi)  : '—'} />
+                        <Column field="avg_aov"           header="Avg AOV"        sortable body={(r) => r.avg_aov  != null ? fmt.currency(r.avg_aov) : '—'} />
+                        <Column field="avg_eff"           header="Avg Eff. Score" sortable body={(r) => r.avg_eff  != null ? fmt.decimal(r.avg_eff)  : '—'} />
+                    </DataTable>
+                </Card>
+            )}
+        </div>
+    );
+}

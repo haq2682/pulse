@@ -30,6 +30,9 @@ import InventorySupplier from './analytics/pages/InventorySupplier';
 import SupplierPerformance from './analytics/pages/SupplierPerformance';
 import SupplierOperations from './analytics/pages/SupplierOperations';
 import SupplierEconomics from './analytics/pages/SupplierEconomics';
+import MarketingCampaigns from './analytics/pages/MarketingCampaigns';
+import MarketingAttribution from './analytics/pages/MarketingAttribution';
+import MarketingChannels from './analytics/pages/MarketingChannels';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
@@ -413,6 +416,19 @@ const Dashboard = () => {
 
         if (pathname.includes('/suppliers/economics')) {
             return <SupplierEconomics />;
+        }
+
+        // Marketing routes
+        if (pathname.includes('/marketing/campaigns')) {
+            return <MarketingCampaigns />;
+        }
+
+        if (pathname.includes('/marketing/attribution')) {
+            return <MarketingAttribution />;
+        }
+
+        if (pathname.includes('/marketing/channels')) {
+            return <MarketingChannels />;
         }
 
         // Default fallback for unrecognized routes
