@@ -27,6 +27,9 @@ import InventoryHealth from './analytics/pages/InventoryHealth';
 import InventoryReorderManagement from './analytics/pages/InventoryReorderManagement';
 import InventoryEfficiency from './analytics/pages/InventoryEfficiency';
 import InventorySupplier from './analytics/pages/InventorySupplier';
+import SupplierPerformance from './analytics/pages/SupplierPerformance';
+import SupplierOperations from './analytics/pages/SupplierOperations';
+import SupplierEconomics from './analytics/pages/SupplierEconomics';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
@@ -397,6 +400,19 @@ const Dashboard = () => {
 
         if (pathname.includes('/inventory/supplier')) {
             return <InventorySupplier />;
+        }
+
+        // Supplier routes
+        if (pathname.includes('/suppliers/performance')) {
+            return <SupplierPerformance />;
+        }
+
+        if (pathname.includes('/suppliers/operations')) {
+            return <SupplierOperations />;
+        }
+
+        if (pathname.includes('/suppliers/economics')) {
+            return <SupplierEconomics />;
         }
 
         // Default fallback for unrecognized routes
