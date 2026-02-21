@@ -108,3 +108,39 @@ def to_json(message: Dict[str, Any]) -> str:
 def from_json(json_str: str) -> Dict[str, Any]:
     """Parse JSON string to message."""
     return json.loads(json_str)
+
+
+def from_debezium(debezium_payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert Debezium CDC payload to canonical format.
+
+    Args:
+        debezium_payload: Debezium message payload
+
+    Returns:
+        Canonical message dictionary
+    """
+    op_map = {"c": "c", "u": "u", "d": "d", "r": "r"}
+
+    op = debezium_payload.get("op")
+    source = debezium_payload.get("source", {})
+    table = source.get("table")
+    data = debezium_payload.get("after") or debezium_payload.get("before")
+
+    if not all([op, table, data]):
+        raise ValueError("Invalid Debezium message: missing required fields")
+
+    return create_message(
+        table=table,
+        payload=data,
+        source_type="db",
+        vendor="debezium",
+        operation=op_map.get(op, "c"),
+    )
+
+
+def is_debezium_format(message: Dict[str, Any]) -> bool:
+    """Check if message is in Debezium format."""
+    if not isinstance(message, dict):
+        return False
+    return "op" in message and "source" in message

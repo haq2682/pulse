@@ -17,12 +17,6 @@ from pyspark.ml.evaluation import ClusteringEvaluator
 from datetime import datetime
 import json
 
-# Environment configuration
-BUCKET = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
-LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
-
 # Feature columns (using log-transformed versions)
 NUMERIC_FEATURES = [
     "log_sell_price",
@@ -70,7 +64,7 @@ def create_spark_session():
     )
 
 
-def load_and_validate_data(spark):
+def load_and_validate_data(spark, INPUT_PATH):
     """Load product and affinity data"""
     try:
         products_path = f"{INPUT_PATH}agg_products.parquet"
@@ -337,7 +331,7 @@ def train_bisecting_kmeans(df, features_col, k_values):
 
 def save_models(
     kmeans_models, kmeans_metrics, gmm_models, gmm_metrics, bkm_models, bkm_metrics,
-    all_metrics, scaler_model, pca_model, category_indexer_model, spark
+    all_metrics, scaler_model, pca_model, category_indexer_model, spark, MODEL_OUTPUT_PATH, LOCAL_METRICS_PATH
 ):
     """Save models to MinIO"""
     print(f"\nSaving models to MinIO: {MODEL_OUTPUT_PATH}")
@@ -391,7 +385,10 @@ def save_models(
     print("Saved metrics")
 
 
-def main():
+def main(BUCKET):
+    INPUT_PATH = f"s3a://{BUCKET}/transformed/"
+    MODEL_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
+    LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
     print("=" * 80)
     print("Product Affinity Clustering - Training (IMPROVED)")
     print("=" * 80)
@@ -399,7 +396,7 @@ def main():
     spark = create_spark_session()
 
     # Load data
-    df = load_and_validate_data(spark)
+    df = load_and_validate_data(spark, INPUT_PATH)
     if df is None:
         print("Training aborted")
         spark.stop()
@@ -459,7 +456,7 @@ def main():
     save_models(
         kmeans_models, kmeans_metrics, gmm_models, gmm_metrics,
         bkm_models, bkm_metrics, all_metrics, scaler_model, pca_model,
-        category_indexer_model, spark
+        category_indexer_model, spark, MODEL_OUTPUT_PATH, LOCAL_METRICS_PATH
     )
 
     print("\nTraining completed successfully!")
@@ -467,4 +464,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET = "pulse-bucket-1"
+    main(BUCKET)

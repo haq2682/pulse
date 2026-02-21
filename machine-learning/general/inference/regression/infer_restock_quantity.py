@@ -22,24 +22,6 @@ import json
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-INPUT_INVENTORY_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
-INPUT_SUPPLIERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_suppliers.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/restock_quantity/"
-MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/restock_quantity/"
-
-# ⚠️ MANUAL CONFIGURATION REQUIRED:
-MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
-
-# Configuration
-Z_SCORE_SAFETY_STOCK = 1.65  # 95% service level
-ORDERING_COST = 50
-MIN_DEMAND_DAYS = 30
-
 # Feature set (must match training)
 NUMERIC_FEATURES = [
     "current_stock", "minimum_stock_level", "available_stock", "stock_coverage_days",
@@ -85,7 +67,7 @@ def create_spark_session():
     )
 
 
-def load_model(model_name):
+def load_model(model_name, MODEL_BASE_PATH):
     """Load trained model from MinIO"""
     model_path = f"{MODEL_BASE_PATH}{model_name}"
     
@@ -119,7 +101,7 @@ def validate_dataset(spark, path, name):
         return None, 0
 
 
-def calculate_demand_metrics(orders_df, order_items_df):
+def calculate_demand_metrics(orders_df, order_items_df, MIN_DEMAND_DAYS):
     """Calculate demand patterns from actual order history"""
     print("Calculating demand metrics...")
     
@@ -187,7 +169,7 @@ def calculate_demand_metrics(orders_df, order_items_df):
     return demand_stats
 
 
-def create_inference_features(products_df, inventory_df, suppliers_df, demand_stats_df):
+def create_inference_features(products_df, inventory_df, suppliers_df, demand_stats_df, Z_SCORE_SAFETY_STOCK):
     """Create same features as training"""
     print("Creating inference features...")
     
@@ -475,7 +457,23 @@ def display_summary_statistics(df):
     print("="*80)
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    INPUT_INVENTORY_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
+    INPUT_SUPPLIERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_suppliers.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/restock_quantity/"
+    MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/restock_quantity/"
+
+    # ⚠️ MANUAL CONFIGURATION REQUIRED:
+    MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
+
+    # Configuration
+    Z_SCORE_SAFETY_STOCK = 1.65  # 95% service level
+    ORDERING_COST = 50
+    MIN_DEMAND_DAYS = 30
     """Main inference pipeline"""
     print("\n" + "="*80)
     print("Inventory Restock Quantity Prediction - Inference")
@@ -489,7 +487,7 @@ def main():
     # Load model
     print("Step 1: Load Model")
     print("-" * 80)
-    model = load_model(MODEL_NAME)
+    model = load_model(MODEL_NAME, MODEL_BASE_PATH)
     
     if model is None:
         print("\n✗ Inference aborted: Model not found")
@@ -514,12 +512,12 @@ def main():
     # Calculate demand metrics
     print("\nStep 3: Calculate Demand Metrics")
     print("-" * 80)
-    demand_stats = calculate_demand_metrics(orders_df, order_items_df)
+    demand_stats = calculate_demand_metrics(orders_df, order_items_df, MIN_DEMAND_DAYS)
     
     # Create features
     print("\nStep 4: Feature Engineering")
     print("-" * 80)
-    df_features = create_inference_features(products_df, inventory_df, suppliers_df, demand_stats)
+    df_features = create_inference_features(products_df, inventory_df, suppliers_df, demand_stats, Z_SCORE_SAFETY_STOCK)
     
     # Prepare data
     print("\nStep 5: Data Preparation & Encoding")
@@ -553,4 +551,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

@@ -17,12 +17,6 @@ from pyspark.ml.feature import VectorAssembler, StandardScalerModel, PCAModel, S
 from pyspark.ml.clustering import KMeansModel
 from datetime import datetime
 
-# Environment configuration
-BUCKET = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
-OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
-
 # Feature columns (must match training)
 NUMERIC_FEATURES = [
     "session_duration_minutes",
@@ -64,7 +58,7 @@ def create_spark_session():
     )
 
 
-def load_data(spark):
+def load_data(spark, INPUT_PATH):
     """Load session data"""
     try:
         sessions_path = f"{INPUT_PATH}agg_customer_sessions.parquet"
@@ -121,7 +115,7 @@ def prepare_features(df):
     return df
 
 
-def load_models_and_profiles(spark):
+def load_models_and_profiles(spark, MODEL_PATH):
     """Load models and behavior profiles from training"""
     try:
         scaler = StandardScalerModel.load(f"{MODEL_PATH}session_behavior_scaler")
@@ -422,21 +416,25 @@ def save_predictions_with_summary(predictions, output_path):
     print(f"{'='*80}\n")
 
 
-def main():
+def main(BUCKET):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PATH = f"s3a://{BUCKET}/transformed/"
+    MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/"
+    OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
     print("="*80)
     print("ENHANCED Session Behavior Clustering - Inference")
     print("="*80)
 
     spark = create_spark_session()
 
-    df = load_data(spark)
+    df = load_data(spark, INPUT_PATH)
     if df is None:
         spark.stop()
         return
 
     df = prepare_features(df)
 
-    model, scaler, pca, cluster_profiles, readiness = load_models_and_profiles(spark)
+    model, scaler, pca, cluster_profiles, readiness = load_models_and_profiles(spark, MODEL_PATH)
     if model is None:
         spark.stop()
         return
@@ -450,4 +448,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET = "pulse-bucket-1"
+    main(BUCKET)

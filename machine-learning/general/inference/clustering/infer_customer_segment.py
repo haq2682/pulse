@@ -18,14 +18,6 @@ from datetime import datetime
 import json
 import numpy as np
 
-# Environment configuration
-BUCKET = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
-OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
-
-# MANUAL SELECTION: Choose which algorithm to use for inference
-SELECTED_MODEL_TYPE = "kmeans"  # Options: 'kmeans' or 'gmm'
 
 # Feature columns (must match training)
 FEATURE_COLS = [
@@ -67,7 +59,7 @@ def create_spark_session():
     )
 
 
-def load_data(spark):
+def load_data(spark, INPUT_PATH):
     """Load and join data from multiple tables"""
     try:
         # Load agg_customers
@@ -116,7 +108,7 @@ def prepare_features(df):
     return df
 
 
-def load_model_and_scaler(spark):
+def load_model_and_scaler(spark, MODEL_PATH, SELECTED_MODEL_TYPE):
     """Load selected model and scaler from MinIO"""
     try:
         # Load scaler
@@ -346,7 +338,14 @@ def save_predictions(predictions, output_path):
     print(f"Saved {record_count} predictions successfully")
 
 
-def main():
+def main(BUCKET):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PATH = f"s3a://{BUCKET}/transformed/"
+    MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/"
+    OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
+
+    # MANUAL SELECTION: Choose which algorithm to use for inference
+    SELECTED_MODEL_TYPE = "kmeans"  # Options: 'kmeans' or 'gmm'
     print("=" * 80)
     print("Customer Segmentation Clustering - Inference")
     print(f"Selected Model: {SELECTED_MODEL_TYPE.upper()}")
@@ -355,7 +354,7 @@ def main():
     spark = create_spark_session()
 
     # Load data
-    df = load_data(spark)
+    df = load_data(spark, INPUT_PATH)
     if df is None:
         print("Inference aborted due to data loading failure")
         spark.stop()
@@ -365,7 +364,7 @@ def main():
     df = prepare_features(df)
 
     # Load model, scaler, and model metadata
-    model, scaler, model_type, k = load_model_and_scaler(spark)
+    model, scaler, model_type, k = load_model_and_scaler(spark, MODEL_PATH, SELECTED_MODEL_TYPE)
     if model is None or scaler is None:
         print("Inference aborted due to model loading failure")
         spark.stop()
@@ -397,4 +396,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET = 'pulse-bucket-1'
+    main(BUCKET)

@@ -22,14 +22,6 @@ import json
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/price_optimization/"
-MODEL_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/price_optimization/random_forest"
-
 # Feature set (must match training)
 NUMERIC_FEATURES = [
     "current_price", "cost_price", "current_profit_margin", "price_to_cost_ratio",
@@ -44,9 +36,6 @@ NUMERIC_FEATURES = [
     "brand_avg_price", "brand_premium_factor",
     "category_idx", "brand_idx"
 ]
-
-MIN_PRICE_POINTS = 2
-
 
 def create_spark_session():
     """Initialize Spark session"""
@@ -78,7 +67,7 @@ def create_spark_session():
     )
 
 
-def load_model():
+def load_model(MODEL_PATH):
     """Load trained model"""
     try:
         model = RandomForestRegressionModel.load(MODEL_PATH)
@@ -101,7 +90,7 @@ def validate_dataset(spark, path, name):
         return None, 0
 
 
-def calculate_price_metrics(orders_df, order_items_df):
+def calculate_price_metrics(orders_df, order_items_df, MIN_PRICE_POINTS):
     """Calculate price metrics matching training"""
     print("Calculating price metrics...")
     
@@ -558,7 +547,13 @@ def display_summary_statistics(df):
     print("="*80)
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/price_optimization/"
+    MODEL_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/price_optimization/random_forest"
+    MIN_PRICE_POINTS = 2
     """Main inference pipeline"""
     print("\n" + "="*80)
     print("Product Price Optimization - Inference")
@@ -571,7 +566,7 @@ def main():
     # Load model
     print("Step 1: Load Model")
     print("-" * 80)
-    model = load_model()
+    model = load_model(MODEL_PATH)
     
     if model is None:
         print("\n✗ Inference aborted: Model not found")
@@ -594,7 +589,7 @@ def main():
     # Calculate price metrics
     print("\nStep 3: Calculate Price Metrics")
     print("-" * 80)
-    pricing_data = calculate_price_metrics(orders_df, order_items_df)
+    pricing_data = calculate_price_metrics(orders_df, order_items_df, MIN_PRICE_POINTS)
     
     # Calculate baselines
     print("\nStep 4: Calculate Baselines")
@@ -638,4 +633,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

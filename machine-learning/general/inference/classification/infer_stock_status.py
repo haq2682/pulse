@@ -12,18 +12,6 @@ import findspark
 
 findspark.init()
 
-# Configuration
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH_INVENTORY_HEALTH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
-INPUT_PATH_INVENTORY = f"s3a://{BUCKET_NAME}/transformed/agg_inventory.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/stock_status_predictions"
-MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/stock_status"
-
-# ⚠️ MANUAL INTERVENTION: Select model
-SELECTED_MODEL = "RandomForest"  # <-- CHANGE BASED ON TRAINING RESULTS
-
-MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
-
 # Feature columns (must match training)
 NUMERICAL_FEATURES = [
     "current_stock",
@@ -198,7 +186,7 @@ def prepare_features(df, numerical_features, categorical_features, preprocessors
     return df_vector
 
 
-def generate_predictions(spark, df, model, preprocessors, model_name):
+def generate_predictions(spark, df, model, preprocessors, model_name, MODEL_VERSION):
     """Generate predictions"""
     predictions = model.transform(df)
     
@@ -259,7 +247,17 @@ def save_predictions(df, output_path):
         return False
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PATH_INVENTORY_HEALTH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
+    INPUT_PATH_INVENTORY = f"s3a://{BUCKET_NAME}/transformed/agg_inventory.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/stock_status_predictions"
+    MODEL_INPUT_DIR = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/classification/models/stock_status"
+
+    # ⚠️ MANUAL INTERVENTION: Select model
+    SELECTED_MODEL = "RandomForest"  # <-- CHANGE BASED ON TRAINING RESULTS
+
+    MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
     print("=" * 60)
     print("Stock Status Classification - Inference Pipeline")
     print("=" * 60)
@@ -299,7 +297,7 @@ def main():
     df_prepared = prepare_features(df, NUMERICAL_FEATURES, CATEGORICAL_FEATURES, preprocessors)
     
     # Generate predictions
-    predictions_df = generate_predictions(spark, df_prepared, model, preprocessors, SELECTED_MODEL)
+    predictions_df = generate_predictions(spark, df_prepared, model, preprocessors, SELECTED_MODEL, MODEL_VERSION)
     
     # Show sample
     print("\nSample predictions:")
@@ -320,4 +318,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME='pulse-bucket-1'
+    main(BUCKET_NAME)

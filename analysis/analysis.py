@@ -1,6 +1,5 @@
-"""
-Main execution script for E-commerce Data Analysis.
-"""
+import argparse
+import json
 import pyspark.sql.functions as F
 from pyspark.sql import Window
 from analysis_config import create_spark_session
@@ -10,7 +9,6 @@ from analysis_utils import (
     check_null_dataframes
 )
 from analysis_export_utils import export_analytics_to_minio
-
 def is_column_all_null_or_zero(df, col_name):
     if df is None:
         return True                    
@@ -44,26 +42,32 @@ analysis = {}
 product_analysis = {}
 supplier_analysis = {}
 dataframes = {}
+
+
+def main(bucket_name=None):
+    """
+    Main analysis pipeline function.
     
-def main():
-    # ---------------------------------------------------------
-    # 1. Initialization
-    # ---------------------------------------------------------
+    Args:
+        bucket_name: MinIO bucket name (business_id). If None, uses default from env.
+    """
     print("🚀 Starting Analysis Pipeline...")
+    if bucket_name:
+        print(f"   Using bucket: {bucket_name}")
+        
     spark = create_spark_session("Ecommerce_Analysis_Main")
 
-    # ---------------------------------------------------------
-    # 2. Load Data (from MinIO transformed/ directory)
-    # ---------------------------------------------------------
+
+
     print("\n📥 Loading Aggregated Tables from MinIO...")
-    # Load transformed data from MinIO bucket
-    dataframes = get_agg_tables(spark)
-    
+        # Load transformed data from MinIO bucket
+    dataframes = get_agg_tables(spark, bucket_name=bucket_name)
+        
     if not dataframes:
         print("❌ No tables loaded. Exiting.")
-        return
+        exit(1)
 
-    # ---------------------------------------------------------
+        # ---------------------------------------------------------
 
     if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at"):
         dataframes["agg_orders"] = dataframes["agg_orders"].withColumn(
@@ -77,14 +81,25 @@ def main():
         F.to_date("account_created_at")
         )
 
-    # ---------------------------------------------------------
-    # MAIN ANALYSIS BEGINS HERE 
+    if "agg_orders" in dataframes and "agg_order_items" in dataframes:
+        order_units = (
+            dataframes["agg_order_items"]
+            .groupBy("order_id")
+            .agg(F.sum("quantity").alias("units_sold"))
+        )
+
+        dataframes["agg_orders"] = (
+            dataframes["agg_orders"]
+            .join(order_units, on="order_id", how="left")
+            .fillna({"units_sold": 0})
+        )
+    else:
+        print("agg_orders or agg_order_items table is missing.")
 
 
-    # Core business KPIs over time
+
     def core_kpis_over_time(df,date_col, grain="day"):
-
-        df_g = add_time_grain(df, date_col, grain)
+        df_g = add_time_grain(df, date_col="order_placed_at", grain=grain)
 
         if grain == "day":
             group_cols = ["grain_date"]
@@ -126,16 +141,51 @@ def main():
         )
 
         return kpi
-    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "units_sold") and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit") and not is_column_all_null_or_zero(dataframes["agg_orders"], "net_profit"):
-        analysis["business_health_daily"]= core_kpis_over_time(dataframes["agg_orders"],"order_placed_at", grain="day")
-        analysis["business_health_weekly"] = core_kpis_over_time(dataframes["agg_orders"],"order_placed_at", grain="week")
-        analysis["business_health_monthly"] = core_kpis_over_time(dataframes["agg_orders"],"order_placed_at", grain="month")
-    else:
-        print("One or more required columns (order_placed_at, order_id, units_sold, total_amount, order_profit, net_profit) are all null or zero in agg_orders dataframe.")
+    # Layer 1: Table Existence
+    if "agg_orders" in dataframes:
         
-       
-    # Product category margin analysis
+        # Layer 2: Schema/Column Existence
+        # We check for all columns required by the .agg() and .withColumn() operations
+        required_columns = [
+            "order_id", 
+            "order_placed_at", 
+            "units_sold", 
+            "total_amount", 
+            "order_profit", 
+            "net_profit"
+        ]
+        
+        if all(col in dataframes["agg_orders"].columns for col in required_columns):
+            
+            # Layer 3: Null/Zero Data Quality Check
+            if (
+                not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and
+                not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and
+                not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount") and
+                not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit")
+            ):
+                # --- Analysis Logic Starts ---
+                analysis["business_health_daily"] = core_kpis_over_time(
+                    dataframes["agg_orders"], "order_placed_at", grain="day"
+                )
+                analysis["business_health_weekly"] = core_kpis_over_time(
+                    dataframes["agg_orders"], "order_placed_at", grain="week"
+                )
+                analysis["business_health_monthly"] = core_kpis_over_time(
+                    dataframes["agg_orders"], "order_placed_at", grain="month"
+                )
+                # --- Analysis Logic Ends ---
+            else:
+                print("Required metrics (dates, IDs, or amounts) are all NULL/zero; skipping business health analysis.")
+        else:
+            print("Missing required columns in agg_orders; skipping business health analysis.")
+    else:
+        print("missing agg_orders table; skipping business health analysis.")
+
+
+
     def analyze_category_margins(products_df):
+    
         category_df = (
             products_df.groupBy("category")
                 .agg(
@@ -154,16 +204,37 @@ def main():
         
         return category_df
 
-    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "category") and not is_column_all_null_or_zero(dataframes["agg_products"], "profit_margin") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_profit") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold"):
-        analysis["low_margin_categories"] = analyze_category_margins(dataframes["agg_products"])
-    else: 
-        print("Category column is all NULL or zero; skipping category margin analysis.")
 
-    # Customer account status distribution over time
+    # Layer 1: Table Existence
+    if "agg_products" in dataframes:
+        
+        # Layer 2: Schema/Column Existence
+        if "category" in dataframes["agg_products"].columns and \
+        "profit_margin" in dataframes["agg_products"].columns and \
+        "total_profit" in dataframes["agg_products"].columns and \
+        "total_revenue" in dataframes["agg_products"].columns and \
+        "total_units_sold" in dataframes["agg_products"].columns:
+            
+            # Layer 3: Null/Zero Data Quality Check
+            if (
+                not is_column_all_null_or_zero(dataframes["agg_products"], "category") and
+                not is_column_all_null_or_zero(dataframes["agg_products"], "profit_margin") and
+                not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
+            ):
+                analysis["low_margin_categories"] = analyze_category_margins(dataframes["agg_products"])
+            else:
+                print("category, profit_margin, or total_revenue are all NULL/zero; skipping category margin analysis.")
+        else:
+            print("missing required columns in agg_products; skipping category margin analysis.")
+    else:
+        print("missing agg_products table; skipping category margin analysis.")
+
+
+
     def status_distribution_over_time(df,date_col, grain="day"):
 
         # Apply shared time-grain helper
-        df_g = add_time_grain(df,  date_col, grain)
+        df_g = add_time_grain(df,  date_col="account_created_date", grain=grain)
 
         # Group/order columns based on grain
         if grain == "day":
@@ -184,15 +255,40 @@ def main():
                 .fillna({"customer_count": 0})
                 .orderBy(*order_cols, "account_status")
         )
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at") and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_status") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
-        analysis["customer_account_status_distribution_daily"]   = status_distribution_over_time(dataframes["agg_customers"],"account_created_at","day")
-        analysis["customer_account_status_distribution_weekly"]  = status_distribution_over_time(dataframes["agg_customers"], "account_created_at", "week")
-        analysis["customer_account_status_distribution_monthly"] = status_distribution_over_time(dataframes["agg_customers"], "account_created_at", "month")
+
+    # Layer 1: Table Existence
+    if "agg_customers" in dataframes:
+        
+        # Layer 2: Schema/Column Existence
+        if "customer_id" in dataframes["agg_customers"].columns and \
+        "account_status" in dataframes["agg_customers"].columns and \
+        "account_created_at" in dataframes["agg_customers"].columns:
+            
+            # Layer 3: Null/Zero Data Quality Check
+            if (
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "account_status") and
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at")
+            ):
+                analysis["customer_account_status_distribution_daily"] = status_distribution_over_time(
+                    dataframes["agg_customers"], "account_created_at", grain="day"
+                )
+                analysis["customer_account_status_distribution_weekly"] = status_distribution_over_time(
+                    dataframes["agg_customers"], "account_created_at", grain="week"
+                )
+                analysis["customer_account_status_distribution_monthly"] = status_distribution_over_time(
+                    dataframes["agg_customers"], "account_created_at", grain="month"
+                )
+            else:
+                print("customer_id, account_status, or account_created_at are all NULL/zero; skipping status distribution analysis.")
+        else:
+            print("missing required columns in agg_customers; skipping status distribution analysis.")
     else:
-        print("One of the required columns (account_created_at, account_status, customer_id) is all NULL or zero; skipping status distribution over time analysis.")
-    
-    
-    # New customers per day/week/month
+        print("missing agg_customers table; skipping status distribution analysis.")
+
+
+
+
     def new_customers(df, date_col="account_created_date", grain="day"):
         df_g = add_time_grain(df, date_col=date_col, grain=grain)
 
@@ -213,14 +309,26 @@ def main():
                 .orderBy(*order_cols)
         )
         return new_df
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
-        analysis["new_customers_daily"] = new_customers(dataframes["agg_customers"],"account_created_date", "day")
-        analysis["new_customers_weekly"]  = new_customers(dataframes["agg_customers"], "account_created_date", "week")
-        analysis["new_customers_monthly"]= new_customers(dataframes["agg_customers"], "account_created_date", "month")
+    # Layer 1: Table Existence
+    if "agg_customers" in dataframes:
+        
+        # Layer 2: Schema/Column Existence
+        if "customer_id" in dataframes["agg_customers"].columns and \
+        "account_created_date" in dataframes["agg_customers"].columns:
+            if not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date"):
+                analysis["new_customers_daily"] = new_customers(dataframes["agg_customers"],"account_created_date", "day")
+                analysis["new_customers_weekly"]  = new_customers(dataframes["agg_customers"], "account_created_date", "week")
+                analysis["new_customers_monthly"]= new_customers(dataframes["agg_customers"], "account_created_date", "month")
+            else:
+                print("Account created at column is all NULL or zero; skipping new customers analysis.")
+        else:
+            print("missing required columns in agg_customers; skipping new customers analysis.")
     else:
-        print("One of the required columns (account_created_date, customer_id) is all NULL or zero; skipping new customers analysis.")
+        print("missing agg_customers table; skipping new customers analysis.")
 
-    # Cumulative customer growth curve
+
+
+
     def cumulative_customers(df, date_col="account_created_at", grain="day"):
         new_df = new_customers(df, date_col, grain)
 
@@ -241,23 +349,28 @@ def main():
         ).fillna({"cumulative_customers": 0})   
         
         return cum_df
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
-        analysis["cumulative_customers_daily"]   = cumulative_customers(dataframes["agg_customers"],"account_created_date", "day")
-        analysis["cumulative_customers_weekly"]  = cumulative_customers(dataframes["agg_customers"], "account_created_date", "week")
-        analysis["cumulative_customers_monthly"] = cumulative_customers(dataframes["agg_customers"], "account_created_date", "month")
+
+    # Layer 1: Table Existence
+    if "agg_customers" in dataframes:
+        
+        # Layer 2: Schema/Column Existence
+        if "customer_id" in dataframes["agg_customers"].columns and \
+        "account_created_date" in dataframes["agg_customers"].columns:
+                    # Layer 3: Null/Zero Data Quality Check
+            if not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date"):
+                analysis["cumulative_customers_daily"]   = cumulative_customers(dataframes["agg_customers"],"account_created_date", "day")
+                analysis["cumulative_customers_weekly"]  = cumulative_customers(dataframes["agg_customers"], "account_created_date", "week")
+                analysis["cumulative_customers_monthly"] = cumulative_customers(dataframes["agg_customers"], "account_created_date", "month")
+            else:
+                print("Account created at column is all NULL or zero; skipping cumulative customers analysis.")
+        else:
+            print("missing required columns in agg_customers; skipping cumulative customers analysis.")
     else:
-        print("One of the required columns (account_created_date, customer_id) is all NULL or zero; skipping cumulative customers analysis.")
+        print("missing agg_customers table; skipping cumulative customers analysis.")
 
 
-    # Total new customers by geography + time
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province") and not is_column_all_null_or_zero(dataframes["agg_customers"], "city") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
-        geo_acquisition = (
-            dataframes["agg_customers"]
-            .groupBy("country", "state_province", "city")
-            .agg(F.countDistinct("customer_id").alias("new_customers"))
-        )
-    else:
-        print("One of the required columns (account_created_at, country, state_province, city, customer_id) is all NULL or zero; skipping geo acquisition analysis.")
+
+
 
     def geo_acquisition_over_time(df, date_col="account_created_at", grain="day"):
         df_g = add_time_grain(df, date_col=date_col, grain=grain)
@@ -278,301 +391,555 @@ def main():
                 .fillna({"new_customers": 0})
                 .orderBy(*order_cols)
         )
-
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_date") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province") and not is_column_all_null_or_zero(dataframes["agg_customers"], "city") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
-        analysis["new_customers_geo_acquisition_daily"]   = geo_acquisition_over_time(dataframes["agg_customers"], "account_created_date", "day")
-        analysis["new_customers_geo_acquisition_monthly"] = geo_acquisition_over_time(dataframes["agg_customers"], "account_created_date", "month")
-    else:
-        print("One of the required columns (account_created_date, country, state_province, city, customer_id) is all NULL or zero; skipping geo acquisition over time analysis.")
-
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_age_group") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
-        analysis["customer_age_group_distribution"] = (
-            dataframes["agg_customers"]
-            .groupBy("customer_age_group")
-            .agg(F.countDistinct("customer_id").alias("customer_count"))
-            .fillna({"customer_count": 0})
-            .orderBy("customer_age_group")
-        )
-    else: 
-        print("Customer age group column is all NULL or zero; skipping age group distribution analysis.")
+    # Layer 1: Table Existence
+    if "agg_customers" in dataframes:
         
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province") and not is_column_all_null_or_zero(dataframes["agg_customers"], "city"):
-        analysis["customer_city_distribution"] = (
-            dataframes["agg_customers"]
-            .groupBy("country", "state_province", "city")
-            .agg(F.countDistinct("customer_id").alias("customer_count"))
-            .fillna({"customer_count": 0})
-            .orderBy("country", "state_province", "city")
-    )
+        # Layer 2: Schema/Column Existence
+        if "customer_id" in dataframes["agg_customers"].columns and \
+        "country" in dataframes["agg_customers"].columns and \
+        "state_province" in dataframes["agg_customers"].columns and \
+        "city" in dataframes["agg_customers"].columns and \
+        "account_created_at" in dataframes["agg_customers"].columns:
+            
+            # Layer 3: Null/Zero Data Quality Check
+            if (
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at")
+            ):
+                # Static Geographic Acquisition
+                analysis["geo_acquisition"] = (
+                    dataframes["agg_customers"]
+                    .groupBy("country", "state_province", "city")
+                    .agg(F.countDistinct("customer_id").alias("new_customers"))
+                )
+
+                # Geographic Acquisition Over Time
+                analysis["new_customers_geo_acquisition_daily"] = geo_acquisition_over_time(
+                    dataframes["agg_customers"], "account_created_at", "day"
+                )
+                analysis["new_customers_geo_acquisition_monthly"] = geo_acquisition_over_time(
+                    dataframes["agg_customers"], "account_created_at", "month"
+                )
+            else:
+                print("customer_id, country, or account_created_at are all NULL/zero; skipping geo acquisition analysis.")
+        else:
+            print("missing required columns in agg_customers; skipping geo acquisition analysis.")
     else:
-        print("Country column is all NULL or zero; skipping city distribution analysis.")
+        print("missing agg_customers table; skipping geo acquisition analysis.")
 
-    # Customer distribution by age group, city, state, country
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province"):
-        analysis["customer_state_distribution"] = (
-            dataframes["agg_customers"]
-            .groupBy("country", "state_province")
-            .agg(F.countDistinct("customer_id").alias("customer_count"))
-            .fillna({"customer_count": 0})
-            .orderBy("country", "state_province")
-    )
-        
+
+
+    # Layer 1: Table Existence
+    if "agg_customers" in dataframes:
+
+        # --- Analysis 1: Age Group Distribution ---
+        # Layer 2: Schema/Column Existence
+        if "customer_id" in dataframes["agg_customers"].columns and \
+        "customer_age_group" in dataframes["agg_customers"].columns:
+            
+            # Layer 3: Null/Zero Data Quality Check
+            if (
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_age_group")
+            ):
+                analysis["customer_age_group_distribution"] = (
+                    dataframes["agg_customers"]
+                    .groupBy("customer_age_group")
+                    .agg(F.countDistinct("customer_id").alias("customer_count"))
+                    .fillna({"customer_count": 0})
+                    .orderBy("customer_age_group")
+                )
+            else:
+                print("customer_id or customer_age_group are all NULL/zero; skipping age group distribution analysis.")
+        else:
+            print("missing required columns in agg_customers; skipping age group distribution analysis.")
+
+
+        if "customer_id" in dataframes["agg_customers"].columns and \
+        "country" in dataframes["agg_customers"].columns and \
+        "state_province" in dataframes["agg_customers"].columns and \
+        "city" in dataframes["agg_customers"].columns:
+
+            # Layer 3: Null/Zero Data Quality Check
+            # City Level
+            if (
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province") and
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "city")
+            ):
+                analysis["customer_city_distribution"] = (
+                    dataframes["agg_customers"]
+                    .groupBy("country", "state_province", "city")
+                    .agg(F.countDistinct("customer_id").alias("customer_count"))
+                    .fillna({"customer_count": 0})
+                    .orderBy("country", "state_province", "city")
+                )
+            else:
+                print("Geographic metrics (city/state) are all NULL/zero; skipping city distribution analysis.")
+
+            # State Level
+            if (
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province")
+            ):
+                analysis["customer_state_distribution"] = (
+                    dataframes["agg_customers"]
+                    .groupBy("country", "state_province")
+                    .agg(F.countDistinct("customer_id").alias("customer_count"))
+                    .fillna({"customer_count": 0})
+                    .orderBy("country", "state_province")
+                )
+            else:
+                print("Country or state_province are all NULL/zero; skipping state distribution analysis.")
+
+            # Country Level
+            if (
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "country")
+            ):
+                analysis["customer_country_distribution"] = (
+                    dataframes["agg_customers"]
+                    .groupBy("country")
+                    .agg(F.countDistinct("customer_id").alias("customer_count"))
+                    .fillna({"customer_count": 0})
+                    .orderBy("country")
+                )
+            else:
+                print("Country column is all NULL/zero; skipping country distribution analysis.")
+
+        else:
+            print("missing geographic columns in agg_customers; skipping geographic distribution analysis.")
+
     else:
-        print("Country or state_province column is all NULL or zero; skipping state distribution analysis.")
+        print("missing agg_customers table; skipping demographic and geographic distribution analysis.")
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "country"):
-        analysis["customer_country_distribution"] = (
-            dataframes["agg_customers"]
-            .groupBy("country")
-            .agg(F.countDistinct("customer_id").alias("customer_count"))
-            .fillna({"customer_count": 0})
-        .orderBy("country")
-    )
+
+
+
+    if "agg_customers" in dataframes:
+
+        if "customer_id" in dataframes["agg_customers"].columns and \
+        "customer_age_group" in dataframes["agg_customers"].columns and \
+        "order_total_spent" in dataframes["agg_customers"].columns and \
+        "customer_lifetime_value" in dataframes["agg_customers"].columns and \
+        "total_revenue" in dataframes["agg_customers"].columns:
+
+            if (
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_age_group") and
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "order_total_spent") and
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and
+                not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue")
+                    ):
+                analysis["customer_age_group_spending"] = (
+                    dataframes["agg_customers"]
+                    .groupBy("customer_age_group")
+                    .agg(
+                        F.countDistinct("customer_id").alias("customer_count"),
+                        F.avg("order_total_spent").alias("avg_order_total_spent"),
+                        F.avg("customer_lifetime_value").alias("avg_clv"),
+                        F.sum("order_total_spent").alias("total_spent"),
+                        F.sum("total_revenue").alias("total_revenue_age_group")
+                    ).fillna({"avg_order_total_spent": 0,
+                            "avg_clv": 0,
+                            "total_spent": 0,
+                            "total_revenue_age_group": 0})
+                    .orderBy("customer_age_group")
+                )
+            else:
+                print("Required metrics (Age Group, Spent, CLV, or Revenue) are all NULL/zero; skipping age group spending analysis.")
+        else:
+            print("Missing required columns in agg_customers; skipping age group spending analysis.")
     else:
-        print("Country column is all NULL or zero; skipping country distribution analysis.")
+        print("missing agg_customers table; skipping age group spending analysis.")
 
 
-    # Customer age group spending analysis
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_age_group") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_total_spent") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue"):
-        analysis["customer_age_group_spending"] = (
-            dataframes["agg_customers"]
-            .groupBy("customer_age_group")
-            .agg(
-                F.countDistinct("customer_id").alias("customer_count"),
-                F.avg("order_total_spent").alias("avg_order_total_spent"),
-                F.avg("customer_lifetime_value").alias("avg_clv"),
-                F.sum("order_total_spent").alias("total_spent"),
-                F.sum("total_revenue").alias("total_revenue_age_group")
-            ).fillna({"avg_order_total_spent": 0,
-                    "avg_clv": 0,
-                    "total_spent": 0,
-                    "total_revenue_age_group": 0})
-            .orderBy("customer_age_group")
-        )
-    else: 
-        print("Customer age group column is all NULL or zero; skipping age group spending analysis.")
 
+    if "agg_orders" in dataframes and "agg_customers" in dataframes and "agg_order_items" in dataframes and "agg_products" in dataframes:
 
-    # Gender-based product preferences
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_age_group") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_total_spent") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue"):
-        analysis["customer_age_group_spending"] = (
-            dataframes["agg_customers"]
-            .groupBy("customer_age_group")
-            .agg(
-                F.countDistinct("customer_id").alias("customer_count"),
-                F.avg("order_total_spent").alias("avg_order_total_spent"),
-                F.avg("customer_lifetime_value").alias("avg_clv"),
-                F.sum("order_total_spent").alias("total_spent"),
-                F.sum("total_revenue").alias("total_revenue_age_group")
-            ).fillna({"avg_order_total_spent": 0,
-                    "avg_clv": 0,
-                    "total_spent": 0,
-                    "total_revenue_age_group": 0})
-            .orderBy("customer_age_group")
-        )
-    else: 
-        print("Customer age group column is all NULL or zero; skipping age group spending analysis.")
+        if "order_id" in dataframes["agg_orders"].columns and \
+        "customer_id" in dataframes["agg_orders"].columns and \
+        "customer_id" in dataframes["agg_customers"].columns and \
+        "gender" in dataframes["agg_customers"].columns:
 
-    # New vs returning customers
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "is_repeat_customer"):
-        dataframes["agg_customers"] = dataframes["agg_customers"].withColumn(
-            "customer_type",
-            F.when(F.col("is_repeat_customer") == 1, F.lit("returning"))
-            .otherwise(F.lit("new"))
-        )
+            if not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and \
+            not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id") and \
+            not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
+                
+                cust_orders = (
+                    dataframes["agg_orders"]
+                    .select("order_id", "customer_id")
+                    .join(
+                        dataframes["agg_customers"].select("customer_id", "gender"),
+                        on="customer_id",
+                        how="inner"
+                    )
+                )
+
+                if "order_id" in dataframes["agg_order_items"].columns and \
+                "product_id" in dataframes["agg_order_items"].columns and \
+                "quantity" in dataframes["agg_order_items"].columns and \
+                "product_id" in dataframes["agg_products"].columns and \
+                "product_name" in dataframes["agg_products"].columns and \
+                "category" in dataframes["agg_products"].columns:
+
+                    if not is_column_all_null_or_zero(dataframes["agg_order_items"], "order_id") and \
+                    not is_column_all_null_or_zero(dataframes["agg_order_items"], "product_id") and \
+                    not is_column_all_null_or_zero(dataframes["agg_products"], "product_id"):
+
+                        cust_order_items = (
+                            cust_orders
+                            .join(dataframes["agg_order_items"].select("order_id", "product_id", "quantity"), on="order_id", how="inner")
+                            .join(dataframes["agg_products"].select("product_id", "product_name", "category", "sub_category", "brand"),
+                                on="product_id",
+                                how="left")
+                        )
+
+                        if not is_column_all_null_or_zero(cust_order_items, "gender") and \
+                        not is_column_all_null_or_zero(cust_order_items, "category") and \
+                        not is_column_all_null_or_zero(cust_order_items, "quantity"):
+
+                            analysis["gender_category_preference"] = (
+                                cust_order_items
+                                .groupBy("gender", "category")
+                                .agg(
+                                    F.sum("quantity").alias("total_units"),
+                                    F.countDistinct("product_id").alias("distinct_products"),
+                                    F.countDistinct("order_id").alias("orders_count")
+                                )
+                                .fillna({"total_units": 0, "distinct_products": 0, "orders_count": 0, "gender": "Unknown"})
+                                .orderBy("gender", F.col("total_units").desc())
+                            )
+
+                            analysis["gender_product_preference"] = (
+                                cust_order_items
+                                .groupBy("gender", "product_id", "product_name", "category")
+                                .agg(
+                                    F.sum("quantity").alias("total_units"),
+                                    F.countDistinct("order_id").alias("orders_count")
+                                ).fillna({"total_units": 0, "orders_count": 0, "gender": "Unknown"})
+                                .orderBy("gender", F.col("total_units").desc())
+                            )
+                        else:
+                            print("Required columns in joined customer order items are NULL/zero; skipping preference analysis.")
+                    else:
+                        print("Order items or products data quality check failed; skipping customer order items join.")
+                else:
+                    print("Missing required columns in order_items or products; skipping customer order items join.")
+            else:
+                print("Order ID or Customer ID data quality check failed; skipping customer orders join.")
+        else:
+            print("Missing required columns in orders or customers; skipping customer orders join.")
     else:
-        print("is_repeat_customer column is all NULL or zero; skipping customer type classification.")
+        print("Missing one or more required tables; skipping gender preference analysis.")
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_type") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country"):
-        analysis["new_vs_returning_customer_country"] = (
-            dataframes["agg_customers"]
-            .groupBy("country", "customer_type")
-            .agg(F.countDistinct("customer_id").alias("customer_count"))
-            .fillna({"customer_count": 0})
-            .orderBy("country", "customer_type")
-        )
+
+
+    if "agg_customers" in dataframes:
+
+        if "is_repeat_customer" in dataframes["agg_customers"].columns:
+
+            if not is_column_all_null_or_zero(dataframes["agg_customers"], "is_repeat_customer"):
+                dataframes["agg_customers"] = dataframes["agg_customers"].withColumn(
+                    "customer_type",
+                    F.when(F.col("is_repeat_customer") == 1, F.lit("returning"))
+                    .otherwise(F.lit("new"))
+                )
+
+                if "customer_id" in dataframes["agg_customers"].columns and \
+                "customer_type" in dataframes["agg_customers"].columns and \
+                "country" in dataframes["agg_customers"].columns and \
+                "state_province" in dataframes["agg_customers"].columns and \
+                "city" in dataframes["agg_customers"].columns:
+
+                    if not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and \
+                    not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_type") and \
+                    not is_column_all_null_or_zero(dataframes["agg_customers"], "country"):
+
+                        analysis["new_vs_returning_customer_country"] = (
+                            dataframes["agg_customers"]
+                            .groupBy("country", "customer_type")
+                            .agg(F.countDistinct("customer_id").alias("customer_count"))
+                            .fillna({"customer_count": 0})
+                            .orderBy("country", "customer_type")
+                        )
+
+                        if not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province") and \
+                        not is_column_all_null_or_zero(dataframes["agg_customers"], "city"):
+                            
+                            analysis["new_vs_returning_customer_city"] = (
+                                dataframes["agg_customers"]
+                                .groupBy("country", "state_province", "city", "customer_type")
+                                .agg(F.countDistinct("customer_id").alias("customer_count"))
+                                .orderBy("country", "state_province", "city", "customer_type")
+                            )
+
+                        if not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province"):
+                            
+                            analysis["new_vs_returning_customer_state"] = (
+                                dataframes["agg_customers"]
+                                .groupBy("country", "state_province", "customer_type")
+                                .agg(F.countDistinct("customer_id").alias("customer_count"))
+                                .fillna({"customer_count": 0})
+                                .orderBy("country", "state_province", "customer_type")
+                            )
+                    else:
+                        print("customer_id, customer_type, or country are all NULL/zero; skipping geographic customer type analysis.")
+                else:
+                    print("Missing required columns in agg_customers; skipping geographic customer type analysis.")
+            else:
+                print("is_repeat_customer column is all NULL or zero; skipping customer type classification.")
+        else:
+            print("missing is_repeat_customer column in agg_customers; skipping customer type classification.")
     else:
-        print("Country or customer_type column is all NULL or zero; skipping new vs returning country analysis.")
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_type") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province") and not is_column_all_null_or_zero(dataframes["agg_customers"], "city"):
-        analysis["new_vs_returning_customer_city"] = (
-            dataframes["agg_customers"]
-            .groupBy("country", "state_province", "city", "customer_type")
-            .agg(F.countDistinct("customer_id").alias("customer_count"))
-            .orderBy("country", "state_province", "city", "customer_type")
-        )
-    else:
-        print("One of the required columns (customer_type, country, state_province, city) is all NULL or zero; skipping new vs returning city analysis.")
+        print("missing agg_customers table; skipping new vs returning customer analysis.")
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_type") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province"):
-        new_vs_returning_state = (
-            dataframes["agg_customers"]
-            .groupBy("country", "state_province", "customer_type")
-        .agg(F.countDistinct("customer_id").alias("customer_count"))
-        .fillna({"customer_count": 0})
-        .orderBy("country", "state_province", "customer_type")
-    )
-    else:
-        print("One of the required columns (customer_type, country, state_province) is all NULL or zero; skipping new vs returning state analysis.")
 
-    # Total & average engagement per customer
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_sessions") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_pages_viewed") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_products_viewed"):
-        analysis["customer_engagement"] = dataframes["agg_customers"].select(
-            "customer_id",
-            "total_sessions",
-            "total_pages_viewed",
-            "total_products_viewed"
-        )
 
-        analysis["customer_engagement_summary"] = dataframes["agg_customers"].agg(
-            F.sum("total_sessions").alias("total_sessions_all_customers"),
-            F.avg("total_sessions").alias("avg_sessions_per_customer"),
-            F.sum("total_pages_viewed").alias("total_pages_viewed_all_customers"),
-            F.avg("total_pages_viewed").alias("avg_pages_viewed_per_customer"),
-            F.sum("total_products_viewed").alias("total_products_viewed_all_customers"),
-            F.avg("total_products_viewed").alias("avg_products_viewed_per_customer")
-        ).fillna({"total_sessions_all_customers": 0,
-                "avg_sessions_per_customer": 0,
-                "total_pages_viewed_all_customers": 0,
-                "avg_pages_viewed_per_customer": 0,
-                "total_products_viewed_all_customers": 0,
-                "avg_products_viewed_per_customer": 0
+    if "agg_customers" in dataframes:
+
+        if "customer_id" in dataframes["agg_customers"].columns and \
+        "total_sessions" in dataframes["agg_customers"].columns and \
+        "total_pages_viewed" in dataframes["agg_customers"].columns and \
+        "total_products_viewed" in dataframes["agg_customers"].columns:
+
+            if not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and \
+            not is_column_all_null_or_zero(dataframes["agg_customers"], "total_sessions") and \
+            not is_column_all_null_or_zero(dataframes["agg_customers"], "total_pages_viewed") and \
+            not is_column_all_null_or_zero(dataframes["agg_customers"], "total_products_viewed"):
+
+                analysis["customer_engagement"] = dataframes["agg_customers"].select(
+                    "customer_id",
+                    "total_sessions",
+                    "total_pages_viewed",
+                    "total_products_viewed"
+                )
+
+                analysis["customer_engagement_summary"] = dataframes["agg_customers"].agg(
+                    F.sum("total_sessions").alias("total_sessions_all_customers"),
+                    F.avg("total_sessions").alias("avg_sessions_per_customer"),
+                    F.sum("total_pages_viewed").alias("total_pages_viewed_all_customers"),
+                    F.avg("total_pages_viewed").alias("avg_pages_viewed_per_customer"),
+                    F.sum("total_products_viewed").alias("total_products_viewed_all_customers"),
+                    F.avg("total_products_viewed").alias("avg_products_viewed_per_customer")
+                ).fillna({
+                    "total_sessions_all_customers": 0,
+                    "avg_sessions_per_customer": 0,
+                    "total_pages_viewed_all_customers": 0,
+                    "avg_pages_viewed_per_customer": 0,
+                    "total_products_viewed_all_customers": 0,
+                    "avg_products_viewed_per_customer": 0
                 })
+            else:
+                print("Required engagement columns are all NULL/zero; skipping engagement analysis.")
+        else:
+            print("Missing required columns in agg_customers; skipping engagement analysis.")
     else:
-        print("One of the required columns in agg_customers is all NULL or zero; skipping engagement analysis.")
+        print("missing agg_customers table; skipping engagement analysis.")
 
-    # session to order analysis
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "session_conversion_rate") and not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate"):
-        analysis["session_to_order_analysis"] = dataframes["agg_customers"].agg(
-            F.avg("session_conversion_rate").alias("avg_session_conversion_rate"),
-            F.avg("cart_abandonment_rate").alias("avg_cart_abandonment_rate")
-        ).fillna({
-            "avg_session_conversion_rate": 0,
-            "avg_cart_abandonment_rate": 0
-        })
+
+
+    if "agg_customers" in dataframes:
+
+        if "session_conversion_rate" in dataframes["agg_customers"].columns and \
+        "cart_abandonment_rate" in dataframes["agg_customers"].columns:
+
+            if not is_column_all_null_or_zero(dataframes["agg_customers"], "session_conversion_rate") and \
+            not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate"):
+
+                analysis["session_to_order_analysis"] = dataframes["agg_customers"].agg(
+                    F.avg("session_conversion_rate").alias("avg_session_conversion_rate"),
+                    F.avg("cart_abandonment_rate").alias("avg_cart_abandonment_rate")
+                ).fillna({
+                    "avg_session_conversion_rate": 0,
+                    "avg_cart_abandonment_rate": 0
+                })
+            else:
+                print("session_conversion_rate or cart_abandonment_rate are all NULL/zero; skipping session to order analysis.")
+        else:
+            print("Missing required columns in agg_customers; skipping session to order analysis.")
     else:
-        print("One of the required columns (session_conversion_rate, cart_abandonment_rate) is all NULL or zero; skipping session to order analysis.")
+        print("missing agg_customers table; skipping session to order analysis.")
 
-    # top customers based on Revenue
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment"):
-        analysis["top_customers_by_revenue"] = (
-            dataframes["agg_customers"]
-            .fillna({"total_revenue": 0.0})
-            .select("customer_id", "total_revenue", "customer_lifetime_value", "customer_segment", "rfm_segment")
-            .orderBy(F.col("total_revenue").desc())
-        )
+
+    if "agg_customers" in dataframes:
+
+        if "customer_id" in dataframes["agg_customers"].columns and \
+        "total_revenue" in dataframes["agg_customers"].columns and \
+        "customer_lifetime_value" in dataframes["agg_customers"].columns and \
+        "customer_segment" in dataframes["agg_customers"].columns and \
+        "rfm_segment" in dataframes["agg_customers"].columns:
+
+            if not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and \
+            not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and \
+            not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment") and \
+            not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment"):
+
+                analysis["top_customers_by_revenue"] = (
+                    dataframes["agg_customers"]
+                    .fillna({"total_revenue": 0.0})
+                    .select("customer_id", "total_revenue", "customer_lifetime_value", "customer_segment", "rfm_segment")
+                    .orderBy(F.col("total_revenue").desc())
+                )
+            else:
+                print("Required customer metrics (Revenue, CLV, or Segments) are all NULL/zero; skipping top customers analysis.")
+        else:
+            print("Missing required columns in agg_customers; skipping top customers analysis.")
     else:
-        print("One of the required columns in agg_customers is all NULL or zero; skipping top customers by revenue analysis.")
+        print("missing agg_customers table; skipping top customers analysis.")
 
-    # top customers based on Profit
-    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit") and not is_column_all_null_or_zero(dataframes["agg_orders"], "net_profit") and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value"):
-        customer_profit = (
-            dataframes["agg_orders"]
-            .groupBy("customer_id")
-            .agg(
-                F.sum("order_profit").alias("total_order_profit"),
-                F.sum("net_profit").alias("total_net_profit"),
-                F.countDistinct("order_id").alias("orders_count")
+
+    if "agg_orders" in dataframes and "agg_customers" in dataframes:
+
+        if "order_profit" in dataframes["agg_orders"].columns and \
+        "net_profit" in dataframes["agg_orders"].columns and \
+        "customer_id" in dataframes["agg_orders"].columns and \
+        "order_id" in dataframes["agg_orders"].columns and \
+        "customer_id" in dataframes["agg_customers"].columns and \
+        "customer_segment" in dataframes["agg_customers"].columns and \
+        "rfm_segment" in dataframes["agg_customers"].columns and \
+        "total_revenue" in dataframes["agg_customers"].columns and \
+        "customer_lifetime_value" in dataframes["agg_customers"].columns:
+
+            if not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit") and \
+            not is_column_all_null_or_zero(dataframes["agg_orders"], "net_profit") and \
+            not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id") and \
+            not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and \
+            not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue"):
+
+                customer_profit = (
+                    dataframes["agg_orders"]
+                    .groupBy("customer_id")
+                    .agg(
+                        F.sum("order_profit").alias("total_order_profit"),
+                        F.sum("net_profit").alias("total_net_profit"),
+                        F.countDistinct("order_id").alias("orders_count")
+                    )
+                )
+
+                customer_profit_enriched = (
+                    customer_profit.alias("p")
+                    .join(
+                        dataframes["agg_customers"].select(
+                            "customer_id", 
+                            "customer_segment", 
+                            "rfm_segment", 
+                            "total_revenue", 
+                            "customer_lifetime_value"
+                        ).alias("c"),
+                        on="customer_id",
+                        how="left"
+                    )
+                )
+
+                analysis["top_customers_by_profit"] = (
+                    customer_profit_enriched
+                    .orderBy(F.col("total_net_profit").desc_nulls_last())
+                )
+            else:
+                print("Required columns in agg_orders or agg_customers are all NULL or zero; skipping top customers by profit analysis.")
+        else:
+            print("Missing required columns in agg_orders or agg_customers; skipping top customers by profit analysis.")
+    else:
+        print("Missing agg_orders or agg_customers table; skipping top customers by profit analysis.")
+
+
+    if "agg_customers" in dataframes:
+
+        if "customer_id" in dataframes["agg_customers"].columns and \
+        "session_conversion_rate" in dataframes["agg_customers"].columns:
+
+            if not is_column_all_null_or_zero(dataframes["agg_customers"], "session_conversion_rate"):
+                conv_percentage = dataframes["agg_customers"].withColumn(
+                    "session_conversion_percentage",
+                    F.when(F.col("session_conversion_rate") < 0.1, "<10%")
+                    .when(F.col("session_conversion_rate") < 0.25, "10–25%")
+                    .when(F.col("session_conversion_rate") < 0.5, "25–50%")
+                    .when(F.col("session_conversion_rate") < 0.75, "50–75%")
+                    .otherwise("75%+")
+                )
+                analysis["session_conversion_distribution"] = (
+                    conv_percentage
+                    .groupBy("session_conversion_percentage")
+                    .agg(F.countDistinct("customer_id").alias("customer_count"))
+                    .fillna({"customer_count": 0})
+                    .orderBy("session_conversion_percentage")
+                )
+            else:
+                print("session_conversion_rate column is all NULL or zero; skipping session conversion percentage calculation.")
+        else:
+            print("Missing session_conversion_rate or customer_id in agg_customers; skipping conversion distribution.")
+
+        if "customer_id" in dataframes["agg_customers"].columns and \
+        "cart_abandonment_rate" in dataframes["agg_customers"].columns:
+
+            if not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate"):
+                abandon_percentage = dataframes["agg_customers"].withColumn(
+                    "cart_abandonment_percentage",
+                    F.when(F.col("cart_abandonment_rate") < 0.1, "<10%")
+                    .when(F.col("cart_abandonment_rate") < 0.25, "10–25%")
+                    .when(F.col("cart_abandonment_rate") < 0.5, "25–50%")
+                    .when(F.col("cart_abandonment_rate") < 0.75, "50–75%")
+                    .otherwise("75%+")
+                )
+
+                analysis["cart_abandonment_distribution"] = (
+                    abandon_percentage
+                    .groupBy("cart_abandonment_percentage")
+                    .agg(F.countDistinct("customer_id").alias("customer_count"))
+                    .fillna({"customer_count": 0})
+                    .orderBy("cart_abandonment_percentage")
+                )
+            else:
+                print("cart_abandonment_rate column is all NULL or zero; skipping cart abandonment percentage calculation.")
+        else:
+            print("Missing cart_abandonment_rate or customer_id in agg_customers; skipping abandonment distribution.")
+
+    else:
+        print("missing agg_customers table; skipping conversion and abandonment distribution analysis.")
+
+
+
+    if "agg_customers" in dataframes:
+        if (
+            not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value")
+            and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue")
+            and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_order_value")
+            and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
+        ):
+            analysis["clv_summary"] = (
+                dataframes["agg_customers"]
+                .agg(
+                    F.countDistinct("customer_id").alias("customers"),
+                    F.avg("customer_lifetime_value").alias("avg_clv"),
+                    F.expr(
+                        "percentile_approx(customer_lifetime_value, array(0.25, 0.5, 0.75))"
+                    ).alias("clv_percentiles"),
+                    F.avg("total_revenue").alias("avg_total_revenue"),
+                    F.avg("avg_order_value").alias("avg_order_value_overall"),
+                    F.sum("total_revenue").alias("total_revenue_all_customers"),
+                )
+                # only fill scalar columns; leave clv_percentiles as-is
+                .fillna({
+                    "customers": 0,
+                    "avg_clv": 0.0,
+                    "avg_total_revenue": 0.0,
+                    "avg_order_value_overall": 0.0,
+                    "total_revenue_all_customers": 0.0,
+                })
             )
-        )
-
-
-        customer_profit_enriched = (
-            customer_profit.alias("p")
-            .join(
-                dataframes["agg_customers"].select("customer_id", "customer_segment", "rfm_segment", "total_revenue", "customer_lifetime_value").alias("c"),
-                on="customer_id",
-                how="left"
+        else:
+            print(
+                "One of the required columns in agg_customers is all NULL or zero; skipping CLV summary calculation."
             )
-        )
-
-        analysis["top_customers_by_profit"] = (
-            customer_profit_enriched
-            .orderBy(F.col("total_net_profit").desc_nulls_last())
-        )
-
     else:
-        print("One of the required columns in agg_orders or agg_customers is all NULL or zero; skipping top customers by profit analysis.")
+        print("missing agg_customers table; skipping CLV summary calculation.")
 
 
-    # distribution percentage for conversion & abandonment
-
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "session_conversion_rate"):
-        conv_percentage = dataframes["agg_customers"].withColumn(
-            "session_conversion_percentage",
-            F.when(F.col("session_conversion_rate") < 0.1, "<10%")
-            .when(F.col("session_conversion_rate") < 0.25, "10–25%")
-            .when(F.col("session_conversion_rate") < 0.5, "25–50%")
-            .when(F.col("session_conversion_rate") < 0.75, "50–75%")
-            .otherwise("75%+")
-        )
-        analysis["session_conversion_distribution"] = (
-            conv_percentage
-            .groupBy("session_conversion_percentage")
-            .agg(F.countDistinct("customer_id").alias("customer_count"))
-            .fillna({"customer_count": 0})
-            .orderBy("session_conversion_percentage")
-        )
-    else:
-        print("session_conversion_rate column is all NULL or zero; skipping session conversion percentage calculation.")
-
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate"):
-        abandon_percentage = dataframes["agg_customers"].withColumn(
-            "cart_abandonment_percentage",
-            F.when(F.col("cart_abandonment_rate") < 0.1, "<10%")
-            .when(F.col("cart_abandonment_rate") < 0.25, "10–25%")
-            .when(F.col("cart_abandonment_rate") < 0.5, "25–50%")
-            .when(F.col("cart_abandonment_rate") < 0.75, "50–75%")
-            .otherwise("75%+")
-        )
-
-        analysis["cart_abandonment_distribution"] = (
-            abandon_percentage
-            .groupBy("cart_abandonment_percentage")
-            .agg(F.countDistinct("customer_id").alias("customer_count"))
-            .fillna({"customer_count": 0})
-            .orderBy("cart_abandonment_percentage")
-        )
-    else:
-        print("cart_abandonment_rate column is all NULL or zero; skipping cart abandonment percentage calculation.")
-
-
-    # # Overall CLV summary
-
-    if "agg_customers" in dataframes and (
-    not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value")
-    and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue")
-    and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_order_value")
-    and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
-    ):
-        analysis["clv_summary"] = (
-            dataframes["agg_customers"]
-            .agg(
-                F.countDistinct("customer_id").alias("customers"),
-                F.avg("customer_lifetime_value").alias("avg_clv"),
-                F.expr(
-                    "percentile_approx(customer_lifetime_value, array(0.25, 0.5, 0.75))"
-                ).alias("clv_percentiles"),
-                F.avg("total_revenue").alias("avg_total_revenue"),
-                F.avg("avg_order_value").alias("avg_order_value_overall"),
-                F.sum("total_revenue").alias("total_revenue_all_customers"),
-            )
-            # only fill scalar columns; leave clv_percentiles as-is
-            .fillna({
-                "customers": 0,
-                "avg_clv": 0.0,
-                "avg_total_revenue": 0.0,
-                "avg_order_value_overall": 0.0,
-                "total_revenue_all_customers": 0.0,
-            })
-        )
-    else:
-        print(
-            "One of the required columns in agg_customers is all NULL or zero; skipping CLV summary calculation."
-        )
-
-
-    # Revenue based on customersegemtns and geolocation
 
     def revenue_by_segment(df, group_cols):
         grouped = (
@@ -602,31 +969,28 @@ def main():
             .orderBy(F.col("segment_revenue").desc_nulls_last())
         )
         return result
-
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "city") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment_label") and not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_referrer_source") and not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_device_type"):
-        analysis["rev_by_country_city"] = revenue_by_segment(dataframes["agg_customers"], ["country", "city"])
-        analysis["rev_by_customer_segment"] = revenue_by_segment(dataframes["agg_customers"], ["customer_segment"])
-        analysis["rev_by_rfm_segment"] = revenue_by_segment(dataframes["agg_customers"], ["rfm_segment"])
-        analysis["rev_by_segment_label"] = revenue_by_segment(dataframes["agg_customers"], ["customer_segment_label"])
-        analysis["rev_by_referrer"] = revenue_by_segment(dataframes["agg_customers"], ["preferred_referrer_source"])
-        analysis["rev_by_device"] = revenue_by_segment(dataframes["agg_customers"], ["preferred_device_type"])
+    if "agg_customers" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue"):
+            analysis["rev_by_country_city"] = revenue_by_segment(dataframes["agg_customers"], ["country", "city"])
+            analysis["rev_by_customer_segment"] = revenue_by_segment(dataframes["agg_customers"], ["customer_segment"])
+            analysis["rev_by_rfm_segment"] = revenue_by_segment(dataframes["agg_customers"], ["rfm_segment"])
+            analysis["rev_by_segment_label"] = revenue_by_segment(dataframes["agg_customers"], ["customer_segment_label"])
+            analysis["rev_by_referrer"] = revenue_by_segment(dataframes["agg_customers"], ["preferred_referrer_source"])
+            analysis["rev_by_device"] = revenue_by_segment(dataframes["agg_customers"], ["preferred_device_type"])
+        else:
+            print("One of the required columns in agg_customers is all NULL or zero; skipping revenue by segment analysis.")
     else:
-        print("One of the required columns (customer_id, total_revenue, country, city, customer_segment, rfm_segment, customer_segment_label, preferred_referrer_source, preferred_device_type) in agg_customers is all NULL or zero; skipping revenue by segment analysis.")
+        print("agg_customers table is missing")
 
 
-    # Average order value trends  
 
-    
-    # 1) Daily AOV trend
     if (
         "agg_daily_aggregations" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_daily_aggregations"], "order_date")
-        and not is_column_all_null_or_zero(dataframes["agg_daily_aggregations"], "order_year")
-        and not is_column_all_null_or_zero(dataframes["agg_daily_aggregations"], "order_month")
+        and not is_column_all_null_or_zero(dataframes["agg_daily_aggregations"], "avg_order_value")
         and not is_column_all_null_or_zero(dataframes["agg_daily_aggregations"], "total_orders")
         and not is_column_all_null_or_zero(dataframes["agg_daily_aggregations"], "total_revenue")
-        and not is_column_all_null_or_zero(dataframes["agg_daily_aggregations"], "avg_order_value")
-        ):
+    ):
         daily = dataframes["agg_daily_aggregations"].fillna(
             {
                 "avg_order_value": 0.0,
@@ -648,7 +1012,7 @@ def main():
         )
     else:
         print(
-            "agg_daily_aggregations not available, or order_date all NULL/zero; "
+            "agg_daily_aggregations not available, or order_date, avg_order_value, total_orders, or total_revenue all NULL/zero; "
             "skipping daily AOV trend."
         )
 
@@ -656,12 +1020,10 @@ def main():
     if (
         "agg_weekly_aggregations" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_weekly_aggregations"], "year_week")
-        and not is_column_all_null_or_zero(dataframes["agg_weekly_aggregations"], "order_year")
-        and not is_column_all_null_or_zero(dataframes["agg_weekly_aggregations"], "order_week")
+        and not is_column_all_null_or_zero(dataframes["agg_weekly_aggregations"], "avg_order_value")
         and not is_column_all_null_or_zero(dataframes["agg_weekly_aggregations"], "total_orders")
         and not is_column_all_null_or_zero(dataframes["agg_weekly_aggregations"], "total_revenue")
-        and not is_column_all_null_or_zero(dataframes["agg_weekly_aggregations"], "avg_order_value")
-         ):
+    ):
         weekly = dataframes["agg_weekly_aggregations"].fillna(
             {
                 "avg_order_value": 0.0,
@@ -691,12 +1053,11 @@ def main():
     if (
         "agg_monthly_aggregations" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_monthly_aggregations"], "year_month")
-        and not is_column_all_null_or_zero(dataframes["agg_monthly_aggregations"], "order_year")
-        and not is_column_all_null_or_zero(dataframes["agg_monthly_aggregations"], "order_month")
+        and not is_column_all_null_or_zero(dataframes["agg_monthly_aggregations"], "avg_order_value")
         and not is_column_all_null_or_zero(dataframes["agg_monthly_aggregations"], "total_orders")
         and not is_column_all_null_or_zero(dataframes["agg_monthly_aggregations"], "total_revenue")
-        and not is_column_all_null_or_zero(dataframes["agg_monthly_aggregations"], "avg_order_value")
-         ):
+
+    ):
         monthly = dataframes["agg_monthly_aggregations"].fillna(
             {
                 "avg_order_value": 0.0,
@@ -718,229 +1079,254 @@ def main():
         )
     else:
         print(
-            "agg_monthly_aggregations not available, or year_month all NULL/zero; "
+            "agg_monthly_aggregations not available, or year_month, avg_order_value, total_orders, or total_revenue all NULL/zero; "
             "skipping monthly AOV trend."
         )
 
 
-    # Discount based analysis, customers contribution based on level of discount 
-
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_discount_received") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_discount_per_order") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_orders") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
-        disc_df = (
-            dataframes["agg_customers"]
-            .fillna({
-                "total_discount_received": 0.0,
-                "total_revenue": 0.0,
-                "avg_discount_per_order": 0.0,
-                "customer_lifetime_value": 0.0,
-                "total_orders": 0
-            })
-            .withColumn(
-                "discount_share_of_revenue",
-                F.when(F.col("total_revenue") > 0,
-                    F.col("total_discount_received") / F.col("total_revenue"))
-                .otherwise(F.lit(0.0))
+    if "agg_customers" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_customers"], "total_discount_received") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_discount_per_order") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_orders"):
+            disc_df = (
+                dataframes["agg_customers"]
+                .fillna({
+                    "total_discount_received": 0.0,
+                    "total_revenue": 0.0,
+                    "avg_discount_per_order": 0.0,
+                    "customer_lifetime_value": 0.0,
+                    "total_orders": 0
+                })
+                .withColumn(
+                    "discount_share_of_revenue",
+                    F.when(F.col("total_revenue") > 0,
+                        F.col("total_discount_received") / F.col("total_revenue"))
+                    .otherwise(F.lit(0.0))
+                )
             )
-        )
-        analysis["discount_customers"] = (
-            disc_df
-            .withColumn(
-                "is_discount_hunter",
-                F.when(
-                    (F.col("discount_share_of_revenue") >= 0.3) &
-                    (F.col("total_orders") >= 3),
-                    F.lit(1)
-                ).otherwise(F.lit(0))
+            analysis["discount_customers"] = (
+                disc_df
+                .withColumn(
+                    "is_discount_hunter",
+                    F.when(
+                        (F.col("discount_share_of_revenue") >= 0.3) &
+                        (F.col("total_orders") >= 3),
+                        F.lit(1)
+                    ).otherwise(F.lit(0))
+                )
             )
-        )
-        analysis["discount_customers_summary"] = (
-            analysis["discount_customers"]
-            .groupBy("is_discount_hunter")
-            .agg(
-                F.countDistinct("customer_id").alias("customer_count"),
-                F.avg("discount_share_of_revenue").alias("avg_discount_share"),
-                F.avg("avg_discount_per_order").alias("avg_discount_per_order"),
-                F.avg("customer_lifetime_value").alias("avg_clv"),
-                F.avg("total_revenue").alias("avg_revenue")
-            ).fillna({
-                "customer_count": 0,
-                "avg_discount_share": 0.0,
-                "avg_discount_per_order": 0.0,
-                "avg_clv": 0.0,
-                "avg_revenue": 0.0
-            })
-        )
+            analysis["discount_customers_summary"] = (
+                analysis["discount_customers"]
+                .groupBy("is_discount_hunter")
+                .agg(
+                    F.countDistinct("customer_id").alias("customer_count"),
+                    F.avg("discount_share_of_revenue").alias("avg_discount_share"),
+                    F.avg("avg_discount_per_order").alias("avg_discount_per_order"),
+                    F.avg("customer_lifetime_value").alias("avg_clv"),
+                    F.avg("total_revenue").alias("avg_revenue")
+                ).fillna({
+                    "customer_count": 0,
+                    "avg_discount_share": 0.0,
+                    "avg_discount_per_order": 0.0,
+                    "avg_clv": 0.0,
+                    "avg_revenue": 0.0
+                })
+            )
 
-        analysis["correlation_discount_vs_clv"] = disc_df.select(
-        F.corr("discount_share_of_revenue", "customer_lifetime_value").alias("corr_discount_share_clv"),
-        F.corr("avg_discount_per_order", "customer_lifetime_value").alias("corr_avg_discount_clv")
-        )
+            analysis["correlation_discount_vs_clv"] = disc_df.select(
+            F.corr("discount_share_of_revenue", "customer_lifetime_value").alias("corr_discount_share_clv"),
+            F.corr("avg_discount_per_order", "customer_lifetime_value").alias("corr_avg_discount_clv")
+            )
 
+        else:
+            print("analysis skipped because one of the above columns is missing")
     else:
-        print("analysis skipped because one of the above columns is missing")
+        print("missing agg_customers table; skipping discount customer analysis.")
 
 
-    # Discount Behavior & Margin Pressure
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_discount_received") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_discount_per_order") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
-        discount_behavior = (
-            dataframes["agg_customers"]
-            .select(
-                "customer_id",
-                "total_revenue",
-                "total_discount_received",
-                (F.col("total_discount_received") / F.col("total_revenue")).alias("discount_to_revenue_ratio"),
-                "avg_discount_per_order",
-                "customer_lifetime_value"
+    if "agg_customers" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_customers"], "total_discount_received") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_discount_per_order") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
+            discount_behavior = (
+                dataframes["agg_customers"]
+                .select(
+                    "customer_id",
+                    "total_revenue",
+                    "total_discount_received",
+                    (F.col("total_discount_received") / F.col("total_revenue")).alias("discount_to_revenue_ratio"),
+                    "avg_discount_per_order",
+                    "customer_lifetime_value"
+                )
             )
-        )
 
-        analysis["high_discount_customers"] = (
-            discount_behavior
-            .filter(F.col("discount_to_revenue_ratio") > 0.3)  # threshold example
-            .orderBy(F.col("discount_to_revenue_ratio").desc())
-        )
+            analysis["high_discount_customers"] = (
+                discount_behavior
+                .filter(F.col("discount_to_revenue_ratio") > 0.3)  # threshold example
+                .orderBy(F.col("discount_to_revenue_ratio").desc())
+            )
+        else:
+            print("One of the required columns in agg_customers is all NULL or zero; skipping discount behavior analysis.")
     else:
-        print("One of the required columns in agg_customers is all NULL or zero; skipping discount behavior analysis.")
+        print("missing agg_customers table; skipping discount behavior analysis.")
 
-    
 
-    #  Cart & Checkout Health (Abandonment & Lost Value)
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_carts_created") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_abandoned_carts") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_purchased_carts") and not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_abandoned_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_time_in_cart_days") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value"):
-        analysis["cart_behavior_summary"] = (
-            dataframes["agg_customers"]
-            .agg(
-                F.sum("total_carts_created").alias("total_carts_created"),
-                F.sum("total_abandoned_carts").alias("total_abandoned_carts"),
-                F.sum("total_purchased_carts").alias("total_purchased_carts"),
-                F.avg("cart_abandonment_rate").alias("avg_cart_abandonment_rate"),
-                F.sum("total_abandoned_value").alias("total_abandoned_value"),
-                F.avg("avg_time_in_cart_days").alias("avg_time_in_cart_days")
+
+    if "agg_customers" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_customers"], "total_carts_created") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_abandoned_carts") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_purchased_carts") and not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_abandoned_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_time_in_cart_days"):
+            analysis["cart_behavior_summary"] = (
+                dataframes["agg_customers"]
+                .agg(
+                    F.sum("total_carts_created").alias("total_carts_created"),
+                    F.sum("total_abandoned_carts").alias("total_abandoned_carts"),
+                    F.sum("total_purchased_carts").alias("total_purchased_carts"),
+                    F.avg("cart_abandonment_rate").alias("avg_cart_abandonment_rate"),
+                    F.sum("total_abandoned_value").alias("total_abandoned_value"),
+                    F.avg("avg_time_in_cart_days").alias("avg_time_in_cart_days")
+                )
             )
-        )
 
-        analysis["high_value_abandoners"] = (
-            dataframes["agg_customers"]
-            .select(
-                "customer_id",
-                "total_abandoned_carts",
-                "total_abandoned_value",
-                "cart_abandonment_rate",
-                "total_revenue",
-                "customer_lifetime_value"
+            analysis["high_value_abandoners"] = (
+                dataframes["agg_customers"]
+                .select(
+                    "customer_id",
+                    "total_abandoned_carts",
+                    "total_abandoned_value",
+                    "cart_abandonment_rate",
+                    "total_revenue",
+                    "customer_lifetime_value"
+                )
+                .filter(F.col("total_abandoned_value") > 0)
+                .orderBy(F.col("total_abandoned_value").desc())
             )
-            .filter(F.col("total_abandoned_value") > 0)
-            .orderBy(F.col("total_abandoned_value").desc())
-        )
+        else:
+            print("One of the required columns in agg_customers is all NULL or zero; skipping cart behavior analysis.")
     else:
-        print("One of the required columns in agg_customers is all NULL or zero; skipping cart behavior analysis.")
+        print("missing agg_customers table; skipping cart behavior analysis.")
+        
 
-
-    # Churn Risk Distribution (Portfolio Health)
-
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_recency_days"):
-        analysis["churn_risk_summary"] = (
-            dataframes["agg_customers"]
-            .groupBy("churn_risk")
-            .agg(
-                F.countDistinct("customer_id").alias("num_customers"),
-                F.sum("total_revenue").alias("total_revenue"),
-                F.avg("customer_lifetime_value").alias("avg_clv"),
-                F.avg("order_recency_days").alias("avg_recency_days")
+    if "agg_customers" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_recency_days"):
+            analysis["churn_risk_summary"] = (
+                dataframes["agg_customers"]
+                .groupBy("churn_risk")
+                .agg(
+                    F.countDistinct("customer_id").alias("num_customers"),
+                    F.sum("total_revenue").alias("total_revenue"),
+                    F.avg("customer_lifetime_value").alias("avg_clv"),
+                    F.avg("order_recency_days").alias("avg_recency_days")
+                )
+                .orderBy("churn_risk")
             )
-            .orderBy("churn_risk")
-        )
+        else:
+            print("One of the required columns in agg_customers is all NULL or zero; skipping churn risk analysis.")
     else:
-        print("One of the required columns in agg_customers is all NULL or zero; skipping churn risk analysis.")
+        print("missing agg_customers table; skipping churn risk analysis.") 
 
 
-    # High‑CLV Customers at Risk of Churn (Immediate Action List)
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_activity_score") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_recency_days") and not is_column_all_null_or_zero(dataframes["agg_customers"], "days_since_last_purchase") and not is_column_all_null_or_zero(dataframes["agg_customers"], "days_since_last_login") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment_label") and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_category"):
-        analysis["high_clv_at_risk"] = (
-            dataframes["agg_customers"]
-            .select(
-                "customer_id",
-                "customer_lifetime_value",
-                "churn_risk",
-                "customer_activity_score",
-                "order_recency_days",
-                "days_since_last_purchase",
-                "days_since_last_login",
-                "customer_segment_label",
-                "rfm_segment",
-                "rfm_category"
+    if "agg_customers" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_activity_score") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "order_recency_days") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "days_since_last_purchase") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "days_since_last_login") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment_label") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_category"):
+
+            analysis["high_clv_at_risk"] = (
+                dataframes["agg_customers"]
+                .select(
+                    "customer_id",
+                    "customer_lifetime_value",
+                    "churn_risk",
+                    "customer_activity_score",
+                    "order_recency_days",
+                    "days_since_last_purchase",
+                    "days_since_last_login",
+                    "customer_segment_label",
+                    "rfm_segment",
+                    "rfm_category"
+                )
+                .filter(
+                    (F.col("churn_risk").rlike("^(?i)(medium|high)")) &
+                    (F.col("customer_lifetime_value") > 0)
+                )
+                .orderBy(F.col("customer_lifetime_value").desc())
             )
-            .filter(
-                (F.col("churn_risk").isin("medium", "high")) &
-                (F.col("customer_lifetime_value") > 0)
-            )
-            .orderBy(F.col("customer_lifetime_value").desc())
-        )
+        else:
+            print("analysis skipped because one of the required columns in agg_customers is all NULL or zero.")
     else:
-        print("One of the required columns in agg_customers is all NULL or zero; skipping high CLV at risk analysis.")
-
-    
-    # RFM Segment Summary (Champions, At Risk, etc.)
+        print("missing agg_customers table; skipping high CLV at risk analysis.")
 
 
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and not is_column_all_null_or_zero(dataframes["agg_customers"], "order_recency_days") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_orders") and not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_order_value"):
-        analysis["rfm_segment_summary"] = (
-            dataframes["agg_customers"]
-            .groupBy("rfm_segment")
-            .agg(
-                F.countDistinct("customer_id").alias("num_customers"),
-                F.sum("total_revenue").alias("total_revenue"),
-                F.avg("customer_lifetime_value").alias("avg_clv"),
-                F.avg("order_recency_days").alias("avg_recency_days"),
-                F.avg("total_orders").alias("avg_total_orders"),
-                F.avg("avg_order_value").alias("avg_aov")
+
+    if "agg_customers" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "order_recency_days") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "total_orders") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "avg_order_value"):
+            
+            analysis["rfm_segment_summary"] = (
+                dataframes["agg_customers"]
+                .groupBy("rfm_segment")
+                .agg(
+                    F.countDistinct("customer_id").alias("num_customers"),
+                    F.sum("total_revenue").alias("total_revenue"),
+                    F.avg("customer_lifetime_value").alias("avg_clv"),
+                    F.avg("order_recency_days").alias("avg_recency_days"),
+                    F.avg("total_orders").alias("avg_total_orders"),
+                    F.avg("avg_order_value").alias("avg_aov")
+                )
+                .orderBy(F.col("total_revenue").desc())
             )
-            .orderBy(F.col("total_revenue").desc())
-        )
+        else:
+            print("analysis skipped because one of the required columns in agg_customers is all NULL or zero.")
     else:
-        print("One of the required columns in agg_customers is all NULL or zero; skipping RFM segment summary analysis.")
+        print("missing agg_customers table; skipping RFM segment summary analysis.")
 
 
-
-    # High‑Intent Non‑Buyers (Fix Funnel / UX)
-
-    if "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_products_viewed") and not is_column_all_null_or_zero(dataframes["agg_customers"], "wishlist_items_count") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_carts_created") and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_purchased_carts") and not is_column_all_null_or_zero(dataframes["agg_customers"], "cart_abandonment_rate") and not is_column_all_null_or_zero(dataframes["agg_customers"], "session_conversion_rate"):
-        analysis["high_intent_non_buyers"] = (
-            dataframes["agg_customers"]
-            .select(
-                "customer_id",
-                "total_products_viewed",
-            "wishlist_items_count",
-            "total_carts_created",
-            "total_purchased_carts",
-            "cart_abandonment_rate",
-            "session_conversion_rate"
-        )
-        .filter(
-            (F.col("total_revenue") == 0) &
-            (
-                (F.col("total_products_viewed") > 10) |
-                (F.col("wishlist_items_count") > 5) |
-                (F.col("total_carts_created") > 3)
+    if "agg_customers" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id"):
+            
+            analysis["high_intent_non_buyers"] = (
+                dataframes["agg_customers"]
+                .select(
+                    "customer_id",
+                    "total_products_viewed",
+                    "wishlist_items_count",
+                    "total_carts_created",
+                    "total_purchased_carts",
+                    "cart_abandonment_rate",
+                    "session_conversion_rate"
+                )
+                .filter(
+                    (F.col("total_revenue") == 0) &
+                    (
+                        (F.col("total_products_viewed") > 10) |
+                        (F.col("wishlist_items_count") > 5) |
+                        (F.col("total_carts_created") > 3)
+                    )
+                )
+                .orderBy(F.col("total_products_viewed").desc())
             )
-        )
-        .orderBy(F.col("total_products_viewed").desc())
-        )
+        else:
+            print("analysis skipped because one of the required columns in agg_customers is all NULL or zero.")
     else:
-        print("One of the required columns (total_revenue, customer_id, total_products_viewed, wishlist_items_count, total_carts_created, total_purchased_carts, cart_abandonment_rate, session_conversion_rate) in agg_customers is all NULL or zero; skipping high intent non-buyers analysis.")
+        print("missing agg_customers table; skipping high intent non-buyers analysis.")
 
 
-    # # OVERALL CUSTOMER ANALYSIS SUMMARY
 
-    # Signup cohort: retention by month (based on first order month)
-
-
-    if "agg_customers" in dataframes and (
-        not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "first_order_date")
-        ):
+    if "agg_customers" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_customers"], "account_created_at") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "first_order_date"):
+            
             customers_with_first_order = (
                 dataframes["agg_customers"]
                 .select(
@@ -951,7 +1337,6 @@ def main():
                 .filter(F.col("first_order_date").isNotNull())
             )
 
-            # Define signup cohort month and first-order month
             analysis["customers_cohorts"] = (
                 customers_with_first_order
                 .withColumn(
@@ -971,81 +1356,76 @@ def main():
                     F.countDistinct("customer_id").alias("cohort_customers")
                 )
             )
+        else:
+            print("analysis skipped because account_created_at or first_order_date is all NULL or zero.")
     else:
-        print("account_created_at or first_order_date is all NULL/zero; skipping signup cohort prep.")
+        print("missing agg_customers table; skipping signup cohort prep.")
 
 
-    # Order‑based monthly cohorts and retention curve
 
-        
-    if (
-        "agg_orders" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id")
-        and analysis["customers_cohorts"] is not None
-        ):
-        # Orders with order month
-        orders_with_month = (
-            dataframes["agg_orders"]
-            .select(
-                "order_id",
-                "customer_id",
-                F.date_trunc("month", "order_placed_at").cast("date").alias("order_month")
+    if "agg_orders" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and \
+        not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id") and \
+        analysis.get("customers_cohorts") is not None:
+            
+            orders_with_month = (
+                dataframes["agg_orders"]
+                .select(
+                    "order_id",
+                    "customer_id",
+                    F.date_trunc("month", "order_placed_at").cast("date").alias("order_month")
+                )
+                .filter(F.col("order_month").isNotNull())
             )
-            .filter(F.col("order_month").isNotNull())
-        )
 
-        # Join customers to their signup cohort
-        orders_with_cohort = (
-            orders_with_month
-            .join(
-                analysis["customers_cohorts"].select("customer_id", "signup_cohort_month"),
-                on="customer_id",
-                how="inner"
+            orders_with_cohort = (
+                orders_with_month
+                .join(
+                    analysis["customers_cohorts"].select("customer_id", "signup_cohort_month"),
+                    on="customer_id",
+                    how="inner"
+                )
             )
-        )
 
-        # Calculate months_since_cohort_start: 0 = cohort month, 1 = next month, etc.
-        orders_with_relative_month = (
-            orders_with_cohort
-            .withColumn(
-                "months_since_signup",
-                (
-                    (F.month("order_month") - F.month("signup_cohort_month"))
-                    + 12 * (F.year("order_month") - F.year("signup_cohort_month"))
-                ).cast("int")
+            orders_with_relative_month = (
+                orders_with_cohort
+                .withColumn(
+                    "months_since_signup",
+                    (
+                        (F.month("order_month") - F.month("signup_cohort_month"))
+                        + 12 * (F.year("order_month") - F.year("signup_cohort_month"))
+                    ).cast("int")
+                )
+                .filter(F.col("months_since_signup") >= 0)
             )
-            .filter(F.col("months_since_signup") >= 0)
-        )
 
-        # Retention: did customer order in each relative month
-        analysis["customer_cohort_retention"] = (
-            orders_with_relative_month
-            .select("signup_cohort_month", "customer_id", "months_since_signup")
-            .dropDuplicates(["signup_cohort_month", "customer_id", "months_since_signup"])
-            .groupBy("signup_cohort_month", "months_since_signup")
-            .agg(
-                F.countDistinct("customer_id").alias("active_customers")
+            analysis["customer_cohort_retention"] = (
+                orders_with_relative_month
+                .select("signup_cohort_month", "customer_id", "months_since_signup")
+                .dropDuplicates(["signup_cohort_month", "customer_id", "months_since_signup"])
+                .groupBy("signup_cohort_month", "months_since_signup")
+                .agg(
+                    F.countDistinct("customer_id").alias("active_customers")
+                )
+                .join(
+                    analysis["signup_cohort_summary"],
+                    on="signup_cohort_month",
+                    how="left"
+                )
+                .withColumn(
+                    "retention_rate",
+                    F.when(
+                        F.col("cohort_customers") > 0,
+                        F.col("active_customers") / F.col("cohort_customers")
+                    ).otherwise(F.lit(0.0))
+                )
+                .orderBy("signup_cohort_month", "months_since_signup")
             )
-            .join(
-                analysis["signup_cohort_summary"],
-                on="signup_cohort_month",
-                how="left"
-            )
-            .withColumn(
-                "retention_rate",
-                F.when(
-                    F.col("cohort_customers") > 0,
-                    F.col("active_customers") / F.col("cohort_customers")
-                ).otherwise(F.lit(0.0))
-            )
-            .orderBy("signup_cohort_month", "months_since_signup")
-        )
+        else:
+            print("analysis skipped because order_placed_at, customer_id, or cohort data is missing/null.")
     else:
-        print("Required columns for cohort retention are missing; skipping monthly cohort retention.")
+        print("missing agg_orders table; skipping monthly cohort retention.")
 
-
-    # Customer 360 / health table
 
     required_cols_360 = [
         "customer_id",
@@ -1113,790 +1493,697 @@ def main():
         print("agg_customers dataframe not found; skipping customer 360 table.")
 
 
-    #  RFM segment × churn_risk
-
-    # Cross-tab: RFM segment x churn_risk
-
-    if "agg_customers" in dataframes and (
-        not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value")
-    ):
-        analysis["rfm_churn_crosstab"] = (
-            dataframes["agg_customers"]
-            .groupBy("rfm_segment", "churn_risk")
-            .agg(
-                F.countDistinct("customer_id").alias("customer_count"),
-                F.sum("total_revenue").alias("segment_revenue"),
-                F.avg("customer_lifetime_value").alias("avg_clv")
-            )
-            .orderBy("rfm_segment", "churn_risk")
-        )
-    else:
-        print("One of (rfm_segment, churn_risk, customer_id, total_revenue, customer_lifetime_value) is all NULL/zero; skipping rfm x churn analysis.")
-
-
-    # Cross-tab: customer_segment_label x preferred_referrer_source
-
-    if "agg_customers" in dataframes and (
-        not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment_label")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_referrer_source")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue")
-    ):
-        analysis["seg_referrer_crosstab"] = (
-            dataframes["agg_customers"]
-            .groupBy("customer_segment_label", "preferred_referrer_source")
-            .agg(
-                F.countDistinct("customer_id").alias("customer_count"),
-                F.sum("total_revenue").alias("segment_revenue"),
-                F.avg("total_revenue").alias("avg_revenue_per_customer")
-            )
-            .orderBy("customer_segment_label", F.col("segment_revenue").desc())
-        )
-    else:
-        print("One of the required columns is all NULL/zero; skipping segment x referrer analysis.")
-
-
-    # Cross-tab: customer_segment_label x preferred_device_type
-
-    if "agg_customers" in dataframes and (
-        not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment_label")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_device_type")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue")
-        ):
-        analysis["seg_device_crosstab"] = (
-            dataframes["agg_customers"]
-            .groupBy("customer_segment_label", "preferred_device_type")
-            .agg(
-                F.countDistinct("customer_id").alias("customer_count"),
-                F.sum("total_revenue").alias("segment_revenue"),
-                F.avg("total_revenue").alias("avg_revenue_per_customer")
-            )
-            .orderBy("customer_segment_label", F.col("segment_revenue").desc())
-        )
-    else:
-        print("One of the required columns is all NULL/zero; skipping segment x device analysis.")
-
-
-
-    # Payment method vs CLV / churn
-
-
-    # Payment method vs CLV and churn
-
-    if "agg_customers" in dataframes and (
-        not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_payment_method")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue")
-        ):
-        analysis["payment_method_vs_clv_churn"] = (
-            dataframes["agg_customers"]
-            .groupBy("preferred_payment_method", "churn_risk")
-            .agg(
-                F.countDistinct("customer_id").alias("customer_count"),
-                F.avg("customer_lifetime_value").alias("avg_clv"),
-                F.avg("total_revenue").alias("avg_revenue_per_customer"),
-                F.sum("total_revenue").alias("total_revenue")
-            )
-            .orderBy("preferred_payment_method", "churn_risk")
-        )
-
-        # Also a simpler view aggregated only by payment method
-        analysis["payment_method_summary"] = (
-            dataframes["agg_customers"]
-            .groupBy("preferred_payment_method")
-            .agg(
-                F.countDistinct("customer_id").alias("customer_count"),
-                F.avg("customer_lifetime_value").alias("avg_clv"),
-                F.avg("total_revenue").alias("avg_revenue_per_customer"),
-                F.sum("total_revenue").alias("total_revenue")
-            )
-            .orderBy(F.col("total_revenue").desc())
-        )
-    else:
-        print("One of (preferred_payment_method, CLV, churn_risk, total_revenue) is all NULL/zero; skipping payment vs CLV/churn analysis.")
-
-
-    # Channel (referrer) vs CLV, churn, and discount reliance
-
-    if "agg_customers" in dataframes and (
-        not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_referrer_source")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "total_discount_received")
-    ):
-        referrer_df = (
-            dataframes["agg_customers"]
-            .withColumn(
-                "discount_share_of_revenue",
-                F.when(F.col("total_revenue") > 0,
-                    F.col("total_discount_received") / F.col("total_revenue"))
-                .otherwise(F.lit(0.0))
-            )
-        )
-
-        analysis["referrer_source_summary"] = (
-            referrer_df
-            .groupBy("preferred_referrer_source")
-            .agg(
-                F.countDistinct("customer_id").alias("customer_count"),
-                F.avg("customer_lifetime_value").alias("avg_clv"),
-                F.sum("total_revenue").alias("total_revenue"),
-                F.avg("total_revenue").alias("avg_revenue_per_customer"),
-                F.avg("discount_share_of_revenue").alias("avg_discount_share")
-            ).fillna({
-                "customer_count": 0,
-                "avg_clv": 0.0,
-                "total_revenue": 0.0,
-                "avg_revenue_per_customer": 0.0,
-                "avg_discount_share": 0.0
-            })
-            .orderBy(F.col("total_revenue").desc_nulls_last())
-        )
-
-        analysis["referrer_churn_summary"] = (
-            referrer_df
-            .groupBy("preferred_referrer_source", "churn_risk")
-            .agg(
-                F.countDistinct("customer_id").alias("customer_count"),
-                F.avg("customer_lifetime_value").alias("avg_clv"),
-                F.avg("discount_share_of_revenue").alias("avg_discount_share")
-            ).fillna({
-                "customer_count": 0,
-                "avg_clv": 0.0,
-                "avg_discount_share": 0.0
-            })
-            .orderBy("preferred_referrer_source", "churn_risk")
-        )
-    else:
-        print("One of the required columns for referrer vs CLV/churn/discount is all NULL/zero; skipping analysis.")
-
-
-    # Profit per customer from agg_orders
-
-    if (
-        "agg_orders" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "net_profit")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
-    ):
-        customer_profit = (
-            dataframes["agg_orders"]
-            .groupBy("customer_id")
-            .agg(
-                F.countDistinct("order_id").alias("orders_count_profit"),
-                F.sum("order_profit").alias("total_order_profit"),
-                F.avg("order_profit").alias("avg_profit_per_order"),
-                F.sum("net_profit").alias("total_net_profit"),
-                F.avg("net_profit").alias("avg_net_profit_per_order")
-            )
-        )
-
-        # Join with agg_customers to see CLV vs profit
-        if "agg_customers" in dataframes:
-            customers_with_profit = (
+    if "agg_customers" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_customers"], "rfm_segment") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value"):
+            
+            analysis["rfm_churn_crosstab"] = (
                 dataframes["agg_customers"]
-                .join(customer_profit, on="customer_id", how="left")
-            )
-
-            # Example aggregated view: CLV vs profit per customer segment
-            if (
-                "customer_segment_label" in customers_with_profit.columns
-                and "total_revenue" in customers_with_profit.columns
-                and "customer_lifetime_value" in customers_with_profit.columns
-            ):
-                analysis["customer_profit_per_segment"] = (
-                    customers_with_profit
-                    .groupBy("customer_segment_label")
-                    .agg(
-                        F.countDistinct("customer_id").alias("customer_count"),
-                        F.sum("total_revenue").alias("total_revenue"),
-                        F.sum("total_order_profit").alias("total_order_profit"),
-                        F.sum("total_net_profit").alias("total_net_profit"),
-                        F.avg("customer_lifetime_value").alias("avg_clv"),
-                        F.avg("total_order_profit").alias("avg_profit_per_customer")
-                    )
-                    .orderBy(F.col("total_order_profit").desc_nulls_last())
+                .groupBy("rfm_segment", "churn_risk")
+                .agg(
+                    F.countDistinct("customer_id").alias("customer_count"),
+                    F.sum("total_revenue").alias("segment_revenue"),
+                    F.avg("customer_lifetime_value").alias("avg_clv")
                 )
+                .orderBy("rfm_segment", "churn_risk")
+            )
         else:
-            print("agg_customers not found; created customer_profit only.")
+            print("analysis skipped because one of (rfm_segment, churn_risk, customer_id, total_revenue, customer_lifetime_value) is all NULL or zero.")
     else:
-        print("One of the required columns in agg_orders is all NULL/zero; skipping customer profit analysis.")
+        print("missing agg_customers table; skipping rfm x churn analysis.")
 
 
-    # Segment AOV using agg_rfm_segmentation + agg_orders
-
-    
-
-    if (
-        "agg_rfm_segmentation" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_rfm_segmentation"], "customer_id")
-        and not is_column_all_null_or_zero(dataframes["agg_rfm_segmentation"], "rfm_segment")
-        and "agg_orders" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount")
-    ):
-        rfm = dataframes["agg_rfm_segmentation"].select(
-            "customer_id",
-            "rfm_segment",          # high_value, at_risk, etc.
-        )
-
-        orders = dataframes["agg_orders"].select(
-            "order_id",
-            "customer_id",
-            "total_amount"
-        ).fillna({"total_amount": 0.0})
-
-        seg_orders = (
-            orders.alias("o")
-            .join(rfm.alias("r"), on="customer_id", how="left")
-        )
-
-        # Example: AOV by overall RFM segment
-        analysis["segment_aov_by_rfm"] = (
-            seg_orders.groupBy("rfm_segment")
-            .agg(
-                F.countDistinct("order_id").alias("orders"),
-                F.sum("total_amount").alias("total_revenue"),
-                F.avg("total_amount").alias("avg_order_value_segment"),
-                F.countDistinct("customer_id").alias("unique_customers"),
+    if "agg_customers" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment_label") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_referrer_source") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue"):
+            
+            analysis["seg_referrer_crosstab"] = (
+                dataframes["agg_customers"]
+                .groupBy("customer_segment_label", "preferred_referrer_source")
+                .agg(
+                    F.countDistinct("customer_id").alias("customer_count"),
+                    F.sum("total_revenue").alias("segment_revenue"),
+                    F.avg("total_revenue").alias("avg_revenue_per_customer")
+                )
+                .orderBy("customer_segment_label", F.col("segment_revenue").desc())
             )
-            .orderBy(F.col("avg_order_value_segment").desc_nulls_last())
-        )
-
-        # Example: AOV by monetary_segment
-    
+        else:
+            print("analysis skipped because one of the required columns in agg_customers is all NULL or zero.")
     else:
-        print(
-            "Either agg_rfm_segmentation or agg_orders missing/invalid; "
-            "cannot compute segment-specific AOV with this option."
-        )
+        print("missing agg_customers table; skipping segment x referrer analysis.")
 
-    # # Product-level analysis
-     
 
-    # Overall Best Selling Products
-        
-    if (
-        "agg_products" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
-    ):
-        product_analysis["best_selling_products"] = (
-            dataframes["agg_products"]
-            .select(
-                "product_id",
-                "product_name",
-                "category",
-                "sub_category",
-                "brand",
-                "total_units_sold",
-                "total_orders",
-                "total_revenue",
+    if "agg_customers" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_segment_label") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_device_type") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue"):
+            
+            analysis["seg_device_crosstab"] = (
+                dataframes["agg_customers"]
+                .groupBy("customer_segment_label", "preferred_device_type")
+                .agg(
+                    F.countDistinct("customer_id").alias("customer_count"),
+                    F.sum("total_revenue").alias("segment_revenue"),
+                    F.avg("total_revenue").alias("avg_revenue_per_customer")
+                )
+                .orderBy("customer_segment_label", F.col("segment_revenue").desc())
             )
-            .fillna(
-                {
-                    "total_units_sold": 0,
-                    "total_orders": 0,
+        else:
+            print("analysis skipped because one of the required columns in agg_customers is all NULL or zero.")
+    else:
+        print("missing agg_customers table; skipping segment x device analysis.")
+
+
+    if "agg_customers" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_payment_method") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue"):
+            
+            analysis["payment_method_vs_clv_churn"] = (
+                dataframes["agg_customers"]
+                .groupBy("preferred_payment_method", "churn_risk")
+                .agg(
+                    F.countDistinct("customer_id").alias("customer_count"),
+                    F.avg("customer_lifetime_value").alias("avg_clv"),
+                    F.avg("total_revenue").alias("avg_revenue_per_customer"),
+                    F.sum("total_revenue").alias("total_revenue")
+                )
+                .orderBy("preferred_payment_method", "churn_risk")
+            )
+
+            analysis["payment_method_summary"] = (
+                dataframes["agg_customers"]
+                .groupBy("preferred_payment_method")
+                .agg(
+                    F.countDistinct("customer_id").alias("customer_count"),
+                    F.avg("customer_lifetime_value").alias("avg_clv"),
+                    F.avg("total_revenue").alias("avg_revenue_per_customer"),
+                    F.sum("total_revenue").alias("total_revenue")
+                )
+                .orderBy(F.col("total_revenue").desc())
+            )
+        else:
+            print("analysis skipped because one of the required columns in agg_customers is all NULL or zero.")
+    else:
+        print("missing agg_customers table; skipping payment vs CLV/churn analysis.")
+
+
+    if "agg_customers" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_customers"], "preferred_referrer_source") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_lifetime_value") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "churn_risk") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "total_revenue") and \
+        not is_column_all_null_or_zero(dataframes["agg_customers"], "total_discount_received"):
+            
+            referrer_df = (
+                dataframes["agg_customers"]
+                .withColumn(
+                    "discount_share_of_revenue",
+                    F.when(F.col("total_revenue") > 0,
+                        F.col("total_discount_received") / F.col("total_revenue"))
+                    .otherwise(F.lit(0.0))
+                )
+            )
+
+            analysis["referrer_source_summary"] = (
+                referrer_df
+                .groupBy("preferred_referrer_source")
+                .agg(
+                    F.countDistinct("customer_id").alias("customer_count"),
+                    F.avg("customer_lifetime_value").alias("avg_clv"),
+                    F.sum("total_revenue").alias("total_revenue"),
+                    F.avg("total_revenue").alias("avg_revenue_per_customer"),
+                    F.avg("discount_share_of_revenue").alias("avg_discount_share")
+                ).fillna({
+                    "customer_count": 0,
+                    "avg_clv": 0.0,
                     "total_revenue": 0.0,
-                }
+                    "avg_revenue_per_customer": 0.0,
+                    "avg_discount_share": 0.0
+                })
+                .orderBy(F.col("total_revenue").desc_nulls_last())
             )
-            .orderBy(
-                F.col("total_units_sold").desc_nulls_last(),
-                F.col("total_revenue").desc_nulls_last(),
+
+            analysis["referrer_churn_summary"] = (
+                referrer_df
+                .groupBy("preferred_referrer_source", "churn_risk")
+                .agg(
+                    F.countDistinct("customer_id").alias("customer_count"),
+                    F.avg("customer_lifetime_value").alias("avg_clv"),
+                    F.avg("discount_share_of_revenue").alias("avg_discount_share")
+                ).fillna({
+                    "customer_count": 0,
+                    "avg_clv": 0.0,
+                    "avg_discount_share": 0.0
+                })
+                .orderBy("preferred_referrer_source", "churn_risk")
             )
-        )
+        else:
+            print("analysis skipped because one of the required columns in agg_customers is all NULL or zero.")
     else:
-        print(
-            "One of the required columns in agg_products is all NULL or zero; "
-            "skipping best selling products analysis."
-        )
+        print("missing agg_customers table; skipping referrer source analysis.")
 
 
-    # product level seasonal trends analysis
-
-
-    if "agg_orders" in dataframes and "agg_order_items" in dataframes and "agg_products" in dataframes and (
-        not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at")
-        and not is_column_all_null_or_zero(dataframes["agg_order_items"], "order_id")
-        and not is_column_all_null_or_zero(dataframes["agg_order_items"], "product_id")
-        and not is_column_all_null_or_zero(dataframes["agg_order_items"], "quantity")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
-    ):
-        # Base joined fact
-        order_product = (
-            dataframes["agg_order_items"]
-            .join(
+    if "agg_orders" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_orders"], "order_profit") and \
+        not is_column_all_null_or_zero(dataframes["agg_orders"], "net_profit") and \
+        not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id"):
+            
+            customer_profit = (
                 dataframes["agg_orders"]
-                .select("order_id", "order_placed_at"),
-                on="order_id",
-                how="inner",
+                .groupBy("customer_id")
+                .agg(
+                    F.countDistinct("order_id").alias("orders_count_profit"),
+                    F.sum("order_profit").alias("total_order_profit"),
+                    F.avg("order_profit").alias("avg_profit_per_order"),
+                    F.sum("net_profit").alias("total_net_profit"),
+                    F.avg("net_profit").alias("avg_net_profit_per_order")
+                )
             )
-            .join(
+
+            if "agg_customers" in dataframes:
+                customers_with_profit = (
+                    dataframes["agg_customers"]
+                    .join(customer_profit, on="customer_id", how="left")
+                )
+
+                if "customer_segment_label" in customers_with_profit.columns and \
+                "total_revenue" in customers_with_profit.columns and \
+                "customer_lifetime_value" in customers_with_profit.columns:
+                    
+                    analysis["customer_profit_per_segment"] = (
+                        customers_with_profit
+                        .groupBy("customer_segment_label")
+                        .agg(
+                            F.countDistinct("customer_id").alias("customer_count"),
+                            F.sum("total_revenue").alias("total_revenue"),
+                            F.sum("total_order_profit").alias("total_order_profit"),
+                            F.sum("total_net_profit").alias("total_net_profit"),
+                            F.avg("customer_lifetime_value").alias("avg_clv"),
+                            F.avg("total_order_profit").alias("avg_profit_per_customer")
+                        )
+                        .orderBy(F.col("total_order_profit").desc_nulls_last())
+                    )
+            else:
+                print("agg_customers not found; created customer_profit only.")
+        else:
+            print("analysis skipped because one of the required columns in agg_orders is all NULL or zero.")
+    else:
+        print("missing agg_orders table; skipping customer profit analysis.")
+
+
+    if "agg_rfm_segmentation" in dataframes and "agg_orders" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_rfm_segmentation"], "customer_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_rfm_segmentation"], "rfm_segment") and \
+        not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id"):
+            
+            rfm = dataframes["agg_rfm_segmentation"].select(
+                "customer_id",
+                "rfm_segment",
+            )
+
+            orders = dataframes["agg_orders"].select(
+                "order_id",
+                "customer_id",
+                "total_amount"
+            ).fillna({"total_amount": 0.0})
+
+            seg_orders = (
+                orders.alias("o")
+                .join(rfm.alias("r"), on="customer_id", how="left")
+            )
+
+            analysis["segment_aov_by_rfm"] = (
+                seg_orders.groupBy("rfm_segment")
+                .agg(
+                    F.countDistinct("order_id").alias("orders"),
+                    F.sum("total_amount").alias("total_revenue"),
+                    F.avg("total_amount").alias("avg_order_value_segment"),
+                    F.countDistinct("customer_id").alias("unique_customers"),
+                )
+                .orderBy(F.col("avg_order_value_segment").desc_nulls_last())
+            )
+        else:
+            print("analysis skipped because customer_id or order_id is all NULL or zero.")
+    else:
+        print("missing agg_rfm_segmentation or agg_orders table; skipping segment-specific AOV.")
+
+
+
+    if "agg_products" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "category") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue"):
+
+            product_analysis["best_selling_products"] = (
                 dataframes["agg_products"]
-                .select("product_id", "product_name", "category", "sub_category", "brand"),
-                on="product_id",
-                how="left",
+                .select(
+                    "product_id",
+                    "product_name",
+                    "category",
+                    "sub_category",
+                    "brand",
+                    "total_units_sold",
+                    "total_orders",
+                    "total_revenue",
+                )
+                .fillna(
+                    {
+                        "total_units_sold": 0,
+                        "total_orders": 0,
+                        "total_revenue": 0.0,
+                    }
+                )
+                .orderBy(
+                    F.col("total_units_sold").desc_nulls_last(),
+                    F.col("total_revenue").desc_nulls_last(),
+                )
             )
-            .withColumn("order_date", F.to_date("order_placed_at"))
-        )
-
-        # Monthly grain: year + month
-        order_product_monthly = add_time_grain(
-            order_product, date_col="order_date", grain="month"
-        )
-
-        product_analysis["product_monthly_trends"] = (
-            order_product_monthly
-            .groupBy(
-                "product_id",
-                "product_name",
-                "category",
-                "sub_category",
-                "brand",
-                "grain_year",
-                "grain_month",
-            )
-            .agg(
-                F.sum("quantity").alias("units_sold"),
-                F.countDistinct("order_id").alias("orders_count"),
-            )
-            .fillna(
-                {
-                    "units_sold": 0,
-                    "orders_count": 0,
-                }
-            )
-            .orderBy("product_id", "grain_year", "grain_month")
-        )
+        else:
+            print("analysis skipped because one of the required columns in agg_products is all NULL or zero.")
     else:
-        print(
-            "One of the required columns in agg_orders, agg_order_items, or agg_products is all NULL or zero; "
-            "skipping product monthly seasonal trends."
-        )
+        print("missing agg_products table; skipping best selling products analysis.")
 
-    
 
-    # Category-level monthly seasonal trends
 
-    if "order_product" in locals():
-        order_product_monthly_cat = add_time_grain(
-            order_product, date_col="order_date", grain="month"
-        )
+    if "agg_orders" in dataframes and "agg_order_items" in dataframes and "agg_products" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and \
+        not is_column_all_null_or_zero(dataframes["agg_order_items"], "order_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_order_items"], "product_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_order_items"], "quantity") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "category"):
 
-        product_analysis["category_monthly_trends"] = (
-            order_product_monthly_cat
-            .groupBy("category", "grain_year", "grain_month")
-            .agg(
-                F.sum("quantity").alias("units_sold"),
-                F.countDistinct("order_id").alias("orders_count"),
+            # Base joined fact
+            order_product = (
+                dataframes["agg_order_items"]
+                .join(
+                    dataframes["agg_orders"]
+                    .select("order_id", "order_placed_at"),
+                    on="order_id",
+                    how="inner",
+                )
+                .join(
+                    dataframes["agg_products"]
+                    .select("product_id", "product_name", "category", "sub_category", "brand"),
+                    on="product_id",
+                    how="left",
+                )
+                .withColumn("order_date", F.to_date("order_placed_at"))
             )
-            .fillna(
-                {
-                    "units_sold": 0,
-                    "orders_count": 0,
-                }
+
+            # Monthly grain: year + month
+            order_product_monthly = add_time_grain(
+                order_product, date_col="order_date", grain="month"
             )
-            .orderBy("category", "grain_year", "grain_month")
-        )
+
+            # Category level trends
+            product_analysis["category_monthly_trends"] = (
+                order_product_monthly
+                .groupBy("category", "grain_year", "grain_month")
+                .agg(
+                    F.sum("quantity").alias("units_sold"),
+                    F.countDistinct("order_id").alias("orders_count"),
+                )
+                .fillna({"units_sold": 0, "orders_count": 0})
+                .orderBy("category", "grain_year", "grain_month")
+            )
+
+            # Product level trends
+            product_analysis["product_monthly_trends"] = (
+                order_product_monthly
+                .groupBy(
+                    "product_id",
+                    "product_name",
+                    "category",
+                    "sub_category",
+                    "brand",
+                    "grain_year",
+                    "grain_month",
+                )
+                .agg(
+                    F.sum("quantity").alias("units_sold"),
+                    F.countDistinct("order_id").alias("orders_count"),
+                )
+                .fillna({"units_sold": 0, "orders_count": 0})
+                .orderBy("product_id", "grain_year", "grain_month")
+            )
+
+            product_analysis["product_calendar_month_seasonality"] = (
+                order_product
+                .withColumn("calendar_month", F.month("order_date"))
+                .groupBy(
+                    "product_id",
+                    "product_name",
+                    "category",
+                    "sub_category",
+                    "brand",
+                    "calendar_month",
+                )
+                .agg(
+                    F.sum("quantity").alias("units_sold"),
+                    F.countDistinct("order_id").alias("orders_count"),
+                )
+                .fillna(
+                    {
+                        "units_sold": 0,
+                        "orders_count": 0,
+                    }
+                )
+                .orderBy("product_id", "calendar_month")
+            )
+
+            product_analysis["category_calendar_month_seasonality"] = (
+                order_product
+                .withColumn("calendar_month", F.month("order_date"))
+                .groupBy("category", "calendar_month")
+                .agg(
+                    F.sum("quantity").alias("units_sold"),
+                    F.countDistinct("order_id").alias("orders_count"),
+                )
+                .fillna(
+                    {
+                        "units_sold": 0,
+                        "orders_count": 0,
+                    }
+                )
+                .orderBy("category", "calendar_month")
+            )
+            
+
+        else:
+            print("analysis skipped because a required column in orders, items, or products is all NULL or zero.")
     else:
-        print("order_product dataset not available; skipping category monthly trends.")
+        print("missing required tables; skipping product monthly seasonal trends.")
 
-    
-    #  “Classical” calendar-month seasonality (across years)
 
-    if "order_product" in locals():
-        product_analysis["product_calendar_month_seasonality"] = (
-            order_product
-            .withColumn("calendar_month", F.month("order_date"))
-            .groupBy(
-                "product_id",
-                "product_name",
-                "category",
-                "sub_category",
-                "brand",
-                "calendar_month",
-            )
-            .agg(
-                F.sum("quantity").alias("units_sold"),
-                F.countDistinct("order_id").alias("orders_count"),
-            )
-            .fillna(
-                {
-                    "units_sold": 0,
-                    "orders_count": 0,
-                }
-            )
-            .orderBy("product_id", "calendar_month")
-        )
 
-        product_analysis["category_calendar_month_seasonality"] = (
-            order_product
-            .withColumn("calendar_month", F.month("order_date"))
-            .groupBy("category", "calendar_month")
-            .agg(
-                F.sum("quantity").alias("units_sold"),
-                F.countDistinct("order_id").alias("orders_count"),
+    if "agg_products" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "category") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "profit_margin") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold"):
+
+            product_analysis["highest_margin_products"] = (
+                dataframes["agg_products"]
+                .select(
+                    "product_id",
+                    "product_name",
+                    "category",
+                    "sub_category",
+                    "brand",
+                    "profit_margin",
+                    "total_revenue",
+                    "total_units_sold",
+                    "total_orders",
+                )
+                .fillna(
+                    {
+                        "profit_margin": 0.0,
+                        "total_revenue": 0.0,
+                        "total_units_sold": 0,
+                        "total_orders": 0,
+                    }
+                )
+                .orderBy(
+                    F.col("profit_margin").desc_nulls_last(),
+                    F.col("total_revenue").desc_nulls_last(),
+                )
             )
-            .fillna(
-                {
-                    "units_sold": 0,
-                    "orders_count": 0,
-                }
-            )
-            .orderBy("category", "calendar_month")
-        )
+        else:
+            print("analysis skipped because a required column in agg_products is all NULL or zero.")
     else:
-        print(
-            "order_product dataset not available; skipping calendar-month seasonality analyses."
-        )
-
-    
-    #  Products with highest profit margin
+        print("missing agg_products table; skipping highest margin products analysis.")
 
 
-    if (
-        "agg_products" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "profit_margin")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
-    ):
-        product_analysis["highest_margin_products"] = (
-            dataframes["agg_products"]
-            .select(
-                "product_id",
-                "product_name",
-                "category",
-                "sub_category",
-                "brand",
-                "profit_margin",
-                "total_revenue",
-                "total_units_sold",
-                "total_orders",
+    if "agg_products" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "category") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "profit_margin") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view"):
+
+            product_analysis["low_margin_high_traffic_products"] = (
+                dataframes["agg_products"]
+                .select(
+                    "product_id",
+                    "product_name",
+                    "category",
+                    "sub_category",
+                    "brand",
+                    "profit_margin",
+                    "total_revenue",
+                    "total_units_sold",
+                    "total_orders",
+                    "view_to_purchase_rate",
+                    "revenue_per_view",
+                    "total_wishlist_adds",
+                    "total_cart_adds",
+                )
+                .fillna(
+                    {
+                        "profit_margin": 0.0,
+                        "total_revenue": 0.0,
+                        "total_units_sold": 0,
+                        "total_orders": 0,
+                        "view_to_purchase_rate": 0.0,
+                        "revenue_per_view": 0.0,
+                        "total_wishlist_adds": 0,
+                        "total_cart_adds": 0,
+                    }
+                )
             )
-            .fillna(
-                {
-                    "profit_margin": 0.0,
-                    "total_revenue": 0.0,
+
+            # Derive a simple "traffic_score" to help rank
+            product_analysis["low_margin_high_traffic_products"] = (
+                product_analysis["low_margin_high_traffic_products"]
+                .withColumn(
+                    "traffic_score",
+                    (
+                        F.col("total_units_sold")
+                        + F.col("total_orders")
+                        + F.col("total_wishlist_adds")
+                        + F.col("total_cart_adds")
+                    )
+                )
+                .orderBy(
+                    F.col("profit_margin").asc_nulls_last(),
+                    F.col("traffic_score").desc_nulls_last(),
+                    F.col("total_revenue").desc_nulls_last(),
+                )
+            )
+        else:
+            print("analysis skipped because a required column in agg_products is all NULL or zero.")
+    else:
+        print("missing agg_products table; skipping low-margin high-traffic products analysis.")
+
+
+    if "agg_products" in dataframes:
+        # Checking for table presence and column validity
+        if not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "category") and \
+        ("current_stock_level" in dataframes["agg_products"].columns or 
+            "current_stock" in dataframes["agg_products"].columns):
+
+            products_df = dataframes["agg_products"]
+
+            # Prefer current_stock_level if present, else fall back to current_stock
+            stock_col = "current_stock_level" if "current_stock_level" in products_df.columns else "current_stock"
+
+            product_analysis["out_of_stock_products"] = (
+                products_df
+                .select(
+                    "product_id",
+                    "product_name",
+                    "category",
+                    "sub_category",
+                    "brand",
+                    F.col(stock_col).alias("current_stock_level"),
+                    "total_units_sold",
+                    "total_orders",
+                    "total_revenue",
+                )
+                .fillna(
+                    {
+                        "current_stock_level": 0,
+                        "total_units_sold": 0,
+                        "total_orders": 0,
+                        "total_revenue": 0.0,
+                    }
+                )
+                .filter(F.col("current_stock_level") <= 0)
+                .orderBy(
+                    F.col("total_revenue").desc_nulls_last(),
+                    F.col("total_units_sold").desc_nulls_last(),
+                )
+            )
+        else:
+            print("analysis skipped because one of the required columns in agg_products is all NULL or zero.")
+    else:
+        print("missing agg_products table; skipping out-of-stock analysis.")
+
+
+    if "agg_products" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "category") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "cart_to_purchase_rate") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_wishlist_adds") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_cart_adds") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "wishlist_to_purchase_rate"):
+            product_analysis["low_conversion_products"] = (
+                dataframes["agg_products"]
+                .select(
+                    "product_id",
+                    "product_name",
+                    "category",
+                    "sub_category",
+                    "brand",
+                    "view_to_purchase_rate",
+                    "cart_to_purchase_rate",
+                    "wishlist_to_purchase_rate",
+                    "total_units_sold",
+                    "total_orders",
+                    "total_wishlist_adds",
+                    "total_cart_adds",
+                    "total_revenue",
+                )
+                .fillna(
+                    {
+                        "view_to_purchase_rate": 0.0,
+                        "cart_to_purchase_rate": 0.0,
+                        "wishlist_to_purchase_rate": 0.0,
+                        "total_units_sold": 0,
+                        "total_orders": 0,
+                        "total_wishlist_adds": 0,
+                        "total_cart_adds": 0,
+                        "total_revenue": 0.0,
+                    }
+                )
+                .orderBy(
+                    F.col("view_to_purchase_rate").asc_nulls_last(),
+                    F.col("cart_to_purchase_rate").asc_nulls_last(),
+                    F.col("wishlist_to_purchase_rate").asc_nulls_last(),
+                    F.col("total_revenue").desc_nulls_last(),
+                )
+            )
+        else:
+            print("analysis skipped because one of the required conversion columns in agg_products is all NULL or zero.")
+    else:
+        print("missing agg_products table; skipping low conversion rate analysis.")
+
+
+    if "agg_reviews" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_reviews"], "product_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_reviews"], "rating"):
+            
+            product_analysis["product_rating_summary"] = (
+                dataframes["agg_reviews"]
+                .groupBy("product_id")
+                .agg(
+                    F.count("*").alias("total_reviews"),
+                    F.avg("rating").alias("avg_rating")
+                )
+                .fillna({"total_reviews": 0, "avg_rating": 0.0})
+                .orderBy(F.col("avg_rating").desc_nulls_last())
+            )
+        else:
+            print("analysis skipped because product_id or rating is all NULL or zero in agg_reviews.")
+    else:
+        print("missing agg_reviews table; skipping product rating summary.")
+
+
+
+    if "agg_products" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_products"], "category") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue"):
+            
+            product_analysis["category_view_patterns"] = (
+                dataframes["agg_products"]
+                .groupBy("category")
+                .agg(
+                    F.countDistinct("product_id").alias("products_in_category"),
+                    F.sum("total_units_sold").alias("total_units_sold"),
+                    F.sum("total_orders").alias("total_orders"),
+                    F.avg("view_to_purchase_rate").alias("avg_view_to_purchase_rate"),
+                    F.avg("revenue_per_view").alias("avg_revenue_per_view"),
+                    F.sum("total_revenue").alias("total_revenue")
+                ).fillna({
+                    "products_in_category": 0,
                     "total_units_sold": 0,
                     "total_orders": 0,
-                }
+                    "avg_view_to_purchase_rate": 0.0,
+                    "avg_revenue_per_view": 0.0,
+                    "total_revenue": 0.0
+                })
+                .orderBy(F.col("total_revenue").desc_nulls_last())
             )
-            .orderBy(
-                F.col("profit_margin").desc_nulls_last(),
-                F.col("total_revenue").desc_nulls_last(),
-            )
-        )
+        else:
+            print("Analysis skipped because one of the required columns in agg_products is all NULL or zero.")
     else:
-        print(
-            "One of the required columns in agg_products is all NULL or zero; "
-            "skipping highest margin products analysis."
-        )
+        print("Missing agg_products table; skipping category view patterns analysis.")
 
 
-    # Products with low profit margin but high traffic
-
-
-    # Products with low margin but high traffic / interest
-
-    if (
-        "agg_products" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "profit_margin")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_wishlist_adds")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_cart_adds")
-    ):
-        product_analysis["low_margin_high_traffic_products"] = (
-            dataframes["agg_products"]
-            .select(
-                "product_id",
-                "product_name",
-                "category",
-                "sub_category",
-                "brand",
-                "profit_margin",
-                "total_revenue",
-                "total_units_sold",
-                "total_orders",
-                "view_to_purchase_rate",
-                "revenue_per_view",
-                "total_wishlist_adds",
-                "total_cart_adds",
-            )
-            .fillna(
-                {
-                    "profit_margin": 0.0,
-                    "total_revenue": 0.0,
-                    "total_units_sold": 0,
-                    "total_orders": 0,
+    if "agg_products" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders"):
+            
+            product_analysis["top_view_to_purchase_products"] = (
+                dataframes["agg_products"]
+                .select(
+                    "product_id",
+                    "product_name",
+                    "category",
+                    "view_to_purchase_rate",
+                    "revenue_per_view",
+                    "total_units_sold",
+                    "total_orders"
+                ).fillna({
                     "view_to_purchase_rate": 0.0,
                     "revenue_per_view": 0.0,
-                    "total_wishlist_adds": 0,
-                    "total_cart_adds": 0,
-                }
-            )
-        )
-
-        # Optional: derive a simple "traffic_score" to help rank
-        product_analysis["low_margin_high_traffic_products"] = (
-            product_analysis["low_margin_high_traffic_products"]
-            .withColumn(
-                "traffic_score",
-                (
-                    F.col("total_units_sold")
-                    + F.col("total_orders")
-                    + F.col("total_wishlist_adds")
-                    + F.col("total_cart_adds")
-                )
-            )
-            # Focus on *low* margin but *high* traffic
-            # You can tune thresholds; here we don't hard-filter, we just sort to surface likely candidates
-            .orderBy(
-                F.col("profit_margin").asc_nulls_last(),      # lowest margin first
-                F.col("traffic_score").desc_nulls_last(),     # highest traffic next
-                F.col("total_revenue").desc_nulls_last(),     # then revenue
-            )
-        )
-    else:
-        print(
-            "One of the required columns in agg_products is all NULL or zero; "
-            "skipping low-margin high-traffic products analysis."
-        )
-
-    # Out-of-stock products (product-centric view)
-
-    if (
-        "agg_products" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
-        and ("current_stock_level" in dataframes["agg_products"].columns
-            or "current_stock" in dataframes["agg_products"].columns)
-    ):
-        products_df = dataframes["agg_products"]
-
-        # Prefer current_stock_level if present, else fall back to current_stock
-        stock_col = "current_stock_level" if "current_stock_level" in products_df.columns else "current_stock"
-
-        product_analysis["out_of_stock_products"] = (
-            products_df
-            .select(
-                "product_id",
-                "product_name",
-                "category",
-                "sub_category",
-                "brand",
-                F.col(stock_col).alias("current_stock_level"),
-                "total_units_sold",
-                "total_orders",
-                "total_revenue",
-            )
-            .fillna(
-                {
-                    "current_stock_level": 0,
                     "total_units_sold": 0,
-                    "total_orders": 0,
-                    "total_revenue": 0.0,
-                }
+                    "total_orders": 0
+                })
+                .orderBy(F.col("view_to_purchase_rate").desc_nulls_last())
             )
-            .filter(F.col("current_stock_level") <= 0)
-            .orderBy(
-                F.col("total_revenue").desc_nulls_last(),
-                F.col("total_units_sold").desc_nulls_last(),
-            )
-        )
+        else:
+            print("Analysis skipped because one of the required columns in agg_products is all NULL or zero.")
     else:
-        print(
-            "One of the required columns in agg_products is all NULL or zero (product_id, product_name, category, stock); "
-            "skipping product out-of-stock analysis."
-        )
+        print("Missing agg_products table; skipping top view to purchase products analysis.")
 
-    # Products with low sell-through rate
 
-    # Products with low view-to-purchase / cart-to-purchase / wishlist-to-purchase rates
 
     if (
         "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "cart_to_purchase_rate")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "wishlist_to_purchase_rate")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_wishlist_adds")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_cart_adds")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
-    ):
-        product_analysis["low_conversion_products"] = (
-            dataframes["agg_products"]
-            .select(
-                "product_id",
-                "product_name",
-                "category",
-                "sub_category",
-                "brand",
-                "view_to_purchase_rate",
-                "cart_to_purchase_rate",
-                "wishlist_to_purchase_rate",
-                "total_units_sold",
-                "total_orders",
-                "total_wishlist_adds",
-                "total_cart_adds",
-                "total_revenue",
-            )
-            .fillna(
-                {
-                    "view_to_purchase_rate": 0.0,
-                    "cart_to_purchase_rate": 0.0,
-                    "wishlist_to_purchase_rate": 0.0,
-                    "total_units_sold": 0,
-                    "total_orders": 0,
-                    "total_wishlist_adds": 0,
-                    "total_cart_adds": 0,
-                    "total_revenue": 0.0,
-                }
-            )
-            .orderBy(
-                F.col("view_to_purchase_rate").asc_nulls_last(),
-                F.col("cart_to_purchase_rate").asc_nulls_last(),
-                F.col("wishlist_to_purchase_rate").asc_nulls_last(),
-                F.col("total_revenue").desc_nulls_last(),
-            )
-        )
-    else:
-        print(
-            "One of the required columns in agg_products is all NULL or zero; "
-            "skipping low view/cart/wishlist to purchase rate analysis."
-        )
-
-    
-    # product rating summary
-
-    if (
-        "agg_reviews" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_reviews"], "product_id")
-        and not is_column_all_null_or_zero(dataframes["agg_reviews"], "rating")
-    ):
-        product_analysis["product_rating_summary"] = (
-            dataframes["agg_reviews"]
-            .groupBy("product_id")
-            .agg(
-                F.count("*").alias("total_reviews"),
-                F.avg("rating").alias("avg_rating")
-            )
-            .fillna({"total_reviews": 0, "avg_rating": 0.0})
-            .orderBy(F.col("avg_rating").desc_nulls_last())
-        )
-
-    
-    # Category-level viewing effectiveness
-
-    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "category") and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders") and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue"):
-        product_analysis["category_view_patterns"] = (
-            dataframes["agg_products"]
-            .groupBy("category")
-            .agg(
-                F.countDistinct("product_id").alias("products_in_category"),
-                F.sum("total_units_sold").alias("total_units_sold"),
-                F.sum("total_orders").alias("total_orders"),
-                F.avg("view_to_purchase_rate").alias("avg_view_to_purchase_rate"),
-                F.avg("revenue_per_view").alias("avg_revenue_per_view"),
-                F.sum("total_revenue").alias("total_revenue")
-            ).fillna({
-                "products_in_category": 0,
-                "total_units_sold": 0,
-                "total_orders": 0,
-                "avg_view_to_purchase_rate": 0.0,
-                "avg_revenue_per_view": 0.0,
-                "total_revenue": 0.0
-            })
-            .orderBy(F.col("total_revenue").desc_nulls_last())
-        )
-    else:
-        print("One of the required columns in agg_products is all NULL or zero; skipping category view patterns analysis.")
-
-
-    # Product-level Top-View-to-Purchase Rates
-
-    if "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name") and not is_column_all_null_or_zero(dataframes["agg_products"], "category") and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders"):
-        product_analysis["top_view_to_purchase_products"] = (
-            dataframes["agg_products"]
-            .select(
-                "product_id",
-                "product_name",
-                "category",
-                "view_to_purchase_rate",
-                "revenue_per_view",
-                "total_units_sold",
-                "total_orders"
-            ).fillna({
-                "view_to_purchase_rate": 0.0,
-                "revenue_per_view": 0.0,
-                "total_units_sold": 0,
-                "total_orders": 0
-            })
-            .orderBy(F.col("view_to_purchase_rate").desc_nulls_last())
-        )
-    else:
-        print("One of the required columns in agg_products is all NULL or zero; skipping top view to purchase products analysis.")
-
-
-    # Product Performance Score
-
-        
-    if (
-        "agg_products" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_performance_score")
     ):
 
         # Base product metrics
@@ -2024,142 +2311,132 @@ def main():
                 F.col("product_performance_score_computed").desc_nulls_last()
             )
         )
+
     else:
         print(
             "One of the required columns in agg_products is all NULL or zero; "
             "skipping product performance score analysis."
         )
 
-    
-    # Category revenue share
 
 
-
-    if (
-        "agg_products" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
-    ):
-        # Aggregate revenue per category
-        category_rev_df = (
-            dataframes["agg_products"]
-            .groupBy("category")
-            .agg(
-                F.sum("total_revenue").alias("category_revenue"),
-                F.countDistinct("product_id").alias("products_in_category"),
-                F.sum("total_units_sold").alias("total_units_sold")
+    if "agg_products" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_products"], "category") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue"):
+            
+            # Aggregate revenue per category
+            category_rev_df = (
+                dataframes["agg_products"]
+                .groupBy("category")
+                .agg(
+                    F.sum("total_revenue").alias("category_revenue"),
+                    F.countDistinct("product_id").alias("products_in_category"),
+                    F.sum("total_units_sold").alias("total_units_sold")
+                )
+                .fillna({
+                    "category_revenue": 0.0,
+                    "products_in_category": 0,
+                    "total_units_sold": 0
+                })
             )
-            .fillna({
-                "category_revenue": 0.0,
-                "products_in_category": 0,
-                "total_units_sold": 0
-            })
-        )
 
-        # Compute total revenue across all categories
-        total_rev_all = (
-            category_rev_df
-            .agg(F.sum("category_revenue").alias("total_revenue_all"))
-            .first()[0] or 0.0
-        )
+            # Compute total revenue across all categories
+            total_rev_all = (
+                category_rev_df
+                .agg(F.sum("category_revenue").alias("total_revenue_all"))
+                .first()[0] or 0.0
+            )
 
-        # Add revenue share and revenue per product
-        product_analysis["category_revenue_share"] = (
-            category_rev_df
-            .withColumn(
-                "revenue_per_product",
-                F.when(F.col("products_in_category") > 0,
-                    F.col("category_revenue") / F.col("products_in_category"))
-                .otherwise(F.lit(0.0))
+            # Add revenue share and revenue per product
+            product_analysis["category_revenue_share"] = (
+                category_rev_df
+                .withColumn(
+                    "revenue_per_product",
+                    F.when(F.col("products_in_category") > 0,
+                        F.col("category_revenue") / F.col("products_in_category"))
+                    .otherwise(F.lit(0.0))
+                )
+                .withColumn(
+                    "revenue_share",
+                    F.when(F.lit(total_rev_all) > 0,
+                        F.col("category_revenue") / F.lit(total_rev_all))
+                    .otherwise(F.lit(0.0))
+                )
+                .orderBy(F.col("category_revenue").desc_nulls_last())
             )
-            .withColumn(
-                "revenue_share",
-                F.when(F.lit(total_rev_all) > 0,
-                    F.col("category_revenue") / F.lit(total_rev_all))
-                .otherwise(F.lit(0.0))
-            )
-            .orderBy(F.col("category_revenue").desc_nulls_last())
-        )
+        else:
+            print("analysis skipped because category or total_revenue in agg_products is all NULL or zero.")
     else:
-        print(
-            "One of the required columns in agg_products is all NULL or zero; "
-            "skipping category revenue share analysis."
-        )
-
-    
-    # Low-performing categories
+        print("missing agg_products table; skipping category revenue share analysis.")
 
 
-    if (
-        "agg_products" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view")
-    ):
-        category_perf = (
-            dataframes["agg_products"]
-            .groupBy("category")
-            .agg(
-                F.countDistinct("product_id").alias("products_in_category"),
-                F.sum("total_units_sold").alias("total_units_sold"),
-                F.sum("total_orders").alias("total_orders"),
-                F.sum("total_revenue").alias("total_revenue"),
-                F.avg("view_to_purchase_rate").alias("avg_view_to_purchase_rate"),
-                F.avg("revenue_per_view").alias("avg_revenue_per_view"),
-                F.avg("profit_margin").alias("avg_profit_margin")
+
+    if "agg_products" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_products"], "category") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "revenue_per_view"):
+            
+            category_perf = (
+                dataframes["agg_products"]
+                .groupBy("category")
+                .agg(
+                    F.countDistinct("product_id").alias("products_in_category"),
+                    F.sum("total_units_sold").alias("total_units_sold"),
+                    F.sum("total_orders").alias("total_orders"),
+                    F.sum("total_revenue").alias("total_revenue"),
+                    F.avg("view_to_purchase_rate").alias("avg_view_to_purchase_rate"),
+                    F.avg("revenue_per_view").alias("avg_revenue_per_view"),
+                    F.avg("profit_margin").alias("avg_profit_margin")
+                )
+                .fillna({
+                    "products_in_category": 0,
+                    "total_units_sold": 0,
+                    "total_orders": 0,
+                    "total_revenue": 0.0,
+                    "avg_view_to_purchase_rate": 0.0,
+                    "avg_revenue_per_view": 0.0,
+                    "avg_profit_margin": 0.0
+                })
             )
-            .fillna({
-                "products_in_category": 0,
-                "total_units_sold": 0,
-                "total_orders": 0,
-                "total_revenue": 0.0,
-                "avg_view_to_purchase_rate": 0.0,
-                "avg_revenue_per_view": 0.0,
-                "avg_profit_margin": 0.0
-            })
-        )
 
-        # Compute overall totals to derive revenue share
-        total_rev_all = (
-            category_perf
-            .agg(F.sum("total_revenue").alias("total_revenue_all"))
-            .first()[0] or 0.0
-        )
-
-        category_perf_with_share = (
-            category_perf
-            .withColumn(
-                "revenue_share",
-                F.when(F.lit(total_rev_all) > 0,
-                    F.col("total_revenue") / F.lit(total_rev_all))
-                .otherwise(F.lit(0.0))
+            # Compute overall totals to derive revenue share
+            total_rev_all = (
+                category_perf
+                .agg(F.sum("total_revenue").alias("total_revenue_all"))
+                .first()[0] or 0.0
             )
-        )
 
-        # "Low-performing" = low revenue & low efficiency metrics.
-        # Here we just *rank* by these; you can add explicit filters later in BI.
-        product_analysis["low_performing_categories"] = (
-            category_perf_with_share
-            .orderBy(
-                F.col("total_revenue").asc_nulls_last(),          # lowest revenue first
-                F.col("avg_view_to_purchase_rate").asc_nulls_last(),
-                F.col("avg_revenue_per_view").asc_nulls_last(),
-                F.col("avg_profit_margin").asc_nulls_last()
+            category_perf_with_share = (
+                category_perf
+                .withColumn(
+                    "revenue_share",
+                    F.when(F.lit(total_rev_all) > 0,
+                        F.col("total_revenue") / F.lit(total_rev_all))
+                    .otherwise(F.lit(0.0))
+                )
             )
-        )
+
+            # "Low-performing" = low revenue & low efficiency metrics
+            product_analysis["low_performing_categories"] = (
+                category_perf_with_share
+                .orderBy(
+                    F.col("total_revenue").asc_nulls_last(),
+                    F.col("avg_view_to_purchase_rate").asc_nulls_last(),
+                    F.col("avg_revenue_per_view").asc_nulls_last(),
+                    F.col("avg_profit_margin").asc_nulls_last()
+                )
+            )
+        else:
+            print("analysis skipped because required columns in agg_products are missing or null.")
     else:
-        print(
-            "One of the required columns in agg_products is all NULL or zero; "
-            "skipping low-performing categories analysis."
-        )
+        print("missing agg_products table; skipping low-performing categories analysis.")
 
-    
+
     # Category popularity score
-
 
     if (
         "agg_products" in dataframes
@@ -2281,8 +2558,9 @@ def main():
             "skipping category popularity score analysis."
         )
 
-    # Category profitability
 
+
+    # Category profitability
 
     if (
         "agg_products" in dataframes
@@ -2352,10 +2630,7 @@ def main():
             "skipping category profitability analysis."
         )
 
-    
-    
 
-    # Category peak season analysis
 
 
     if (
@@ -2469,27 +2744,13 @@ def main():
             "is all NULL or zero; skipping category peak season analysis."
         )
 
-    
-    #  Product lifecycle segments (new vs mature) and performance
-
 
     # Product lifecycle segments
-        
     if (
         "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "brand")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "launch_date")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "days_since_launch")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "view_to_purchase_rate")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "avg_rating")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "inventory_turnover_rate")
     ):
         lifecycle_df = (
             dataframes["agg_products"]
@@ -2567,91 +2828,85 @@ def main():
         )
 
 
-    # Product stockout risk
+    if "agg_products" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_products"], "product_id") and \
+        ("current_stock_level" in dataframes["agg_products"].columns or 
+            "current_stock" in dataframes["agg_products"].columns) and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and \
+        not is_column_all_null_or_zero(dataframes["agg_products"], "days_of_supply"):
+            
+            prod_df = dataframes["agg_products"]
 
-        
-    if (
-        "agg_products" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_name")
-        and (
-            "current_stock_level" in dataframes["agg_products"].columns
-            or "current_stock" in dataframes["agg_products"].columns
-        )
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "days_of_supply")
-    ):
-        prod_df = dataframes["agg_products"]
+            # Prefer current_stock_level if present
+            stock_col = (
+                "current_stock_level"
+                if "current_stock_level" in prod_df.columns
+                else "current_stock"
+            )
 
-        # Prefer current_stock_level if present
-        stock_col = (
-            "current_stock_level"
-            if "current_stock_level" in prod_df.columns
-            else "current_stock"
-        )
+            stockout_risk_df = (
+                prod_df
+                .select(
+                    "product_id",
+                    "product_name",
+                    "category",
+                    "sub_category",
+                    "brand",
+                    F.col(stock_col).alias("current_stock_level"),
+                    "days_of_supply",
+                    "total_units_sold",
+                    "total_orders",
+                    "total_revenue",
+                )
+                .fillna(
+                    {
+                        "current_stock_level": 0,
+                        "days_of_supply": 0.0,
+                        "total_units_sold": 0,
+                        "total_orders": 0,
+                        "total_revenue": 0.0,
+                    }
+                )
+                .withColumn(
+                    "is_high_seller",
+                    F.col("total_units_sold") > 0,
+                )
+                .withColumn(
+                    "is_low_stock",
+                    (F.col("current_stock_level") <= 0)
+                    | (F.col("days_of_supply") <= 3),  # threshold: <= 3 days of supply
+                )
+                .withColumn(
+                    "stockout_risk_flag",
+                    F.when(F.col("is_high_seller") & F.col("is_low_stock"), F.lit(1)).otherwise(F.lit(0)),
+                )
+            )
 
-        stockout_risk_df = (
-            prod_df
-            .select(
-                "product_id",
-                "product_name",
-                "category",
-                "sub_category",
-                "brand",
-                F.col(stock_col).alias("current_stock_level"),
-                "days_of_supply",
-                "total_units_sold",
-                "total_orders",
-                "total_revenue",
+            product_analysis["product_stockout_risk"] = (
+                stockout_risk_df
+                .orderBy(
+                    F.col("stockout_risk_flag").desc_nulls_last(),
+                    F.col("total_units_sold").desc_nulls_last(),
+                    F.col("days_of_supply").asc_nulls_last(),
+                )
             )
-            .fillna(
-                {
-                    "current_stock_level": 0,
-                    "days_of_supply": 0.0,
-                    "total_units_sold": 0,
-                    "total_orders": 0,
-                    "total_revenue": 0.0,
-                }
-            )
-            .withColumn(
-                "is_high_seller",
-                F.col("total_units_sold") > 0,
-            )
-            .withColumn(
-                "is_low_stock",
-                (F.col("current_stock_level") <= 0)
-                | (F.col("days_of_supply") <= 3),  # threshold: <= 3 days of supply
-            )
-            .withColumn(
-                "stockout_risk_flag",
-                F.when(F.col("is_high_seller") & F.col("is_low_stock"), F.lit(1)).otherwise(F.lit(0)),
-            )
-        )
-
-        product_analysis["product_stockout_risk"] = (
-            stockout_risk_df
-            .orderBy(
-                F.col("stockout_risk_flag").desc_nulls_last(),
-                F.col("total_units_sold").desc_nulls_last(),
-                F.col("days_of_supply").asc_nulls_last(),
-            )
-        )
+        else:
+            print("Analysis skipped because required stock or sales columns in agg_products are missing or null.")
     else:
-        print(
-            "One of the required columns in agg_products is all NULL or zero; "
-            "skipping stockout risk analysis."
-        )
+        print("Missing agg_products table; skipping stockout risk analysis.")
 
-    
+
+
     # Product stockout replenishment priority
-
-        
     if (
         "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "stockout_occurrences")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "stockout_days")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
+        
     ):
         product_analysis["product_stockout_replenishment"] = (
             dataframes["agg_products"]
@@ -2694,82 +2949,74 @@ def main():
         )
 
 
-    # Product dead stock analysis
+    if "agg_products" in dataframes:
+        if (
+            ("current_stock_level" in dataframes["agg_products"].columns or 
+            "current_stock" in dataframes["agg_products"].columns) and 
+            not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold") and 
+            not is_column_all_null_or_zero(dataframes["agg_products"], "inventory_turnover_rate")
+        ):
+            prod_df2 = dataframes["agg_products"]
 
-
-        
-    if (
-        "agg_products" in dataframes
-        and (
-            "current_stock_level" in dataframes["agg_products"].columns
-            or "current_stock" in dataframes["agg_products"].columns
-        )
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "inventory_turnover_rate")
-    ):
-        prod_df2 = dataframes["agg_products"]
-
-        stock_col2 = (
-            "current_stock_level"
-            if "current_stock_level" in prod_df2.columns
-            else "current_stock"
-        )
-
-        dead_stock_df = (
-            prod_df2
-            .select(
-                "product_id",
-                "product_name",
-                "category",
-                "sub_category",
-                "brand",
-                F.col(stock_col2).alias("current_stock_level"),
-                "total_units_sold",
-                "total_orders",
-                "total_revenue",
-                "inventory_turnover_rate",
-                "days_of_supply",
+            stock_col2 = (
+                "current_stock_level"
+                if "current_stock_level" in prod_df2.columns
+                else "current_stock"
             )
-            .fillna(
-                {
-                    "current_stock_level": 0,
-                    "total_units_sold": 0,
-                    "total_orders": 0,
-                    "total_revenue": 0.0,
-                    "inventory_turnover_rate": 0.0,
-                    "days_of_supply": 0.0,
-                }
-            )
-            # Heuristic "dead stock" score
-            .withColumn(
-                "dead_stock_score",
-                F.col("current_stock_level") * 1.0
-                - F.col("total_units_sold") * 0.5
-                - F.col("inventory_turnover_rate") * 10.0,
-            )
-        )
 
-        product_analysis["product_dead_stock"] = (
-            dead_stock_df
-            .orderBy(
-                F.col("dead_stock_score").desc_nulls_last(),
-                F.col("current_stock_level").desc_nulls_last(),
-                F.col("inventory_turnover_rate").asc_nulls_last(),
+            dead_stock_df = (
+                prod_df2
+                .select(
+                    "product_id",
+                    "product_name",
+                    "category",
+                    "sub_category",
+                    "brand",
+                    F.col(stock_col2).alias("current_stock_level"),
+                    "total_units_sold",
+                    "total_orders",
+                    "total_revenue",
+                    "inventory_turnover_rate",
+                    "days_of_supply",
+                )
+                .fillna(
+                    {
+                        "current_stock_level": 0,
+                        "total_units_sold": 0,
+                        "total_orders": 0,
+                        "total_revenue": 0.0,
+                        "inventory_turnover_rate": 0.0,
+                        "days_of_supply": 0.0,
+                    }
+                )
+                # Heuristic "dead stock" score: high stock + low sales + low turnover
+                .withColumn(
+                    "dead_stock_score",
+                    F.col("current_stock_level") * 1.0
+                    - F.col("total_units_sold") * 0.5
+                    - F.col("inventory_turnover_rate") * 10.0,
+                )
             )
-        )
+
+            product_analysis["product_dead_stock"] = (
+                dead_stock_df
+                .orderBy(
+                    F.col("dead_stock_score").desc_nulls_last(),
+                    F.col("current_stock_level").desc_nulls_last(),
+                    F.col("inventory_turnover_rate").asc_nulls_last(),
+                )
+            )
+        else:
+            print("Analysis skipped because stock, units sold, or turnover columns in agg_products are missing or null.")
     else:
-        print(
-            "One of the required columns in agg_products is all NULL or zero; "
-            "skipping dead stock analysis."
-        )
+        print("Missing agg_products table; skipping dead stock analysis.")
 
-    
 
     # 1) Product inventory health (joined with revenue from agg_products)
 
-
     if (
         "agg_product_inventory_health" in dataframes
+        and "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "product_id")
         and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "current_stock")
         and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "available_stock")
@@ -2808,6 +3055,9 @@ def main():
         if (
             "agg_products" in dataframes
             and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
+            and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
+            and not is_column_all_null_or_zero(dataframes["agg_products"], "total_orders")
+            and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
         ):
             prod_basic = (
                 dataframes["agg_products"]
@@ -2842,38 +3092,8 @@ def main():
 
         product_analysis["product_inventory_health"] = product_inventory_health_df
 
-    else:
-        print(
-            "One of the required columns in agg_product_inventory_health is all NULL or zero; "
-            "skipping base product inventory health view."
-        )
-
-
-
-    # 2) Critical products: high revenue + low days_of_supply (urgent replenishment)
-
-    if "product_inventory_health" in product_analysis and (
-        not is_column_all_null_or_zero(product_analysis["product_inventory_health"], "product_id")
-        and not is_column_all_null_or_zero(product_analysis["product_inventory_health"], "days_of_supply")
-        and not is_column_all_null_or_zero(product_analysis["product_inventory_health"], "total_revenue")
-        and not is_column_all_null_or_zero(product_analysis["product_inventory_health"], "reorder_urgency")
-        and not is_column_all_null_or_zero(product_analysis["product_inventory_health"], "stock_health_score")
-    ):
-        base = (
-            product_analysis["product_inventory_health"]
-            .fillna(
-                {
-                    "days_of_supply": 0.0,
-                    "total_revenue": 0.0,
-                    "reorder_urgency": 0.0,
-                    "stock_health_score": 0.0,
-                }
-            )
-        )
-
-    
         critical_products = (
-            base
+            product_inventory_health_df
             .withColumn(
                 "is_low_days_of_supply",
                 F.col("days_of_supply") <= 3,
@@ -2892,11 +3112,17 @@ def main():
         )
 
         product_analysis["product_inventory_critical"] = critical_products
+        
 
-    
+    else:
+        print(
+            "One of the required columns in agg_product_inventory_health is all NULL or zero; "
+            "skipping base product inventory health view."
+        )
+
+
 
     # 1) Supplier × Product performance
-        
 
     if (
         "agg_products" in dataframes
@@ -2905,6 +3131,7 @@ def main():
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "supplier_id")
         and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "profit_margin")
     ):
 
         # --- Base product + supplier_id info from products (p_ prefix) ---
@@ -3069,15 +3296,16 @@ def main():
         )
 
 
-    # Stockout Rate by Product/Supplier: Critical for lost sales calculation
 
-
-    # -------------------------------------------------------
-    # Product-level stockout rate (by product)
-    # -------------------------------------------------------
     if (
         "agg_product_inventory_health" in dataframes
+        and "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "stockout_frequency")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "reorder_point_breach_count")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "current_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "available_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "days_of_supply")
     ):
         # Base inventory health
         prod_inv = dataframes["agg_product_inventory_health"].fillna(
@@ -3141,68 +3369,49 @@ def main():
     if has_suppliers or has_sup_inv:
         # Supplier base (from agg_suppliers if available)
         if has_suppliers:
-            supplier_cols = ["supplier_id"]
-            
-            # Check and add each column if it exists
-            if "supplier_status" in dataframes["agg_suppliers"].columns:
-                supplier_cols.append("supplier_status")
-            if "total_products_supplied" in dataframes["agg_suppliers"].columns:
-                supplier_cols.append("total_products_supplied")
-            if "total_units_sold" in dataframes["agg_suppliers"].columns:
-                supplier_cols.append("total_units_sold")
-            if "total_orders_fulfilled" in dataframes["agg_suppliers"].columns:
-                supplier_cols.append("total_orders_fulfilled")
-            if "total_stockouts" in dataframes["agg_suppliers"].columns:
-                supplier_cols.append("total_stockouts")
-            if "stockout_rate" in dataframes["agg_suppliers"].columns:
-                supplier_cols.append("stockout_rate")
-            if "supplier_reliability_score" in dataframes["agg_suppliers"].columns:
-                supplier_cols.append("supplier_reliability_score")
-            if "supplier_inventory_health_score" in dataframes["agg_suppliers"].columns:
-                supplier_cols.append("supplier_inventory_health_score")
-            
-            s = dataframes["agg_suppliers"].select(*supplier_cols)
+            s = dataframes["agg_suppliers"].select(
+                "supplier_id",
+                "supplier_status",
+                "total_products_supplied",
+                "total_units_sold",
+                "total_orders_fulfilled",
+                "total_stockouts",
+                "stockout_rate",                 # supplier-level stockout rate
+                "supplier_reliability_score",
+                "supplier_inventory_health_score",
+            )
         else:
             # Fallback: only supplier_id from inventory health
             s = dataframes["agg_supplier_inventory_health"].select("supplier_id").distinct()
 
         # Inventory health aggregates (renamed to avoid clashes)
         if has_sup_inv:
-            inv_cols = ["supplier_id"]
-            
-            if "total_stockouts" in dataframes["agg_supplier_inventory_health"].columns:
-                inv_cols.append(F.col("total_stockouts").alias("inv_total_stockouts"))
-            if "stockout_rate" in dataframes["agg_supplier_inventory_health"].columns:
-                inv_cols.append(F.col("stockout_rate").alias("inv_stockout_rate"))
-            if "total_products" in dataframes["agg_supplier_inventory_health"].columns:
-                inv_cols.append(F.col("total_products").alias("inv_total_products"))
-            if "total_current_stock" in dataframes["agg_supplier_inventory_health"].columns:
-                inv_cols.append(F.col("total_current_stock").alias("inv_total_current_stock"))
-            if "total_available_stock" in dataframes["agg_supplier_inventory_health"].columns:
-                inv_cols.append(F.col("total_available_stock").alias("inv_total_available_stock"))
-            
-            i = dataframes["agg_supplier_inventory_health"].select(*inv_cols)
+            i = dataframes["agg_supplier_inventory_health"].select(
+                "supplier_id",
+                F.col("total_stockouts").alias("inv_total_stockouts"),
+                F.col("stockout_rate").alias("inv_stockout_rate"),
+                F.col("total_products").alias("inv_total_products"),
+                F.col("total_current_stock").alias("inv_total_current_stock"),
+                F.col("total_available_stock").alias("inv_total_available_stock"),
+            )
             joined = s.alias("s").join(i.alias("i"), on="supplier_id", how="left")
         else:
             joined = s
 
-        # Build select list dynamically based on available columns
-        select_cols = [
-            "supplier_id",
-            F.coalesce(F.col("supplier_status"), F.lit("unknown")).alias("supplier_status") if "supplier_status" in joined.columns else F.lit("unknown").alias("supplier_status"),
-            F.coalesce(F.col("total_stockouts"), F.lit(0)).alias("total_stockouts") if "total_stockouts" in joined.columns else F.lit(0).alias("total_stockouts"),
-            F.coalesce(F.col("stockout_rate"), F.lit(0.0)).alias("supplier_stockout_rate") if "stockout_rate" in joined.columns else F.lit(0.0).alias("supplier_stockout_rate"),
-            F.coalesce(F.col("inv_total_stockouts"), F.lit(0)).alias("inv_total_stockouts") if "inv_total_stockouts" in joined.columns else F.lit(0).alias("inv_total_stockouts"),
-            F.coalesce(F.col("inv_stockout_rate"), F.lit(0.0)).alias("inv_stockout_rate") if "inv_stockout_rate" in joined.columns else F.lit(0.0).alias("inv_stockout_rate"),
-            F.coalesce(F.col("inv_total_products"), F.lit(0)).alias("inv_total_products") if "inv_total_products" in joined.columns else F.lit(0).alias("inv_total_products"),
-            F.coalesce(F.col("inv_total_current_stock"), F.lit(0)).alias("inv_total_current_stock") if "inv_total_current_stock" in joined.columns else F.lit(0).alias("inv_total_current_stock"),
-            F.coalesce(F.col("inv_total_available_stock"), F.lit(0)).alias("inv_total_available_stock") if "inv_total_available_stock" in joined.columns else F.lit(0).alias("inv_total_available_stock"),
-            F.coalesce(F.col("supplier_reliability_score"), F.lit(0.0)).alias("supplier_reliability_score") if "supplier_reliability_score" in joined.columns else F.lit(0.0).alias("supplier_reliability_score"),
-            F.coalesce(F.col("supplier_inventory_health_score"), F.lit(0.0)).alias("supplier_inventory_health_score") if "supplier_inventory_health_score" in joined.columns else F.lit(0.0).alias("supplier_inventory_health_score"),
-        ]
-
         supplier_analysis["stockout_rate_by_supplier"] = (
-            joined.select(*select_cols)
+            joined.select(
+                "supplier_id",
+                F.coalesce(F.col("supplier_status"), F.lit("unknown")).alias("supplier_status"),
+                F.coalesce(F.col("total_stockouts"), F.lit(0)).alias("total_stockouts"),
+                F.coalesce(F.col("stockout_rate"), F.lit(0.0)).alias("supplier_stockout_rate"),
+                F.coalesce(F.col("inv_total_stockouts"), F.lit(0)).alias("inv_total_stockouts"),
+                F.coalesce(F.col("inv_stockout_rate"), F.lit(0.0)).alias("inv_stockout_rate"),
+                F.coalesce(F.col("inv_total_products"), F.lit(0)).alias("inv_total_products"),
+                F.coalesce(F.col("inv_total_current_stock"), F.lit(0)).alias("inv_total_current_stock"),
+                F.coalesce(F.col("inv_total_available_stock"), F.lit(0)).alias("inv_total_available_stock"),
+                F.coalesce(F.col("supplier_reliability_score"), F.lit(0.0)).alias("supplier_reliability_score"),
+                F.coalesce(F.col("supplier_inventory_health_score"), F.lit(0.0)).alias("supplier_inventory_health_score"),
+            )
             .orderBy(
                 F.col("supplier_stockout_rate").desc_nulls_last(),
                 F.col("total_stockouts").desc_nulls_last(),
@@ -3215,9 +3424,7 @@ def main():
         )
 
 
-    
     # Supplier ranking: total_revenue_generated, avg_profit_margin, stockout_rate
-
 
     if (
         "agg_suppliers" in dataframes
@@ -3273,9 +3480,7 @@ def main():
         )
 
 
-
     # 3) Supplier stockout impact: focus on top-revenue products
-        
 
     if "supplier_product_performance" in product_analysis:
         spp2 = (
@@ -3292,7 +3497,9 @@ def main():
             )
         )
 
-        TOP_REVENUE_THRESHOLD = 10000.0
+        TOP_REVENUE_THRESHOLD = dataframes["agg_suppliers"].agg(
+            F.expr("percentile_approx(total_revenue_generated, 0.9)")
+        ).collect()[0][0]
 
         supplier_stockout_impact = (
             spp2
@@ -3338,9 +3545,9 @@ def main():
             "skipping supplier stockout impact on products analysis."
         )
 
-    
+
+
     # Category-to-category affinity analysis
-        
 
     if (
         "agg_category_affinity" in dataframes
@@ -3382,29 +3589,16 @@ def main():
                 F.col("total_co_occurrences").desc_nulls_last(),
             )
         )
-    else:
-        print(
-            "One of the required columns in agg_category_affinity is all NULL or zero; "
-            "skipping category-to-category affinity analysis."
-        )
 
-    
-    # Top affinity category per base category
-
-        
-    if "category_affinity_pairs" in product_analysis:
-        base = product_analysis["category_affinity_pairs"]
-
-        
         max_lift_per_a = (
-            base.groupBy("product_a_category")
+            category_affinity_base.groupBy("product_a_category")
             .agg(
                 F.max("avg_lift_between_categories").alias("max_lift_for_a")
             )
         )
 
         category_affinity_top_per_category = (
-            base.alias("b")
+            category_affinity_base.alias("b")
             .join(
                 max_lift_per_a.alias("m"),
                 on="product_a_category",
@@ -3427,10 +3621,14 @@ def main():
 
         product_analysis["category_affinity_top_per_category"] = category_affinity_top_per_category
 
+    else:
+        print(
+            "One of the required columns in agg_category_affinity is all NULL or zero; "
+            "skipping category-to-category affinity analysis."
+        )
+
 
     # 1) Product-to-product affinity: full pairs
-
-        
 
     if (
         "agg_product_affinity" in dataframes
@@ -3485,29 +3683,16 @@ def main():
                 F.col("co_occurrence_count").desc_nulls_last(),
             )
         )
-    else:
-        print(
-            "One of the required columns in agg_product_affinity is all NULL or zero; "
-            "skipping product-to-product affinity base analysis."
-        )
 
-    
-    # Top partner per product
-
-        
-    if "product_affinity_pairs" in product_analysis:
-        base = product_analysis["product_affinity_pairs"]
-
-        # For each product_a_id, get max affinity_score
         max_affinity_per_a = (
-            base.groupBy("product_a_id")
+            product_affinity_base.groupBy("product_a_id")
             .agg(
                 F.max("affinity_score").alias("max_affinity_for_a")
             )
         )
 
         product_affinity_top_per_product = (
-            base.alias("p")
+            product_affinity_base.alias("p")
             .join(
                 max_affinity_per_a.alias("m"),
                 on="product_a_id",
@@ -3538,38 +3723,20 @@ def main():
         product_analysis["product_affinity_top_per_product"] = product_affinity_top_per_product
 
 
-    
 
-    # 3) Top 5 strong affinity recommendations per product
-        
-
-    if "product_affinity_pairs" in product_analysis:
-        base = product_analysis["product_affinity_pairs"]
-
-        # Tune these thresholds for your data
-        strong_recos = (
-            base
-            .filter(
-                (F.col("affinity_score") >= 0.5)    # strong normalized score
-                & (F.col("avg_lift") >= 1.1)        # lift > 1 indicates positive association
-                & (F.col("co_occurrence_count") >= 5)
-            )
-            .orderBy(
-                F.col("product_a_id"),
-                F.col("affinity_score").desc_nulls_last(),
-                F.col("avg_lift").desc_nulls_last(),
-            )
+    else:
+        print(
+            "One of the required columns in agg_product_affinity is all NULL or zero; "
+            "skipping product-to-product affinity base analysis."
         )
 
-        product_analysis["product_affinity_top5_candidates"] = strong_recos
 
-
-    # precomputed products recommendations 
 
     if (
         "agg_product_recommendations" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_product_recommendations"], "product_a_id")
         and not is_column_all_null_or_zero(dataframes["agg_product_recommendations"], "recommended_products")
+        and not is_column_all_null_or_zero(dataframes["agg_product_recommendations"], "avg_affinity_score")
     ):
         
         product_analysis["precomputed_product_recommendations"] = (
@@ -3625,16 +3792,24 @@ def main():
             "skipping precomputed product recommendations analysis."
         )
 
-    
+
 
 
     # 1) Campaign Performance Summary
-
-        
     if (
         "agg_marketing_campaigns" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "campaign_id")
         and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "revenue_generated")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "clicks")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "spent_amount")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "impressions")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "budget")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "orders_from_campaign")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "campaign_efficiency_score")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "avg_order_value")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "conversion_rate")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "roas")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "roi")
     ):
         analysis["campaign_performance_summary"] = (
             dataframes["agg_marketing_campaigns"]
@@ -3683,6 +3858,17 @@ def main():
         and "agg_order_items" in dataframes
         and "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "campaign_id")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "clicks")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "spent_amount")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "impressions")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "budget")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "orders_from_campaign")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "campaign_efficiency_score")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "avg_order_value")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "conversion_rate")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "roas")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "roi")
     ):
         orders_with_campaign = (
             dataframes["agg_orders"]
@@ -3693,7 +3879,7 @@ def main():
         
         order_items_cols = ["order_id", "product_id", "quantity"]
         if line_revenue_col: 
-            order_items_cols. append(line_revenue_col)
+            order_items_cols.append(line_revenue_col)
         
         order_product_campaign = (
             dataframes["agg_order_items"]. select(*order_items_cols)
@@ -3866,8 +4052,7 @@ def main():
                 .orderBy(F.col("campaign_products_revenue").desc_nulls_last())
             )
 
-    
-    # # Inventory Analysis 
+
 
     if (
         "agg_product_inventory_health" in dataframes
@@ -3887,11 +4072,10 @@ def main():
                 "minimum_stock_level": 0,
                 "reorder_point_breach_count": 0,
                 "avg_daily_sales": 0.0,
-                # "days_of_supply": None,  # REMOVE this line
             }
         )
 
-        # If days_of_supply missing, approximate from avg_daily_sales
+        # Layer 2: If days_of_supply missing, approximate from avg_daily_sales
         if "days_of_supply" not in inv.columns:
             inv = inv.withColumn(
                 "days_of_supply",
@@ -3901,7 +4085,6 @@ def main():
             )
 
         # Compute stock_status_computed using business rules:
-    
         inv = inv.withColumn(
             "stock_status_computed",
             F.when(
@@ -3948,7 +4131,7 @@ def main():
             }
         )
 
-        # No days_of_supply here, so we classify purely on levels and minimum_stock_level
+        # Classification purely on levels and minimum_stock_level
         inv = inv.withColumn(
             "stock_status_computed",
             F.when(
@@ -3979,30 +4162,33 @@ def main():
         )
 
     else:
-        print(
-            "agg_product_inventory_health or agg_inventory not available, or product_id column is all NULL/zero; "
-            "skipping stock status analysis."
-        )
+        print("Required inventory tables not found or critical columns are null/zero.")
 
 
 
-    # Days of supply
 
-        
+    # -------------------------------------------------------
+    # Days of Supply Analysis
+    # -------------------------------------------------------
+
+    # Layer 1: Check primary health table
     if (
         "agg_product_inventory_health" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "current_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "available_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "avg_daily_sales")
     ):
+        # Layer 2: Validate columns for health-based calculation
         inv = dataframes["agg_product_inventory_health"].fillna(
             {
                 "current_stock": 0,
                 "available_stock": 0,
                 "avg_daily_sales": 0.0,
-                # "days_of_supply": None,  # REMOVE this line
             }
         )
 
-        # If days_of_supply already exists in the table, respect it.
+        # Respect existing days_of_supply if present, otherwise calculate
         if "days_of_supply" not in inv.columns:
             inv = inv.withColumn(
                 "days_of_supply",
@@ -4023,11 +4209,12 @@ def main():
             .orderBy(F.col("days_of_supply").asc_nulls_last())
         )
 
+    # Layer 1 Fallback: Check standard inventory table
     elif (
         "agg_inventory" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_inventory"], "product_id")
     ):
-        # Fallback: approximate avg_daily_sales from total_sold and last_restocked_date (or stock_turnover_ratio)
+        # Layer 2: Validate columns for fallback calculation
         inv = dataframes["agg_inventory"].fillna(
             {
                 "available_stock": 0,
@@ -4037,17 +4224,17 @@ def main():
             }
         )
 
-        # Try to derive avg_daily_sales:
-        # 1) If stock_turnover_ratio exists: approx annual_turnover / 365 * avg_inventory -> daily_sales
-        # 2) Else, if last_restocked_date exists: total_sold / days_since_restock
+        # Derive avg_daily_sales based on available data grains
         if "avg_daily_sales" in inv.columns and not is_column_all_null_or_zero(inv, "avg_daily_sales"):
-            inv = inv
+            pass 
         else:
+            # Option A: Turnover Ratio
             if "stock_turnover_ratio" in inv.columns and not is_column_all_null_or_zero(inv, "stock_turnover_ratio"):
                 inv = inv.withColumn(
                     "avg_daily_sales",
                     F.col("stock_turnover_ratio") * F.col("avg_inventory") / F.lit(365.0),
                 )
+            # Option B: Last Restock Date
             elif "last_restocked_date" in inv.columns and not is_column_all_null_or_zero(inv, "last_restocked_date"):
                 inv = inv.withColumn(
                     "days_since_restock",
@@ -4089,17 +4276,18 @@ def main():
 
 
 
-    # SKU-level reorder urgency
 
-
-
+    # Layer 1: Check primary health table
     if (
         "agg_product_inventory_health" in dataframes
-        and not is_column_all_null_or_zero(
-            dataframes["agg_product_inventory_health"], "product_id"
-        )
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "available_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "current_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "minimum_stock_level")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "reorder_point_breach_count")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "avg_daily_sales")
     ):
-        # Do NOT use None in fillna; only numeric defaults
+        # Layer 2: Validate columns and fill numeric defaults
         inv = dataframes["agg_product_inventory_health"].fillna(
             {
                 "available_stock": 0,
@@ -4107,11 +4295,10 @@ def main():
                 "minimum_stock_level": 0,
                 "reorder_point_breach_count": 0,
                 "avg_daily_sales": 0.0,
-                # "days_of_supply": None,  # <-- remove this, Spark can't handle None here
             }
         )
 
-        # Ensure days_of_supply exists / is populated
+        # Ensure days_of_supply exists for scoring
         if (
             "days_of_supply" not in inv.columns
             or is_column_all_null_or_zero(inv, "days_of_supply")
@@ -4124,19 +4311,16 @@ def main():
                 ).otherwise(F.lit(None)),
             )
 
-        # Reorder urgency score
+        # Reorder urgency scoring logic
         inv = inv.withColumn(
             "reorder_urgency_score",
-            # Strong penalty for breach
             F.when(F.col("reorder_point_breach_count") > 0, 100).otherwise(0)
-            # Low days of supply
             + F.when(
                 F.col("days_of_supply").isNotNull(),
                 F.when(F.col("days_of_supply") < 7, 50)
                 .when(F.col("days_of_supply") < 30, 20)
                 .otherwise(0),
             ).otherwise(10)
-            # Available stock below minimum
             + F.when(
                 (F.col("minimum_stock_level") > 0)
                 & (F.col("available_stock") <= F.col("minimum_stock_level")),
@@ -4166,10 +4350,12 @@ def main():
             ).orderBy(F.col("reorder_urgency_score").desc_nulls_last())
         )
 
+    # Layer 1 Fallback: Check standard inventory table
     elif (
         "agg_inventory" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_inventory"], "product_id")
     ):
+        # Layer 2: Numeric fill for fallback
         inv = dataframes["agg_inventory"].fillna(
             {
                 "available_stock": 0,
@@ -4179,7 +4365,6 @@ def main():
             }
         )
 
-        # No days_of_supply here, just level vs minimum + breach
         inv = inv.withColumn(
             "reorder_urgency_score",
             F.when(F.col("reorder_point_breach") == 1, 100).otherwise(0)
@@ -4216,20 +4401,17 @@ def main():
         )
 
     else:
-        print(
-            "agg_product_inventory_health or agg_inventory not available, or product_id column is all NULL/zero; "
-            "skipping SKU-level reorder urgency analysis."
-        )
+        print("Required inventory data missing; skipping reorder urgency analysis.")
 
-    
-    # Reorder Point Breach Frequency: Products frequently hitting reorder_point_breach_count
 
-        
+
+
     # -------------------------------------------------------
     # Reorder Point Breach Frequency: products frequently breaching reorder point
     # -------------------------------------------------------
     if (
         "agg_product_inventory_health" in dataframes
+        and "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "product_id")
     ):
         # 1) Base DF: DO NOT use None in fillna, only scalars
@@ -4291,6 +4473,7 @@ def main():
     # -------------------------------------------------------
     elif (
         "agg_inventory" in dataframes
+        and "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_inventory"], "product_id")
     ):
         inv = dataframes["agg_inventory"].fillna(
@@ -4311,7 +4494,7 @@ def main():
             )
         )
 
-         # Optional enrich with product metadata (again, skip stock_status to keep it simple)
+        # Optional enrich with product metadata (again, skip stock_status to keep it simple)
         if (
             "agg_products" in dataframes
             and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
@@ -4327,26 +4510,19 @@ def main():
 
         BREACH_THRESHOLD = 3
 
-        # Build select list dynamically based on available columns
-        select_cols = [
-            "product_id",
-            "supplier_id",
-            "reorder_point_breach_count",
-            "latest_stock_quantity",
-            "latest_available_stock",
-        ]
-        if "product_name" in breaches_agg.columns:
-            select_cols.append("product_name")
-        if "category" in breaches_agg.columns:
-            select_cols.append("category")
-        if "total_units_sold" in breaches_agg.columns:
-            select_cols.append("total_units_sold")
-        if "total_revenue" in breaches_agg.columns:
-            select_cols.append("total_revenue")
-
         product_analysis["reorder_point_breach_frequency"] = (
             breaches_agg.filter(F.col("reorder_point_breach_count") >= BREACH_THRESHOLD)
-            .select(*select_cols)
+            .select(
+                "product_id",
+                "supplier_id",
+                "reorder_point_breach_count",
+                "latest_stock_quantity",
+                "latest_available_stock",
+                "product_name",
+                "category",
+                "total_units_sold",
+                "total_revenue",
+            )
             .orderBy(F.col("reorder_point_breach_count").desc_nulls_last())
         )
 
@@ -4358,14 +4534,18 @@ def main():
 
 
 
-    # Overstock Analysis: Products with stock_health_score < 40 and high storage_cost
 
 
-    
-
+    # Overstock Analysis: low stock_health_score & high storage cost
     if (
         "agg_product_inventory_health" in dataframes
+        and "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "stock_health_score")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "storage_cost")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "storage_cost_per_unit")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "current_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "available_stock")
     ):
         # 1) Base inventory DF – do NOT use None in fillna
         inv = dataframes["agg_product_inventory_health"].fillna(
@@ -4395,9 +4575,9 @@ def main():
             inv = inv.alias("i").join(prod.alias("p"), on="product_id", how="left")
 
         # 3) Thresholds
-        LOW_HEALTH_THRESHOLD = 40          # stock_health_score < 40
-        HIGH_STORAGE_COST = 1000.0         # absolute storage cost
-        HIGH_STORAGE_COST_PER_UNIT = 1.0   # per-unit storage cost
+        LOW_HEALTH_THRESHOLD = dataframes["agg_product_inventory_health"].select(F.avg("stock_health_score")).collect()[0][0]            # stock_health_score < 40
+        HIGH_STORAGE_COST =   dataframes["agg_product_inventory_health"].select(F.avg("storage_cost")).collect()[0][0]       # absolute storage cost
+        HIGH_STORAGE_COST_PER_UNIT = dataframes["agg_product_inventory_health"].select(F.avg("storage_cost_per_unit")).collect()[0][0]   # per-unit storage cost
 
         # 4) Flag overstock
         overstock = (
@@ -4445,12 +4625,17 @@ def main():
 
 
 
+
+
     # Storage Cost Efficiency: total_storage_cost / total_available_stock by supplier
-
-
     if (
         "agg_supplier_inventory_health" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "supplier_id")
+        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "total_storage_cost")
+        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "total_available_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "total_current_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "avg_storage_cost_per_unit")
+        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "supplier_inventory_health_score")
     ):
         sup_inv = dataframes["agg_supplier_inventory_health"].fillna(
             {
@@ -4494,13 +4679,19 @@ def main():
         )
 
 
-    
-# Primary: product-level storage_cost in agg_product_inventory_health
 
 
+
+    # Primary: product-level storage_cost in agg_product_inventory_health
     if (
         "agg_product_inventory_health" in dataframes
+        and "agg_products" in dataframes
+        and "agg_suppliers" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "storage_cost")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "storage_cost_per_unit")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "available_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "current_stock")
     ):
         inv = dataframes["agg_product_inventory_health"].fillna(
             {
@@ -4557,6 +4748,8 @@ def main():
     # Fallback: supplier-level total_storage_cost in agg_supplier_inventory_health
     elif (
         "agg_supplier_inventory_health" in dataframes
+        and "agg_suppliers" in dataframes
+        and "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "supplier_id")
     ):
         sup_inv = dataframes["agg_supplier_inventory_health"].fillna(
@@ -4586,13 +4779,16 @@ def main():
         )
 
 
-        
+
     # Margin Erosion Risk: products with high storage cost relative to sales
-
-
     if (
         "agg_product_inventory_health" in dataframes
+        and "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "storage_cost")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "storage_cost_per_unit")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "current_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "available_stock")
     ):
         inv = dataframes["agg_product_inventory_health"].fillna(
             {
@@ -4645,8 +4841,8 @@ def main():
         # Thresholds for "at risk" (tune to your business):
         # - storage cost > 10% of revenue OR
         # - per-unit storage > 20% of unit selling price
-        STORAGE_TO_REV_THRESHOLD = 0.10
-        STORAGE_PER_UNIT_TO_PRICE_THRESHOLD = 0.20
+        STORAGE_TO_REV_THRESHOLD = inv.agg(F.percentile_approx("storage_cost_to_revenue", 0.75)).collect()[0][0]  # e.g., 0.10
+        STORAGE_PER_UNIT_TO_PRICE_THRESHOLD = inv.agg(F.percentile_approx("storage_cost_per_unit_to_price", 0.75)).collect()[0][0]  # e.g., 0.20
 
         risk_df = (
             inv.withColumn(
@@ -4692,15 +4888,12 @@ def main():
 
 
 
-    # Reserved vs available stock
-
-
-
     if (
         "agg_product_inventory_health" in dataframes
-        and not is_column_all_null_or_zero(
-            dataframes["agg_product_inventory_health"], "product_id"
-        )
+        and "agg_products" in dataframes
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "available_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "reserved_quantity")
     ):
         inv = dataframes["agg_product_inventory_health"].fillna(
             {
@@ -4733,6 +4926,8 @@ def main():
     elif (
         "agg_inventory" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_inventory"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_inventory"], "available_stock")
+        and not is_column_all_null_or_zero(dataframes["agg_inventory"], "reserved_quantity")
     ):
         inv = dataframes["agg_inventory"].fillna(
             {
@@ -4774,377 +4969,161 @@ def main():
         )
 
 
-        
     # Excess inventory: items not selling
     # Preferred source: agg_product_inventory_health
-
-
-    if (
-        "agg_product_inventory_health" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "product_id")
-    ):
-        inv = dataframes["agg_product_inventory_health"].fillna(
-            {
-                "available_stock": 0,
-                "current_stock": 0,
-            }
-        )
-
-        # Try to enrich with product-level sales if agg_products exists
-        if (
-            "agg_products" in dataframes
-            and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
-        ):
-            prod = dataframes["agg_products"].select(
-                "product_id",
-                "product_name",
-                "category",
-                "total_units_sold",
-                "total_revenue",
-                "avg_order_value_product",
-                "days_since_launch",
-            )
-
-            inv = (
-                inv.alias("i")
-                .join(prod.alias("p"), on="product_id", how="left")
-            )
-        else:
-            prod = None
-
-        # Fallback for avg_daily_sales if missing: use product total_units_sold over a 180-day window
-        if "avg_daily_sales" in inv.columns:
-            inv = inv.withColumn(
-                "avg_daily_sales_effective",
-                F.when(F.col("avg_daily_sales").isNotNull(), F.col("avg_daily_sales"))
-                .otherwise(
-                    F.when(
-                        F.col("total_units_sold").isNotNull() & (F.col("total_units_sold") > 0),
-                        F.col("total_units_sold") / F.lit(180.0),
-                    ).otherwise(F.lit(0.0))
-                ),
-            )
-        else:
-            inv = inv.withColumn(
-                "avg_daily_sales_effective",
-                F.when(
-                    F.col("total_units_sold").isNotNull() & (F.col("total_units_sold") > 0),
-                    F.col("total_units_sold") / F.lit(180.0),
-                ).otherwise(F.lit(0.0)),
-            )
-
-        # Ensure days_of_supply exists: prefer existing, else derive from available_stock / avg_daily_sales_effective
-        if "days_of_supply" in inv.columns and not is_column_all_null_or_zero(inv, "days_of_supply"):
-            inv = inv.withColumn(
-                "days_of_supply_effective",
-                F.col("days_of_supply"),
-            )
-        else:
-            inv = inv.withColumn(
-                "days_of_supply_effective",
-                F.when(
-                    F.col("avg_daily_sales_effective") > 0,
-                    F.col("available_stock") / F.col("avg_daily_sales_effective"),
-                ).otherwise(F.lit(None)),
-            )
-
-        # Thresholds (you can tune these):
-        EXCESS_DOS = 180.0     # very high days of supply
-        LOW_SALES_RATE = 0.1   # <= 0.1 units/day ~ < 3 units/month
-
-        excess = (
-            inv.withColumn(
-                "is_excess_inventory",
-                F.when(
-                    (F.col("available_stock") > 0)
-                    & (F.col("days_of_supply_effective").isNotNull())
-                    & (F.col("days_of_supply_effective") >= F.lit(EXCESS_DOS))
-                    & (F.col("avg_daily_sales_effective") <= F.lit(LOW_SALES_RATE)),
-                    1,
-                ).otherwise(0),
-            )
-            .filter(F.col("is_excess_inventory") == 1)
-            .select(
-                "product_id",
-                *[c for c in ["product_name", "category"] if c in inv.columns],
-                "supplier_id",
-                "available_stock",
-                "current_stock",
-                "avg_daily_sales_effective",
-                "days_of_supply_effective",
-                *[c for c in ["total_units_sold", "total_revenue", "days_since_launch"] if c in inv.columns],
-                "stock_health_score",
-                "reorder_urgency",
-            )
-            .orderBy(
-                F.col("days_of_supply_effective").desc_nulls_last(),
-                F.col("available_stock").desc_nulls_last(),
-            )
-        )
-
-        product_analysis["excess_inventory_not_selling"] = excess
-
-    # Fallback: use agg_inventory + agg_products if product_inventory_health not usable
-    elif (
-        "agg_inventory" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_inventory"], "product_id")
-    ):
-        inv = dataframes["agg_inventory"].fillna(
-            {
-                "available_stock": 0,
-                "stock_quantity": 0,
-                "total_sold": 0,
-            }
-        )
-
-        base = inv
-        if (
-            "agg_products" in dataframes
-            and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
-        ):
-            prod = dataframes["agg_products"].select(
-                "product_id",
-                "product_name",
-                "category",
-                "total_units_sold",
-                "total_revenue",
-                "days_since_launch",
-            )
-            base = base.alias("i").join(prod.alias("p"), on="product_id", how="left")
-
-        # Approx avg_daily_sales from total_sold or total_units_sold over 180 days
-        # Check if total_units_sold exists in base before using it
-        if "total_units_sold" in base.columns:
-            base = base.withColumn(
-                "total_units_sold_effective",
-                F.coalesce(F.col("total_sold"), F.col("total_units_sold")),
-            )
-        else:
-            base = base.withColumn(
-                "total_units_sold_effective",
-                F.coalesce(F.col("total_sold"), F.lit(0)),
-            )
-        
-        base = base.withColumn(
-            "avg_daily_sales_effective",
-            F.when(
-                F.col("total_units_sold_effective") > 0,
-                F.col("total_units_sold_effective") / F.lit(180.0),
-            ).otherwise(F.lit(0.0)),
-        )
-
-        base = base.withColumn(
-            "days_of_supply_effective",
-            F.when(
-                F.col("avg_daily_sales_effective") > 0,
-                F.col("available_stock") / F.col("avg_daily_sales_effective"),
-            ).otherwise(F.lit(None)),
-        )
-
-        EXCESS_DOS = 180.0
-        LOW_SALES_RATE = 0.1
-
-        excess = (
-            base.withColumn(
-                "is_excess_inventory",
-                F.when(
-                    (F.col("available_stock") > 0)
-                    & (F.col("days_of_supply_effective").isNotNull())
-                    & (F.col("days_of_supply_effective") >= F.lit(EXCESS_DOS))
-                    & (F.col("avg_daily_sales_effective") <= F.lit(LOW_SALES_RATE)),
-                    1,
-                ).otherwise(0),
-            )
-            .filter(F.col("is_excess_inventory") == 1)
-            .select(
-                "product_id",
-                *[c for c in ["product_name", "category"] if c in base.columns],
-                "supplier_id",
-                "available_stock",
-                "stock_quantity",
-                "avg_daily_sales_effective",
-                "days_of_supply_effective",
-                *[c for c in ["total_units_sold_effective", "total_revenue", "days_since_launch"] if c in base.columns],
-            )
-            .orderBy(
-                F.col("days_of_supply_effective").desc_nulls_last(),
-                F.col("available_stock").desc_nulls_last(),
-            )
-        )
-
-        product_analysis["excess_inventory_not_selling"] = excess
-
-    else:
-        print(
-            "agg_product_inventory_health or agg_inventory not available, or product_id column is all NULL/zero; "
-            "skipping excess inventory (items not selling) analysis."
-        )
-
-    
-
-    # Aging inventory: slow movers
-    # Preferred: agg_product_inventory_health (+ optional agg_products enrichment)
-
-    if (
-        "agg_product_inventory_health" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "product_id")
-    ):
-        inv = dataframes["agg_product_inventory_health"].fillna(
-            {
-                "available_stock": 0,
-                "current_stock": 0,
-            }
-        )
-
-        # Optional enrichment with product-level context
-        if (
-            "agg_products" in dataframes
-            and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
-        ):
-            prod = dataframes["agg_products"].select(
-                "product_id",
-                "product_name",
-                "category",
-                "total_units_sold",
-                "total_revenue",
-                "days_since_launch",
-            )
-
-            inv = inv.alias("i").join(prod.alias("p"), on="product_id", how="left")
-
-        # Effective avg_daily_sales
-        inv = inv.withColumn(
-            "avg_daily_sales_effective",
-            F.when(F.col("avg_daily_sales").isNotNull(), F.col("avg_daily_sales"))
-            .otherwise(
-                F.when(
-                    F.col("total_units_sold").isNotNull() & (F.col("total_units_sold") > 0),
-                    F.col("total_units_sold") / F.lit(180.0),  # simple proxy: last ~6 months
-                ).otherwise(F.lit(0.0))
-            ),
-        )
-
-        # Effective days_since_restock: prefer days_since_restock, else days_since_launch
-        inv = inv.withColumn(
-            "days_since_restock_effective",
-            F.when(F.col("days_since_restock").isNotNull(), F.col("days_since_restock"))
-            .otherwise(F.col("days_since_launch")),
-        )
-
-        # Effective days_of_supply: prefer existing, else derive from stock / avg_daily_sales_effective
-        if "days_of_supply" in inv.columns and not is_column_all_null_or_zero(inv, "days_of_supply"):
-            inv = inv.withColumn("days_of_supply_effective", F.col("days_of_supply"))
-        else:
-            inv = inv.withColumn(
-                "days_of_supply_effective",
-                F.when(
-                    F.col("avg_daily_sales_effective") > 0,
-                    F.col("available_stock") / F.col("avg_daily_sales_effective"),
-                ).otherwise(F.lit(None)),
-            )
-
-        # Thresholds for "slow mover" (tune as needed)
-        SLOW_MIN_DAYS_IN_STOCK = 60      # at least 60 days in stock
-        SLOW_MAX_SALES_RATE = 0.5        # <= 0.5 units/day
-        SLOW_MIN_DOS = 30.0              # optional: at least 30 days of supply
-
-        slow = (
-            inv.withColumn(
-                "is_slow_mover",
-                F.when(
-                    (F.col("available_stock") > 0)
-                    & (F.col("avg_daily_sales_effective") <= F.lit(SLOW_MAX_SALES_RATE))
-                    & (F.col("days_since_restock_effective").isNotNull())
-                    & (F.col("days_since_restock_effective") >= F.lit(SLOW_MIN_DAYS_IN_STOCK))
-                    & (
-                        F.col("days_of_supply_effective").isNull()
-                        | (F.col("days_of_supply_effective") >= F.lit(SLOW_MIN_DOS))
-                    ),
-                    1,
-                ).otherwise(0),
-            )
-            .filter(F.col("is_slow_mover") == 1)
-            .select(
-                "product_id",
-                *[c for c in ["product_name", "category"] if c in inv.columns],
-                "supplier_id",
-                "available_stock",
-                "current_stock",
-                "avg_daily_sales_effective",
-                "days_of_supply_effective",
-                "days_since_restock_effective",
-                *[c for c in ["total_units_sold", "total_revenue", "days_since_launch"] if c in inv.columns],
-                "stock_health_score",
-                "reorder_urgency",
-            )
-            .orderBy(
-                F.col("days_since_restock_effective").desc_nulls_last(),
-                F.col("avg_daily_sales_effective").asc_nulls_last(),
-            )
-        )
-
-        product_analysis["aging_inventory_slow_movers"] = slow
-
-    # Fallback: agg_inventory + agg_products if product_inventory_health not usable
-    elif (
-        "agg_inventory" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_inventory"], "product_id")
-    ):
-        inv = dataframes["agg_inventory"].fillna(
-            {
-                "available_stock": 0,
-                "stock_quantity": 0,
-                "total_sold": 0,
-            }
-        )
-
-        base = inv
-        if (
-            "agg_products" in dataframes
-            and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
-        ):
-            prod = dataframes["agg_products"].select(
-                "product_id",
-                "product_name",
-                "category",
-                "total_units_sold",
-                "total_revenue",
-                "days_since_launch",
-            )
-            base = base.alias("i").join(prod.alias("p"), on="product_id", how="left")
-
-        # Check if required columns exist before proceeding
-        has_last_restocked = "last_restocked_date" in base.columns and not is_column_all_null_or_zero(base, "last_restocked_date")
-        has_days_since_launch = "days_since_launch" in base.columns and not is_column_all_null_or_zero(base, "days_since_launch")
-        has_total_sold = "total_sold" in base.columns and not is_column_all_null_or_zero(base, "total_sold")
-        has_total_units_sold = "total_units_sold" in base.columns and not is_column_all_null_or_zero(base, "total_units_sold")
-        has_total_revenue = "total_revenue" in base.columns and not is_column_all_null_or_zero(base, "total_revenue")
-
-        # Only proceed if we have the minimum required columns
-        if has_last_restocked or has_days_since_launch:
-            # days_since_restock from last_restocked_date
-            if has_last_restocked:
-                base = base.withColumn(
-                    "days_since_restock_effective",
-                    F.when(
-                        F.col("last_restocked_date").isNotNull(),
-                        F.datediff(F.current_date(), F.col("last_restocked_date")),
-                    ).otherwise(F.col("days_since_launch") if has_days_since_launch else F.lit(None)),
-                )
-            elif has_days_since_launch:
-                base = base.withColumn(
-                    "days_since_restock_effective",
-                    F.col("days_since_launch"),
+    if "agg_product_inventory_health" in dataframes and "products" in dataframes:
+        if "product_id" in dataframes["agg_products"].columns and "product_id" in dataframes["agg_product_inventory_health"].columns:    
+            if (
+                "agg_product_inventory_health" in dataframes
+                and "agg_products" in dataframes
+                and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "product_id")
+                and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "available_stock")
+                and not is_column_all_null_or_zero(dataframes["agg_product_inventory_health"], "current_stock")
+                and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
+                and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
+                and not is_column_all_null_or_zero(dataframes["agg_products"], "avg_order_value_product")
+            ):
+                inv = dataframes["agg_product_inventory_health"].fillna(
+                    {
+                        "available_stock": 0,
+                        "current_stock": 0,
+                    }
                 )
 
-            # Sales velocity proxy
-            if has_total_sold or has_total_units_sold:
+                # Try to enrich with product-level sales if agg_products exists
+                if (
+                    "agg_products" in dataframes
+                    and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
+                ):
+                    prod = dataframes["agg_products"].select(
+                        "product_id",
+                        "product_name",
+                        "category",
+                        "total_units_sold",
+                        "total_revenue",
+                        "avg_order_value_product",
+                        "days_since_launch",
+                    )
+
+                    inv = (
+                        inv.alias("i")
+                        .join(prod.alias("p"), on="product_id", how="left")
+                    )
+                else:
+                    prod = None
+
+                # Fallback for avg_daily_sales if missing: use product total_units_sold over a 180-day window
+                if "avg_daily_sales" in inv.columns:
+                    inv = inv.withColumn(
+                        "avg_daily_sales_effective",
+                        F.when(F.col("avg_daily_sales").isNotNull(), F.col("avg_daily_sales"))
+                        .otherwise(
+                            F.when(
+                                F.col("total_units_sold").isNotNull() & (F.col("total_units_sold") > 0),
+                                F.col("total_units_sold") / F.lit(180.0),
+                            ).otherwise(F.lit(0.0))
+                        ),
+                    )
+                else:
+                    inv = inv.withColumn(
+                        "avg_daily_sales_effective",
+                        F.when(
+                            F.col("total_units_sold").isNotNull() & (F.col("total_units_sold") > 0),
+                            F.col("total_units_sold") / F.lit(180.0),
+                        ).otherwise(F.lit(0.0)),
+                    )
+
+                # Ensure days_of_supply exists: prefer existing, else derive from available_stock / avg_daily_sales_effective
+                if "days_of_supply" in inv.columns and not is_column_all_null_or_zero(inv, "days_of_supply"):
+                    inv = inv.withColumn(
+                        "days_of_supply_effective",
+                        F.col("days_of_supply"),
+                    )
+                else:
+                    inv = inv.withColumn(
+                        "days_of_supply_effective",
+                        F.when(
+                            F.col("avg_daily_sales_effective") > 0,
+                            F.col("available_stock") / F.col("avg_daily_sales_effective"),
+                        ).otherwise(F.lit(None)),
+                    )
+
+                # Thresholds (you can tune these):
+            
+                EXCESS_DOS = inv.agg(F.percentile_approx("days_of_supply_effective", 0.75)).collect()[0][0]  # 75th percentile
+                LOW_SALES_RATE = inv.agg(F.percentile_approx("avg_daily_sales_effective", 0.25)).collect()[0][0]  # 25th percentile
+
+                excess = (
+                    inv.withColumn(
+                        "is_excess_inventory",
+                        F.when(
+                            (F.col("available_stock") > 0)
+                            & (F.col("days_of_supply_effective").isNotNull())
+                            & (F.col("days_of_supply_effective") >= F.lit(EXCESS_DOS))
+                            & (F.col("avg_daily_sales_effective") <= F.lit(LOW_SALES_RATE)),
+                            1,
+                        ).otherwise(0),
+                    )
+                    .filter(F.col("is_excess_inventory") == 1)
+                    .select(
+                        "product_id",
+                        *[c for c in ["product_name", "category"] if c in inv.columns],
+                        "supplier_id",
+                        "available_stock",
+                        "current_stock",
+                        "avg_daily_sales_effective",
+                        "days_of_supply_effective",
+                        *[c for c in ["total_units_sold", "total_revenue", "days_since_launch"] if c in inv.columns],
+                        "stock_health_score",
+                        "reorder_urgency",
+                    )
+                    .orderBy(
+                        F.col("days_of_supply_effective").desc_nulls_last(),
+                        F.col("available_stock").desc_nulls_last(),
+                    )
+                )
+
+                product_analysis["excess_inventory_not_selling"] = excess
+
+            # Fallback: use agg_inventory + agg_products if product_inventory_health not usable
+            elif (
+                "agg_inventory" in dataframes
+                and not is_column_all_null_or_zero(dataframes["agg_inventory"], "product_id")
+                and not is_column_all_null_or_zero(dataframes["agg_inventory"], "available_stock")
+                and not is_column_all_null_or_zero(dataframes["agg_inventory"], "stock_quantity")
+                and "agg_products" in dataframes
+                and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
+                and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
+                and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
+                and not is_column_all_null_or_zero(dataframes["agg_products"], "avg_order_value_product")
+            ):
+                inv = dataframes["agg_inventory"].fillna(
+                    {
+                        "available_stock": 0,
+                        "stock_quantity": 0,
+                        "total_sold": 0,
+                    }
+                )
+
+                base = inv
+                if (
+                    "agg_products" in dataframes
+                    and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
+                ):
+                    prod = dataframes["agg_products"].select(
+                        "product_id",
+                        "product_name",
+                        "category",
+                        "total_units_sold",
+                        "total_revenue",
+                        "days_since_launch",
+                    )
+                    base = base.alias("i").join(prod.alias("p"), on="product_id", how="left")
+
+                # Approx avg_daily_sales from total_sold or total_units_sold over 180 days
                 base = base.withColumn(
                     "total_units_sold_effective",
-                    F.coalesce(
-                        F.col("total_sold") if has_total_sold else F.lit(None),
-                        F.col("total_units_sold") if has_total_units_sold else F.lit(None)
-                    ),
+                    F.coalesce(F.col("total_sold"), F.col("total_units_sold")),
                 ).withColumn(
                     "avg_daily_sales_effective",
                     F.when(
@@ -5161,78 +5140,52 @@ def main():
                     ).otherwise(F.lit(None)),
                 )
 
-                SLOW_MIN_DAYS_IN_STOCK = 60
-                SLOW_MAX_SALES_RATE = 0.5
-                SLOW_MIN_DOS = 30.0
+                EXCESS_DOS = base.agg(F.percentile_approx("days_of_supply_effective", 0.75)).collect()[0][0]  # 75th percentile
+                LOW_SALES_RATE = base.agg(F.percentile_approx("avg_daily_sales_effective", 0.25)).collect()[0][0]  # 25th percentile
 
-                slow = (
+                excess = (
                     base.withColumn(
-                        "is_slow_mover",
+                        "is_excess_inventory",
                         F.when(
                             (F.col("available_stock") > 0)
-                            & (F.col("avg_daily_sales_effective") <= F.lit(SLOW_MAX_SALES_RATE))
-                            & (F.col("days_since_restock_effective").isNotNull())
-                            & (F.col("days_since_restock_effective") >= F.lit(SLOW_MIN_DAYS_IN_STOCK))
-                            & (
-                                F.col("days_of_supply_effective").isNull()
-                                | (F.col("days_of_supply_effective") >= F.lit(SLOW_MIN_DOS))
-                            ),
+                            & (F.col("days_of_supply_effective").isNotNull())
+                            & (F.col("days_of_supply_effective") >= F.lit(EXCESS_DOS))
+                            & (F.col("avg_daily_sales_effective") <= F.lit(LOW_SALES_RATE)),
                             1,
                         ).otherwise(0),
                     )
-                    .filter(F.col("is_slow_mover") == 1)
+                    .filter(F.col("is_excess_inventory") == 1)
+                    .select(
+                        "product_id",
+                        *[c for c in ["product_name", "category"] if c in base.columns],
+                        "supplier_id",
+                        "available_stock",
+                        "stock_quantity",
+                        "avg_daily_sales_effective",
+                        "days_of_supply_effective",
+                        *[c for c in ["total_units_sold_effective", "total_revenue", "days_since_launch"] if c in base.columns],
+                    )
+                    .orderBy(
+                        F.col("days_of_supply_effective").desc_nulls_last(),
+                        F.col("available_stock").desc_nulls_last(),
+                    )
                 )
 
-                # Build select list dynamically based on available columns
-                select_cols = ["product_id"]
-                if "product_name" in slow.columns:
-                    select_cols.append("product_name")
-                if "category" in slow.columns:
-                    select_cols.append("category")
-                select_cols.extend([
-                    "supplier_id",
-                    "available_stock",
-                    "stock_quantity",
-                    "avg_daily_sales_effective",
-                    "days_of_supply_effective",
-                    "days_since_restock_effective"
-                ])
-                if "total_units_sold_effective" in slow.columns:
-                    select_cols.append("total_units_sold_effective")
-                if has_total_revenue and "total_revenue" in slow.columns:
-                    select_cols.append("total_revenue")
-                if has_days_since_launch and "days_since_launch" in slow.columns:
-                    select_cols.append("days_since_launch")
+                product_analysis["excess_inventory_not_selling"] = excess
 
-                slow = slow.select(*select_cols).orderBy(
-                    F.col("days_since_restock_effective").desc_nulls_last(),
-                    F.col("avg_daily_sales_effective").asc_nulls_last(),
-                )
-
-                product_analysis["aging_inventory_slow_movers"] = slow
             else:
                 print(
-                    "agg_inventory missing required sales columns (total_sold, total_units_sold); "
-                    "skipping aging inventory / slow movers analysis."
+                    "agg_product_inventory_health or agg_inventory not available, or product_id column is all NULL/zero; "
+                    "skipping excess inventory (items not selling) analysis."
                 )
         else:
-            print(
-                "agg_inventory missing required date columns (last_restocked_date, days_since_launch); "
-                "skipping aging inventory / slow movers analysis."
-            )
-
+            print("missing product_id column in agg_products or agg_product_inventory_health")
     else:
-        print(
-            "agg_product_inventory_health or agg_inventory not available, or product_id column is all NULL/zero; "
-            "skipping aging inventory / slow movers analysis.")
+        print("missing agg_products table  or inventory data; skipping excess inventory (items not selling) analysis.")
 
 
-    
 
-        
     # High-Value Funnel:  Sessions → Views → Cart → Order
-
-
     if (
         "agg_customer_sessions" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_customer_sessions"], "session_id")
@@ -5288,7 +5241,7 @@ def main():
         )
         
         # Mark high-value sessions
-        HIGH_VALUE_REVENUE_THRESHOLD = 200.0
+        HIGH_VALUE_REVENUE_THRESHOLD = funnel.select(F.avg("session_monetary_value")).collect()[0][0]  # e.g., average session value
         
         funnel = funnel.withColumn(
             "is_high_value_session",
@@ -5416,15 +5369,19 @@ def main():
 
 
 
-        
+
 
     # Checkout drop-off reasons (incomplete payment, missing info, etc.)
     # 1) Prefer agg_cart_abandonment_analysis from agg-only schema
 
-
     if (
         "agg_cart_abandonment_analysis" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_id")
+        and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status")
+        and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status_derived")
+        and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_abandonment_reason")
+        and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "session_converted")
+        and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "abandonment_risk_score")
     ):
 
         carts = dataframes["agg_cart_abandonment_analysis"].fillna(
@@ -5491,6 +5448,9 @@ def main():
         if (
             "agg_customer_sessions" in dataframes
             and not is_column_all_null_or_zero(dataframes["agg_customer_sessions"], "session_id")
+            and not is_column_all_null_or_zero(dataframes["agg_customer_sessions"], "device_type")
+            and not is_column_all_null_or_zero(dataframes["agg_customer_sessions"], "referrer_source")
+            and not is_column_all_null_or_zero(dataframes["agg_customer_sessions"], "session_engagement_score")
         ):
             sessions = dataframes["agg_customer_sessions"].select(
                 "session_id",
@@ -5522,6 +5482,9 @@ def main():
         if (
             "agg_checkout_events" in dataframes
             and not is_column_all_null_or_zero(dataframes["agg_checkout_events"], "checkout_id")
+            and not is_column_all_null_or_zero(dataframes["agg_checkout_events"], "checkout_status")
+            and not is_column_all_null_or_zero(dataframes["agg_checkout_events"], "dropoff_reason")
+            
         ):
             chk = dataframes["agg_checkout_events"].fillna(
                 {
@@ -5575,29 +5538,17 @@ def main():
             )
 
 
-    # # Supplier And procurement insights
 
-        
+
+
     has_suppliers = (
         "agg_suppliers" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "supplier_id")
-        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "supplier_status")
-        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "total_products_supplied")
-        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "total_units_sold")
-        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "total_orders_fulfilled")
-        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "total_stockouts")
-        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "total_revenue_generated")
-        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "supplier_performance_score")
-        and not is_column_all_null_or_zero(dataframes["agg_suppliers"], "supplier_reliability_score")
     )
 
     has_sup_inv = (
         "agg_supplier_inventory_health" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "supplier_id")
-        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "total_products")
-        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "total_current_stock")
-        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "total_available_stock")
-        and not is_column_all_null_or_zero(dataframes["agg_supplier_inventory_health"], "total_stockouts")
     )
 
     if not has_suppliers and not has_sup_inv:
@@ -5813,382 +5764,309 @@ def main():
             )
 
 
-    # Overall wishlist usage and conversion
-
-    if "agg_wishlist" in dataframes and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "purchased_date") and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "customer_id"):
-        analysis["wishlist_overall_summary"] = dataframes["agg_wishlist"].agg(
-            F.count("*").alias("total_wishlist_items"),
-            F.countDistinct("customer_id").alias("customers_using_wishlist"),
-            F.countDistinct("product_id").alias("products_in_wishlist"),
-            F.sum(F.when(F.col("purchased_date").isNotNull(), 1).otherwise(0)).alias("wishlist_purchased_items")
-        ).withColumn(
-            "wishlist_conversion_rate",
-            F.col("wishlist_purchased_items") / F.col("total_wishlist_items")
-        ).fillna({
-            "total_wishlist_items": 0,
-            "customers_using_wishlist": 0,
-            "products_in_wishlist": 0,
-            "wishlist_purchased_items": 0,
-            "wishlist_conversion_rate": 0.0
-        })
-    else:
-        print("One of the required columns in agg_wishlist is all NULL or zero; skipping wishlist overall analysis.")
 
 
-    # Wishlist usage & conversion by product
-
-    if "agg_wishlist" in dataframes and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "purchased_date"):
-        analysis["wishlist_by_product"] = (
-            dataframes["agg_wishlist"]  
-            .groupBy("product_id")
-            .agg(
-                F.count("*").alias("wishlist_adds"),
-                F.sum(F.when(F.col("purchased_date").isNotNull(), 1).otherwise(0)).alias("wishlist_purchases")
-            )
-            .withColumn(
-                "wishlist_conversion_rate",
-                F.col("wishlist_purchases") / F.col("wishlist_adds")
-            )
-        )
-    else:
-        print("One of the required columns in agg_wishlist is all NULL or zero; skipping wishlist by product analysis.")
-
-
-        
-    # Wishlist Time-to-Purchase: distribution
-
-    if "agg_wishlist" in dataframes and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "wishlist_id"):
-        wl = dataframes["agg_wishlist"].select(
-            "wishlist_id",
-            "customer_id",
-            "product_id",
-            "wishlist_to_purchase_time"
-        ).filter(F.col("wishlist_to_purchase_time").isNotNull())
-
-        # 1) Overall stats
-        analysis["wishlist_time_to_purchase_stats"] = wl.agg(
-            F.count("*").alias("records"),
-            F.avg("wishlist_to_purchase_time").alias("avg_time"),
-            F.expr("percentile_approx(wishlist_to_purchase_time, 0.5)").alias("median_time"),
-            F.expr("percentile_approx(wishlist_to_purchase_time, 0.9)").alias("p90_time"),
-            F.max("wishlist_to_purchase_time").alias("max_time"),
-        )
-
-        # 2) Buckets (adjust edges to your unit: days/hours)
-        wl_buckets = wl.withColumn(
-            "time_bucket",
-            F.when(F.col("wishlist_to_purchase_time") <= 1, "≤ 1")
-            .when((F.col("wishlist_to_purchase_time") > 1) & (F.col("wishlist_to_purchase_time") <= 7), "1–7")
-            .when((F.col("wishlist_to_purchase_time") > 7) & (F.col("wishlist_to_purchase_time") <= 30), "7–30")
-            .otherwise("> 30")
-        )
-
-        # 3) Counts per bucket
-        bucket_counts = (
-            wl_buckets.groupBy("time_bucket")
-            .agg(F.count("*").alias("count"))
-        )
-
-        # 4) Total count (for share calculation)
-        total_count = bucket_counts.agg(F.sum("count").alias("total_count"))
-
-        # 5) Cross join to get total_count on every row, then compute share
-        analysis["wishlist_time_to_purchase_distribution"] = (
-            bucket_counts.crossJoin(total_count)
-            .withColumn("share", F.col("count") / F.col("total_count"))
-            .select("time_bucket", "count", "share")
-            .orderBy("time_bucket")
-        )
-
-    else:
-        print(
-            "agg_wishlist not available, or wishlist_id all NULL/zero; "
-            "skipping wishlist time-to-purchase analysis."
-        )
-
-
-
-    # Abandoned Wishlist Analysis: Items added but never purchased or removed
-
-        
-    if "agg_wishlist" in dataframes and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "wishlist_id"):
-        wl = dataframes["agg_wishlist"].select(
-            "wishlist_id",
-            "customer_id",
-            "product_id",
-            "added_date",
-            "purchased_date",
-            "removed_date"
-        )
-
-        # Abandoned = no purchased_date and no removed_date
-        abandoned = wl.filter(
-            F.col("purchased_date").isNull() & F.col("removed_date").isNull()
-        )
-
-        analysis["abandoned_wishlist_items"] = abandoned
-    else:
-        print(
-            "agg_wishlist not available, or wishlist_id all NULL/zero; "
-            "skipping abandoned wishlist analysis."
-        )
-
-        
-    if  "abandoned_wishlist_items" in analysis:
-        abandoned = analysis["abandoned_wishlist_items"]
-
-        # By customer
-        analysis["abandoned_wishlist_by_customer"] = (
-            abandoned.groupBy("customer_id")
-            .agg(F.count("*").alias("abandoned_wishlist_count"))
-            .orderBy(F.col("abandoned_wishlist_count").desc())
-        )
-
-        # By product
-        analysis["abandoned_wishlist_by_product"] = (
-            abandoned.groupBy("product_id")
-            .agg(F.count("*").alias("abandoned_wishlist_count"))
-            .orderBy(F.col("abandoned_wishlist_count").desc())
-        )
-
-    # Seasonal Wishlist Patterns: Wishlist adds before holidays/sales events
-
-        
-    if "agg_wishlist" in dataframes and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "wishlist_id"):
-        wl = dataframes["agg_wishlist"].select(
-            "wishlist_id",
-            "customer_id",
-            "product_id",
-            "added_date"
-        ).filter(F.col("added_date").isNotNull())
-
-        # Adds by year-month
-        wl_monthly = wl.withColumn("year_month", F.date_format("added_date", "yyyy-MM"))
-
-        analysis["wishlist_adds_by_month"] = (
-            wl_monthly.groupBy("year_month")
-            .agg(
-                F.count("*").alias("wishlist_adds")
-            )
-            .orderBy("year_month")
-        )
-    else:
-        print(
-            "agg_wishlist not available, or wishlist_id all NULL/zero; "
-            "skipping wishlist seasonality by month."
-        )
-
-
-    # Basic cart creation & status distribution
-
-    has_cart = "agg_shopping_cart" in dataframes and not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_id")
-    has_cart_items = "agg_cart_items" in dataframes and not is_column_all_null_or_zero(dataframes["agg_cart_items"], "cart_item_id")
-
-    if has_cart and not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_status"):
-        if has_cart_items:
-            # Compute cart lines per cart once (used for both overall stats and status distribution)
-            cart_items_per_cart = (
-                dataframes["agg_cart_items"]
-                .groupBy("cart_id")
-                .agg(F.count("*").alias("cart_lines_count"))
-            )
-            cart_with_lines = (
-                dataframes["agg_shopping_cart"]
-                .join(cart_items_per_cart, on="cart_id", how="left")
-                .fillna({"cart_lines_count": 0})
-            )
-
-            # Cart overall stats: total carts and total cart lines
-            analysis["cart_overall_stats"] = cart_with_lines.agg(
-                F.countDistinct("cart_id").alias("total_carts"),
-                F.sum("cart_lines_count").alias("total_cart_lines")
-            ).fillna({
-                "total_carts": 0,
-                "total_cart_lines": 0
-            })
-
-            # Cart status distribution with lines count per status
-            analysis["cart_status_distribution"] = (
-                cart_with_lines
-                .groupBy("cart_status")
+    # Layer 1: Table Check
+    if "agg_wishlist" in dataframes:
+        # Layer 2: Column Check
+        if (
+            not is_column_all_null_or_zero(dataframes["agg_wishlist"], "product_id")
+            and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "purchased_date")
+            and not is_column_all_null_or_zero(dataframes["agg_wishlist"], "customer_id")
+        ):
+            analysis["wishlist_overall_summary"] = (
+                dataframes["agg_wishlist"]
                 .agg(
-                    F.countDistinct("cart_id").alias("carts_count"),
-                    F.sum("cart_lines_count").alias("cart_lines_count")
-                ).fillna({
-                    "carts_count": 0,
-                    "cart_lines_count": 0
+                    F.count("*").alias("total_wishlist_items"),
+                    F.countDistinct("customer_id").alias("customers_using_wishlist"),
+                    F.countDistinct("product_id").alias("products_in_wishlist"),
+                    F.sum(F.when(F.col("purchased_date").isNotNull(), 1).otherwise(0)).alias("wishlist_purchased_items")
+                )
+                .withColumn(
+                    "wishlist_conversion_rate",
+                    F.when(
+                        F.col("total_wishlist_items") > 0,
+                        F.col("wishlist_purchased_items") / F.col("total_wishlist_items")
+                    ).otherwise(0.0)
+                )
+                .fillna({
+                    "total_wishlist_items": 0,
+                    "customers_using_wishlist": 0,
+                    "products_in_wishlist": 0,
+                    "wishlist_purchased_items": 0,
+                    "wishlist_conversion_rate": 0.0
                 })
-                .orderBy("cart_status")
             )
-        else:
-            # Fallback when agg_cart_items is not available
-            analysis["cart_overall_stats"] = dataframes["agg_shopping_cart"].agg(
-                F.countDistinct("cart_id").alias("total_carts"),
-                F.lit(0).alias("total_cart_lines")
-            ).fillna({
-                "total_carts": 0,
-                "total_cart_lines": 0
-            })
 
-            analysis["cart_status_distribution"] = (
-                dataframes["agg_shopping_cart"]
-                .groupBy("cart_status")
+            analysis["wishlist_by_product"] = (
+                dataframes["agg_wishlist"]  
+                .groupBy("product_id")
                 .agg(
-                    F.countDistinct("cart_id").alias("carts_count"),
-                    F.lit(0).alias("cart_lines_count")
-                ).fillna({
-                    "carts_count": 0,
-                    "cart_lines_count": 0
-                })
-                .orderBy("cart_status")
-            )
-    has_cart = "agg_shopping_cart" in dataframes and not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_id")
-    has_cart_items = "agg_cart_items" in dataframes and not is_column_all_null_or_zero(dataframes["agg_cart_items"], "cart_item_id")
-
-    if has_cart and not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_status"):
-        if has_cart_items:
-            # Compute cart lines per cart once (used for both overall stats and status distribution)
-            cart_items_per_cart = (
-                dataframes["agg_cart_items"]
-                .groupBy("cart_id")
-                .agg(F.count("*").alias("cart_lines_count"))
-            )
-            cart_with_lines = (
-                dataframes["agg_shopping_cart"]
-                .join(cart_items_per_cart, on="cart_id", how="left")
-                .fillna({"cart_lines_count": 0})
+                    F.count("*").alias("wishlist_adds"),
+                    F.sum(F.when(F.col("purchased_date").isNotNull(), 1).otherwise(0)).alias("wishlist_purchases")
+                )
+                .withColumn(
+                    "wishlist_conversion_rate",
+                    F.col("wishlist_purchases") / F.col("wishlist_adds")
+                )
             )
 
-            # Cart overall stats: total carts and total cart lines
-            analysis["cart_overall_stats"] = cart_with_lines.agg(
-                F.countDistinct("cart_id").alias("total_carts"),
-                F.sum("cart_lines_count").alias("total_cart_lines")
-            ).fillna({
-                "total_carts": 0,
-                "total_cart_lines": 0
-            })
-
-            # Cart status distribution with lines count per status
-            analysis["cart_status_distribution"] = (
-                cart_with_lines
-                .groupBy("cart_status")
+            analysis["wishlist_by_customer"] = (
+                dataframes["agg_wishlist"] 
+                .groupBy("customer_id")
                 .agg(
-                    F.countDistinct("cart_id").alias("carts_count"),
-                    F.sum("cart_lines_count").alias("cart_lines_count")
-                ).fillna({
-                    "carts_count": 0,
-                    "cart_lines_count": 0
-                })
-                .orderBy("cart_status")
-            )
-        else:
-            # Fallback when agg_cart_items is not available
-            analysis["cart_overall_stats"] = dataframes["agg_shopping_cart"].agg(
-                F.countDistinct("cart_id").alias("total_carts"),
-                F.lit(0).alias("total_cart_lines")
-            ).fillna({
-                "total_carts": 0,
-                "total_cart_lines": 0
-            })
+                    F.count("*").alias("wishlist_adds"),
+                    F.sum(F.when(F.col("purchased_date").isNotNull(), 1).otherwise(0)).alias("wishlist_purchases")
+                )
+                .withColumn(
+                    "wishlist_conversion_rate",
+                    F.when(F.col("wishlist_adds") > 0,
+                        F.col("wishlist_purchases") / F.col("wishlist_adds"))
+                    .otherwise(F.lit(0.0))
+                )
+            )    
 
-            analysis["cart_status_distribution"] = (
-                dataframes["agg_shopping_cart"]
-                .groupBy("cart_status")
-                .agg(
-                    F.countDistinct("cart_id").alias("carts_count"),
-                    F.lit(0).alias("cart_lines_count")
-                ).fillna({
-                    "carts_count": 0,
-                    "cart_lines_count": 0
-                })
-                .orderBy("cart_status")
-            )
-    else:
-        print("cart_id or cart_status column is all NULL or zero; skipping overall cart statistics and cart status distribution analysis.")
-        print("cart_id or cart_status column is all NULL or zero; skipping overall cart statistics and cart status distribution analysis.")
-
-
-    
-    # Abandonment & recovery (using agg_cart_abandonment_analysis)
-
-    if "agg_cart_abandonment_analysis" in dataframes and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_id") and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status"):
-        analysis["cart_abandon_summary"] = dataframes["agg_cart_abandonment_analysis"].agg(
-            F.countDistinct("cart_id").alias("total_carts_tracked"),
-            F.countDistinct(F.when(F.col("cart_status") == "Abandoned", F.col("cart_id"))).alias("abandoned_carts"),
-            F.countDistinct(F.when(F.col("cart_status") == "Converted", F.col("cart_id"))).alias("converted_carts")
-        ).withColumn(
-            "abandonment_rate",
-            F.col("abandoned_carts") / F.col("total_carts_tracked")
-        ).withColumn(
-            "purchase_rate",
-            F.col("converted_carts") / F.col("total_carts_tracked")
-        ).fillna({
-            "total_carts_tracked": 0,
-            "abandoned_carts": 0,
-            "converted_carts": 0,
-            "abandonment_rate": 0.0,
-            "purchase_rate": 0.0
-        })
-    else:
-        print("cart_id or cart_status column is all NULL or zero; skipping cart abandonment overall analysis.")
-
-
-    
-    # Value and size characteristics of abandoned vs purchased carts
-
-    if "agg_cart_abandonment_analysis" in dataframes and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status"):
-        analysis["cart_value_stats"] = (
-            dataframes["agg_cart_abandonment_analysis"]
-            .groupBy("cart_status")
-            .agg(
-                F.countDistinct("cart_id").alias("carts_count"),
-                F.avg("cart_total_value").alias("avg_cart_value"),
-            F.avg("cart_items_count").alias("avg_cart_items"),
-            F.avg("time_in_cart_days").alias("avg_time_in_cart_days"),
-            F.avg("recovery_potential_score").alias("avg_recovery_potential_score")
-        ).fillna({
-            "carts_count": 0,
-            "avg_cart_value": 0.0,
-            "avg_cart_items": 0.0,
-            "avg_time_in_cart_days": 0.0,
-            "avg_recovery_potential_score": 0.0
-        })
-        .orderBy("cart_status")
-    )
-    else:
-        print("cart_status column is all NULL or zero; skipping cart value statistics analysis.")
-
-
-    # Recovery opportunity: high-value abandoned carts
-
-    if "agg_cart_abandonment_analysis" in dataframes and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status") and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_total_value"):
-        analysis["high_value_abandoned_carts"] = (
-            dataframes["agg_cart_abandonment_analysis"]
-            .filter(
-                (F.col("cart_status") == "abandoned") &
-                (F.col("cart_total_value") >= 100)  # threshold – adjust as needed
-            )
-            .select(
-                "cart_id",
+            wl = dataframes["agg_wishlist"].select(
+                "wishlist_id",
                 "customer_id",
-                "cart_total_value",
-                "cart_items_count",
-                "time_in_cart_days",
-                "recovery_potential_score",
-                "abandonment_risk_score"
+                "product_id",
+                "wishlist_to_purchase_time"
+            ).filter(F.col("wishlist_to_purchase_time").isNotNull())
+
+            # 1) Overall stats
+            analysis["wishlist_time_to_purchase_stats"] = wl.agg(
+                F.count("*").alias("records"),
+                F.avg("wishlist_to_purchase_time").alias("avg_time"),
+                F.expr("percentile_approx(wishlist_to_purchase_time, 0.5)").alias("median_time"),
+                F.expr("percentile_approx(wishlist_to_purchase_time, 0.9)").alias("p90_time"),
+                F.max("wishlist_to_purchase_time").alias("max_time"),
             )
-        )
+
+            # 2) Buckets (adjust edges to your unit: days/hours)
+            wl_buckets = wl.withColumn(
+                "time_bucket",
+                F.when(F.col("wishlist_to_purchase_time") <= 1, "≤ 1")
+                .when((F.col("wishlist_to_purchase_time") > 1) & (F.col("wishlist_to_purchase_time") <= 7), "1–7")
+                .when((F.col("wishlist_to_purchase_time") > 7) & (F.col("wishlist_to_purchase_time") <= 30), "7–30")
+                .otherwise("> 30")
+            )
+
+            # 3) Counts per bucket
+            bucket_counts = (
+                wl_buckets.groupBy("time_bucket")
+                .agg(F.count("*").alias("count"))
+            )
+
+            # 4) Total count (for share calculation)
+            total_count = bucket_counts.agg(F.sum("count").alias("total_count"))
+
+            # 5) Cross join to get total_count on every row, then compute share
+            analysis["wishlist_time_to_purchase_distribution"] = (
+                bucket_counts.crossJoin(total_count)
+                .withColumn("share", F.col("count") / F.col("total_count"))
+                .select("time_bucket", "count", "share")
+                .orderBy("time_bucket")
+            )
+
+            if  not is_column_all_null_or_zero(dataframes["agg_wishlist"], "removed_date") and \
+                not is_column_all_null_or_zero(dataframes["agg_wishlist"], "purchased_date") and \
+                not is_column_all_null_or_zero(dataframes["agg_wishlist"], "added_date"):
+                    
+                wl2 = dataframes["agg_wishlist"].select(
+                    "wishlist_id",
+                    "customer_id",
+                    "product_id",
+                    "added_date",
+                    "purchased_date",
+                    "removed_date"
+                )
+
+                # Abandoned = no purchased_date and no removed_date
+                abandoned = wl2.filter(
+                    F.col("purchased_date").isNull() & F.col("removed_date").isNull()
+                )
+
+                analysis["abandoned_wishlist_items"] = abandoned
+
+                analysis["abandoned_wishlist_by_customer"] = (
+                    abandoned.groupBy("customer_id")
+                    .agg(F.count("*").alias("abandoned_wishlist_count"))
+                    .orderBy(F.col("abandoned_wishlist_count").desc())
+                )
+
+                # By product
+                analysis["abandoned_wishlist_by_product"] = (
+                    abandoned.groupBy("product_id")
+                    .agg(F.count("*").alias("abandoned_wishlist_count"))
+                    .orderBy(F.col("abandoned_wishlist_count").desc())
+                )
+
+                wl3 = dataframes["agg_wishlist"].select(
+                    "wishlist_id",
+                    "customer_id",
+                    "product_id",
+                    "added_date"
+                ).filter(F.col("added_date").isNotNull())
+
+                # Adds by year-month
+                wl_monthly = wl3.withColumn("year_month", F.date_format("added_date", "yyyy-MM"))
+
+                analysis["wishlist_adds_by_month"] = (
+                    wl_monthly.groupBy("year_month")
+                    .agg(
+                        F.count("*").alias("wishlist_adds")
+                    )
+                    .orderBy("year_month")
+                )
+
+            else:
+                print("removed_date, purchased_date, or added_date column missing/all NULL/zero; skipping abandoned wishlist analysis.")
+
+        else:
+            print("One of the required columns in agg_wishlist is all NULL or zero; skipping wishlist overall analysis.")
     else:
-        print("cart_status or cart_total_value column is all NULL or zero; skipping high-value abandoned carts analysis.")
+        print("agg_wishlist table not found in dataframes; skipping wishlist analysis.")
 
 
+
+
+    # -------------------------------------------------------
+    # Shopping Cart Statistics & Distribution
+    # -------------------------------------------------------
+
+    # Layer 1: Table Existence Check
+    if "agg_shopping_cart" in dataframes:
         
+
+        if (
+            not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_id") 
+            and not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_status")
+        ):
+            analysis["cart_overall_stats"] = (
+                dataframes["agg_shopping_cart"]
+                .agg(
+                    F.countDistinct("cart_id").alias("total_carts"),
+                    F.count("*").alias("total_cart_lines")
+                )
+                .fillna({
+                    "total_carts": 0,
+                    "total_cart_lines": 0
+                })
+            )
+        else:
+            print("cart_id or cart_status column is all NULL or zero; skipping overall cart statistics analysis.")
+
+    
+        if not is_column_all_null_or_zero(dataframes["agg_shopping_cart"], "cart_status"):
+            analysis["cart_status_distribution"] = (
+                dataframes["agg_shopping_cart"]
+                .groupBy("cart_status")
+                .agg(
+                    F.countDistinct("cart_id").alias("carts_count"),
+                    F.count("*").alias("cart_lines_count")
+                )
+                .fillna({
+                    "carts_count": 0,
+                    "cart_lines_count": 0
+                })
+                .orderBy("cart_status")
+            )
+        else:
+            print("cart_status column is all NULL or zero; skipping cart status distribution analysis.")
+
+    else:
+        print("agg_shopping_cart table not found in dataframes; skipping cart analysis.")
+
+
+
+    if "agg_cart_abandonment_analysis" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_id") and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status"):
+            analysis["cart_abandon_summary"] = dataframes["agg_cart_abandonment_analysis"].agg(
+                F.countDistinct("cart_id").alias("total_carts_tracked"),
+                F.countDistinct(F.when(F.col("cart_status") == "Abandoned", F.col("cart_id"))).alias("abandoned_carts"),
+                F.countDistinct(F.when(F.col("cart_status") == "Converted", F.col("cart_id"))).alias("converted_carts")
+            ).withColumn(
+                "abandonment_rate",
+                F.col("abandoned_carts") / F.col("total_carts_tracked")
+            ).withColumn(
+                "purchase_rate",
+                F.col("converted_carts") / F.col("total_carts_tracked")
+            ).fillna({
+                "total_carts_tracked": 0,
+                "abandoned_carts": 0,
+                "converted_carts": 0,
+                "abandonment_rate": 0.0,
+                "purchase_rate": 0.0
+            })
+        else:
+            print("cart_id or cart_status column is all NULL or zero; skipping cart abandonment overall analysis.")
+    else:
+        print("agg_cart_abandonment_analysis table not found in dataframes; skipping cart abandonment analysis.")
+
+
+
+    if "agg_cart_abandonment_analysis" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status"):
+            analysis["cart_value_stats"] = (
+                dataframes["agg_cart_abandonment_analysis"]
+                .groupBy("cart_status")
+                .agg(
+                    F.countDistinct("cart_id").alias("carts_count"),
+                    F.avg("cart_total_value").alias("avg_cart_value"),
+                F.avg("cart_items_count").alias("avg_cart_items"),
+                F.avg("time_in_cart_days").alias("avg_time_in_cart_days"),
+                F.avg("recovery_potential_score").alias("avg_recovery_potential_score")
+            ).fillna({
+                "carts_count": 0,
+                "avg_cart_value": 0.0,
+                "avg_cart_items": 0.0,
+                "avg_time_in_cart_days": 0.0,
+                "avg_recovery_potential_score": 0.0
+            })
+            .orderBy("cart_status")
+        )
+        else:
+            print("cart_status column is all NULL or zero; skipping cart value statistics analysis.")
+    else:
+        print("agg_cart_abandonment_analysis table not found in dataframes; skipping cart value statistics analysis.")
+
+
+
+    if "agg_cart_abandonment_analysis" in dataframes:
+        if not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status") and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_total_value"):
+            avg_cart_value = dataframes["agg_cart_abandonment_analysis"].agg(F.avg("cart_total_value")).collect()[0][0]
+            analysis["high_value_abandoned_carts"] = (
+                dataframes["agg_cart_abandonment_analysis"]
+                .filter(
+                    (F.col("cart_status").rlike("^(?i)(abandoned)")) &
+                    (F.col("cart_total_value") >= avg_cart_value))
+                ).select(
+                    "cart_id",
+                    "customer_id",
+                    "cart_total_value",
+                    "cart_items_count",
+                    "time_in_cart_days",
+                    "recovery_potential_score",
+                    "abandonment_risk_score"
+                )
+            
+            
+        else:
+            print("cart_status or cart_total_value column is all NULL or zero; skipping high-value abandoned carts analysis.")
+    else:
+        print("agg_cart_abandonment_analysis table not found in dataframes; skipping high-value abandoned carts analysis.")
+
+
+
+
+
     # Average Time-to-Purchase: time_in_cart_days/hours for completed carts
-
-
     if (
         "agg_cart_abandonment_analysis" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_id")
+        and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "session_converted")
+        and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "time_in_cart_days")
+        and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "time_in_cart_hours")
     ):
         carts = dataframes["agg_cart_abandonment_analysis"].fillna(
             {
@@ -6267,15 +6145,18 @@ def main():
             "skipping average time-to-purchase analysis."
         )
 
-    
-    # # # Campaign Performance
-        
 
-    # Campaign Performance: Impressions → Clicks → Conversions, CTR, ROAS, ROI
+
 
     if (
         "agg_marketing_campaigns" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "campaign_id")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "impressions")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "clicks")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "conversions")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "spent_amount")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "revenue_generated")
+        and not is_column_all_null_or_zero(dataframes["agg_marketing_campaigns"], "budget")
     ):
         cm = dataframes["agg_marketing_campaigns"].fillna(
             {
@@ -6395,13 +6276,13 @@ def main():
 
 
 
-
     # Device-Based Conversion Rates: Mobile vs Desktop from device_used
-
-
     if (
         "agg_cart_abandonment_analysis" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_id")
+        and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "device_used")
+        and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "session_converted")
+        and not is_column_all_null_or_zero(dataframes["agg_cart_abandonment_analysis"], "cart_status_derived")
     ):
         carts = dataframes["agg_cart_abandonment_analysis"].fillna(
             {
@@ -6456,37 +6337,16 @@ def main():
 
     else:
         print(
-            "agg_cart_abandonment_analysis not available, or cart_id all NULL/zero; "
+            "agg_cart_abandonment_analysis not available, or cart_id/device_used/session_converted/cart_status_derived columns all NULL/zero; "
             "skipping device-based conversion rates analysis."
         )
 
 
-    
-    # # Pyament patterns analysis 
 
-    # Payment Method Preference by Geography: Map payment_method adoption by country/state
+    has_payments = "agg_payments" in dataframes and not is_column_all_null_or_zero(dataframes["agg_payments"], "payment_id") and not is_column_all_null_or_zero(dataframes["agg_payments"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_payments"], "payment_method")
 
-    has_payments = "agg_payments" in dataframes and not is_column_all_null_or_zero(
-        dataframes["agg_payments"], "payment_id"
-    ) and not is_column_all_null_or_zero(
-        dataframes["agg_payments"], "order_id"
-    ) and not is_column_all_null_or_zero(
-        dataframes["agg_payments"], "payment_method"
-    ) and not is_column_all_null_or_zero(
-        dataframes["agg_payments"], "payment_status"
-    )
-    has_customers = "agg_customers" in dataframes and not is_column_all_null_or_zero(
-        dataframes["agg_customers"], "customer_id"
-    ) and not is_column_all_null_or_zero(
-        dataframes["agg_customers"], "country"
-    ) and not is_column_all_null_or_zero(
-        dataframes["agg_customers"], "state_province"
-    )
-    has_orders = "agg_orders" in dataframes and not is_column_all_null_or_zero(
-        dataframes["agg_orders"], "order_id"
-    ) and not is_column_all_null_or_zero(
-        dataframes["agg_orders"], "customer_id"
-    )
+    has_customers = "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country") and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province")
+    has_orders = "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id")
 
     if not (has_payments and has_customers and has_orders):
         print(
@@ -6550,13 +6410,10 @@ def main():
             .orderBy("country", "state_province", F.col("payment_count").desc())
         )
 
-    
 
-    # Payment Method Success Rates: payment_status = 'completed' by method
-        
-    has_payments = "agg_payments" in dataframes and not is_column_all_null_or_zero(
-        dataframes["agg_payments"], "payment_id"
-    )
+
+    has_payments = "agg_payments" in dataframes and not is_column_all_null_or_zero(dataframes["agg_payments"], "payment_id") and not is_column_all_null_or_zero(dataframes["agg_payments"], "payment_method") and not is_column_all_null_or_zero(dataframes["agg_payments"], "payment_status")
+
 
     # -------------------------------------------------------------------
     # 1) Overall success rate by payment_method
@@ -6602,19 +6459,15 @@ def main():
         )
     else:
         print(
-            "agg_payments not available, or payment_id all NULL/zero; "
+            "agg_payments not available, or payment_id/payment_method/payment_status columns all NULL/zero; "
             "skipping payment method success rates."
         )
 
     # -------------------------------------------------------------------
     # 2) OPTIONAL: Success rate by payment_method + country
     # -------------------------------------------------------------------
-    has_customers = "agg_customers" in dataframes and not is_column_all_null_or_zero(
-        dataframes["agg_customers"], "customer_id"
-    )
-    has_orders = "agg_orders" in dataframes and not is_column_all_null_or_zero(
-        dataframes["agg_orders"], "order_id"
-    )
+    has_customers = "agg_customers" in dataframes and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_customers"], "country")
+    has_orders = "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id")
 
     if has_payments and has_customers and has_orders:
         orders = dataframes["agg_orders"].select("order_id", "customer_id")
@@ -6644,17 +6497,11 @@ def main():
             .orderBy("country", F.col("success_rate").desc_nulls_last())
         )
 
-    
-    
-    # Payment Method AOV Correlation: Do certain methods correlate with higher order values?
 
 
-    has_payments = "agg_payments" in dataframes and not is_column_all_null_or_zero(
-        dataframes["agg_payments"], "payment_id"
-    )
-    has_orders = "agg_orders" in dataframes and not is_column_all_null_or_zero(
-        dataframes["agg_orders"], "order_id"
-    )
+
+    has_payments = "agg_payments" in dataframes and not is_column_all_null_or_zero(dataframes["agg_payments"], "payment_id") and not is_column_all_null_or_zero(dataframes["agg_payments"], "payment_method") and not is_column_all_null_or_zero(dataframes["agg_payments"], "payment_status")
+    has_orders = "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount")
 
     if not (has_payments and has_orders):
         print(
@@ -6699,14 +6546,10 @@ def main():
             .orderBy(F.col("avg_order_value_method").desc_nulls_last())
         )
 
-    
 
-    # Refund Rate by Payment Method: refund_amount / total payments by method
-    
 
-    has_payments = "agg_payments" in dataframes and not is_column_all_null_or_zero(
-        dataframes["agg_payments"], "payment_id"
-    )
+
+    has_payments = "agg_payments" in dataframes and not is_column_all_null_or_zero(dataframes["agg_payments"], "payment_id") and not is_column_all_null_or_zero(dataframes["agg_payments"], "payment_method") and not is_column_all_null_or_zero(dataframes["agg_payments"], "refund_amount") and not is_column_all_null_or_zero(dataframes["agg_payments"], "processing_fee")
 
     if not has_payments:
         print(
@@ -6764,18 +6607,11 @@ def main():
         )
 
 
-    # Refund rate by product
 
-        
-    has_payments = "agg_payments" in dataframes and not is_column_all_null_or_zero(
-        dataframes["agg_payments"], "payment_id"
-    )
-    has_order_items = "agg_order_items" in dataframes and not is_column_all_null_or_zero(
-        dataframes["agg_order_items"], "order_item_id"
-    )
-    has_products = "agg_products" in dataframes and not is_column_all_null_or_zero(
-        dataframes["agg_products"], "product_id"
-    )
+    has_payments = "agg_payments" in dataframes and not is_column_all_null_or_zero(dataframes["agg_payments"], "payment_id") and not is_column_all_null_or_zero(dataframes["agg_payments"], "refund_amount")
+    has_order_items = "agg_order_items" in dataframes and not is_column_all_null_or_zero(dataframes["agg_order_items"], "order_item_id") and not is_column_all_null_or_zero(dataframes["agg_order_items"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_order_items"], "product_id") and not is_column_all_null_or_zero(dataframes["agg_order_items"], "quantity")
+    has_products = "agg_products" in dataframes and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
+
 
     if not (has_payments and has_order_items):
         print(
@@ -6845,29 +6681,15 @@ def main():
             .orderBy(F.col("refund_rate_orders").desc_nulls_last())
         )
 
-    
-    # Refund rate by month
 
 
 
-    has_orders = "agg_orders" in dataframes and not is_column_all_null_or_zero(
-        dataframes["agg_orders"], "order_id"
-    )
+    has_orders = "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_year") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_month")
 
     if not (has_payments and has_orders):
         print(
             "agg_payments or agg_orders missing/invalid; "
             "cannot compute refund rate by month."
-        )
-    elif not (
-        "order_placed_year" in dataframes["agg_orders"].columns
-        and "order_placed_month" in dataframes["agg_orders"].columns
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_year")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_month")
-    ):
-        print(
-            "agg_orders missing order_placed_year or order_placed_month columns, or columns are all NULL/zero; "
-            "skipping refund rate by month analysis."
         )
     else:
         payments = dataframes["agg_payments"].select(
@@ -6929,13 +6751,10 @@ def main():
             .orderBy("order_placed_year", "order_placed_month")
         )
 
-    
-    # Time to Refund Analysis: refund_date - payment_date by payment method
 
-        
-    has_payments = "agg_payments" in dataframes and not is_column_all_null_or_zero(
-        dataframes["agg_payments"], "payment_id"
-    )
+
+
+    has_payments = "agg_payments" in dataframes and not is_column_all_null_or_zero(dataframes["agg_payments"], "payment_id") and not is_column_all_null_or_zero(dataframes["agg_payments"], "payment_method") and not is_column_all_null_or_zero(dataframes["agg_payments"], "payment_date") and not is_column_all_null_or_zero(dataframes["agg_payments"], "refund_date") and not is_column_all_null_or_zero(dataframes["agg_payments"], "refund_amount")
 
     if not has_payments:
         print(
@@ -6984,13 +6803,15 @@ def main():
         )
 
 
-    # # sentiment analysis by reviews 
 
+    # -------------------------------------------------------------------
     # Base reviews table: agg_reviews
     # -------------------------------------------------------------------
     if (
-        "agg_reviews" in dataframes
+        "agg_reviews" in dataframes and "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_reviews"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_reviews"], "review_date")
+        and not is_column_all_null_or_zero(dataframes["agg_reviews"], "rating")
     ):
         reviews = dataframes["agg_reviews"].select(
             "product_id",
@@ -7002,6 +6823,7 @@ def main():
         if (
             "agg_products" in dataframes
             and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
+            and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
         ):
             prod = dataframes["agg_products"].select(
                 "product_id",
@@ -7069,15 +6891,17 @@ def main():
         )
 
 
-    
+
     # Sentiment by Product Category
-
-
     if (
         "agg_reviews" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_reviews"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_reviews"], "review_sentiment")
+        and not is_column_all_null_or_zero(dataframes["agg_reviews"], "rating")
         and "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
+
     ):
         reviews = dataframes["agg_reviews"].select(
             "product_id",
@@ -7138,14 +6962,14 @@ def main():
 
 
     # Low-rated product monthly trends (rating only)
-
-
     if (
         "agg_reviews" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_reviews"], "product_id")
         and not is_column_all_null_or_zero(dataframes["agg_reviews"], "rating")
         and "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_units_sold")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "total_revenue")
     ):
         # 1) Base reviews with date + rating
         reviews = dataframes["agg_reviews"].select(
@@ -7207,8 +7031,8 @@ def main():
         )
 
         # 6) Low-rated monthly periods (rating-only thresholds)
-        MIN_REVIEWS_MONTH = 5
-        RATING_THRESHOLD = 3.5  # <= 3.5 stars is considered low
+        MIN_REVIEWS_MONTH = monthly_with_meta.select(F.min("monthly_reviews")).collect()[0][0]
+        RATING_THRESHOLD = monthly_with_meta.select(F.avg("avg_rating_month")).collect()[0][0]  # <= 3.5 stars is considered low
 
         low_rated_months = (
             monthly_with_meta
@@ -7240,8 +7064,6 @@ def main():
 
 
     # Rating Threshold Analysis: Sales velocity at different rating tiers
-
-
     if (
         "agg_reviews" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_reviews"], "product_id")
@@ -7331,9 +7153,6 @@ def main():
             "skipping rating threshold sales velocity analysis."
         )
 
-    
-
-    # Order Processing Time Analysis:
 
 
     # =============================================================================
@@ -7344,15 +7163,9 @@ def main():
         and "agg_order_items" in dataframes
         and "agg_products" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_processing_days_diff")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "delivery_days_diff")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_order_fulfillment_time_days")
+        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
         and not is_column_all_null_or_zero(dataframes["agg_order_items"], "order_id")
         and not is_column_all_null_or_zero(dataframes["agg_order_items"], "product_id")
-        and not is_column_all_null_or_zero(dataframes["agg_order_items"], "quantity")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "product_id")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "category")
-        and not is_column_all_null_or_zero(dataframes["agg_products"], "sub_category")
     ):
         orders_with_cat = (
             dataframes["agg_order_items"]. select("order_id", "product_id", "quantity")
@@ -7399,7 +7212,7 @@ def main():
     # =============================================================================
     # 2) Peak Processing Times Analysis
     # =============================================================================
-    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_processing_days_diff") and not is_column_all_null_or_zero(dataframes["agg_orders"], "delivery_days_diff") and not is_column_all_null_or_zero(dataframes["agg_orders"], "total_amount"):
+    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id"):
         
         orders_time = (
             dataframes["agg_orders"]
@@ -7453,10 +7266,8 @@ def main():
         )
 
 
-    
+
     # Base orders with delivery info
-
-
     if (
         "agg_orders" in dataframes
         and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
@@ -7541,79 +7352,80 @@ def main():
         )
 
 
-    
-    
+
 
     # Approximate on-time delivery using a simple SLA threshold
-    SLA_DAYS = 3  # adjust to your promised standard (e.g., 2, 3, 5)
+    # adjust to your promised standard (e.g., 2, 3, 5)
+    # Layer 1: Table Existence Check
     if (
-        "agg_orders" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_delivered_at")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "delivery_days_diff")
+        "agg_orders" in dataframes 
         and "agg_customers" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "country")
     ):
-        orders = dataframes["agg_orders"].select(
-            "order_id",
-            "customer_id",
-            "order_delivered_at",
-            "delivery_days_diff",
-        ).filter(F.col("order_delivered_at").isNotNull())
+        # Layer 2: Column Null/Zero Check
+        if (
+            not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
+            and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
+            and not is_column_all_null_or_zero(dataframes["agg_orders"], "delivery_days_diff")
+        ):
+            orders = dataframes["agg_orders"].select(
+                "order_id",
+                "customer_id",
+                "order_delivered_at",
+                "delivery_days_diff",
+            ).filter(F.col("order_delivered_at").isNotNull())
 
-        customers = dataframes["agg_customers"].select(
-            "customer_id",
-            "country",
-            "state_province",
-            "city",
-        )
-
-        orders_geo = (
-            orders.alias("o")
-            .join(customers.alias("c"), on="customer_id", how="left")
-        )
-
-        orders_geo = orders_geo.withColumn(
-            "is_on_time",
-            F.when(F.col("delivery_days_diff") <= SLA_DAYS, F.lit(1)).otherwise(F.lit(0)),
-        )
-
-        # --- On-time delivery % by country ---
-        analysis["ontime_delivery_by_country"] = (
-            orders_geo.groupBy("country")
-            .agg(
-                F.count("*").alias("delivered_orders"),
-                F.sum("is_on_time").alias("on_time_orders"),
-                (F.sum("is_on_time") / F.count("*")).alias("on_time_rate"),
-                F.avg("delivery_days_diff").alias("avg_delivery_days"),
+            customers = dataframes["agg_customers"].select(
+                "customer_id",
+                "country",
+                "state_province",
+                "city",
             )
-            .orderBy(F.col("on_time_rate").asc_nulls_last())
-        )
 
-        # --- On-time delivery % by state ---
-        analysis["ontime_delivery_by_state"] = (
-            orders_geo.groupBy("country", "state_province")
-            .agg(
-                F.count("*").alias("delivered_orders"),
-                F.sum("is_on_time").alias("on_time_orders"),
-                (F.sum("is_on_time") / F.count("*")).alias("on_time_rate"),
-                F.avg("delivery_days_diff").alias("avg_delivery_days"),
+            orders_geo = (
+                orders.alias("o")
+                .join(customers.alias("c"), on="customer_id", how="left")
             )
-            .orderBy(F.col("on_time_rate").asc_nulls_last())
-        )
+            SLA_DAYS = dataframes["agg_orders"].select(F.avg("delivery_days_diff")).collect()[0][0]
+            orders_geo = orders_geo.withColumn(
+                "is_on_time",
+                F.when(F.col("delivery_days_diff") <= SLA_DAYS, F.lit(1)).otherwise(F.lit(0)),
+            )
 
-        # --- On-time delivery % by city ---
-        analysis["ontime_delivery_by_city"] = (
-            orders_geo.groupBy("country", "state_province", "city")
-            .agg(
-                F.count("*").alias("delivered_orders"),
-                F.sum("is_on_time").alias("on_time_orders"),
-                (F.sum("is_on_time") / F.count("*")).alias("on_time_rate"),
-                F.avg("delivery_days_diff").alias("avg_delivery_days"),
+            # --- On-time delivery % by country ---
+            analysis["ontime_delivery_by_country"] = (
+                orders_geo.groupBy("country")
+                .agg(
+                    F.count("*").alias("delivered_orders"),
+                    F.sum("is_on_time").alias("on_time_orders"),
+                    (F.sum("is_on_time") / F.count("*")).alias("on_time_rate"),
+                    F.floor(F.avg("delivery_days_diff")).alias("avg_delivery_days"),
+                )
+                .orderBy(F.col("on_time_rate").asc_nulls_last())
             )
-            .orderBy(F.col("on_time_rate").asc_nulls_last())
-        )
+
+            # --- On-time delivery % by state ---
+            analysis["ontime_delivery_by_state"] = (
+                orders_geo.groupBy("country", "state_province")
+                .agg(
+                    F.count("*").alias("delivered_orders"),
+                    F.sum("is_on_time").alias("on_time_orders"),
+                    (F.sum("is_on_time") / F.count("*")).alias("on_time_rate"),
+                    F.floor(F.avg("delivery_days_diff")).alias("avg_delivery_days"),
+                )
+                .orderBy(F.col("on_time_rate").asc_nulls_last())
+            )
+
+            # --- On-time delivery % by city ---
+            analysis["ontime_delivery_by_city"] = (
+                orders_geo.groupBy("country", "state_province", "city")
+                .agg(
+                    F.count("*").alias("delivered_orders"),
+                    F.sum("is_on_time").alias("on_time_orders"),
+                    (F.sum("is_on_time") / F.count("*")).alias("on_time_rate"),
+                    F.floor(F.avg("delivery_days_diff")).alias("avg_delivery_days"),
+                )
+                .orderBy(F.col("on_time_rate").asc_nulls_last())
+            )
 
     else:
         print(
@@ -7621,104 +7433,101 @@ def main():
             "skipping on-time delivery approximation."
         )
 
-    
-    # Shipping Cost Efficiency: shipping_cost as % of subtotal by region
 
 
-    if (
-        "agg_orders" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "subtotal")
-        and not is_column_all_null_or_zero(dataframes["agg_orders"], "shipping_cost")
-        and "agg_customers" in dataframes
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "country")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "state_province")
-        and not is_column_all_null_or_zero(dataframes["agg_customers"], "city")
-    ):
-        # 1) Base orders: keep only fields needed
-        orders = dataframes["agg_orders"].select(
-            "order_id",
-            "customer_id",
-            "subtotal",
-            "shipping_cost",
-        )
+    # Shipping Cost Efficiency by Region: Analyzing costs across Geo-grains
+    # ------------------------------------------------------------------
 
-        # Avoid div-by-zero: ship% only where subtotal > 0
-        orders = orders.withColumn(
-            "shipping_pct_of_subtotal",
-            F.when(
-                F.col("subtotal") > 0,
-                F.col("shipping_cost") / F.col("subtotal")
-            ).otherwise(F.lit(None)),
-        )
-
-        # 2) Customers: region info
-        customers = dataframes["agg_customers"].select(
-            "customer_id",
-            "country",
-            "state_province",
-            "city",
-        )
-
-        # 3) Join orders -> customers
-        orders_geo = (
-            orders.alias("o")
-            .join(customers.alias("c"), on="customer_id", how="left")
-        )
-
-        # Common aggregations used for each region level
-        def region_agg(df, group_cols):
-            return (
-                df.groupBy(*group_cols)
-                .agg(
-                    F.count("*").alias("orders"),
-                    F.sum("shipping_cost").alias("total_shipping_cost"),
-                    F.sum("subtotal").alias("total_subtotal"),
-                    F.avg("shipping_pct_of_subtotal").alias("avg_shipping_pct_of_subtotal"),
-                    F.expr(
-                        "percentile_approx(shipping_pct_of_subtotal, 0.5)"
-                    ).alias("median_shipping_pct_of_subtotal"),
-                )
-                .withColumn(
-                    "shipping_pct_of_subtotal_overall",
-                    F.when(
-                        F.col("total_subtotal") > 0,
-                        F.col("total_shipping_cost") / F.col("total_subtotal"),
-                    ).otherwise(F.lit(None)),
-                )
+    # Layer 1: Table Existence Check
+    if "agg_orders" in dataframes and "agg_customers" in dataframes:
+        # Layer 2: Critical Column Validation
+        if (
+            not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
+            and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id")
+            and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
+        ):
+            # 1) Base orders: keep only fields needed
+            orders = dataframes["agg_orders"].select(
+                "order_id",
+                "customer_id",
+                "subtotal",
+                "shipping_cost",
             )
 
-        # 4) By country
-        analysis["shipping_efficiency_by_country"] = (
-            region_agg(orders_geo, ["country"])
-            .orderBy(
-                F.col("avg_shipping_pct_of_subtotal").desc_nulls_last(),
-                "country",
+            # Avoid div-by-zero: ship% only where subtotal > 0
+            orders = orders.withColumn(
+                "shipping_pct_of_subtotal",
+                F.when(
+                    F.col("subtotal") > 0,
+                    F.col("shipping_cost") / F.col("subtotal")
+                ).otherwise(F.lit(None)),
             )
-        )
 
-        # 5) By state (within country)
-        analysis["shipping_efficiency_by_state"] = (
-            region_agg(orders_geo, ["country", "state_province"])
-            .orderBy(
-                F.col("avg_shipping_pct_of_subtotal").desc_nulls_last(),
-                "country",
-                "state_province",
-            )
-        )
-
-        # 6) By city (within state/country)
-        analysis["shipping_efficiency_by_city"] = (
-            region_agg(orders_geo, ["country", "state_province", "city"])
-            .orderBy(
-                F.col("avg_shipping_pct_of_subtotal").desc_nulls_last(),
+            # 2) Customers: region info
+            customers = dataframes["agg_customers"].select(
+                "customer_id",
                 "country",
                 "state_province",
                 "city",
             )
-        )
+
+            # 3) Join orders -> customers
+            orders_geo = (
+                orders.alias("o")
+                .join(customers.alias("c"), on="customer_id", how="left")
+            )
+
+            # Common aggregation helper
+            def region_agg(df, group_cols):
+                return (
+                    df.groupBy(*group_cols)
+                    .agg(
+                        F.count("*").alias("orders"),
+                        F.sum("shipping_cost").alias("total_shipping_cost"),
+                        F.sum("subtotal").alias("total_subtotal"),
+                        F.avg("shipping_pct_of_subtotal").alias("avg_shipping_pct_of_subtotal"),
+                        F.expr(
+                            "percentile_approx(shipping_pct_of_subtotal, 0.5)"
+                        ).alias("median_shipping_pct_of_subtotal"),
+                    )
+                    .withColumn(
+                        "shipping_pct_of_subtotal_overall",
+                        F.when(
+                            F.col("total_subtotal") > 0,
+                            F.col("total_shipping_cost") / F.col("total_subtotal"),
+                        ).otherwise(F.lit(None)),
+                    )
+                )
+
+            # 4) By country
+            analysis["shipping_efficiency_by_country"] = (
+                region_agg(orders_geo, ["country"])
+                .orderBy(
+                    F.col("avg_shipping_pct_of_subtotal").desc_nulls_last(),
+                    "country",
+                )
+            )
+
+            # 5) By state (within country)
+            analysis["shipping_efficiency_by_state"] = (
+                region_agg(orders_geo, ["country", "state_province"])
+                .orderBy(
+                    F.col("avg_shipping_pct_of_subtotal").desc_nulls_last(),
+                    "country",
+                    "state_province",
+                )
+            )
+
+            # 6) By city (within state/country)
+            analysis["shipping_efficiency_by_city"] = (
+                region_agg(orders_geo, ["country", "state_province", "city"])
+                .orderBy(
+                    F.col("avg_shipping_pct_of_subtotal").desc_nulls_last(),
+                    "country",
+                    "state_province",
+                    "city",
+                )
+            )
 
     else:
         print(
@@ -7727,118 +7536,28 @@ def main():
         )
 
 
-    # Processing Delays by Season: season impact on order_processing_days_diff
 
 
-    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_status") and not is_column_all_null_or_zero(dataframes["agg_orders"], "season") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_processing_days_diff"):
-        orders = dataframes["agg_orders"].select(
-            "order_id",
-            "order_status",
-            "season",
-            "order_processing_days_diff",
-        ).filter(F.col("season").isNotNull())
-
-        # 1) Processing delays by season
-        analysis["processing_by_season"] = (
-            orders.groupBy("season")
-            .agg(
-                F.count("*").alias("orders"),
-                F.avg("order_processing_days_diff").alias("avg_processing_days"),
-                F.expr(
-                    "percentile_approx(order_processing_days_diff, 0.5)"
-                ).alias("median_processing_days"),
-                F.max("order_processing_days_diff").alias("max_processing_days"),
-            )
-            .orderBy(F.col("avg_processing_days").desc_nulls_last())
-        )
-
-        # 2) Optional: breakdown by season + order_status (e.g., shipped, delivered)
-        analysis["processing_by_season_and_status"] = (
-            orders.groupBy("season", "order_status")
-            .agg(
-                F.count("*").alias("orders"),
-                F.avg("order_processing_days_diff").alias("avg_processing_days"),
-                F.expr(
-                    "percentile_approx(order_processing_days_diff, 0.5)"
-                ).alias("median_processing_days"),
-            )
-            .orderBy("season", F.col("avg_processing_days").desc_nulls_last())
-        )
-    else:
-        print(
-            "agg_orders not available, or order_id all NULL/zero; "
-            "skipping processing delays by season analysis."
-        )
-
-
-
-    # Shipping Cost Outliers: Orders with unusually high shipping costs for investigation
-
-    if "agg_orders" in dataframes and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_placed_at") and not is_column_all_null_or_zero(dataframes["agg_orders"], "subtotal") and not is_column_all_null_or_zero(dataframes["agg_orders"], "shipping_cost") and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_status"):
-        # 1) Base orders
-        orders = dataframes["agg_orders"].select(
-            "order_id",
-            "customer_id",
-            "order_placed_at",
-            "subtotal",
-            "shipping_cost",
-            "order_status",
-        )
-
-        # 2) Shipping as % of subtotal (avoid div-by-zero)
-        orders = orders.withColumn(
-            "shipping_pct_of_subtotal",
-            F.when(
-                F.col("subtotal") > 0,
-                F.col("shipping_cost") / F.col("subtotal"),
-            ).otherwise(F.lit(None)),
-        )
-
-        # 3) Compute global stats for shipping_pct_of_subtotal
-        stats = orders.select(
-            F.avg("shipping_pct_of_subtotal").alias("mean_pct"),
-            F.stddev("shipping_pct_of_subtotal").alias("std_pct"),
-        ).collect()[0]
-
-        mean_pct = stats["mean_pct"] or 0.0
-        std_pct = stats["std_pct"] or 0.0
-
-        # Configure thresholds
-        # - MIN_SUBTOTAL: ignore tiny orders where shipping naturally dominates
-        # - Z_THRESHOLD: how many std devs above mean to call "outlier"
-        # - PCT_ABS_THRESHOLD: also require pct itself be above an absolute floor
-        MIN_SUBTOTAL = 10.0       # currency units
-        Z_THRESHOLD = 3.0         # > 3 standard deviations
-        PCT_ABS_THRESHOLD = 0.5   # > 50% of subtotal
-
-        if std_pct is None:
-            std_pct = 0.0
-
-        # 4) Add z-score column (handle std = 0)
-        orders_with_z = orders.withColumn(
-            "shipping_pct_zscore",
-            F.when(
-                F.lit(std_pct) > 0,
-                (F.col("shipping_pct_of_subtotal") - F.lit(mean_pct)) / F.lit(std_pct),
-            ).otherwise(F.lit(0.0)),
-        )
-
-        # 5) Filter outliers
-        outliers = (
-            orders_with_z
-            .filter(
-                (F.col("subtotal") >= MIN_SUBTOTAL)
-                & (F.col("shipping_pct_of_subtotal").isNotNull())
-                & (F.col("shipping_pct_of_subtotal") >= PCT_ABS_THRESHOLD)
-                & (F.col("shipping_pct_zscore") >= Z_THRESHOLD)
-            )
-        )
-
-        # 6) Optional: bring in customer geography for investigation
+    # Approximate on-time delivery using a simple SLA threshold
+    # adjust to your promised standard (e.g., 2, 3, 5)
+    # Layer 1: Table Existence Check
+    if (
+        "agg_orders" in dataframes 
+        and "agg_customers" in dataframes
+    ):
+        # Layer 2: Column Null/Zero Check
         if (
-            "agg_customers" in dataframes
+            not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
             and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
+            and not is_column_all_null_or_zero(dataframes["agg_orders"], "delivery_days_diff")
         ):
+            orders = dataframes["agg_orders"].select(
+                "order_id",
+                "customer_id",
+                "order_delivered_at",
+                "delivery_days_diff",
+            ).filter(F.col("order_delivered_at").isNotNull())
+
             customers = dataframes["agg_customers"].select(
                 "customer_id",
                 "country",
@@ -7846,60 +7565,1157 @@ def main():
                 "city",
             )
 
-            outliers = (
-                outliers.alias("o")
+            orders_geo = (
+                orders.alias("o")
                 .join(customers.alias("c"), on="customer_id", how="left")
             )
+            SLA_DAYS = dataframes["agg_orders"].select(F.avg("delivery_days_diff")).collect()[0][0]
+            orders_geo = orders_geo.withColumn(
+                "is_on_time",
+                F.when(F.col("delivery_days_diff") <= SLA_DAYS, F.lit(1)).otherwise(F.lit(0)),
+            )
 
-        # 7) Final outlier table (explicit, unique columns)
-        analysis["shipping_cost_outliers"] = (
-            outliers.select(
-                "order_id",
-                "customer_id",
-                *[c for c in ["country", "state_province", "city"] if c in outliers.columns],
-                "order_placed_at",
-                "order_status",
-                "subtotal",
-                "shipping_cost",
-                "shipping_pct_of_subtotal",
-                "shipping_pct_zscore",
+            # --- On-time delivery % by country ---
+            analysis["ontime_delivery_by_country"] = (
+                orders_geo.groupBy("country")
+                .agg(
+                    F.count("*").alias("delivered_orders"),
+                    F.sum("is_on_time").alias("on_time_orders"),
+                    (F.sum("is_on_time") / F.count("*")).alias("on_time_rate"),
+                    F.floor(F.avg("delivery_days_diff")).alias("avg_delivery_days"),
+                )
+                .orderBy(F.col("on_time_rate").asc_nulls_last())
             )
-            .orderBy(
-                F.col("shipping_pct_zscore").desc_nulls_last(),
-                F.col("shipping_pct_of_subtotal").desc_nulls_last(),
-                F.col("shipping_cost").desc_nulls_last(),
+
+            # --- On-time delivery % by state ---
+            analysis["ontime_delivery_by_state"] = (
+                orders_geo.groupBy("country", "state_province")
+                .agg(
+                    F.count("*").alias("delivered_orders"),
+                    F.sum("is_on_time").alias("on_time_orders"),
+                    (F.sum("is_on_time") / F.count("*")).alias("on_time_rate"),
+                    F.floor(F.avg("delivery_days_diff")).alias("avg_delivery_days"),
+                )
+                .orderBy(F.col("on_time_rate").asc_nulls_last())
             )
-        )
+
+            # --- On-time delivery % by city ---
+            analysis["ontime_delivery_by_city"] = (
+                orders_geo.groupBy("country", "state_province", "city")
+                .agg(
+                    F.count("*").alias("delivered_orders"),
+                    F.sum("is_on_time").alias("on_time_orders"),
+                    (F.sum("is_on_time") / F.count("*")).alias("on_time_rate"),
+                    F.floor(F.avg("delivery_days_diff")).alias("avg_delivery_days"),
+                )
+                .orderBy(F.col("on_time_rate").asc_nulls_last())
+            )
 
     else:
         print(
-            "agg_orders not available, or order_id all NULL/zero; "
-            "skipping shipping cost outlier analysis."
+            "agg_orders or agg_customers not available, or key ID columns NULL/zero; "
+            "skipping on-time delivery approximation."
         )
 
-    export_result = export_analytics_to_minio(
-        analysis=analysis,
-        product_analysis=product_analysis,
-        supplier_analysis=supplier_analysis,
-        business_id=None,
-        file_format="parquet",
-        parallel=True,
-    )
-    
-    print(f"\n📦 Analytics exported to bucket: {export_result['bucket']}")
-    print(f"📁 Export timestamp: {export_result['timestamp']}")
-    export_result = export_analytics_to_minio(
-        analysis=analysis,
-        product_analysis=product_analysis,
-        supplier_analysis=supplier_analysis,
-        business_id=None,
-        file_format="parquet",
-        parallel=True,
-    )
-    
-    print(f"\n📦 Analytics exported to bucket: {export_result['bucket']}")
+
+
+
+    # Shipping Cost Efficiency by Region: Analyzing costs across Geo-grains
+    # ------------------------------------------------------------------
+
+    # Layer 1: Table Existence Check
+    if "agg_orders" in dataframes and "agg_customers" in dataframes:
+        # Layer 2: Critical Column Validation
+        if (
+            not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
+            and not is_column_all_null_or_zero(dataframes["agg_orders"], "customer_id")
+            and not is_column_all_null_or_zero(dataframes["agg_customers"], "customer_id")
+        ):
+            # 1) Base orders: keep only fields needed
+            orders = dataframes["agg_orders"].select(
+                "order_id",
+                "customer_id",
+                "subtotal",
+                "shipping_cost",
+            )
+
+            # Avoid div-by-zero: ship% only where subtotal > 0
+            orders = orders.withColumn(
+                "shipping_pct_of_subtotal",
+                F.when(
+                    F.col("subtotal") > 0,
+                    F.col("shipping_cost") / F.col("subtotal")
+                ).otherwise(F.lit(None)),
+            )
+
+            # 2) Customers: region info
+            customers = dataframes["agg_customers"].select(
+                "customer_id",
+                "country",
+                "state_province",
+                "city",
+            )
+
+            # 3) Join orders -> customers
+            orders_geo = (
+                orders.alias("o")
+                .join(customers.alias("c"), on="customer_id", how="left")
+            )
+
+            # Common aggregation helper
+            def region_agg(df, group_cols):
+                return (
+                    df.groupBy(*group_cols)
+                    .agg(
+                        F.count("*").alias("orders"),
+                        F.sum("shipping_cost").alias("total_shipping_cost"),
+                        F.sum("subtotal").alias("total_subtotal"),
+                        F.avg("shipping_pct_of_subtotal").alias("avg_shipping_pct_of_subtotal"),
+                        F.expr(
+                            "percentile_approx(shipping_pct_of_subtotal, 0.5)"
+                        ).alias("median_shipping_pct_of_subtotal"),
+                    )
+                    .withColumn(
+                        "shipping_pct_of_subtotal_overall",
+                        F.when(
+                            F.col("total_subtotal") > 0,
+                            F.col("total_shipping_cost") / F.col("total_subtotal"),
+                        ).otherwise(F.lit(None)),
+                    )
+                )
+
+            # 4) By country
+            analysis["shipping_efficiency_by_country"] = (
+                region_agg(orders_geo, ["country"])
+                .orderBy(
+                    F.col("avg_shipping_pct_of_subtotal").desc_nulls_last(),
+                    "country",
+                )
+            )
+
+            # 5) By state (within country)
+            analysis["shipping_efficiency_by_state"] = (
+                region_agg(orders_geo, ["country", "state_province"])
+                .orderBy(
+                    F.col("avg_shipping_pct_of_subtotal").desc_nulls_last(),
+                    "country",
+                    "state_province",
+                )
+            )
+
+            # 6) By city (within state/country)
+            analysis["shipping_efficiency_by_city"] = (
+                region_agg(orders_geo, ["country", "state_province", "city"])
+                .orderBy(
+                    F.col("avg_shipping_pct_of_subtotal").desc_nulls_last(),
+                    "country",
+                    "state_province",
+                    "city",
+                )
+            )
+
+    else:
+        print(
+            "agg_orders or agg_customers not available, or key ID columns NULL/zero; "
+            "skipping shipping cost efficiency by region."
+        )
+
+
+
+    # -------------------------------------------------------
+    # Seasonal Processing Delay Analysis
+    # -------------------------------------------------------
+
+    # Layer 1: Table Existence Check
+    if "agg_orders" in dataframes:
+        # Layer 2: Column Null/Zero Check
+        if (
+            not is_column_all_null_or_zero(dataframes["agg_orders"], "order_id")
+            and not is_column_all_null_or_zero(dataframes["agg_orders"], "season")
+            and not is_column_all_null_or_zero(dataframes["agg_orders"], "order_processing_days_diff")
+        ):
+            orders = dataframes["agg_orders"].select(
+                "order_id",
+                "order_status",
+                "season",
+                "order_processing_days_diff",
+            ).filter(F.col("season").isNotNull())
+
+            # 1) Processing delays by season
+            analysis["processing_by_season"] = (
+                orders.groupBy("season")
+                .agg(
+                    F.count("*").alias("orders"),
+                    F.avg("order_processing_days_diff").alias("avg_processing_days"),
+                    F.expr(
+                        "percentile_approx(order_processing_days_diff, 0.5)"
+                    ).alias("median_processing_days"),
+                    F.max("order_processing_days_diff").alias("max_processing_days"),
+                )
+                .orderBy(F.col("avg_processing_days").desc_nulls_last())
+            )
+
+            # 2) Breakdown by season + order_status
+            analysis["processing_by_season_and_status"] = (
+                orders.groupBy("season", "order_status")
+                .agg(
+                    F.count("*").alias("orders"),
+                    F.avg("order_processing_days_diff").alias("avg_processing_days"),
+                    F.expr(
+                        "percentile_approx(order_processing_days_diff, 0.5)"
+                    ).alias("median_processing_days"),
+                )
+                .orderBy("season", F.col("avg_processing_days").desc_nulls_last())
+            )
+        else:
+            print("Required columns (season or processing days) are NULL or zero; skipping analysis.")
+    else:
+        print("agg_orders not available; skipping processing delays by season analysis.")
+
+
+    print("customer analysis count")
+    count = 0
+    for key in analysis.keys():
+        count+=1
+    print(count)
+
+
+    print("Product analysis count")
+    count = 0
+    for key in product_analysis.keys():
+        count+=1
+    print(count)
+
+    print("supplier analysis count")
+    count = 0
+    for key in supplier_analysis.keys():
+        count+=1
+    print(count)
+
 
     print("\n✅ Analysis Complete.")
 
+    # Export all analytics to MinIO
+    print("\n" + "="*60)
+    print("📤 EXPORTING ANALYTICS TO MINIO")
+    print("="*60)
+
+    export_result = export_analytics_to_minio(
+        analysis=analysis,
+        product_analysis=product_analysis,
+        supplier_analysis=supplier_analysis,
+        business_id=bucket_name,  # Use bucket_name if provided
+        file_format="parquet",  # Can be changed to "csv" or "json"
+        parallel=True,
+        max_workers=8
+    )
+
+    print(f"\n✅ Export completed: {export_result['stats']['successful']} analytics exported successfully")
+    print(f"   Bucket: {export_result['bucket']}")
+    print(f"   Format: {export_result['format']}")
+    
+    # -------------------------------------------------------
+    # Print columns/fields of all analytics dataframes
+    # -------------------------------------------------------
+    print("\n" + "=" * 60)
+    print("📋 ANALYTICS DATAFRAME SCHEMAS")
+    print("=" * 60)
+
+    # Hardcoded expected columns per analytic (used as fallback when df was not generated)
+    ANALYTICS_SCHEMA = {
+        "kpis": {
+            "business_health_daily": [
+                "grain_date", "total_orders", "total_units_sold", "total_revenue",
+                "gross_profit", "net_profit", "aov", "margin_pct",
+            ],
+            "business_health_weekly": [
+                "grain_year", "grain_week", "total_orders", "total_units_sold",
+                "total_revenue", "gross_profit", "net_profit", "aov", "margin_pct",
+            ],
+            "business_health_monthly": [
+                "grain_year", "grain_month", "total_orders", "total_units_sold",
+                "total_revenue", "gross_profit", "net_profit", "aov", "margin_pct",
+            ],
+            "clv_summary": [
+                "customers", "avg_clv", "clv_percentiles", "avg_total_revenue",
+                "avg_order_value_overall", "total_revenue_all_customers",
+            ],
+            "funnel_summary": [
+                "total_sessions", "sessions_with_views", "sessions_with_cart",
+                "sessions_with_orders", "high_value_sessions", "avg_products_viewed",
+                "avg_items_added_to_cart", "avg_orders_per_session", "avg_session_value",
+                "total_session_value", "view_to_cart_conversion", "cart_to_order_conversion",
+                "overall_conversion_rate",
+            ],
+            # ADDED: was entirely missing from previous schema
+            "cart_abandon_summary": [
+                "total_carts_tracked", "abandoned_carts", "converted_carts",
+                "abandonment_rate", "purchase_rate",
+            ],
+            "session_to_order_analysis": [
+                "avg_session_conversion_rate", "avg_cart_abandonment_rate",
+            ],
+            "customer_engagement_summary": [
+                "total_sessions_all_customers", "avg_sessions_per_customer",
+                "total_pages_viewed_all_customers", "avg_pages_viewed_per_customer",
+                "total_products_viewed_all_customers", "avg_products_viewed_per_customer",
+            ],
+        },
+
+        "customer_analytics": {
+            "customer_account_status_distribution_daily": [
+                "grain_date", "account_status", "customer_count",
+            ],
+            "customer_account_status_distribution_weekly": [
+                "grain_year", "grain_week", "account_status", "customer_count",
+            ],
+            "customer_account_status_distribution_monthly": [
+                "grain_year", "grain_month", "account_status", "customer_count",
+            ],
+            "new_customers_daily": [
+                "grain_date", "new_customers",
+            ],
+            "new_customers_weekly": [
+                "grain_year", "grain_week", "new_customers",
+            ],
+            "new_customers_monthly": [
+                "grain_year", "grain_month", "new_customers",
+            ],
+            "cumulative_customers_daily": [
+                "grain_date", "new_customers", "cumulative_customers",
+            ],
+            "cumulative_customers_weekly": [
+                "grain_year", "grain_week", "new_customers", "cumulative_customers",
+            ],
+            "cumulative_customers_monthly": [
+                "grain_year", "grain_month", "new_customers", "cumulative_customers",
+            ],
+            "new_customers_geo_acquisition_daily": [
+                "grain_date", "country", "state_province", "city", "new_customers",
+            ],
+            "new_customers_geo_acquisition_monthly": [
+                "grain_year", "grain_month", "country", "state_province", "city", "new_customers",
+            ],
+            "customer_age_group_distribution": [
+                "customer_age_group", "customer_count",
+            ],
+            "customer_city_distribution": [
+                "country", "state_province", "city", "customer_count",
+            ],
+            "customer_state_distribution": [
+                "country", "state_province", "customer_count",
+            ],
+            "customer_country_distribution": [
+                "country", "customer_count",
+            ],
+            "customer_age_group_spending": [
+                "customer_age_group", "customer_count", "avg_order_total_spent",
+                "avg_clv", "total_spent", "total_revenue_age_group",
+            ],
+            "new_vs_returning_customer_country": [
+                "country", "customer_type", "customer_count",
+            ],
+            "new_vs_returning_customer_city": [
+                "country", "state_province", "city", "customer_type", "customer_count",
+            ],
+            "new_vs_returning_customer_state": [
+                "country", "state_province", "customer_type", "customer_count",
+            ],
+            "customer_engagement": [
+                "customer_id", "total_sessions", "total_pages_viewed", "total_products_viewed",
+            ],
+            "session_conversion_distribution": [
+                "session_conversion_percentage", "customer_count",
+            ],
+            "cart_abandonment_distribution": [
+                "cart_abandonment_percentage", "customer_count",
+            ],
+            "top_customers_by_revenue": [
+                "customer_id", "total_revenue", "customer_lifetime_value",
+                "customer_segment", "rfm_segment",
+            ],
+            "top_customers_by_profit": [
+                "customer_id", "total_order_profit", "total_net_profit", "orders_count",
+                "customer_segment", "rfm_segment", "total_revenue", "customer_lifetime_value",
+            ],
+            # FIX: code does NOT .select() on disc_df — it retains all agg_customers columns
+            # + discount_share_of_revenue (withColumn) + is_discount_hunter (withColumn).
+            # Listing the key analytical columns that are guaranteed to be present:
+            "discount_customers": [
+                "customer_id", "total_revenue", "total_discount_received",
+                "discount_share_of_revenue", "avg_discount_per_order",
+                "customer_lifetime_value", "total_orders", "is_discount_hunter",
+            ],
+            "discount_customers_summary": [
+                "is_discount_hunter", "customer_count", "avg_discount_share",
+                "avg_discount_per_order", "avg_clv", "avg_revenue",
+            ],
+            "correlation_discount_vs_clv": [
+                "corr_discount_share_clv", "corr_avg_discount_clv",
+            ],
+            "high_discount_customers": [
+                "customer_id", "total_revenue", "total_discount_received",
+                "discount_to_revenue_ratio", "avg_discount_per_order", "customer_lifetime_value",
+            ],
+            "cart_behavior_summary": [
+                "total_carts_created", "total_abandoned_carts", "total_purchased_carts",
+                "avg_cart_abandonment_rate", "total_abandoned_value", "avg_time_in_cart_days",
+            ],
+            "high_value_abandoners": [
+                "customer_id", "total_abandoned_carts", "total_abandoned_value",
+                "cart_abandonment_rate", "total_revenue", "customer_lifetime_value",
+            ],
+            "churn_risk_summary": [
+                "churn_risk", "num_customers", "total_revenue", "avg_clv", "avg_recency_days",
+            ],
+            "high_clv_at_risk": [
+                "customer_id", "customer_lifetime_value", "churn_risk",
+                "customer_activity_score", "order_recency_days", "days_since_last_purchase",
+                "days_since_last_login", "customer_segment_label", "rfm_segment", "rfm_category",
+            ],
+            "rfm_segment_summary": [
+                "rfm_segment", "num_customers", "total_revenue", "avg_clv",
+                "avg_recency_days", "avg_total_orders", "avg_aov",
+            ],
+            "high_intent_non_buyers": [
+                "customer_id", "total_products_viewed", "wishlist_items_count",
+                "total_carts_created", "total_purchased_carts",
+                "cart_abandonment_rate", "session_conversion_rate",
+            ],
+            "customer_overall_health_summary": [
+                "customer_id", "account_created_at", "account_status", "is_active",
+                "is_repeat_customer", "total_orders", "total_items_purchased",
+                "total_cancelled_orders", "total_reviews_written", "total_sessions",
+                "total_pages_viewed", "total_products_viewed", "wishlist_items_count",
+                "total_carts_created", "total_abandoned_carts", "total_purchased_carts",
+                "order_frequency", "gender", "customer_age_group", "city", "state_province",
+                "country", "order_recency_days", "customer_tenure_days", "days_since_last_login",
+                "customer_activity_status", "customer_segment", "customer_segment_label",
+                "rfm_segment", "rfm_category", "churn_risk", "customer_lifetime_value",
+                "total_revenue", "avg_order_value", "avg_items_per_order",
+                "total_discount_received", "avg_discount_per_order", "avg_session_duration",
+                "session_conversion_rate", "cart_abandonment_rate", "preferred_device_type",
+                "preferred_referrer_source", "preferred_payment_method",
+                "wishlist_conversion_rate", "days_since_last_purchase", "cancellation_rate",
+                "customer_activity_score", "total_abandoned_value", "avg_time_in_cart_days",
+                "customer_abandonment_rate", "customer_purchase_rate",
+            ],
+            "customers_cohorts": [
+                "customer_id", "signup_date", "first_order_date",
+                "signup_cohort_month", "first_order_month",
+            ],
+            "signup_cohort_summary": [
+                "signup_cohort_month", "cohort_customers",
+            ],
+            "customer_cohort_retention": [
+                "signup_cohort_month", "months_since_signup", "active_customers",
+                "cohort_customers", "retention_rate",
+            ],
+            "rfm_churn_crosstab": [
+                "rfm_segment", "churn_risk", "customer_count", "segment_revenue", "avg_clv",
+            ],
+            "seg_referrer_crosstab": [
+                "customer_segment_label", "preferred_referrer_source",
+                "customer_count", "segment_revenue", "avg_revenue_per_customer",
+            ],
+            "seg_device_crosstab": [
+                "customer_segment_label", "preferred_device_type",
+                "customer_count", "segment_revenue", "avg_revenue_per_customer",
+            ],
+            "payment_method_vs_clv_churn": [
+                "preferred_payment_method", "churn_risk", "customer_count",
+                "avg_clv", "avg_revenue_per_customer", "total_revenue",
+            ],
+            "payment_method_summary": [
+                "preferred_payment_method", "customer_count", "avg_clv",
+                "avg_revenue_per_customer", "total_revenue",
+            ],
+            "referrer_source_summary": [
+                "preferred_referrer_source", "customer_count", "avg_clv",
+                "total_revenue", "avg_revenue_per_customer", "avg_discount_share",
+            ],
+            "referrer_churn_summary": [
+                "preferred_referrer_source", "churn_risk", "customer_count",
+                "avg_clv", "avg_discount_share",
+            ],
+            "customer_profit_per_segment": [
+                "customer_segment_label", "customer_count", "total_revenue",
+                "total_order_profit", "total_net_profit", "avg_clv", "avg_profit_per_customer",
+            ],
+            "gender_category_preference": [
+                "gender", "category", "total_units", "distinct_products", "orders_count",
+            ],
+            "gender_product_preference": [
+                "gender", "product_id", "product_name", "category", "total_units", "orders_count",
+            ],
+        },
+
+        "product_analytics": {
+            "best_selling_products": [
+                "product_id", "product_name", "category", "sub_category", "brand",
+                "total_units_sold", "total_orders", "total_revenue",
+            ],
+            "product_monthly_trends": [
+                "product_id", "product_name", "category", "sub_category", "brand",
+                "grain_year", "grain_month", "units_sold", "orders_count",
+            ],
+            "category_monthly_trends": [
+                "category", "grain_year", "grain_month", "units_sold", "orders_count",
+            ],
+            "product_calendar_month_seasonality": [
+                "product_id", "product_name", "category", "sub_category", "brand",
+                "calendar_month", "units_sold", "orders_count",
+            ],
+            "category_calendar_month_seasonality": [
+                "category", "calendar_month", "units_sold", "orders_count",
+            ],
+            "highest_margin_products": [
+                "product_id", "product_name", "category", "sub_category", "brand",
+                "profit_margin", "total_revenue", "total_units_sold", "total_orders",
+            ],
+            "low_margin_high_traffic_products": [
+                "product_id", "product_name", "category", "sub_category", "brand",
+                "profit_margin", "total_revenue", "total_units_sold", "total_orders",
+                "view_to_purchase_rate", "revenue_per_view", "total_wishlist_adds",
+                "total_cart_adds", "traffic_score",
+            ],
+            "out_of_stock_products": [
+                "product_id", "product_name", "category", "sub_category", "brand",
+                "current_stock_level", "total_units_sold", "total_orders", "total_revenue",
+            ],
+            "low_conversion_products": [
+                "product_id", "product_name", "category", "sub_category", "brand",
+                "view_to_purchase_rate", "cart_to_purchase_rate", "wishlist_to_purchase_rate",
+                "total_units_sold", "total_orders", "total_wishlist_adds",
+                "total_cart_adds", "total_revenue",
+            ],
+            "product_rating_summary": [
+                "product_id", "total_reviews", "avg_rating",
+            ],
+            "category_view_patterns": [
+                "category", "products_in_category", "total_units_sold", "total_orders",
+                "avg_view_to_purchase_rate", "avg_revenue_per_view", "total_revenue",
+            ],
+            "top_view_to_purchase_products": [
+                "product_id", "product_name", "category", "view_to_purchase_rate",
+                "revenue_per_view", "total_units_sold", "total_orders",
+            ],
+            "product_performance_score": [
+                "product_id", "product_name", "category", "sub_category", "brand",
+                "total_units_sold", "total_orders", "total_revenue", "avg_rating",
+                "view_to_purchase_rate", "revenue_score", "volume_score", "rating_score",
+                "view_to_purchase_score", "product_performance_score_computed",
+            ],
+            "category_revenue_share": [
+                "category", "category_revenue", "products_in_category", "total_units_sold",
+                "revenue_per_product", "revenue_share",
+            ],
+            "low_performing_categories": [
+                "category", "products_in_category", "total_units_sold", "total_orders",
+                "total_revenue", "avg_view_to_purchase_rate", "avg_revenue_per_view",
+                "avg_profit_margin", "revenue_share",
+            ],
+            "category_popularity_score": [
+                "category", "products_in_category", "total_units_sold", "total_orders",
+                "total_revenue", "total_wishlist_adds", "total_cart_adds",
+                "units_score", "orders_score", "revenue_score", "wishlist_score",
+                "cart_score", "category_popularity_score",
+            ],
+            "category_profitability": [
+                "category", "products_in_category", "category_revenue", "category_profit",
+                "avg_profit_margin", "total_units_sold", "total_orders",
+                "profit_per_product", "revenue_per_product", "profit_share",
+            ],
+            "category_monthly_seasonality": [
+                "category", "calendar_month", "units_sold", "orders_count", "total_revenue_month",
+            ],
+            "category_peak_season": [
+                "category", "peak_season_month", "units_sold", "orders_count", "peak_season_revenue",
+            ],
+            "product_lifecycle_segments": [
+                "product_id", "product_name", "category", "sub_category", "brand",
+                "launch_date", "days_since_launch", "total_units_sold", "total_orders",
+                "total_revenue", "view_to_purchase_rate", "avg_rating",
+                "current_stock_level", "current_stock", "days_of_supply",
+                "inventory_turnover_rate", "lifecycle_stage",
+            ],
+            "product_lifecycle_summary": [
+                "lifecycle_stage", "products_count", "avg_view_to_purchase_rate",
+                "avg_rating", "avg_units_sold", "avg_revenue", "avg_inventory_turnover_rate",
+            ],
+            "product_stockout_risk": [
+                "product_id", "product_name", "category", "sub_category", "brand",
+                "current_stock_level", "days_of_supply", "total_units_sold", "total_orders",
+                "total_revenue", "is_high_seller", "is_low_stock", "stockout_risk_flag",
+            ],
+            "product_stockout_replenishment": [
+                "product_id", "product_name", "category", "sub_category", "brand",
+                "stockout_occurrences", "stockout_days", "total_units_sold", "total_orders",
+                "total_revenue", "replenishment_priority_score",
+            ],
+            "product_dead_stock": [
+                "product_id", "product_name", "category", "sub_category", "brand",
+                "current_stock_level", "total_units_sold", "total_orders", "total_revenue",
+                "inventory_turnover_rate", "days_of_supply", "dead_stock_score",
+            ],
+            "product_inventory_health": [
+                "product_id", "current_stock", "available_stock", "reorder_point_breach_count",
+                "stockout_frequency", "avg_stock_quantity", "days_of_supply",
+                "inventory_turnover_ratio", "reorder_urgency", "stock_health_score",
+                "product_name", "category", "sub_category", "brand",
+                "total_units_sold", "total_orders", "total_revenue",
+            ],
+            "product_inventory_critical": [
+                "product_id", "current_stock", "available_stock", "reorder_point_breach_count",
+                "stockout_frequency", "avg_stock_quantity", "days_of_supply",
+                "inventory_turnover_ratio", "reorder_urgency", "stock_health_score",
+                "product_name", "category", "sub_category", "brand",
+                "total_units_sold", "total_orders", "total_revenue",
+                "is_low_days_of_supply", "criticality_score",
+            ],
+            "supplier_product_performance": [
+                "product_id", "product_name", "category", "sub_category", "brand",
+                "supplier_id", "total_units_sold", "total_orders", "total_revenue",
+                "total_profit", "profit_margin", "supplier_status", "is_preferred",
+                "is_verified", "sup_total_products_supplied", "sup_total_units_sold",
+                "sup_total_orders_fulfilled", "sup_total_reviews", "sup_total_stockouts",
+                "sup_total_revenue_generated", "sup_avg_profit_margin", "sup_avg_product_rating",
+                "supplier_performance_score", "supplier_reliability_score",
+                "stock_efficiency_ratio", "sup_stockout_rate", "sup_inventory_health_score",
+                "inv_total_products", "inv_total_current_stock", "inv_total_available_stock",
+                "inv_total_reorder_breaches", "inv_total_stockouts", "inv_total_storage_cost",
+                "inv_avg_stock_per_product", "inv_stockout_rate", "inv_inventory_health_score",
+            ],
+            "stockout_rate_by_product": [
+                "product_id", "supplier_id", "stockout_frequency", "reorder_point_breach_count",
+                "current_stock", "available_stock", "days_of_supply", "stock_status",
+                "product_name", "category",
+            ],
+            "supplier_ranking_core": [
+                "supplier_id", "supplier_status", "is_preferred", "is_verified",
+                "total_products_supplied", "total_units_sold", "total_orders_fulfilled",
+                "total_stockouts", "total_revenue_generated", "avg_profit_margin",
+                "stockout_rate", "supplier_inventory_health_score",
+                "supplier_performance_score", "supplier_reliability_score", "stock_efficiency_ratio",
+            ],
+            "supplier_stockout_impact_on_products": [
+                "product_id", "product_name", "category", "sub_category", "brand",
+                "supplier_id", "supplier_status", "is_preferred", "is_verified",
+                "total_revenue", "total_units_sold", "total_orders", "profit_margin",
+                "sup_total_stockouts", "sup_stockout_rate", "sup_inventory_health_score",
+                "supplier_performance_score", "supplier_reliability_score",
+            ],
+            "category_affinity_pairs": [
+                "product_a_category", "product_b_category", "pair_count",
+                "total_co_occurrences", "avg_lift_between_categories", "avg_support",
+            ],
+            "category_affinity_top_per_category": [
+                "base_category", "affinity_category", "pair_count",
+                "total_co_occurrences", "avg_lift", "avg_support",
+            ],
+            "product_affinity_pairs": [
+                "product_a_id", "product_a_name", "product_a_category",
+                "product_b_id", "product_b_name", "product_b_category",
+                "co_occurrence_count", "support", "confidence_a_to_b", "confidence_b_to_a",
+                "lift_a_to_b", "lift_b_to_a", "avg_lift", "affinity_strength", "affinity_score",
+            ],
+            "product_affinity_top_per_product": [
+                "product_a_id", "product_a_name", "product_a_category",
+                "recommended_product_id", "recommended_product_name", "recommended_product_category",
+                "co_occurrence_count", "support", "confidence_a_to_b", "lift_a_to_b",
+                "avg_lift", "affinity_strength", "affinity_score",
+            ],
+            "precomputed_product_recommendations": [
+                "product_a_id", "recommended_products", "avg_affinity_score", "has_recommendations",
+            ],
+            "precomputed_reco_coverage": [
+                "total_products", "products_with_recommendations", "coverage_rate",
+            ],
+            # FIX: primary path selects product_id, (supplier_id), available_stock, current_stock,
+            # minimum_stock_level, days_of_supply, stock_status_computed.
+            # Old schema had stock_quantity (fallback-only) and was missing minimum_stock_level.
+            "inventory_stock_status": [
+                "product_id", "supplier_id", "available_stock", "current_stock",
+                "minimum_stock_level", "days_of_supply", "stock_status_computed",
+            ],
+            # FIX: primary path selects product_id, (supplier_id), available_stock,
+            # avg_daily_sales, days_of_supply. Old schema showed fallback-path-only columns.
+            "days_of_supply": [
+                "product_id", "supplier_id", "available_stock", "avg_daily_sales", "days_of_supply",
+            ],
+            # FIX: breach column is reorder_point_breach_count (not reorder_point_breach).
+            # product_name and category are conditionally selected but present when agg_products available.
+            "sku_reorder_urgency": [
+                "product_id", "product_name", "category", "available_stock", "current_stock",
+                "minimum_stock_level", "reorder_point_breach_count",
+                "days_of_supply", "reorder_urgency_score", "reorder_urgency_tier",
+            ],
+            # FIX: primary path uses stock_health_score, reorder_urgency, days_of_supply, stock_status
+            # (not latest_stock_quantity / latest_available_stock which belong to fallback path only).
+            "reorder_point_breach_frequency": [
+                "product_id", "supplier_id", "reorder_point_breach_count",
+                "stock_health_score", "reorder_urgency", "current_stock",
+                "available_stock", "days_of_supply", "stock_status",
+                "product_name", "category", "total_units_sold", "total_revenue",
+            ],
+            "overstock_analysis": [
+                "product_id", "supplier_id", "stock_health_score", "storage_cost",
+                "storage_cost_per_unit", "current_stock", "available_stock", "days_of_supply",
+                "stock_status", "product_name", "category", "total_units_sold", "total_revenue",
+            ],
+            "reserved_vs_available": [
+                "product_id", "product_name", "category", "supplier_id",
+                "available_stock", "reserved_quantity", "total_stock", "reserved_share",
+            ],
+            "excess_inventory_not_selling": [
+                "product_id", "product_name", "category", "supplier_id",
+                "available_stock", "current_stock", "avg_daily_sales_effective",
+                "days_of_supply_effective", "total_units_sold", "total_revenue",
+                "days_since_launch", "stock_health_score", "reorder_urgency",
+            ],
+            "margin_erosion_risk": [
+                "product_id", "product_name", "category", "supplier_id",
+                "storage_cost", "storage_cost_per_unit", "available_stock", "current_stock",
+                "stock_health_score", "total_units_sold", "total_revenue",
+                "avg_order_value_product", "storage_cost_to_revenue",
+                "storage_cost_per_unit_to_price",
+            ],
+            "inventory_carrying_cost_by_product": [
+                "product_id", "product_name", "category", "supplier_id",
+                "storage_cost", "available_stock", "current_stock", "storage_cost_per_unit",
+            ],
+        },
+
+        "supplier_analytics": {
+            "stockout_rate_by_supplier": [
+                "supplier_id", "supplier_status", "total_stockouts", "supplier_stockout_rate",
+                "inv_total_stockouts", "inv_stockout_rate", "inv_total_products",
+                "inv_total_current_stock", "inv_total_available_stock",
+                "supplier_reliability_score", "supplier_inventory_health_score",
+            ],
+            "storage_cost_efficiency_by_supplier": [
+                "supplier_id", "total_storage_cost", "total_available_stock",
+                "total_current_stock", "avg_storage_cost_per_unit",
+                "supplier_inventory_health_score", "storage_cost_efficiency",
+            ],
+            "inventory_carrying_cost_by_supplier": [
+                "supplier_id", "total_storage_cost", "total_available_stock",
+            ],
+            "supplier_reliability": [
+                "supplier_id", "supplier_status", "supplier_reliability_score_effective",
+                "supplier_performance_score", "stock_efficiency_ratio",
+            ],
+            "supplier_stockouts": [
+                "supplier_id", "total_stockouts", "supplier_stockout_rate",
+                "inv_total_stockouts", "inv_stockout_rate", "inv_total_products",
+                "inv_total_current_stock", "inv_total_available_stock",
+            ],
+            "supplier_fulfillment_performance": [
+                "supplier_id", "supplier_status", "total_orders_fulfilled", "total_units_sold",
+                "avg_restock_lead_time", "supplier_performance_score",
+                "stock_efficiency_ratio", "supplier_reliability_score_effective",
+            ],
+            "supplier_revenue_contribution": [
+                "supplier_id", "total_revenue_generated", "total_orders_fulfilled",
+                "avg_order_value", "revenue_contribution_share",
+            ],
+            "supplier_profit_margin": [
+                "supplier_id", "avg_profit_margin", "total_revenue_generated",
+                "total_orders_fulfilled",
+            ],
+            "supplier_days_since_last_restock": [
+                "supplier_id", "days_since_last_restock", "inv_total_products",
+                "inv_total_current_stock", "inv_total_available_stock",
+            ],
+            "supplier_contract_expiry": [
+                "supplier_id", "supplier_status", "contract_start_date", "contract_end_date",
+                "days_until_contract_expiry", "contract_status_flag",
+                "supplier_reliability_score_effective", "supplier_performance_score",
+            ],
+        },
+
+        "marketing_analytics": {
+            "campaign_performance_summary": [
+                "campaign_id", "campaign_name", "campaign_type", "start_date", "end_date",
+                "campaign_status", "impressions", "clicks", "orders_from_campaign",
+                "revenue_generated", "avg_order_value", "conversion_rate", "roas", "roi",
+                "campaign_efficiency_score", "spent_amount", "budget",
+                "revenue_per_click", "roi_per_spend",
+            ],
+            "campaign_product_contribution": [
+                "campaign_id", "product_id", "product_name", "category", "sub_category",
+                "brand", "units_sold", "product_revenue", "orders_count",
+                "avg_product_margin", "campaign_revenue", "product_revenue_share",
+            ],
+            "campaign_ltv": [
+                "campaign_id", "distinct_customers", "campaign_revenue_from_orders",
+                "avg_customer_lifetime_value", "num_customers_with_clv",
+                "high_clv_customers", "high_clv_share",
+            ],
+            "campaign_customer_ltv_summary": [
+                "campaign_id", "distinct_customers", "campaign_revenue_from_orders",
+                "avg_customer_lifetime_value", "num_customers_with_clv",
+                "high_clv_customers", "high_clv_share",
+            ],
+            # FIX: code builds this by filtering campaign_performance_summary and adding 2 columns.
+            # It inherits ALL columns from campaign_performance_summary plus the 2 new ones.
+            "campaign_wasteful_campaigns": [
+                "campaign_id", "campaign_name", "campaign_type", "start_date", "end_date",
+                "campaign_status", "impressions", "clicks", "orders_from_campaign",
+                "revenue_generated", "avg_order_value", "conversion_rate", "roas", "roi",
+                "campaign_efficiency_score", "spent_amount", "budget",
+                "revenue_per_click", "roi_per_spend",
+                "revenue_per_click_recalc", "is_low_efficiency",
+            ],
+            "campaign_margin_profile": [
+                "campaign_id", "campaign_avg_product_margin",
+                "campaign_products_revenue", "campaign_units_sold",
+            ],
+            "campaign_performance": [
+                "campaign_id", "campaign_name", "campaign_type", "campaign_status",
+                "performance_tier", "budget", "spent_amount", "effective_impressions",
+                "effective_clicks", "effective_conversions", "revenue_generated",
+                "avg_order_value", "ctr_effective", "conversion_rate_effective",
+                "roas_effective", "roi_effective",
+            ],
+        },
+
+        "revenue_analytics": {
+            "low_margin_categories": [
+                "category", "avg_profit_margin", "total_category_profit",
+                "total_category_revenue", "units_sold",
+            ],
+            "rev_by_country_city": [
+                "country", "city", "customer_count", "segment_revenue",
+                "revenue_per_customer", "revenue_share",
+            ],
+            "rev_by_customer_segment": [
+                "customer_segment", "customer_count", "segment_revenue",
+                "revenue_per_customer", "revenue_share",
+            ],
+            "rev_by_rfm_segment": [
+                "rfm_segment", "customer_count", "segment_revenue",
+                "revenue_per_customer", "revenue_share",
+            ],
+            "rev_by_segment_label": [
+                "customer_segment_label", "customer_count", "segment_revenue",
+                "revenue_per_customer", "revenue_share",
+            ],
+            "rev_by_referrer": [
+                "preferred_referrer_source", "customer_count", "segment_revenue",
+                "revenue_per_customer", "revenue_share",
+            ],
+            "rev_by_device": [
+                "preferred_device_type", "customer_count", "segment_revenue",
+                "revenue_per_customer", "revenue_share",
+            ],
+            "aov_trend_daily": [
+                "order_date", "order_year", "order_month",
+                "total_orders", "total_revenue", "avg_order_value",
+            ],
+            "aov_trend_weekly": [
+                "year_week", "order_year", "order_week",
+                "total_orders", "total_revenue", "avg_order_value",
+            ],
+            "aov_trend_monthly": [
+                "year_month", "order_year", "order_month",
+                "total_orders", "total_revenue", "avg_order_value",
+            ],
+            "segment_aov_by_rfm": [
+                "rfm_segment", "orders", "total_revenue",
+                "avg_order_value_segment", "unique_customers",
+            ],
+            "inventory_carrying_cost_overall": [
+                "total_inventory_carrying_cost",
+            ],
+        },
+
+        "funnel_analytics": {
+            "high_value_funnel": [
+                "session_id", "customer_id", "session_start", "device_type", "referrer_source",
+                "products_viewed", "total_products_viewed", "items_added_to_cart",
+                "orders_from_session", "converted", "abandoned", "cart_value",
+                "session_engagement_score", "session_type", "conversion_flag",
+                "cart_abandonment_flag", "reached_view", "reached_cart", "reached_order",
+                "session_monetary_value", "is_high_value_session",
+                "view_to_cart_rate", "cart_to_order_rate", "view_to_order_rate",
+            ],
+            "high_value_vs_regular": [
+                "is_high_value_session", "session_count", "avg_products_viewed",
+                "avg_items_in_cart", "avg_orders", "avg_session_value", "total_value",
+                "avg_view_to_cart_rate", "avg_cart_to_order_rate", "avg_view_to_order_rate",
+            ],
+            "funnel_by_device": [
+                "device_type", "total_sessions", "sessions_with_views",
+                "sessions_with_cart", "sessions_with_orders",
+                "avg_session_value", "high_value_sessions", "conversion_rate",
+            ],
+            "funnel_by_referrer": [
+                "referrer_source", "total_sessions", "sessions_with_views",
+                "sessions_with_cart", "sessions_with_orders",
+                "avg_session_value", "high_value_sessions", "conversion_rate",
+            ],
+            "abandoned_vs_converted": [
+                "converted", "session_count", "avg_products_viewed",
+                "avg_items_in_cart", "avg_cart_value", "total_cart_value",
+            ],
+            # FIX: these 3 were wrongly placed under product_analytics in the previous schema.
+            # They are assigned to product_analysis dict in the code, but logically they
+            # belong here — move them to funnel_analytics for correct categorization.
+            "checkout_dropoff_reasons": [
+                "cart_abandonment_reason", "dropoff_count",
+                "avg_abandonment_risk_score", "conversion_after_abandonment_rate",
+            ],
+            "checkout_dropoff_buckets": [
+                "dropoff_bucket", "dropoff_count", "avg_abandonment_risk_score",
+            ],
+            "checkout_dropoff_by_device_and_reason": [
+                "device_type", "dropoff_bucket", "dropoff_count",
+                "avg_abandonment_risk_score", "avg_session_engagement_score",
+            ],
+            "device_conversion_rates": [
+                "device_used", "carts", "converted_carts", "abandoned_carts",
+                "conversion_rate", "abandonment_rate",
+            ],
+        },
+
+        "payment_analytics": {
+            "payment_counts_by_country_method": [
+                "country", "payment_method", "payment_count", "order_count",
+            ],
+            "payment_counts_by_state_method": [
+                "country", "state_province", "payment_method", "payment_count", "order_count",
+            ],
+            "payment_method_success_rates": [
+                "payment_method", "total_payments", "completed_payments",
+                "distinct_orders", "success_rate",
+            ],
+            "payment_method_success_rates_by_country": [
+                "country", "payment_method", "total_payments", "completed_payments",
+                "distinct_orders", "success_rate",
+            ],
+            "payment_method_aov": [
+                "payment_method", "payment_count", "order_count",
+                "total_revenue", "avg_order_value_method",
+            ],
+            "refund_rate_by_payment_method": [
+                "payment_method", "total_payments", "total_refund_amount",
+                "payments_with_refund", "refund_rate_payments", "avg_refund_per_payment",
+            ],
+            "refund_rate_by_product": [
+                "product_id", "product_name", "category", "orders_for_product",
+                "orders_with_refund", "total_refund_amount", "refund_rate_orders",
+            ],
+            "refund_rate_by_month": [
+                "order_placed_year", "order_placed_month", "orders", "orders_with_refund",
+                "total_refund_amount", "total_order_amount",
+                "refund_rate_orders", "refund_rate_amount",
+            ],
+            "time_to_refund_by_payment_method": [
+                "payment_method", "refunded_payments", "total_refund_amount",
+                "avg_days_to_refund", "days_to_refund_percentiles",
+                "min_days_to_refund", "max_days_to_refund",
+            ],
+        },
+
+        "review_analytics": {
+            "review_velocity_daily": [
+                "product_id", "review_date", "daily_reviews", "avg_rating_daily",
+            ],
+            "review_velocity_weekly": [
+                "product_id", "year_week", "review_year", "review_week",
+                "weekly_reviews", "avg_rating_weekly",
+            ],
+            "review_velocity_monthly": [
+                "product_id", "year_month", "review_year", "review_month",
+                "monthly_reviews", "avg_rating_monthly",
+            ],
+            "sentiment_by_category": [
+                "category", "total_reviews", "avg_rating", "positive_reviews",
+                "negative_reviews", "neutral_reviews", "avg_sentiment_score",
+                "positive_share", "negative_share",
+            ],
+            "product_monthly_rating_trends": [
+                "product_id", "product_name", "category", "total_units_sold", "total_revenue",
+                "year_month", "review_year", "review_month",
+                "monthly_reviews", "avg_rating_month",
+            ],
+            "low_rated_product_monthly_trends_rating_only": [
+                "product_id", "product_name", "category", "total_units_sold", "total_revenue",
+                "year_month", "review_year", "review_month",
+                "monthly_reviews", "avg_rating_month",
+            ],
+            "rating_tier_per_product": [
+                "product_id", "product_name", "category", "total_reviews",
+                "avg_rating_product", "total_units_sold", "total_revenue", "rating_tier",
+            ],
+            "rating_tier_sales_velocity": [
+                "rating_tier", "products_in_tier", "total_units_sold_tier",
+                "total_revenue_tier", "avg_units_sold_per_product",
+                "avg_revenue_per_product", "avg_rating_in_tier", "avg_reviews_per_product",
+            ],
+        },
+
+        "operations_analytics": {
+            "processing_by_category": [
+                "category", "orders", "total_units", "avg_processing_days",
+                "avg_delivery_days", "avg_total_fulfillment_days",
+                "median_processing_days", "max_processing_days",
+            ],
+            "processing_by_subcategory": [
+                "category", "sub_category", "orders", "avg_processing_days",
+                "avg_delivery_days", "median_processing_days",
+            ],
+            "processing_by_hour": [
+                "order_hour", "orders", "avg_processing_days",
+                "avg_delivery_days", "total_revenue",
+            ],
+            "processing_by_day_of_week": [
+                "order_dow", "order_dow_name", "orders", "avg_processing_days",
+                "avg_delivery_days", "total_revenue",
+            ],
+            "weekend_vs_weekday": [
+                "day_type", "orders", "avg_processing_days",
+                "avg_delivery_days", "total_revenue",
+            ],
+            "delivery_days_by_country": [
+                "country", "delivered_orders", "avg_delivery_days",
+                "median_delivery_days", "max_delivery_days",
+            ],
+            "delivery_days_by_state": [
+                "country", "state_province", "delivered_orders", "avg_delivery_days",
+                "median_delivery_days", "max_delivery_days",
+            ],
+            "delivery_days_by_city": [
+                "country", "state_province", "city", "delivered_orders", "avg_delivery_days",
+                "median_delivery_days", "max_delivery_days",
+            ],
+            "ontime_delivery_by_country": [
+                "country", "delivered_orders", "on_time_orders",
+                "on_time_rate", "avg_delivery_days",
+            ],
+            "ontime_delivery_by_state": [
+                "country", "state_province", "delivered_orders", "on_time_orders",
+                "on_time_rate", "avg_delivery_days",
+            ],
+            "ontime_delivery_by_city": [
+                "country", "state_province", "city", "delivered_orders", "on_time_orders",
+                "on_time_rate", "avg_delivery_days",
+            ],
+            "shipping_efficiency_by_country": [
+                "country", "orders", "total_shipping_cost", "total_subtotal",
+                "avg_shipping_pct_of_subtotal", "median_shipping_pct_of_subtotal",
+                "shipping_pct_of_subtotal_overall",
+            ],
+            "shipping_efficiency_by_state": [
+                "country", "state_province", "orders", "total_shipping_cost", "total_subtotal",
+                "avg_shipping_pct_of_subtotal", "median_shipping_pct_of_subtotal",
+                "shipping_pct_of_subtotal_overall",
+            ],
+            "shipping_efficiency_by_city": [
+                "country", "state_province", "city", "orders", "total_shipping_cost",
+                "total_subtotal", "avg_shipping_pct_of_subtotal",
+                "median_shipping_pct_of_subtotal", "shipping_pct_of_subtotal_overall",
+            ],
+            "processing_by_season": [
+                "season", "orders", "avg_processing_days",
+                "median_processing_days", "max_processing_days",
+            ],
+            "processing_by_season_and_status": [
+                "season", "order_status", "orders",
+                "avg_processing_days", "median_processing_days",
+            ],
+        },
+
+        "wishlist_analytics": {
+            "wishlist_overall_summary": [
+                "total_wishlist_items", "customers_using_wishlist", "products_in_wishlist",
+                "wishlist_purchased_items", "wishlist_conversion_rate",
+            ],
+            "wishlist_by_product": [
+                "product_id", "wishlist_adds", "wishlist_purchases", "wishlist_conversion_rate",
+            ],
+            "wishlist_by_customer": [
+                "customer_id", "wishlist_adds", "wishlist_purchases", "wishlist_conversion_rate",
+            ],
+            "wishlist_time_to_purchase_stats": [
+                "records", "avg_time", "median_time", "p90_time", "max_time",
+            ],
+            "wishlist_time_to_purchase_distribution": [
+                "time_bucket", "count", "share",
+            ],
+            "abandoned_wishlist_items": [
+                "wishlist_id", "customer_id", "product_id",
+                "added_date", "purchased_date", "removed_date",
+            ],
+            "abandoned_wishlist_by_customer": [
+                "customer_id", "abandoned_wishlist_count",
+            ],
+            "abandoned_wishlist_by_product": [
+                "product_id", "abandoned_wishlist_count",
+            ],
+            "wishlist_adds_by_month": [
+                "year_month", "wishlist_adds",
+            ],
+        },
+
+        "cart_analytics": {
+            "cart_overall_stats": [
+                "total_carts", "total_cart_lines",
+            ],
+            "cart_status_distribution": [
+                "cart_status", "carts_count", "cart_lines_count",
+            ],
+            "cart_value_stats": [
+                "cart_status", "carts_count", "avg_cart_value", "avg_cart_items",
+                "avg_time_in_cart_days", "avg_recovery_potential_score",
+            ],
+            "high_value_abandoned_carts": [
+                "cart_id", "customer_id", "cart_total_value", "cart_items_count",
+                "time_in_cart_days", "recovery_potential_score", "abandonment_risk_score",
+            ],
+            "time_to_purchase_overall": [
+                "completed_carts", "avg_time_in_cart_days", "avg_time_in_cart_hours",
+                "time_in_cart_days_percentiles",
+            ],
+            # FIX: groupby key is cart_value_tier OR cart_size_category (whichever column exists).
+            # Showing cart_value_tier as the primary expected key.
+            "time_to_purchase_by_tier": [
+                "cart_value_tier", "completed_carts", "avg_time_in_cart_days",
+                "avg_time_in_cart_hours", "avg_cart_items_count",
+            ],
+            "time_to_purchase_buckets": [
+                "time_to_purchase_bucket", "completed_carts", "avg_time_in_cart_days",
+            ],
+        },
+
+        "geo_analytics": {
+            "geo_acquisition": [
+                "country", "state_province", "city", "new_customers",
+            ],
+        },
+    }
+
+    print("\n" + "=" * 60)
+    print("📋 ANALYTICS SCHEMA BY CATEGORY")
+    print("=" * 60)
+    print(json.dumps(ANALYTICS_SCHEMA, indent=4))
+    print("=" * 60)
+    total = sum(len(analytics) for analytics in ANALYTICS_SCHEMA.values())
+    print(f"Total categories: {len(ANALYTICS_SCHEMA)}  |  Total analytics: {total}")
+    print("=" * 60)
+    
+    # Stop Spark session
+    spark.stop()
+    print("\n✅ Spark session stopped")
+    
+    print("\n" + "=" * 60)
+    print("🎉 ANALYSIS PIPELINE COMPLETED SUCCESSFULLY!")
+    print("=" * 60)
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='E-commerce analytics pipeline')
+    parser.add_argument('--bucket-name', type=str, help='MinIO bucket name (business_id)')
+    args = parser.parse_args()
+    
+    main(bucket_name=args.bucket_name)

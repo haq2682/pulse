@@ -26,18 +26,7 @@ from datetime import datetime
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/delivery_time/"
-MIN_RECORDS_THRESHOLD = 100
-MAX_NULL_PERCENTAGE = 95.0
 
-# Configuration
-USE_CROSS_VALIDATION = False
-
-# Required columns
 REQUIRED_ORDER_COLUMNS = ["order_id", "customer_id", "order_status", "order_placed_at", "delivery_days_diff"]
 REQUIRED_CUSTOMER_COLUMNS = ["customer_id", "country", "state_province", "city"]
 
@@ -135,7 +124,7 @@ def validate_dataset(spark, path, name):
         return None, 0
 
 
-def validate_columns(df, required_columns, dataset_name):
+def validate_columns(df, required_columns, dataset_name, MAX_NULL_PERCENTAGE):
     """Validate columns exist and are not entirely null"""
     print(f"\nValidating columns for {dataset_name}...")
     
@@ -423,7 +412,7 @@ def create_delivery_time_features(orders_df, customers_df, city_stats_df, state_
     return order_features
 
 
-def prepare_training_data(df):
+def prepare_training_data(df, MIN_RECORDS_THRESHOLD):
     """Prepare data with encoding and scaling"""
     print("Preparing training data...")
     
@@ -562,14 +551,23 @@ def evaluate_model(predictions, model_name):
     return metrics
 
 
-def save_model(model, model_name):
+def save_model(model, model_name, MODEL_OUTPUT_PATH):
     """Save model to MinIO"""
     model_path = f"{MODEL_OUTPUT_PATH}{model_name}"
     model.write().overwrite().save(model_path)
     print(f"✓ Model saved: {model_path}")
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
+    MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/delivery_time/"
+    MIN_RECORDS_THRESHOLD = 100
+    MAX_NULL_PERCENTAGE = 95.0
+
+    # Configuration
+    USE_CROSS_VALIDATION = False
+
     """Main training pipeline"""
     print("\n" + "="*60)
     print("Delivery Time Prediction - Training")
@@ -596,8 +594,8 @@ def main():
     print("\nStep 2: Column Validation")
     print("-" * 60)
     
-    orders_valid, _, _ = validate_columns(orders_df, REQUIRED_ORDER_COLUMNS, "Orders")
-    customers_valid, _, _ = validate_columns(customers_df, REQUIRED_CUSTOMER_COLUMNS, "Customers")
+    orders_valid, _, _ = validate_columns(orders_df, REQUIRED_ORDER_COLUMNS, "Orders", MAX_NULL_PERCENTAGE)
+    customers_valid, _, _ = validate_columns(customers_df, REQUIRED_CUSTOMER_COLUMNS, "Customers", MAX_NULL_PERCENTAGE)
     
     if not (orders_valid and customers_valid):
         print("\n✗ Training aborted: Required columns missing or entirely null")
@@ -630,7 +628,7 @@ def main():
     # Prepare data
     print("\nStep 7: Data Preparation")
     print("-" * 60)
-    result = prepare_training_data(df_features)
+    result = prepare_training_data(df_features, MIN_RECORDS_THRESHOLD)
     
     if result is None:
         print("\n✗ Training aborted: Insufficient data")
@@ -658,7 +656,7 @@ def main():
     
     model, predictions, model_name = train_random_forest(train_df, test_df, USE_CROSS_VALIDATION)
     metrics = evaluate_model(predictions, model_name)
-    save_model(model, model_name)
+    save_model(model, model_name, MODEL_OUTPUT_PATH)
     
     print("\n" + "="*60)
     print(f"Best Model: {model_name} (R² = {metrics['r2']:.4f})")
@@ -671,4 +669,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

@@ -591,8 +591,8 @@ def prepare_training_data(df, target_column):
     valid_count = df_valid.count()
     print(f"Records with valid target: {valid_count}")
     
-    if valid_count < MIN_RECORDS_THRESHOLD:
-        print(f"✗ Insufficient data: {valid_count} < {MIN_RECORDS_THRESHOLD}")
+    if valid_count < MIN_RECORDS:
+        print(f"✗ Insufficient data: {valid_count} < {MIN_RECORDS}")
         return None
     
     # Encode categorical features

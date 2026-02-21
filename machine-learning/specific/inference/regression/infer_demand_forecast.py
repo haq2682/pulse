@@ -22,20 +22,6 @@ import math
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-INPUT_CATEGORIES_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_categories.parquet"
-INPUT_MONTHLY_AGG_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_monthly_aggregations.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/demand_forecast/"
-MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/demand_forecast/"
-
-# ⚠️ MANUAL CONFIGURATION REQUIRED:
-MODEL_NAME = "gbt"  # Options: "linear_regression", "random_forest", "gbt"
-
-FORECAST_HORIZON_DAYS = 30
 
 # Feature columns (must match training)
 FEATURE_COLUMNS = [
@@ -95,7 +81,7 @@ def create_spark_session():
     )
 
 
-def load_model(model_name):
+def load_model(model_name, MODEL_BASE_PATH):
     """Load trained model from MinIO"""
     model_path = f"{MODEL_BASE_PATH}{model_name}"
     
@@ -360,7 +346,7 @@ def prepare_inference_data(df):
     return df_prepared
 
 
-def generate_predictions(model, df, model_name):
+def generate_predictions(model, df, model_name, FORECAST_HORIZON_DAYS):
     """Generate predictions with seasonal/trend factors"""
     predictions_df = model.transform(df)
     
@@ -420,7 +406,19 @@ def display_sample_predictions(df, n=5):
         )
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    INPUT_CATEGORIES_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_categories.parquet"
+    INPUT_MONTHLY_AGG_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_monthly_aggregations.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/demand_forecast/"
+    MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/demand_forecast/"
+
+    # ⚠️ MANUAL CONFIGURATION REQUIRED:
+    MODEL_NAME = "gbt"  # Options: "linear_regression", "random_forest", "gbt"
+
+    FORECAST_HORIZON_DAYS = 30
     """Main inference pipeline"""
     print("\n" + "="*60)
     print("Demand Forecasting V2 - Inference")
@@ -434,7 +432,7 @@ def main():
     # Load model
     print("Step 1: Load Model")
     print("-" * 60)
-    model = load_model(MODEL_NAME)
+    model = load_model(MODEL_NAME, MODEL_BASE_PATH)
     
     if model is None:
         print("\n✗ Inference aborted: Model not found")
@@ -471,7 +469,7 @@ def main():
     # Generate predictions
     print("\nStep 5: Generate Predictions")
     print("-" * 60)
-    predictions_df = generate_predictions(model, df_prepared, MODEL_NAME)
+    predictions_df = generate_predictions(model, df_prepared, MODEL_NAME, FORECAST_HORIZON_DAYS)
     
     # Display samples
     display_sample_predictions(predictions_df)
@@ -492,4 +490,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

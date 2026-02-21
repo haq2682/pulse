@@ -12,19 +12,6 @@ import findspark
 
 findspark.init()
 
-# Configuration
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_reviews.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/review_sentiment_predictions"
-MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/review_sentiment"
-
-# ⚠️ MANUAL INTERVENTION REQUIRED: Select model to use for inference
-# Available options: "LogisticRegression", "NaiveBayes", "RandomForest", "MultilayerPerceptron"
-SELECTED_MODEL = "NaiveBayes"  # <-- CHANGE THIS BASED ON TRAINING RESULTS
-
-MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
-
-
 def create_spark_session():
     """Initialize Spark session with MinIO configuration"""
     return SparkSession.builder \
@@ -184,7 +171,7 @@ def extract_key_phrases(df):
     return df
 
 
-def generate_predictions(spark, df, model, preprocessors, model_name):
+def generate_predictions(spark, df, model, preprocessors, model_name, MODEL_VERSION):
     """Generate predictions and format output according to schema"""
     predictions = model.transform(df)
     
@@ -240,7 +227,17 @@ def save_predictions(df, output_path):
         return False
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_reviews.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/review_sentiment_predictions"
+    MODEL_INPUT_DIR = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/classification/models/review_sentiment"
+
+    # ⚠️ MANUAL INTERVENTION REQUIRED: Select model to use for inference
+    # Available options: "LogisticRegression", "NaiveBayes", "RandomForest", "MultilayerPerceptron"
+    SELECTED_MODEL = "NaiveBayes"  # <-- CHANGE THIS BASED ON TRAINING RESULTS
+
+    MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
     print("=" * 60)
     print("Review Sentiment Classification - Inference Pipeline")
     print("=" * 60)
@@ -277,7 +274,7 @@ def main():
     df_prepared = prepare_features(df, preprocessors)
     
     # Generate predictions
-    predictions_df = generate_predictions(spark, df_prepared, model, preprocessors, SELECTED_MODEL)
+    predictions_df = generate_predictions(spark, df_prepared, model, preprocessors, SELECTED_MODEL, MODEL_VERSION)
     
     # Show sample predictions
     print("\nSample predictions:")
@@ -299,4 +296,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME='pulse-bucket-1'
+    main(BUCKET_NAME)

@@ -13,17 +13,6 @@ from pyspark.ml.clustering import KMeans
 from pyspark.ml.evaluation import ClusteringEvaluator
 from pyspark.ml import Pipeline, PipelineModel
 
-BUCKET = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
-METRICS_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/metrics/"
-LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
-
-FEATURES = ["log_age", "log_sales_velocity", "log_revenue_velocity", "log_turnover"]
-K_RANGE = [3, 4, 5, 6]
-MIN_PRODUCTS = 50
-
-
 def create_spark():
     return (
         SparkSession.builder.appName("ProductLifecycleTrain")
@@ -52,7 +41,7 @@ def create_spark():
     )
 
 
-def load_data(spark):
+def load_data(spark, INPUT_PATH):
     df = spark.read.parquet(f"{INPUT_PATH}agg_products.parquet")
     df = df.dropDuplicates(["product_id"])
     print(f"Loaded {df.count()} products")
@@ -70,7 +59,7 @@ def validate_columns(df, required_cols):
     return True
 
 
-def prepare_features(df):
+def prepare_features(df, MIN_PRODUCTS):
     required = ["product_id", "days_since_launch", "total_units_sold", "total_revenue", "inventory_turnover_rate"]
     if not validate_columns(df, required):
         return None
@@ -123,7 +112,7 @@ def compute_stats(df):
             ["age_p25", "age_p50", "age_p75", "vel_p25", "vel_p50", "vel_p75", "turnover_p50", "turnover_p75"]}
 
 
-def build_pipeline():
+def build_pipeline(FEATURES):
     assembler = VectorAssembler(inputCols=FEATURES, outputCol="features_raw", handleInvalid="skip")
     scaler = MinMaxScaler(inputCol="features_raw", outputCol="features_scaled")
     return Pipeline(stages=[assembler, scaler])
@@ -195,7 +184,7 @@ def profile_clusters(predictions, stats):
     return profiles
 
 
-def save_model_and_metrics(spark, preprocess_model, kmeans_model, profiles, stats, best_k, best_silhouette):
+def save_model_and_metrics(spark, preprocess_model, kmeans_model, profiles, stats, best_k, best_silhouette, MODEL_OUTPUT_PATH, LOCAL_METRICS_PATH, METRICS_OUTPUT_PATH, FEATURES):
     full_stages = list(preprocess_model.stages) + [kmeans_model]
     full_pipeline = PipelineModel(stages=full_stages)
     full_pipeline.write().overwrite().save(f"{MODEL_OUTPUT_PATH}product_lifecycle_pipeline")
@@ -229,11 +218,19 @@ def save_model_and_metrics(spark, preprocess_model, kmeans_model, profiles, stat
         print(f"S3 warning: {e}")
 
 
-def main():
+def main(BUCKET):
+    INPUT_PATH = f"s3a://{BUCKET}/transformed/"
+    MODEL_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
+    METRICS_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/metrics/"
+    LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
+
+    FEATURES = ["log_age", "log_sales_velocity", "log_revenue_velocity", "log_turnover"]
+    K_RANGE = [3, 4, 5, 6]
+    MIN_PRODUCTS = 50
     spark = create_spark()
     
-    df = load_data(spark)
-    df = prepare_features(df)
+    df = load_data(spark, INPUT_PATH)
+    df = prepare_features(df, MIN_PRODUCTS)
     if df is None:
         spark.stop()
         return
@@ -242,7 +239,7 @@ def main():
     stats = compute_stats(df)
     print(f"Stats: {stats}")
     
-    preprocess_pipeline = build_pipeline()
+    preprocess_pipeline = build_pipeline(FEATURES)
     preprocess_model = preprocess_pipeline.fit(df)
     df_scaled = preprocess_model.transform(df)
     df_scaled.cache()
@@ -285,7 +282,7 @@ def main():
     for p in profiles:
         print(f"  Cluster {p['cluster_id']}: {p['stage']} ({p['count']})")
     
-    save_model_and_metrics(spark, preprocess_model, best_model, profiles, stats, best_k, best_sil)
+    save_model_and_metrics(spark, preprocess_model, best_model, profiles, stats, best_k, best_sil, MODEL_OUTPUT_PATH, LOCAL_METRICS_PATH, METRICS_OUTPUT_PATH, FEATURES)
     
     df.unpersist()
     df_scaled.unpersist()
@@ -293,4 +290,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET = "pulse-bucket-1"
+    main(BUCKET)

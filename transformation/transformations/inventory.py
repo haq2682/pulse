@@ -25,13 +25,20 @@ def transform_inventory(dataframes):
         .groupBy("product_id")
         .agg(spark_avg("stock_quantity").alias("avg_inventory"))
     )
-    avg_daily_sales = (
-        dataframes["orders"]
+    avg_daily_units_sold = (
+        dataframes["order_items"]
+        .join(
+            dataframes["orders"].select("order_id", "order_placed_at"),
+            "order_id",
+            "inner",
+        )
         .groupBy(to_date("order_placed_at").alias("order_date"))
-        .agg(spark_sum("total_amount").alias("daily_sales"))
-        .select(spark_avg("daily_sales").alias("avg_daily_sales"))
-        .collect()[0]["avg_daily_sales"]
+        .agg(spark_sum("quantity").alias("daily_units"))
+        .select(spark_avg("daily_units").alias("avg_daily_units"))
+        .collect()[0]["avg_daily_units"]
     )
+    if avg_daily_units_sold is None or avg_daily_units_sold == 0:
+        avg_daily_units_sold = 1  # Avoid division by zero
     dataframes["inventory"] = (
         dataframes["inventory"]
         .join(total_sold_df, "product_id", "left")
@@ -73,8 +80,9 @@ def transform_inventory(dataframes):
                     col("stock_quantity") - col("reserved_quantity"),
                 ),
                 "stock_coverage_days": when(
-                    col("stock_quantity").isNotNull() & (avg_daily_sales > lit(0)),
-                    col("stock_quantity") / avg_daily_sales,
+                    col("stock_quantity").isNotNull()
+                    & (lit(avg_daily_units_sold) > lit(0)),
+                    col("stock_quantity") / lit(avg_daily_units_sold),
                 ),
                 "reorder_point_breach": when(
                     col("stock_quantity").isNotNull()

@@ -27,28 +27,39 @@ def get_minio_buckets(spark: SparkSession, bucket_prefix: str = None) -> List[st
         List of bucket names (optionally filtered by prefix)
     """
     try:
-        # Get Hadoop FileSystem
-        jvm = spark._jvm
+        from minio import Minio
+        
+        # Extract MinIO credentials from Spark configuration
         hadoop_conf = spark._jsc.hadoopConfiguration()
         
-        # Get the S3A FileSystem instance
-        uri = jvm.java.net.URI("s3a://")
-        fs = jvm.org.apache.hadoop.fs.FileSystem.get(uri, hadoop_conf)
+        # Get MinIO endpoint, access key, and secret key from Spark config
+        endpoint = hadoop_conf.get("fs.s3a.endpoint", "localhost:9000")
+        access_key = hadoop_conf.get("fs.s3a.access.key", "")
+        secret_key = hadoop_conf.get("fs.s3a.secret.key", "")
         
-        # List all buckets at root level
-        root_path = jvm.org.apache.hadoop.fs.Path("s3a://")
-        file_statuses = fs.listStatus(root_path)
+        # Remove protocol prefix if present (MinIO client expects host:port)
+        endpoint = endpoint.replace("http://", "").replace("https://", "")
         
-        # Extract bucket names
+        # Determine if using SSL
+        use_ssl = hadoop_conf.get("fs.s3a.connection.ssl.enabled", "false").lower() == "true"
+        
+        # Create MinIO client
+        client = Minio(
+            endpoint,
+            access_key=access_key,
+            secret_key=secret_key,
+            secure=use_ssl
+        )
+        
+        # List all buckets
+        bucket_list = client.list_buckets()
         buckets = []
-        for file_status in file_statuses:
-            path = file_status.getPath()
-            # Get bucket name from path (format: s3a://bucket-name)
-            bucket_name = path.toUri().getHost()
-            if bucket_name:
-                # Apply optional prefix filter
-                if bucket_prefix is None or bucket_name.startswith(bucket_prefix):
-                    buckets.append(bucket_name)
+        
+        for bucket in bucket_list:
+            bucket_name = bucket.name
+            # Apply optional prefix filter
+            if bucket_prefix is None or bucket_name.startswith(bucket_prefix):
+                buckets.append(bucket_name)
         
         if not buckets and bucket_prefix:
             # Fallback: if filtering by prefix and no buckets found, try the general bucket
@@ -58,6 +69,7 @@ def get_minio_buckets(spark: SparkSession, bucket_prefix: str = None) -> List[st
         
     except Exception as e:
         print(f"Error listing MinIO buckets: {e}")
+        print(f"Falling back to default bucket: {GENERAL_MODEL_BUCKET}")
         # Fallback to general bucket
         return [GENERAL_MODEL_BUCKET]
 
@@ -261,7 +273,6 @@ MODEL_TRAINING_WINDOWS = {
     "aov_v2": (200, 500_000),
     "clv": (100, 500_000),
     "restock_quantity": (100, 200_000),
-    "revenue_forecast": (12, 1000),  # Time series - needs fewer but specific records
     "safety_stock": (100, 200_000),
     "session_conversion": (200, 500_000),
     "stockout_probability": (100, 200_000),

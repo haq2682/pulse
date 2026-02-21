@@ -15,18 +15,6 @@ import findspark
 
 findspark.init()
 
-# Configuration
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH_CART = f"s3a://{BUCKET_NAME}/transformed/agg_cart_abandonment_analysis.parquet"
-INPUT_PATH_SESSIONS = f"s3a://{BUCKET_NAME}/transformed/agg_customer_sessions.parquet"
-INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-INPUT_PATH_ORDERS = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/cart_abandonment_predictions"
-MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/cart_abandonment"
-
-SELECTED_MODEL = "RandomForest"
-MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
-
 # Base features (MUST match training - no time_in_cart_hours)
 NUMERICAL_FEATURES = [
     "cart_total_value",
@@ -174,7 +162,7 @@ def load_model_and_preprocessors(spark, model_dir, model_name):
         return None
 
 
-def prepare_features(df, numerical_features, categorical_features):
+def prepare_features(df, numerical_features, categorical_features, MODEL_INPUT_DIR, SELECTED_MODEL):
     df_filled = df.fillna(0, subset=numerical_features)
     df_filled = df_filled.fillna("Unknown", subset=categorical_features)
     
@@ -200,7 +188,7 @@ def prepare_features(df, numerical_features, categorical_features):
     return df_vector
 
 
-def generate_predictions(spark, df, model):
+def generate_predictions(spark, df, model, MODEL_VERSION):
     predictions = model.transform(df)
     
     map_to_output_status = udf(lambda pred: "Will Abandon" if pred > 0.5 else "Will Convert", StringType())
@@ -225,7 +213,17 @@ def generate_predictions(spark, df, model):
     return output_df
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PATH_CART = f"s3a://{BUCKET_NAME}/transformed/agg_cart_abandonment_analysis.parquet"
+    INPUT_PATH_SESSIONS = f"s3a://{BUCKET_NAME}/transformed/agg_customer_sessions.parquet"
+    INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
+    INPUT_PATH_ORDERS = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/cart_abandonment_predictions"
+    MODEL_INPUT_DIR = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/classification/models/cart_abandonment"
+
+    SELECTED_MODEL = "RandomForest"
+    MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
     print("=" * 60)
     print("Cart Abandonment Risk - Inference Pipeline")
     print("=" * 60)
@@ -262,8 +260,8 @@ def main():
     all_numerical = NUMERICAL_FEATURES + new_num_features + cust_num_features
     all_categorical = CATEGORICAL_FEATURES + new_cat_features + cust_cat_features
     
-    df_prepared = prepare_features(df, all_numerical, all_categorical)
-    predictions_df = generate_predictions(spark, df_prepared, model)
+    df_prepared = prepare_features(df, all_numerical, all_categorical, MODEL_INPUT_DIR, SELECTED_MODEL)
+    predictions_df = generate_predictions(spark, df_prepared, model, MODEL_VERSION)
     
     print("\nSample predictions:")
     predictions_df.select("cart_id", "predicted_status", "abandonment_probability", "abandonment_risk_score").show(5, truncate=False)
@@ -275,4 +273,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

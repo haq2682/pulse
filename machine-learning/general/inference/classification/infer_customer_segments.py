@@ -9,19 +9,6 @@ import findspark
 
 findspark.init()
 
-# Configuration
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-INPUT_PATH_RFM = f"s3a://{BUCKET_NAME}/transformed/agg_rfm_segmentation.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/customer_segment_predictions"
-MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/customer_segments"
-
-# ⚠️ MANUAL INTERVENTION REQUIRED: Select model to use for inference
-# Available options: "LogisticRegression", "RandomForest"
-SELECTED_MODEL = "RandomForest"  # <-- CHANGE THIS BASED ON TRAINING RESULTS
-
-MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
-
 # Feature columns (must match training) - NO RFM scores to prevent leakage
 NUMERICAL_FEATURES = [
     "days_since_last_order",
@@ -211,7 +198,7 @@ def extract_feature_importance(model, model_name):
     return {}
 
 
-def generate_predictions(spark, df, model, preprocessors, model_name, feature_importance):
+def generate_predictions(spark, df, model, preprocessors, model_name, feature_importance, MODEL_VERSION):
     """Generate predictions and format output according to schema"""
     predictions = model.transform(df)
     
@@ -273,7 +260,18 @@ def save_predictions(df, output_path):
         return False
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PATH_CUSTOMERS = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
+    INPUT_PATH_RFM = f"s3a://{BUCKET_NAME}/transformed/agg_rfm_segmentation.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/customer_segment_predictions"
+    MODEL_INPUT_DIR = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/classification/models/customer_segments"
+
+    # ⚠️ MANUAL INTERVENTION REQUIRED: Select model to use for inference
+    # Available options: "LogisticRegression", "RandomForest"
+    SELECTED_MODEL = "RandomForest"  # <-- CHANGE THIS BASED ON TRAINING RESULTS
+
+    MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
     print("=" * 60)
     print("Customer Segment Classification - Inference Pipeline")
     print("=" * 60)
@@ -323,7 +321,7 @@ def main():
     
     # Generate predictions
     predictions_df = generate_predictions(
-        spark, df_prepared, model, preprocessors, SELECTED_MODEL, feature_importance
+        spark, df_prepared, model, preprocessors, SELECTED_MODEL, feature_importance, MODEL_VERSION
     )
     
     # Show sample predictions
@@ -346,4 +344,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME= "pulse-bucket-1"
+    main(BUCKET_NAME)

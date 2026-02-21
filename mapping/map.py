@@ -17,7 +17,9 @@ from utils.helpers import (
     safe_serialize,
     detect_table,
     split_unified_dataframe,
+    parse_minio_endpoint,
 )
+from utils.table_mapper import map_table_name
 import os
 
 import findspark
@@ -180,8 +182,11 @@ COLUMNS_INFO = [
     ("customer_sessions", "cart_abandonment_flag", "boolean"),
 ]
 
+# Parse MINIO_ENDPOINT to strip protocol prefix if present
+minio_endpoint = parse_minio_endpoint(os.getenv("MINIO_ENDPOINT", "localhost:9000"))
+
 minio_client = Minio(
-    os.getenv("MINIO_ENDPOINT"),
+    minio_endpoint,
     access_key=os.getenv("MINIO_ACCESS_KEY"),
     secret_key=os.getenv("MINIO_SECRET_KEY"),
     secure=False,
@@ -285,9 +290,10 @@ df_to_table = {
 
 def resolve_table_splits(df_name, df, columns_info, mode):
     """
-    Resolve table splits with fast-path optimization (Phase 6).
+    Resolve table splits with fast-path optimization and fuzzy matching.
 
     Fast path: Check df_to_table first (0.1ms) - works for 95% of streaming cases
+    Fuzzy match: Try to map table name using fuzzy matching and synonyms
     Fallback: Use detect_table (50ms) or split_unified_dataframe for unknown names
 
     Args:
@@ -304,10 +310,27 @@ def resolve_table_splits(df_name, df, columns_info, mode):
         table_name = df_to_table[df_name]["table"]  # Extract the table name from the dict
         return {table_name: df}
 
+    # Try fuzzy matching on the dataframe name
+    # Extract potential table name from df_name (e.g., "orders.csv" -> "orders", "customer_data_df" -> "customer_data")
+    potential_table_name = df_name.lower().replace('.csv', '').replace('.json', '').replace('_df', '').replace('_data', '').replace('_dataset', '').strip()
+    
+    canonical_table = map_table_name(potential_table_name, threshold=85)
+    if canonical_table:
+        print(f"  ✅ Mapped file '{df_name}' to canonical table '{canonical_table}'")
+        return {canonical_table: df}
+    
+    print(f"  ⚠️  Could not map '{df_name}' to any canonical table, trying content-based detection...")
+
     # Fallback: Unknown name - use detection/splitting
     if mode == "stream":
         detected_table = detect_table(df, columns_info)
-        return {detected_table: df} if detected_table else {}
+        if detected_table:
+            # Try fuzzy matching on detected table
+            canonical_table = map_table_name(detected_table, threshold=80)
+            if canonical_table:
+                return {canonical_table: df}
+            return {detected_table: df}
+        return {}
     else:
         return split_unified_dataframe(df, columns_info)
 
@@ -440,7 +463,7 @@ def mapping(df, column_variants, mapped):
     return new_df, extra_df, extra_cols, missing_cols, mapped_cols
 
 
-def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="batch"):
+def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="batch", manual_mappings=None):
     """
     Unified processor for schema mapping.
 
@@ -459,6 +482,9 @@ def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="bat
         Object containing mapping_dict_<table> for each table.
     mode : str
         "batch" for files (single or multiple), "stream" for streaming.
+    manual_mappings : dict, optional
+        Dictionary of manual column mappings provided by user.
+        Format: {table_name: {canonical_col: source_col}}
 
     Returns
     -------
@@ -496,21 +522,66 @@ def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="bat
             continue
 
         for table_name, sub_df in split_dfs.items():
-            mapping_dict = getattr(mapping_list, f"mapping_dict_{table_name}", None)
+            # Check if table_name is in canonical schema
+            canonical_table = map_table_name(table_name, threshold=80)
+            if canonical_table:
+                table_to_use = canonical_table
+            else:
+                # If no canonical mapping found, skip this table
+                print(f"⚠️  Table '{table_name}' not found in canonical schema. Skipping...")
+                continue
+            
+            mapping_dict = getattr(mapping_list, f"mapping_dict_{table_to_use}", None)
             if not mapping_dict:
-                print(f"⚠️ No mapping dict found for {table_name}. Skipping.")
+                print(f"⚠️  No mapping dict found for canonical table '{table_to_use}'. Skipping...")
                 continue
 
-            mapped = {col: "" for t, col, _ in columns_info if t == table_name}
-            print(f"Processing → {table_name} with {len(mapped)} canonical columns")
+            mapped = {col: "" for t, col, _ in columns_info if t == table_to_use}
+            print(f"Processing → {table_to_use} with {len(mapped)} canonical columns")
 
             final_df, extra_df, extra_cols, missing_cols, mapped_cols = mapping(
                 sub_df, mapping_dict, mapped
             )
 
+            # Apply manual mappings if provided
+            if manual_mappings and table_to_use in manual_mappings:
+                print(f"\n📝 Applying manual mappings for {table_to_use}...")
+                table_manual_mappings = manual_mappings[table_to_use]
+                
+                for canonical_col, source_col in table_manual_mappings.items():
+                    if canonical_col in missing_cols:
+                        # Check if the source column exists in extra_cols or original dataframe
+                        if source_col in extra_cols or source_col in sub_df.columns:
+                            try:
+                                # Rename the source column to canonical column
+                                if source_col in final_df.columns:
+                                    # Column already in final_df (from extra_df)
+                                    final_df = final_df.withColumnRenamed(source_col, canonical_col)
+                                elif source_col in extra_df.columns:
+                                    # Column is in extra_df, add it to final_df
+                                    final_df = final_df.withColumn(canonical_col, extra_df[source_col])
+                                else:
+                                    # Column is in original dataframe
+                                    final_df = final_df.withColumn(canonical_col, sub_df[source_col])
+                                
+                                # Update lists - check existence before removing
+                                if canonical_col in missing_cols:
+                                    missing_cols.remove(canonical_col)
+                                if source_col in extra_cols:
+                                    extra_cols.remove(source_col)
+                                mapped_cols.append(canonical_col)
+                                
+                                print(f"   ✅ Mapped {source_col} → {canonical_col}")
+                            except Exception as map_error:
+                                print(f"   ⚠️  Could not map {source_col} → {canonical_col}: {map_error}")
+                        else:
+                            print(f"   ⚠️  Source column {source_col} not found for mapping to {canonical_col}")
+                
+                print(f"   After manual mapping: {len(missing_cols)} missing columns")
+
             # Sanitize lists before putting them into results
-            results[f"{df_name}__{table_name}"] = {
-                "table_name": table_name,
+            results[f"{df_name}__{table_to_use}"] = {
+                "table_name": table_to_use,
                 "final_df": final_df,  # keep Spark DF
                 "extra_df": extra_df,  # keep Spark DF
                 "extra_cols": [safe_serialize(c) for c in extra_cols],
@@ -518,7 +589,7 @@ def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="bat
                 "mapped_cols": [safe_serialize(c) for c in mapped_cols],
             }
 
-            print(f"✅ Completed {df_name} → {table_name}")
+            print(f"✅ Completed {df_name} → {table_to_use}")
             print(f"   Missing cols: {missing_cols}")
             print(f"   Extra cols: {extra_cols}")
             print("   Preview:")
@@ -527,7 +598,7 @@ def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="bat
     return results
 
 
-def save_dataframes_to_minio(results, client, bucket_name, operation=None, primary_key_col=None):
+def save_dataframes_to_minio(results, client, bucket_name, operation=None, primary_key_col=None, folder="mapped"):
     """
     Save processed DataFrames to MinIO bucket with append logic.
 
@@ -535,8 +606,9 @@ def save_dataframes_to_minio(results, client, bucket_name, operation=None, prima
         results: Dictionary of processed results
         client: MinIO client instance
         bucket_name: Name of the bucket to save to
-        operation: Debezium CDC operation type ('c' for create, 'u' for update, 'd' for delete, 'r' for read/snapshot)
+        operation: CDC operation type ('c' for create, 'u' for update, 'd' for delete, 'r' for read/snapshot)
         primary_key_col: Primary key column name for identifying rows to update/delete
+        folder: Folder name within bucket to save files (default: "mapped")
     """
 
     if not client.bucket_exists(bucket_name):
@@ -573,11 +645,15 @@ def save_dataframes_to_minio(results, client, bucket_name, operation=None, prima
         # Convert Spark DataFrame to Pandas
         new_pdf = final_df.toPandas()
 
-        # File path in mapped folder
-        file_name = f"mapped/{table_name}.csv"
+        # File path in specified folder
+        file_name = f"{folder}/{table_name}.csv"
 
         # Get the primary key for this table
         pk_col = primary_key_col or table_primary_keys.get(table_name)
+
+        # Ensure primary key column has consistent data type
+        if pk_col and pk_col in new_pdf.columns:
+            new_pdf[pk_col] = new_pdf[pk_col].astype(str)
 
         # Try to load existing data if file exists
         existing_pdf = None
@@ -586,6 +662,9 @@ def save_dataframes_to_minio(results, client, bucket_name, operation=None, prima
             try:
                 existing_data = response.read().decode("utf-8")
                 existing_pdf = pd.read_csv(StringIO(existing_data))
+                # Ensure primary key column has consistent data type
+                if pk_col and pk_col in existing_pdf.columns:
+                    existing_pdf[pk_col] = existing_pdf[pk_col].astype(str)
                 print(f"  Loaded existing data: {len(existing_pdf)} rows")
             finally:
                 response.close()
@@ -595,7 +674,7 @@ def save_dataframes_to_minio(results, client, bucket_name, operation=None, prima
             existing_pdf = None
             print(f"  No existing file found, creating new...")
 
-        # Handle Debezium CDC operations
+        # Handle CDC operations
         if operation and pk_col and pk_col in new_pdf.columns:
             if operation in ("d", "delete"):
                 # Delete operation: remove rows with matching primary keys using merge

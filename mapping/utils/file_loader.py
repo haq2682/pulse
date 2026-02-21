@@ -49,16 +49,74 @@ def load_all_files_from_minio(minio_client, bucket_name, spark):
 
 
 def load_file_from_minio(minio_client, bucket_name, file_name, spark):
+    """
+    Load a file from MinIO and convert to Spark DataFrame(s).
+    
+    Handles:
+    - CSV: Single table
+    - Excel: Multiple sheets (each sheet becomes a separate table)
+    - Parquet: Single table
+    - JSON: Can be single table or multi-table structure
+    
+    Args:
+        minio_client: MinIO client instance
+        bucket_name: Name of the bucket
+        file_name: Path to the file in MinIO
+        spark: SparkSession instance
+        
+    Returns:
+        Single Spark DataFrame or dict of {table_name: Spark DataFrame} for multi-table files
+    """
+    
     obj = minio_client.get_object(bucket_name, file_name)
     data = obj.read()
     obj.close()
     obj.release_conn()
+    
+    print(f"File: {file_name}")
+    print(f"File size: {len(data)} bytes")
+    print(f"First few bytes: {data[:10]}")
 
     # Read into Pandas, forcing all columns to string
     if file_name.endswith(".csv"):
         pdf = pd.read_csv(BytesIO(data), dtype=str)
-    elif file_name.endswith(".xlsx"):
-        pdf = pd.read_excel(BytesIO(data), dtype=str)
+        spark_df = spark.createDataFrame(pdf)
+        spark_df.cache()
+        spark_df.count()
+        return spark_df
+        
+    elif file_name.endswith(".xlsx") or file_name.endswith(".xls"):
+        # Excel files can have multiple sheets - handle each sheet as a potential table
+        excel_file = BytesIO(data)
+        excel_file.seek(0)  # Ensure we're at the start of the stream
+        xl_file = pd.ExcelFile(excel_file, engine='openpyxl')
+        sheet_names = xl_file.sheet_names
+        
+        if len(sheet_names) == 1:
+            # Single sheet - return as single DataFrame
+            pdf = pd.read_excel(xl_file, sheet_name=0, dtype=str)
+            spark_df = spark.createDataFrame(pdf)
+            spark_df.cache()
+            spark_df.count()
+            return spark_df
+        else:
+            # Multiple sheets - return dict of DataFrames
+            result = {}
+            for sheet_name in sheet_names:
+                pdf = pd.read_excel(xl_file, sheet_name=sheet_name, dtype=str)
+                if not pdf.empty:  # Skip empty sheets
+                    spark_df = spark.createDataFrame(pdf)
+                    spark_df.cache()
+                    spark_df.count()
+                    # Normalize sheet name to match table naming
+                    normalized_name = normalize_name(sheet_name)
+                    if normalized_name:
+                        result[normalized_name] = spark_df
+                    else:
+                        # If normalization fails, use sheet name directly
+                        result[f"sheet_{sheet_name}"] = spark_df
+            return result if result else None
+            
     elif file_name.endswith(".parquet"):
         pdf = pd.read_parquet(BytesIO(data))
         pdf = pdf.astype(str)  # parquet often safe but mixed columns can still break

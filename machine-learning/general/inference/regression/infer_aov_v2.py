@@ -21,22 +21,6 @@ import json
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/aov_prediction/"
-MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/aov_prediction/"
-SCALER_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/aov_prediction/scaler"
-
-# ⚠️ MANUAL CONFIGURATION REQUIRED:
-MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
-
-# Models that require scaling (must match training)
-MODELS_REQUIRING_SCALING = ["linear_regression"]
-
 # Feature set (MUST MATCH TRAINING - reduced set)
 NUMERIC_FEATURES = [
     # Customer profile (core)
@@ -126,7 +110,7 @@ def create_spark_session():
     )
 
 
-def load_model(model_name):
+def load_model(model_name, MODEL_BASE_PATH):
     """Load trained model from MinIO"""
     model_path = f"{MODEL_BASE_PATH}{model_name}"
     
@@ -148,7 +132,7 @@ def load_model(model_name):
         return None
 
 
-def load_scaler():
+def load_scaler(SCALER_PATH):
     """Load saved scaler model for linear regression"""
     try:
         scaler_model = StandardScalerModel.load(SCALER_PATH)
@@ -600,7 +584,21 @@ def display_sample_predictions(df, n=5):
         print()
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/aov_prediction/"
+    MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/aov_prediction/"
+    SCALER_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/aov_prediction/scaler"
+
+    # ⚠️ MANUAL CONFIGURATION REQUIRED:
+    MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
+
+    # Models that require scaling (must match training)
+    MODELS_REQUIRING_SCALING = ["linear_regression"]
     """Main inference pipeline"""
     print("\n" + "="*60)
     print("AOV Prediction - FIXED Inference Pipeline")
@@ -615,7 +613,7 @@ def main():
     # Load model
     print("Step 1: Load Model")
     print("-" * 60)
-    model = load_model(MODEL_NAME)
+    model = load_model(MODEL_NAME, MODEL_BASE_PATH)
     
     if model is None:
         print("\n✗ Inference aborted: Model not found")
@@ -627,7 +625,7 @@ def main():
     if MODEL_NAME in MODELS_REQUIRING_SCALING:
         print("\nStep 1b: Load Scaler (required for linear_regression)")
         print("-" * 60)
-        saved_scaler = load_scaler()
+        saved_scaler = load_scaler(SCALER_PATH)
     
     # Load datasets
     print("\nStep 2: Load Datasets")
@@ -677,4 +675,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

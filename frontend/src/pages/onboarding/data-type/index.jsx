@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { RadioButton } from 'primereact/radiobutton';
 import Breadcrumb from '../Breadcrumb';
 import Heading from '@/components/global/Typography/Heading';
 import Text from '@/components/global/Typography/Text';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
+import { useAuth } from '@/context/AuthContext';
+import axiosInstance from '@/services/api/axiosInstance';
+import { Message } from 'primereact/message';
 
 const DataType = () => {
     const navigate = useNavigate();
@@ -37,9 +40,9 @@ const DataType = () => {
 
     const dataSourceOptions = [
         {
-            id: 'files',
-            title: 'Files (CSV/Excel/Parquet)',
-            description: 'Upload transaction, customer, product, inventory files.',
+            id: 'batch',
+            title: 'Files (CSV/Excel/Parquet/JSON)',
+            description: 'Upload your E-Commerce Business data in bulk via files.',
             icon: 'pi-file'
         },
         {
@@ -55,6 +58,37 @@ const DataType = () => {
             icon: 'pi-cloud'
         }
     ];
+
+    const fetchCurrentStep = async () => {
+        try {
+            const response = await axiosInstance.get(`/onboarding/get-current-step?userId=${user.user_id}`);
+            const currentStep = response.data.currentStep;
+
+            if (currentStep === 'business') {
+                navigate(`/onboarding/business/${pathname.split('/')[3]}`);
+            }
+            else if (currentStep === 'data-type') {
+                return;
+            }
+            else if (currentStep === 'connect') {
+                navigate(`/onboarding/connect/${pathname.split('/')[3]}`);
+            }
+            else if (currentStep === 'mapping') {
+                navigate(`/onboarding/mapping/${pathname.split('/')[3]}`);
+            }
+            else {
+                navigate(`/onboarding/data-type/${pathname.split('/')[3]}`);
+            }
+        }
+
+        catch (e) {
+            setError(e.message || 'An error occurred while fetching onboarding status. Please try again.');
+        }
+    }
+
+    useEffect(() => {
+        fetchCurrentStep();
+    }, []);
 
     const handleContinue = async (e) => {
         e.preventDefault();
@@ -89,6 +123,22 @@ const DataType = () => {
                         <Text className="text-sm md:text-base text-gray-600 m-0">
                             Bring data via files, a database connection, or a REST API.
                         </Text>
+                        <Message
+                            style={{
+                                border: 'solid #00C597',
+                                borderWidth: '0 0 0 6px',
+                                color: '#00C597'
+                            }}
+                            className="w-full text-left flex justify-start items-start gap-3 mt-4"
+                            severity="success"
+                            content={
+                                <>
+                                    <div className="font-bold text-left my-4">
+                                        <div className="ml-2">NOTE: Batch Processing can process files up to 5 GB. If you have even larger data, then consider either API or Database URI option</div>
+                                    </div>
+                                </>
+                            }
+                        />
                     </div>
 
                     {/* Data Source Options */}

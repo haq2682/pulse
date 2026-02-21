@@ -6,6 +6,7 @@
 *.md
 !requirements.txt
 !packages.txt
+!ANALYTICS_SCHEMA.txt
 .vscode
 
 # dependencies
@@ -35,6 +36,7 @@ api/__pycache__/*
 */**/.env
 /.pnp
 .pnp.js
+*/**/*.pyc
 
 # testing
 frontend/coverage

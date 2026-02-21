@@ -26,14 +26,6 @@ from pyspark.ml.feature import VectorAssembler, StandardScalerModel, PCAModel
 from pyspark.ml.clustering import KMeansModel, GaussianMixtureModel, BisectingKMeansModel
 from datetime import datetime
 
-# Environment configuration
-BUCKET = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
-OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
-
-# MANUAL SELECTION
-SELECTED_MODEL_TYPE = "kmeans"  # Options: 'kmeans', 'gmm', 'bisecting_kmeans'
 
 # Feature columns (must match training)
 NUMERIC_FEATURES = [
@@ -79,7 +71,7 @@ def create_spark_session():
     )
 
 
-def load_data(spark):
+def load_data(spark, INPUT_PATH):
     """Load geographic data"""
     try:
         city_path = f"{INPUT_PATH}agg_city_aggregations.parquet"
@@ -140,7 +132,7 @@ def prepare_features(df):
     return df
 
 
-def load_models(spark):
+def load_models(spark, MODEL_PATH, SELECTED_MODEL_TYPE):
     """Load all required models"""
     try:
         # Load preprocessing models
@@ -285,7 +277,7 @@ def calculate_expansion_scores(df):
     return df
 
 
-def generate_predictions(spark, df, model, scaler, pca, k):
+def generate_predictions(spark, df, model, scaler, pca, k, SELECTED_MODEL_TYPE):
     """Apply model and generate predictions"""
     print("Generating predictions...")
 
@@ -376,7 +368,14 @@ def save_predictions(predictions, output_path):
     print(f"Saved {predictions.count()} predictions")
 
 
-def main():
+def main(BUCKET):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PATH = f"s3a://{BUCKET}/transformed/"
+    MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/"
+    OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
+
+    # MANUAL SELECTION
+    SELECTED_MODEL_TYPE = "kmeans"  # Options: 'kmeans', 'gmm', 'bisecting_kmeans'
     print("=" * 80)
     print("Geographic Sales Clustering - Inference")
     print(f"Model: {SELECTED_MODEL_TYPE.upper()}")
@@ -385,7 +384,7 @@ def main():
     spark = create_spark_session()
 
     # Load data
-    df = load_data(spark)
+    df = load_data(spark, INPUT_PATH)
     if df is None:
         spark.stop()
         return
@@ -394,13 +393,13 @@ def main():
     df = prepare_features(df)
 
     # Load models
-    model, scaler, pca, k = load_models(spark)
+    model, scaler, pca, k = load_models(spark, MODEL_PATH, SELECTED_MODEL_TYPE)
     if model is None:
         spark.stop()
         return
 
     # Generate predictions
-    predictions = generate_predictions(spark, df, model, scaler, pca, k)
+    predictions = generate_predictions(spark, df, model, scaler, pca, k, SELECTED_MODEL_TYPE)
 
     # Save
     save_predictions(predictions, f"{OUTPUT_PATH}geographic_clustering.parquet")
@@ -410,4 +409,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET= 'pulse-bucket-1'
+    main(BUCKET)

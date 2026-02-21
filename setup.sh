@@ -60,6 +60,8 @@ echo "Starting Spark Worker 1..."
 echo "Starting Spark Worker 2..."
 ./bash/start_worker.sh
 
+chmod -R +x .
+
 echo ""
 echo "=========================================="
 echo "✅ SETUP COMPLETE"

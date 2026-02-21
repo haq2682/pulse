@@ -125,8 +125,8 @@ def prepare_training_data(df):
     valid_count = df_valid.count()
     print(f"Records with valid CLV: {valid_count}")
     
-    if valid_count < MIN_RECORDS_THRESHOLD:
-        print(f"✗ Insufficient training data: {valid_count} < {MIN_RECORDS_THRESHOLD}")
+    if valid_count < MIN_RECORDS:
+        print(f"✗ Insufficient training data: {valid_count} < {MIN_RECORDS}")
         return None
     
     # Fill missing feature values with 0

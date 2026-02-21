@@ -24,20 +24,6 @@ import math
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-INPUT_CATEGORIES_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_categories.parquet"
-INPUT_MONTHLY_AGG_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_monthly_aggregations.parquet"
-MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/demand_forecast/"
-MIN_RECORDS_THRESHOLD = 100
-
-# Feature Engineering Configuration
-USE_CROSS_VALIDATION = False  # Set to True to enable hyperparameter tuning (slower)
-LAG_MONTHS = [1, 3, 6]  # Lag periods for temporal features
-
 # Enhanced feature columns with temporal and categorical features
 FEATURE_COLUMNS = [
     # Product features
@@ -330,7 +316,7 @@ def create_advanced_features(orders_df, order_items_df, products_df, categories_
     return product_features
 
 
-def prepare_training_data(df):
+def prepare_training_data(df, MIN_RECORDS_THRESHOLD):
     """
     Prepare data with feature scaling for Linear Regression
     """
@@ -387,9 +373,10 @@ def prepare_training_data(df):
     
     df_scaled = df_scaled.toDF(*new_cols)
     
-    # Final selection
+    # Final selection (keep year_month for time-based splitting)
     df_prepared = df_scaled.select(
         "product_id",
+        "year_month",
         "features",
         TARGET_COLUMN
     ).dropDuplicates(["product_id"])
@@ -561,14 +548,25 @@ def evaluate_model(predictions, model_name):
     return metrics
 
 
-def save_model(model, model_name):
+def save_model(model, model_name, MODEL_OUTPUT_PATH):
     """Save model to MinIO"""
     model_path = f"{MODEL_OUTPUT_PATH}{model_name}"
     model.write().overwrite().save(model_path)
     print(f"✓ Model saved: {model_path}")
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    INPUT_CATEGORIES_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_categories.parquet"
+    INPUT_MONTHLY_AGG_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_monthly_aggregations.parquet"
+    MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/demand_forecast/"
+    MIN_RECORDS_THRESHOLD = 100
+
+    # Feature Engineering Configuration
+    USE_CROSS_VALIDATION = False  # Set to True to enable hyperparameter tuning (slower)
+    LAG_MONTHS = [1, 3, 6]  # Lag periods for temporal features
     """Main training pipeline"""
     print("\n" + "="*60)
     print("Demand Forecasting V2 - Advanced Feature Engineering")
@@ -604,7 +602,7 @@ def main():
     # Prepare training data
     print("\nStep 3: Data Preparation & Scaling")
     print("-" * 60)
-    result = prepare_training_data(df_features)
+    result = prepare_training_data(df_features, MIN_RECORDS_THRESHOLD)
     
     if result is None:
         print("\n✗ Training aborted: Insufficient data")
@@ -613,12 +611,20 @@ def main():
     
     df_prepared, scaler_model = result
     
-    # Split data
-    print("\nStep 4: Train/Test Split")
+    # Split data using time-based split (chronological ordering, not random)
+    print("\nStep 4: Time-Based Train/Test Split")
     print("-" * 60)
-    train_df, test_df = df_prepared.randomSplit([0.8, 0.2], seed=42)
-    print(f"Training set: {train_df.count()} records")
-    print(f"Test set: {test_df.count()} records")
+    total_count = df_prepared.count()
+    split_point = int(total_count * 0.8)
+
+    # Order by year_month so earlier products go to training and later to testing
+    window_spec = Window.orderBy("year_month")
+    df_with_row = df_prepared.withColumn("_row_num", F.row_number().over(window_spec))
+
+    train_df = df_with_row.filter(F.col("_row_num") <= split_point).drop("_row_num")
+    test_df = df_with_row.filter(F.col("_row_num") > split_point).drop("_row_num")
+    print(f"Training set: {train_df.count()} records (earlier time periods)")
+    print(f"Test set: {test_df.count()} records (later time periods)")
     
     # Train models
     print("\nStep 5: Model Training")
@@ -628,17 +634,17 @@ def main():
     
     lr_model, lr_pred, lr_name = train_linear_regression(train_df, test_df, USE_CROSS_VALIDATION)
     lr_metrics = evaluate_model(lr_pred, lr_name)
-    save_model(lr_model, lr_name)
+    save_model(lr_model, lr_name, MODEL_OUTPUT_PATH)
     models_results.append(lr_metrics)
     
     rf_model, rf_pred, rf_name = train_random_forest(train_df, test_df, USE_CROSS_VALIDATION)
     rf_metrics = evaluate_model(rf_pred, rf_name)
-    save_model(rf_model, rf_name)
+    save_model(rf_model, rf_name, MODEL_OUTPUT_PATH)
     models_results.append(rf_metrics)
     
     gbt_model, gbt_pred, gbt_name = train_gbt(train_df, test_df, USE_CROSS_VALIDATION)
     gbt_metrics = evaluate_model(gbt_pred, gbt_name)
-    save_model(gbt_model, gbt_name)
+    save_model(gbt_model, gbt_name, MODEL_OUTPUT_PATH)
     models_results.append(gbt_metrics)
     
     # Model comparison
@@ -663,4 +669,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

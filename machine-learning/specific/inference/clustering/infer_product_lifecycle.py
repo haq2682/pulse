@@ -12,12 +12,6 @@ from pyspark.sql.types import StringType, DoubleType
 from pyspark.ml import PipelineModel
 from pyspark.ml.linalg import DenseVector, SparseVector
 
-BUCKET = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-MODEL_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
-METRICS_PATH = f"s3a://{BUCKET}/machine-learning/clustering/metrics/"
-OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
-LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
 
 FEATURES = ["log_age", "log_sales_velocity", "log_revenue_velocity", "log_turnover"]
 
@@ -50,7 +44,7 @@ def create_spark():
     )
 
 
-def load_data(spark):
+def load_data(spark, INPUT_PATH):
     df = spark.read.parquet(f"{INPUT_PATH}agg_products.parquet")
     df = df.dropDuplicates(["product_id"])
     print(f"Loaded {df.count()} products")
@@ -90,7 +84,7 @@ def prepare_features(df):
     return df
 
 
-def load_model_and_profiles():
+def load_model_and_profiles(MODEL_PATH, LOCAL_METRICS_PATH):
     pipeline = PipelineModel.load(f"{MODEL_PATH}product_lifecycle_pipeline")
     
     profiles, stats = [], {}
@@ -212,16 +206,21 @@ def save_and_summarize(df, output_path):
     df.groupBy("cluster_id").count().orderBy("cluster_id").show()
 
 
-def main():
+def main(BUCKET):
+    INPUT_PATH = f"s3a://{BUCKET}/transformed/"
+    MODEL_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
+    METRICS_PATH = f"s3a://{BUCKET}/machine-learning/clustering/metrics/"
+    OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
+    LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
     spark = create_spark()
     
-    df = load_data(spark)
+    df = load_data(spark, INPUT_PATH)
     df = prepare_features(df)
     if df is None:
         spark.stop()
         return
     
-    pipeline, profiles, stats = load_model_and_profiles()
+    pipeline, profiles, stats = load_model_and_profiles(MODEL_PATH, LOCAL_METRICS_PATH)
     if pipeline is None:
         print("Failed to load model")
         spark.stop()
@@ -239,4 +238,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET = "pulse-bucket-1"
+    main(BUCKET)

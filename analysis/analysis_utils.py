@@ -4,10 +4,52 @@ from pyspark.sql import Window
 from minio import Minio
 
 
+def parse_minio_endpoint(endpoint_url):
+    """
+    Parse MinIO endpoint URL and strip protocol prefix and path if present.
+    
+    The MinIO Python client expects endpoint in format 'hostname:port' without
+    protocol prefix or path components. This function handles various formats:
+    - With protocol: 'http://localhost:9000' -> 'localhost:9000'
+    - With protocol and path: 'http://localhost:9000/path' -> 'localhost:9000'
+    - Without protocol: 'localhost:9000' -> 'localhost:9000'
+    - Without protocol but with path: 'localhost:9000/path' -> 'localhost:9000'
+    
+    Args:
+        endpoint_url: MinIO endpoint URL (e.g., 'localhost:9000' or 'http://localhost:9000/path')
+        
+    Returns:
+        str: Endpoint in 'hostname:port' format
+        
+    Raises:
+        ValueError: If endpoint is empty or invalid after parsing
+    """
+    if not endpoint_url:
+        raise ValueError("MINIO_ENDPOINT cannot be empty")
+    
+    # Strip protocol prefix if present
+    if "://" in endpoint_url:
+        endpoint_url = endpoint_url.split("://", 1)[1]
+    
+    # Strip any path component (everything after the first /)
+    if "/" in endpoint_url:
+        endpoint_url = endpoint_url.split("/", 1)[0]
+    
+    # Validate that we have a non-empty endpoint after parsing
+    endpoint_url = endpoint_url.strip()
+    if not endpoint_url:
+        raise ValueError("MINIO_ENDPOINT is invalid after removing protocol and path")
+    
+    return endpoint_url
+
+
 def get_minio_client():
     """Create and return a MinIO client instance."""
+    # Parse MINIO_ENDPOINT to strip protocol prefix if present
+    minio_endpoint = parse_minio_endpoint(os.getenv("MINIO_ENDPOINT", "localhost:9000"))
+    
     return Minio(
-        os.getenv("MINIO_ENDPOINT"),
+        minio_endpoint,
         access_key=os.getenv("MINIO_ACCESS_KEY"),
         secret_key=os.getenv("MINIO_SECRET_KEY"),
         secure=False,
@@ -16,20 +58,24 @@ def get_minio_client():
 
 
 
-def get_agg_tables(spark, db_config=None):
+def get_agg_tables(spark, db_config=None, bucket_name=None):
     """
     Load aggregated tables from MinIO transformed/ directory.
     
     Args:
         spark: SparkSession
         db_config: Deprecated parameter kept for backward compatibility
+        bucket_name: MinIO bucket name (business_id). If None, uses default from env.
         
     Returns:
         dict: Dictionary of table names to Spark DataFrames
     """
     try:
         minio_client = get_minio_client()
-        bucket_name = os.getenv("MINIO_BUCKET", "pulse-bucket-1")
+        
+        # Use provided bucket_name or fall back to env/default
+        if bucket_name is None:
+            bucket_name = os.getenv("MINIO_BUCKET", "pulse-bucket-1")
         
         print(f"Loading aggregated tables from MinIO bucket: {bucket_name}")
         print(f"Directory: transformed/")

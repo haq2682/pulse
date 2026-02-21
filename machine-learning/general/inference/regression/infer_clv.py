@@ -20,19 +20,6 @@ import uuid
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/clv_predictions/"
-MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/clv/"
-
-# ⚠️ MANUAL CONFIGURATION REQUIRED:
-# Set MODEL_NAME to one of: "linear_regression", "random_forest", "gbt"
-# Based on training results, select the best performing model
-MODEL_NAME = "random_forest"  # <-- UPDATE THIS AFTER TRAINING
-
-PREDICTION_HORIZON_DAYS = 365  # Predict CLV for next 1 year
-
 # Feature columns (must match training)
 FEATURE_COLUMNS = [
     "total_orders",
@@ -79,7 +66,7 @@ def create_spark_session():
     )
 
 
-def load_model(model_name):
+def load_model(model_name, MODEL_BASE_PATH):
     """Load trained model from MinIO"""
     model_path = f"{MODEL_BASE_PATH}{model_name}"
     
@@ -157,7 +144,7 @@ def prepare_inference_data(df):
     return df_prepared
 
 
-def generate_predictions(model, df, model_name):
+def generate_predictions(model, df, model_name, PREDICTION_HORIZON_DAYS):
     """Generate predictions and format output"""
     # Generate predictions
     predictions_df = model.transform(df)
@@ -218,7 +205,18 @@ def display_sample_predictions(df, n=5):
         )
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/clv_predictions/"
+    MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/clv/"
+
+    # ⚠️ MANUAL CONFIGURATION REQUIRED:
+    # Set MODEL_NAME to one of: "linear_regression", "random_forest", "gbt"
+    # Based on training results, select the best performing model
+    MODEL_NAME = "random_forest"  # <-- UPDATE THIS AFTER TRAINING
+
+    PREDICTION_HORIZON_DAYS = 365  # Predict CLV for next 1 year
     """Main inference pipeline"""
     print("\n" + "="*60)
     print("CLV Prediction Model Inference")
@@ -233,7 +231,7 @@ def main():
     # Step 1: Load model
     print("Step 1: Load Model")
     print("-" * 60)
-    model = load_model(MODEL_NAME)
+    model = load_model(MODEL_NAME, MODEL_BASE_PATH)
     
     if model is None:
         print("\n✗ Inference aborted: Model not found")
@@ -269,7 +267,7 @@ def main():
     # Step 5: Generate predictions
     print("\nStep 5: Generate Predictions")
     print("-" * 60)
-    predictions_df = generate_predictions(model, df_prepared, MODEL_NAME)
+    predictions_df = generate_predictions(model, df_prepared, MODEL_NAME, PREDICTION_HORIZON_DAYS)
     
     # Step 6: Display samples
     display_sample_predictions(predictions_df)
@@ -290,4 +288,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

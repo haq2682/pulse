@@ -11,12 +11,6 @@ import findspark
 
 findspark.init()
 
-# Configuration
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PATH_AFFINITY = f"s3a://{BUCKET_NAME}/transformed/agg_product_affinity.parquet"
-INPUT_PATH_PRODUCTS = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/product_bundling"
-MIN_LABELED_RECORDS = 100
 
 # CRITICAL: Avoid data leakage - DO NOT use lift/confidence/support as features
 # if they are used to generate the label
@@ -427,7 +421,11 @@ def save_models(model, preprocessors, output_dir, model_name):
     print(f"✓ Saved {model_name} and preprocessors to {model_path}")
 
 
-def main():
+def main(BUCKET_NAME):
+    INPUT_PATH_AFFINITY = f"s3a://{BUCKET_NAME}/transformed/agg_product_affinity.parquet"
+    INPUT_PATH_PRODUCTS = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/product_bundling"
+    MIN_LABELED_RECORDS = 100
     print("=" * 60)
     print("Product Bundling Classification - Training Pipeline")
     print("=" * 60)
@@ -536,4 +534,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

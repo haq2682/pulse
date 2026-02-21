@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route } from "react-router";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from '@/context/AuthContext'; 
 import { AdminAuthProvider } from '@/context/AdminAuthContext';
+import { PipelineProgressProvider } from '@/context/PipelineProgressContext';
 
 // Guards
 import ProtectedAdminRoute from '@/components/auth/ProtectedAdminRoute';
@@ -51,8 +52,10 @@ createRoot(document.getElementById('root')).render(
       <BrowserRouter>
         {/* AuthProvider must be INSIDE BrowserRouter */}
         <AuthProvider>
-           {/* Nest AdminAuthProvider here so it can use Router and Auth hooks if needed */}
-           <AdminAuthProvider>
+          {/* PipelineProgressProvider for pipeline tracking */}
+          <PipelineProgressProvider>
+            {/* Nest AdminAuthProvider here so it can use Router and Auth hooks if needed */}
+            <AdminAuthProvider>
                 <Routes>
                     {/* PUBLIC ROUTES */}
                     <Route path="/" element={<Landing />} />
@@ -67,11 +70,11 @@ createRoot(document.getElementById('root')).render(
                     <Route path="/reset-password-email" element={<GuestRoute><ResetPasswordEmail /></GuestRoute>} />
 
                     {/* USER PROTECTED ROUTES */}
-                    <Route path="/analytics" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                    <Route path="/onboarding/business" element={<ProtectedRoute><AddBusiness /></ProtectedRoute>} />
-                    <Route path="/onboarding/data-type" element={<ProtectedRoute><DataType /></ProtectedRoute>} />
-                    <Route path="/onboarding/connect" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
-                    <Route path="/onboarding/mapping" element={<ProtectedRoute><Mapping /></ProtectedRoute>} />
+                    <Route path="/analytics/:businessId?/:subpage1?/:subpage2?" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                    <Route path="/onboarding/business/:onboardingId" element={<ProtectedRoute><AddBusiness /></ProtectedRoute>} />
+                    <Route path="/onboarding/data-type/:onboardingId" element={<ProtectedRoute><DataType /></ProtectedRoute>} />
+                    <Route path="/onboarding/connect/:onboardingId" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
+                    <Route path="/onboarding/mapping/:onboardingId" element={<ProtectedRoute><Mapping /></ProtectedRoute>} />
 
                     {/* --- ADMIN ROUTES --- */}
                     
@@ -129,6 +132,7 @@ createRoot(document.getElementById('root')).render(
 
                 </Routes>
            </AdminAuthProvider>
+          </PipelineProgressProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>

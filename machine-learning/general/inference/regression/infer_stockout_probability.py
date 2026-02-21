@@ -21,22 +21,6 @@ import uuid
 # Load environment variables
 load_dotenv()
 
-# Constants
-BUCKET_NAME = "pulse-bucket-1"
-INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
-INPUT_INVENTORY_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
-INPUT_SUPPLIERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_suppliers.parquet"
-INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
-INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
-OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/stockout_probability/"
-MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/stockout_probability/"
-
-# Configuration
-MIN_DEMAND_DAYS = 30
-CRITICAL_DAYS_THRESHOLD = 3
-HIGH_RISK_THRESHOLD = 7
-MEDIUM_RISK_THRESHOLD = 14
-
 # Feature set (must match training)
 NUMERIC_FEATURES = [
     "current_stock", "available_stock", "reserved_quantity", "stock_utilization_rate",
@@ -85,7 +69,7 @@ def create_spark_session():
     )
 
 
-def load_models():
+def load_models(MODEL_BASE_PATH):
     """Load both trained models"""
     try:
         days_model = RandomForestRegressionModel.load(f"{MODEL_BASE_PATH}days_until_stockout")
@@ -109,7 +93,7 @@ def validate_dataset(spark, path, name):
         return None, 0
 
 
-def calculate_demand_metrics_with_trends(orders_df, order_items_df):
+def calculate_demand_metrics_with_trends(orders_df, order_items_df, MIN_DEMAND_DAYS):
     """Calculate comprehensive demand metrics"""
     print("Calculating demand metrics...")
     
@@ -425,7 +409,7 @@ def prepare_inference_data(df):
     return df_prepared
 
 
-def generate_predictions(days_model, prob_model, df):
+def generate_predictions(days_model, prob_model, df, CRITICAL_DAYS_THRESHOLD, HIGH_RISK_THRESHOLD, MEDIUM_RISK_THRESHOLD):
     """Generate comprehensive stockout predictions"""
     # Predict days until stockout
     df_with_days = days_model.transform(df).withColumnRenamed("prediction", "days_until_stockout")
@@ -620,7 +604,21 @@ def display_summary_statistics(df):
     print("="*80)
 
 
-def main():
+def main(BUCKET_NAME):
+    GENERAL_BUCKET_NAME = "pulse-bucket-1"
+    INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
+    INPUT_INVENTORY_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
+    INPUT_SUPPLIERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_suppliers.parquet"
+    INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
+    INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
+    OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/stockout_probability/"
+    MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/stockout_probability/"
+
+    # Configuration
+    MIN_DEMAND_DAYS = 30
+    CRITICAL_DAYS_THRESHOLD = 3
+    HIGH_RISK_THRESHOLD = 7
+    MEDIUM_RISK_THRESHOLD = 14
     """Main inference pipeline"""
     print("\n" + "="*80)
     print("Stockout Probability Prediction - Inference")
@@ -633,7 +631,7 @@ def main():
     # Load models
     print("Step 1: Load Models")
     print("-" * 80)
-    days_model, prob_model = load_models()
+    days_model, prob_model = load_models(MODEL_BASE_PATH)
     
     if days_model is None or prob_model is None:
         print("\n✗ Inference aborted: Models not found")
@@ -658,12 +656,12 @@ def main():
     # Calculate demand metrics
     print("\nStep 3: Calculate Demand Metrics")
     print("-" * 80)
-    demand_stats = calculate_demand_metrics_with_trends(orders_df, order_items_df)
+    demand_stats = calculate_demand_metrics_with_trends(orders_df, order_items_df, MIN_DEMAND_DAYS)
     
     # Create features
     print("\nStep 4: Feature Engineering")
     print("-" * 80)
-    df_features = create_inference_features(products_df, inventory_df, suppliers_df, demand_stats)
+    df_features = create_inference_features(products_df, inventory_df, suppliers_df, demand_stats, DEFAULT_SERVICE_LEVEL, Z_SCORE_95, Z_SCORE_99)
     
     # Prepare data
     print("\nStep 5: Data Preparation & Encoding")
@@ -673,7 +671,7 @@ def main():
     # Generate predictions
     print("\nStep 6: Generate Predictions")
     print("-" * 80)
-    predictions_df = generate_predictions(days_model, prob_model, df_prepared)
+    predictions_df = generate_predictions(days_model, prob_model, df_prepared, CRITICAL_DAYS_THRESHOLD, HIGH_RISK_THRESHOLD, MEDIUM_RISK_THRESHOLD)
     
     # Display samples
     display_sample_predictions(predictions_df)
@@ -697,4 +695,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    BUCKET_NAME = "pulse-bucket-1"
+    main(BUCKET_NAME)

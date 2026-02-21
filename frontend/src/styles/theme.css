@@ -1,3 +1,13 @@
+button:focus, button:focus-visible, button:active {
+    outline: 0 none;
+    outline-offset: 0;
+    border: 0 none;
+}
+
+button:focus:not(:focus-visible) {
+    outline: none;
+}
+
 /* Gradient Text Utilities */
 .gradient-text {
     background: radial-gradient(circle, var(--color-g2) 0%, var(--color-g1) 100%);
@@ -293,4 +303,53 @@
 
 .p-dropdown-label {
     border: 0;
+}
+
+.p-autocomplete-input {
+    width: 100%;
+}
+
+.p-autocomplete-item {
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+.p-autocomplete-panel .p-autocomplete-item {
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
+.p-button-loading-icon {
+    margin-right: 8px;
+}
+
+.p-progress-spinner .p-progress-spinner-circle {
+    stroke: var(--color-g1) !important;
+    stroke-dasharray: 89, 200;
+    stroke-dashoffset: 0;
+    animation: p-progress-spinner-dash 1.5s ease-in-out infinite;
+    stroke-linecap: round;
+}
+
+@keyframes p-progress-spinner-dash {
+    0% {
+        stroke-dasharray: 1, 200;
+        stroke-dashoffset: 0;
+    }
+    50% {
+        stroke-dasharray: 89, 200;
+        stroke-dashoffset: -35px;
+    }
+    100% {
+        stroke-dasharray: 89, 200;
+        stroke-dashoffset: -124px;
+    }
+}
+
+.p-dialog .p-dialog-content {
+    padding: 0px 30px 30px;
+}
+
+.p-dialog .p-dialog-header {
+    padding: 20px 25px 0px;
 }

@@ -148,13 +148,25 @@ def product_affinity(dataframes):
         )
         .drop("prod_b_join_id")
     )
+    # Use percentile-based thresholds for affinity strength to handle
+    # varying dataset sizes (small/synthetic datasets produce inflated lift values)
+    lift_percentiles = product_affinity.filter(
+        col("avg_lift").isNotNull() & (col("avg_lift") > 0)
+    ).approxQuantile("avg_lift", [0.25, 0.50, 0.75, 0.90], 0.05)
+
+    if len(lift_percentiles) == 4:
+        p25, p50, p75, p90 = lift_percentiles
+    else:
+        # Fallback to standard thresholds
+        p25, p50, p75, p90 = 1.0, 1.5, 2.0, 3.0
+
     product_affinity = product_affinity.withColumns(
         {
-            # Affinity strength based on lift
-            "affinity_strength": when(col("avg_lift") >= 3.0, "Very Strong")
-            .when(col("avg_lift") >= 2.0, "Strong")
-            .when(col("avg_lift") >= 1.5, "Moderate")
-            .when(col("avg_lift") >= 1.0, "Weak")
+            # Affinity strength based on percentile-derived thresholds
+            "affinity_strength": when(col("avg_lift") >= lit(p90), "Very Strong")
+            .when(col("avg_lift") >= lit(p75), "Strong")
+            .when(col("avg_lift") >= lit(p50), "Moderate")
+            .when(col("avg_lift") >= lit(p25), "Weak")
             .otherwise("No Affinity"),
             # Cross-category indicator
             "is_cross_category": when(

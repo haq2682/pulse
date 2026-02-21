@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { InputText } from 'primereact/inputtext';
 import { Dropdown } from 'primereact/dropdown';
 import Breadcrumb from '../Breadcrumb';
@@ -55,6 +55,37 @@ const AddBusiness = () => {
         },
     ];
 
+    const fetchCurrentStep = async () => {
+        try {
+            const response = await axiosInstance.get(`/onboarding/get-current-step?userId=${user.user_id}`);
+            const currentStep = response.data.currentStep;
+
+            if (currentStep === 'business') {
+                return;
+            }
+            else if (currentStep === 'data-type') {
+                navigate(`/onboarding/data-type/${pathname.split('/')[3]}`);
+            }
+            else if (currentStep === 'connect') {
+                navigate(`/onboarding/connect/${pathname.split('/')[3]}`);
+            }
+            else if (currentStep === 'mapping') {
+                navigate(`/onboarding/mapping/${pathname.split('/')[3]}`);
+            }
+            else {
+                navigate(`/onboarding/business/${pathname.split('/')[3]}`);
+            }
+        }
+
+        catch (e) {
+            setErrors((prev) => ({ ...prev, form: e.message || 'An error occurred while fetching onboarding status. Please try again.' }));
+        }
+    }
+
+    useEffect(() => {
+        fetchCurrentStep();
+    }, []);
+
     const handleContinue = async (e) => {
         e.preventDefault();
 
@@ -68,9 +99,45 @@ const AddBusiness = () => {
         // TODO: Add your API call here
         setTimeout(() => {
             setLoading(false);
-            // Navigate to next step
-            navigate('/onboarding/data-type');
-        }, 1500);
+            return;
+        }
+
+        if (!nameRegex.test(businessName)) {
+            setErrors((prev) => ({
+                ...prev,
+                businessName: 'Business Name must contain only letters and spaces (no numbers or special characters)'
+            }));
+            setLoading(false);
+            return;
+        }
+
+        if (!currency) {
+            setErrors((prev) => ({ ...prev, currency: 'Currency is required' }));
+            setLoading(false);
+            return;
+        }
+
+        if (!region) {
+            setErrors((prev) => ({ ...prev, region: 'Region is required' }));
+            setLoading(false);
+            return;
+        }
+
+        try {
+            await axiosInstance.post('/onboarding/create-business', {
+                userId: user.user_id,
+                businessName,
+                businessCurrency: currency,
+                businessRegion: region,
+            });
+            navigate(`/onboarding/data-type/${pathname.split('/')[3]}`);
+        }
+        catch (e) {
+            setErrors((prev) => ({ ...prev, form: e.message || 'An error occurred. Please try again.' }));
+        }
+        finally {
+            setLoading(false);
+        }
     };
 
     const isFormValid = businessName && currency && region;
