@@ -37,6 +37,9 @@ import FunnelOverview from './analytics/pages/FunnelOverview';
 import FunnelCart from './analytics/pages/FunnelCart';
 import FunnelCheckout from './analytics/pages/FunnelCheckout';
 import FunnelWishlist from './analytics/pages/FunnelWishlist';
+import PaymentMethods from './analytics/pages/PaymentMethods';
+import PaymentRefunds from './analytics/pages/PaymentRefunds';
+import PaymentFinancialMetrics from './analytics/pages/PaymentFinancialMetrics';
 
 const Dashboard = () => {
     const { logout, user } = useAuth();
@@ -450,6 +453,19 @@ const Dashboard = () => {
 
         if (pathname.includes('/funnel/wishlist')) {
             return <FunnelWishlist />;
+        }
+
+        // Payments & Finance routes
+        if (pathname.includes('/payments/methods')) {
+            return <PaymentMethods />;
+        }
+
+        if (pathname.includes('/payments/refunds')) {
+            return <PaymentRefunds />;
+        }
+
+        if (pathname.includes('/payments/metrics')) {
+            return <PaymentFinancialMetrics />;
         }
 
         // Default fallback for unrecognized routes
