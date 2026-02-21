@@ -125,11 +125,6 @@ export default function FunnelCart() {
             setFetchError(false);
             const res = await fetch(buildUrl());
             if (!res.ok) {
-                toastRef.current?.show({
-                    severity: 'warn', summary: 'No Data',
-                    detail: 'Analytics data not available. Run the analytics pipeline first.',
-                    life: 5000,
-                });
                 setRawCart(null);
                 return;
             }
@@ -140,7 +135,6 @@ export default function FunnelCart() {
             console.error('[FunnelCart] fetch error');
             setFetchError(true);
             setRawCart(null);
-            toastRef.current?.show({ severity: 'error', summary: 'Error', detail: 'Unable to load cart data.', life: 5000 });
         } finally {
             setLoading(false);
         }
@@ -257,17 +251,25 @@ export default function FunnelCart() {
 
     if (fetchError) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="text-center max-w-md">
-                    <i className="pi pi-exclamation-triangle text-5xl text-red-400 mb-4" />
-                    <p className="text-gray-600 text-lg font-medium">Something went wrong</p>
-                    <p className="text-gray-400 text-sm mt-2">Please try refreshing the page.</p>
+            <div className="p-6 min-h-[calc(100vh-120px)]">
+                <Toast ref={toastRef} />
+                <DateFilterBar
+                    quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
+                    dataMode={dataMode}
+                />
+                <div className="flex items-center justify-center min-h-[50vh]">
+                    <div className="text-center">
+                        <i className="pi pi-exclamation-circle text-5xl text-red-400 mb-3 block" />
+                        <p className="text-gray-700 font-medium text-lg">Something went wrong</p>
+                        <p className="text-gray-500 text-sm mt-1">Unable to load cart data. Please try again later.</p>
+                    </div>
                 </div>
             </div>
         );
     }
 
-    if (!hasData) {
+    if (!hasData && !loading && pipelineStatus !== 'loading') {
         return (
             <div className="p-6 space-y-4">
                 <Toast ref={toastRef} />
