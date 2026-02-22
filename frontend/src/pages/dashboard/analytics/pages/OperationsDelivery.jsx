@@ -152,6 +152,7 @@ export default function OperationsDelivery() {
 
         const delByCountry   = a.delivery_days_by_country?.data     ?? [];
         const delByState     = a.delivery_days_by_state?.data       ?? [];
+        const delByCity      = a.delivery_days_by_city?.data        ?? [];
         const ontimeByCountry = a.ontime_delivery_by_country?.data  ?? [];
         const ontimeByState   = a.ontime_delivery_by_state?.data    ?? [];
         const ontimeByCity    = a.ontime_delivery_by_city?.data     ?? [];
@@ -263,7 +264,7 @@ export default function OperationsDelivery() {
             kpis: { totalDelivered, avgDelDays, overallOntime, fastestCountry, topOntimeCountry },
             delCountryBarData, delDoughnutData, ontimeCountryBarData, ontimeVsLateData,
             delStateBarData, ontimeStateBarData, topCitiesOntimeData,
-            delByCountry, ontimeByCountry, delByState, ontimeByState,
+            delByCountry, ontimeByCountry, delByState, ontimeByState, delByCity,
         };
     }, [rawOps]);
 
@@ -543,6 +544,29 @@ export default function OperationsDelivery() {
                                     <Tag value={fmt.pct(r.on_time_rate)}
                                         severity={(+(r.on_time_rate ?? 0)) >= 90 ? 'success' : (+(r.on_time_rate ?? 0)) >= 70 ? 'warning' : 'danger'} />
                                 )} />
+                            </DataTable>
+                        </div>
+                    </Card>
+                )}
+
+                {/* Delivery Days by City Table */}
+                {(derived?.delByCity?.length ?? 0) > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">
+                                Delivery Days by City
+                            </h3>
+                            <DataTable
+                                value={[...derived.delByCity].sort((a, b) => (+(a.avg_delivery_days ?? 0)) - (+(b.avg_delivery_days ?? 0)))}
+                                paginator rows={15} stripedRows emptyMessage="No data" className="text-sm"
+                            >
+                                <Column field="country"          header="Country"        sortable />
+                                <Column field="state_province"   header="State/Province" sortable />
+                                <Column field="city"             header="City"           sortable />
+                                <Column field="delivered_orders" header="Delivered"      sortable body={(r) => fmt.number(r.delivered_orders)} />
+                                <Column field="avg_delivery_days" header="Avg Days"      sortable body={(r) => fmt.decimal(r.avg_delivery_days, 1)} />
+                                <Column field="median_delivery_days" header="Median Days" sortable body={(r) => fmt.decimal(r.median_delivery_days, 1)} />
+                                <Column field="max_delivery_days"   header="Max Days"    sortable body={(r) => fmt.decimal(r.max_delivery_days, 1)} />
                             </DataTable>
                         </div>
                     </Card>

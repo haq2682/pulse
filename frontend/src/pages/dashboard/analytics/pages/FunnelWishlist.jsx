@@ -152,6 +152,7 @@ export default function FunnelWishlist() {
         const ttpDist          = a.wishlist_time_to_purchase_distribution?.data ?? [];
         const abandonedItems   = a.abandoned_wishlist_items?.data          ?? [];
         const abandonByProduct = a.abandoned_wishlist_by_product?.data     ?? [];
+        const abandonByCustomer = a.abandoned_wishlist_by_customer?.data   ?? [];
         const addsByMonth      = a.wishlist_adds_by_month?.data            ?? [];
 
         if (summary.length === 0 && byProduct.length === 0) return null;
@@ -234,7 +235,7 @@ export default function FunnelWishlist() {
             kpis: { totalItems, customersUsing, productsInList, convRate },
             topAddsBarData, topPurchBarData, convRateBarData, addVsPurchBarData,
             addsByMonthData, ttpDistData, ttpDoughnutData, abandonProdBarData,
-            byProduct, ttpStats, ttpDist,
+            byProduct, ttpStats, ttpDist, abandonByCustomer,
         };
     }, [rawWishlist]);
 
@@ -447,6 +448,22 @@ export default function FunnelWishlist() {
                                 <Column field="wishlist_adds"           header="Wishlist Adds"       sortable body={(r) => fmt.number(r.wishlist_adds)} />
                                 <Column field="wishlist_purchases"      header="Purchases"           sortable body={(r) => fmt.number(r.wishlist_purchases)} />
                                 <Column field="wishlist_conversion_rate" header="Conv. Rate %"       sortable body={(r) => fmt.pct(r.wishlist_conversion_rate)} />
+                            </DataTable>
+                        </div>
+                    </Card>
+                )}
+
+                {/* Abandoned Wishlist by Customer */}
+                {(derived?.abandonByCustomer?.length ?? 0) > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Abandoned Wishlist by Customer</h3>
+                            <DataTable
+                                value={[...derived.abandonByCustomer].sort((a, b) => (+(b.abandoned_wishlist_count ?? 0)) - (+(a.abandoned_wishlist_count ?? 0)))}
+                                paginator rows={15} stripedRows emptyMessage="No data" className="text-sm"
+                            >
+                                <Column field="customer_id"              header="Customer ID"          sortable />
+                                <Column field="abandoned_wishlist_count" header="Abandoned Items"      sortable body={(r) => fmt.number(r.abandoned_wishlist_count)} />
                             </DataTable>
                         </div>
                     </Card>

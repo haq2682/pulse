@@ -15,7 +15,7 @@ import {
     Tooltip,
     Legend,
 } from 'chart.js';
-import { Line, Doughnut } from 'react-chartjs-2';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import { useAnalyticsWebSocket } from '../../../../hooks/useAnalyticsWebSocket';
 import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
@@ -367,7 +367,10 @@ const ExecutiveOverview = () => {
                     : 0,
         };
 
-        return { kpis, revenueTrend, customerData, productData, operationsData, marketingData };
+        return { kpis, revenueTrend, customerData, productData, operationsData, marketingData,
+            bhWeeklyRaw: kpisCategory?.analytics?.business_health_weekly?.data ?? [],
+            bhMonthlyRaw: kpisCategory?.analytics?.business_health_monthly?.data ?? [],
+        };
     }, [rawCategories, clientFilter, isFiltered]);
 
     // -----------------------------------------------------------------------
@@ -835,6 +838,38 @@ const ExecutiveOverview = () => {
                     ]}
                 />
             </div>
+
+            {/* Business Health Weekly & Monthly */}
+            {(derived?.bhWeeklyRaw?.length ?? 0) > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Business Health (Weekly)</h3>
+                        <div className="h-[220px]">
+                            <Bar
+                                data={{
+                                    labels: (derived.bhWeeklyRaw).map((r) => `${r.grain_year}-W${String(r.grain_week ?? 0).padStart(2,'0')}`),
+                                    datasets: [{ label: 'Revenue', data: (derived.bhWeeklyRaw).map((r) => +(r.total_revenue ?? 0)), backgroundColor: 'rgba(59,130,246,0.8)' }],
+                                }}
+                                options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + v.toLocaleString() } } } }}
+                            />
+                        </div>
+                    </div>
+                    {(derived?.bhMonthlyRaw?.length ?? 0) > 0 && (
+                        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Business Health (Monthly)</h3>
+                            <div className="h-[220px]">
+                                <Bar
+                                    data={{
+                                        labels: (derived.bhMonthlyRaw).map((r) => `${r.grain_year}-${String(r.grain_month ?? 0).padStart(2,'0')}`),
+                                        datasets: [{ label: 'Revenue', data: (derived.bhMonthlyRaw).map((r) => +(r.total_revenue ?? 0)), backgroundColor: 'rgba(34,197,94,0.8)' }],
+                                    }}
+                                    options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + v.toLocaleString() } } } }}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

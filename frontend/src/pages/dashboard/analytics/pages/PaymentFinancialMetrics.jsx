@@ -173,11 +173,13 @@ export default function PaymentFinancialMetrics() {
 
         const aovMonthly      = a.aov_trend_monthly?.data              ?? [];
         const aovDaily        = a.aov_trend_daily?.data                ?? [];
+        const aovWeekly       = a.aov_trend_weekly?.data               ?? [];
         const revBySegment    = a.rev_by_customer_segment?.data        ?? [];
         const revByRfm        = a.rev_by_rfm_segment?.data             ?? [];
         const revByLabel      = a.rev_by_segment_label?.data           ?? [];
         const revByDevice     = a.rev_by_device?.data                  ?? [];
         const revByReferrer   = a.rev_by_referrer?.data                ?? [];
+        const revByCountryCity = a.rev_by_country_city?.data           ?? [];
         const lowMarginCats   = a.low_margin_categories?.data          ?? [];
         const segmentAov      = a.segment_aov_by_rfm?.data             ?? [];
         const carryingCost    = a.inventory_carrying_cost_overall?.data ?? [];
@@ -333,6 +335,7 @@ export default function PaymentFinancialMetrics() {
             aovLineData, revBySegBarData, revByRfmBarData, revRfmDoughnutData, revPerCustRfmData,
             aovByRfmBarData, revByDeviceBarData, revByReferrerBarData, lowMarginBarData, revByLabelBarData,
             revBySegment, revByRfm, lowMarginCats, aovRfmSorted,
+            aovWeekly, revByCountryCity,
         };
     }, [rawRevenue]);
 
@@ -612,6 +615,54 @@ export default function PaymentFinancialMetrics() {
                                     <Tag value={fmt.pct(r.avg_profit_margin)}
                                         severity={(+(r.avg_profit_margin ?? 0)) < 10 ? 'danger' : (+(r.avg_profit_margin ?? 0)) < 20 ? 'warning' : 'success'} />
                                 )} />
+                            </DataTable>
+                        </div>
+                    </Card>
+                )}
+
+                {/* AOV Weekly Trend */}
+                {(derived?.aovWeekly?.length ?? 0) > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">
+                                AOV Trend (Weekly)
+                            </h3>
+                            <div className="h-[260px]">
+                                <Line
+                                    data={{
+                                        labels: derived.aovWeekly.map((r) => `${r.order_year}-W${String(r.order_week ?? 0).padStart(2,'0')}`),
+                                        datasets: [{
+                                            label: 'Avg Order Value',
+                                            data: derived.aovWeekly.map((r) => +(r.avg_order_value ?? 0)),
+                                            borderColor: 'rgb(139,92,246)',
+                                            backgroundColor: 'rgba(139,92,246,0.15)',
+                                            tension: 0.4, fill: true,
+                                        }],
+                                    }}
+                                    options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false, ticks: { callback: (v) => '$' + v.toLocaleString() } } } }}
+                                />
+                            </div>
+                        </div>
+                    </Card>
+                )}
+
+                {/* Revenue by Country & City Table */}
+                {(derived?.revByCountryCity?.length ?? 0) > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">
+                                Revenue by Country &amp; City
+                            </h3>
+                            <DataTable
+                                value={[...derived.revByCountryCity].sort((a, b) => (+(b.segment_revenue ?? 0)) - (+(a.segment_revenue ?? 0)))}
+                                paginator rows={10} stripedRows emptyMessage="No data" className="text-sm"
+                            >
+                                <Column field="country" header="Country" sortable />
+                                <Column field="city" header="City" sortable />
+                                <Column field="customer_count" header="Customers" sortable body={(r) => fmt.number(r.customer_count)} />
+                                <Column field="segment_revenue" header="Revenue" sortable body={(r) => fmt.currency(r.segment_revenue)} />
+                                <Column field="revenue_per_customer" header="Rev / Customer" sortable body={(r) => fmt.currency(r.revenue_per_customer)} />
+                                <Column field="revenue_share" header="Revenue Share" sortable body={(r) => fmt.pct(r.revenue_share)} />
                             </DataTable>
                         </div>
                     </Card>

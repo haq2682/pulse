@@ -165,6 +165,8 @@ export default function ReviewsSentiment() {
 
         const sentByCat    = a.sentiment_by_category?.data          ?? [];
         const velMonthly   = a.review_velocity_monthly?.data        ?? [];
+        const velWeekly    = a.review_velocity_weekly?.data         ?? [];
+        const velDaily     = a.review_velocity_daily?.data          ?? [];
 
         if (sentByCat.length === 0) return null;
 
@@ -287,7 +289,7 @@ export default function ReviewsSentiment() {
             kpis: { totalReviews, totalPositive, totalNegative, totalNeutral, overallSentScore },
             posSentBarData, sentScoreBarData, sentStackedData, overallSentDoughnut,
             negShareBarData, monthLineData, monthLineDualOpts,
-            sentByCat,
+            sentByCat, velWeekly, velDaily,
         };
     }, [rawReview]);
 
@@ -487,6 +489,49 @@ export default function ReviewsSentiment() {
                                 <Column field="positive_share"     header="Positive %"        sortable body={(r) => fmt.pct(r.positive_share)} />
                                 <Column field="negative_share"     header="Negative %"        sortable body={(r) => fmt.pct(r.negative_share)} />
                                 <Column field="avg_sentiment_score" header="Sentiment Score"  sortable body={(r) => fmt.decimal(r.avg_sentiment_score, 3)} />
+                            </DataTable>
+                        </div>
+                    </Card>
+                )}
+
+                {/* Review Velocity — Weekly */}
+                {(derived?.velWeekly?.length ?? 0) > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">
+                                Review Velocity (Weekly) — Aggregated
+                            </h3>
+                            <div className="h-[240px]">
+                                <Line
+                                    data={{
+                                        labels: derived.velWeekly.map((r) => `${r.review_year}-W${String(r.review_week ?? 0).padStart(2,'0')}`),
+                                        datasets: [
+                                            { label: 'Weekly Reviews', data: derived.velWeekly.map((r) => +(r.weekly_reviews ?? 0)), borderColor: 'rgb(59,130,246)', backgroundColor: 'rgba(59,130,246,0.15)', tension: 0.4, fill: true, yAxisID: 'y' },
+                                            { label: 'Avg Rating', data: derived.velWeekly.map((r) => +(r.avg_rating_weekly ?? 0)), borderColor: 'rgb(249,115,22)', backgroundColor: 'transparent', tension: 0.4, yAxisID: 'y1' },
+                                        ],
+                                    }}
+                                    options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true, position: 'left' }, y1: { beginAtZero: false, position: 'right', min: 0, max: 5, grid: { drawOnChartArea: false } } } }}
+                                />
+                            </div>
+                        </div>
+                    </Card>
+                )}
+
+                {/* Review Velocity — Daily */}
+                {(derived?.velDaily?.length ?? 0) > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">
+                                Review Velocity (Daily) — Aggregated across Products
+                            </h3>
+                            <DataTable
+                                value={[...derived.velDaily].sort((a, b) => (a.review_date ?? '').localeCompare(b.review_date ?? '')).slice(-60)}
+                                paginator rows={15} stripedRows emptyMessage="No data" className="text-sm"
+                            >
+                                <Column field="product_id"       header="Product ID"  sortable />
+                                <Column field="review_date"      header="Date"        sortable />
+                                <Column field="daily_reviews"    header="Daily Reviews" sortable body={(r) => fmt.number(r.daily_reviews)} />
+                                <Column field="avg_rating_daily" header="Avg Rating"  sortable body={(r) => fmt.decimal(r.avg_rating_daily, 2)} />
                             </DataTable>
                         </div>
                     </Card>

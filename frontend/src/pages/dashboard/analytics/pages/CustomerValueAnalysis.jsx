@@ -205,6 +205,15 @@ const CustomerValueAnalysis = () => {
         // high_discount_customers — static
         const highDiscountCustomers = a.high_discount_customers?.data ?? [];
 
+        // discount_customers — static (individual customer discount detail)
+        const discountCustomers = a.discount_customers?.data ?? [];
+
+        // customer_overall_health_summary — static (comprehensive health per customer)
+        const overallHealthRows = a.customer_overall_health_summary?.data ?? [];
+
+        // customers_cohorts — static
+        const customerCohorts = a.customers_cohorts?.data ?? [];
+
         // customer_profit_per_segment — static
         const custProfitSeg = a.customer_profit_per_segment?.data ?? [];
 
@@ -232,7 +241,8 @@ const CustomerValueAnalysis = () => {
 
         return {
             discountSummary, hunterRow, nonHunterRow, corrData,
-            highDiscountCustomers, custProfitSeg, topByRevenue, topByProfit,
+            highDiscountCustomers, discountCustomers, overallHealthRows, customerCohorts,
+            custProfitSeg, topByRevenue, topByProfit,
             paymentSummary, referrerSummary, deviceCrosstab,
             totalHunters, totalNonHunters, avgHunterCLV, avgNonHunterCLV, totalSegRevenue,
         };
@@ -754,6 +764,78 @@ const CustomerValueAnalysis = () => {
                             <Column field="total_net_profit" header="Net Profit" sortable body={(r) => fmt.currency(r.total_net_profit)} />
                             <Column field="avg_clv" header="Avg CLV" sortable body={(r) => fmt.currency(r.avg_clv)} />
                             <Column field="avg_profit_per_customer" header="Avg Profit/Customer" sortable body={(r) => fmt.currency(r.avg_profit_per_customer)} />
+                        </DataTable>
+                    </div>
+                </Card>
+            )}
+
+            {/* Discount Customers Detail Table */}
+            {(derived?.discountCustomers?.length ?? 0) > 0 && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">
+                            Discount Customers Detail *
+                        </h3>
+                        <DataTable
+                            value={[...derived.discountCustomers].sort((a, b) => (b.total_discount_received ?? 0) - (a.total_discount_received ?? 0))}
+                            paginator rows={10} stripedRows size="small" className="text-sm"
+                        >
+                            <Column field="customer_id" header="Customer ID" sortable />
+                            <Column field="total_revenue" header="Revenue" sortable body={(r) => fmt.currency(r.total_revenue)} />
+                            <Column field="total_discount_received" header="Total Discount" sortable body={(r) => fmt.currency(r.total_discount_received)} />
+                            <Column field="discount_share_of_revenue" header="Discount Share" sortable body={(r) => fmt.pct(r.discount_share_of_revenue)} />
+                            <Column field="avg_discount_per_order" header="Avg Disc/Order" sortable body={(r) => fmt.currency(r.avg_discount_per_order)} />
+                            <Column field="customer_lifetime_value" header="CLV" sortable body={(r) => fmt.currency(r.customer_lifetime_value)} />
+                            <Column field="total_orders" header="Orders" sortable body={(r) => fmt.number(r.total_orders)} />
+                            <Column field="is_discount_hunter" header="Discount Hunter" sortable body={(r) => r.is_discount_hunter ? 'Yes' : 'No'} />
+                        </DataTable>
+                    </div>
+                </Card>
+            )}
+
+            {/* Customer Overall Health Summary */}
+            {(derived?.overallHealthRows?.length ?? 0) > 0 && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">
+                            Customer Overall Health Summary *
+                        </h3>
+                        <DataTable
+                            value={[...derived.overallHealthRows].sort((a, b) => (b.customer_lifetime_value ?? 0) - (a.customer_lifetime_value ?? 0))}
+                            paginator rows={10} stripedRows size="small" className="text-sm"
+                            scrollable scrollHeight="400px"
+                        >
+                            <Column field="customer_id" header="Customer ID" sortable />
+                            <Column field="customer_segment_label" header="Segment" sortable />
+                            <Column field="rfm_segment" header="RFM" sortable />
+                            <Column field="churn_risk" header="Churn Risk" sortable />
+                            <Column field="customer_lifetime_value" header="CLV" sortable body={(r) => fmt.currency(r.customer_lifetime_value)} />
+                            <Column field="total_revenue" header="Revenue" sortable body={(r) => fmt.currency(r.total_revenue)} />
+                            <Column field="total_orders" header="Orders" sortable body={(r) => fmt.number(r.total_orders)} />
+                            <Column field="session_conversion_rate" header="Conv. Rate" sortable body={(r) => fmt.pct(r.session_conversion_rate)} />
+                            <Column field="cart_abandonment_rate" header="Cart Abandon" sortable body={(r) => fmt.pct(r.cart_abandonment_rate)} />
+                            <Column field="customer_activity_score" header="Activity Score" sortable body={(r) => (r.customer_activity_score ?? 0).toFixed(2)} />
+                        </DataTable>
+                    </div>
+                </Card>
+            )}
+
+            {/* Customer Cohorts Table */}
+            {(derived?.customerCohorts?.length ?? 0) > 0 && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">
+                            Customer Cohorts *
+                        </h3>
+                        <DataTable
+                            value={[...derived.customerCohorts].sort((a, b) => (a.signup_cohort_month ?? '').localeCompare(b.signup_cohort_month ?? ''))}
+                            paginator rows={10} stripedRows size="small" className="text-sm"
+                        >
+                            <Column field="customer_id" header="Customer ID" sortable />
+                            <Column field="signup_cohort_month" header="Signup Cohort" sortable />
+                            <Column field="first_order_month" header="First Order Month" sortable />
+                            <Column field="signup_date" header="Signup Date" sortable />
+                            <Column field="first_order_date" header="First Order Date" sortable />
                         </DataTable>
                     </div>
                 </Card>

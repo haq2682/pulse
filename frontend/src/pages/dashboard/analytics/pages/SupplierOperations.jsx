@@ -136,11 +136,12 @@ export default function SupplierOperations() {
         if (!rawSupplier) return null;
         const a = rawSupplier.analytics ?? {};
 
-        const fulfillment   = a.supplier_fulfillment_performance?.data ?? [];
-        const stockoutBySup = a.stockout_rate_by_supplier?.data        ?? [];
-        const lastRestock   = a.supplier_days_since_last_restock?.data ?? [];
-        const contractExp   = a.supplier_contract_expiry?.data         ?? [];
-        const rankingCore   = a.supplier_ranking_core?.data            ?? [];
+        const fulfillment    = a.supplier_fulfillment_performance?.data ?? [];
+        const stockoutBySup  = a.stockout_rate_by_supplier?.data        ?? [];
+        const supplierStockouts = a.supplier_stockouts?.data            ?? [];
+        const lastRestock    = a.supplier_days_since_last_restock?.data ?? [];
+        const contractExp    = a.supplier_contract_expiry?.data         ?? [];
+        const rankingCore    = a.supplier_ranking_core?.data            ?? [];
 
         if (fulfillment.length === 0 && stockoutBySup.length === 0 && contractExp.length === 0) return null;
 
@@ -272,7 +273,7 @@ export default function SupplierOperations() {
             totalOrdersFulfilled, avgLeadTime, avgStockoutRate, expiringContracts,
             leadTimeBarData, stockoutBarData, totalStockoutsBarData, ordersBarData,
             restockBarData, healthBarData, contractBarData,
-            mergedOps, contractExp,
+            mergedOps, contractExp, supplierStockouts,
         };
     }, [rawSupplier]);
 
@@ -571,6 +572,29 @@ export default function SupplierOperations() {
                                 body={(r) => fmt.decimal(r.supplier_performance_score, 1)} />
                             <Column field="supplier_reliability_score_effective" header="Reliability" sortable
                                 body={(r) => fmt.decimal(r.supplier_reliability_score_effective, 1)} />
+                        </DataTable>
+                    </div>
+                </Card>
+            )}
+            {/* Supplier Stockouts Detail Table */}
+            {(derived?.supplierStockouts?.length ?? 0) > 0 && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">
+                            Supplier Stockouts Detail
+                        </h3>
+                        <DataTable
+                            value={[...derived.supplierStockouts].sort((a, b) => (b.total_stockouts ?? 0) - (a.total_stockouts ?? 0))}
+                            paginator rows={15} rowsPerPageOptions={[15, 25]}
+                            className="p-datatable-sm" stripedRows sortMode="multiple"
+                        >
+                            <Column field="supplier_id" header="Supplier" sortable body={(r) => suppLabel(r.supplier_id)} />
+                            <Column field="total_stockouts" header="Total Stockouts" sortable body={(r) => fmt.number(r.total_stockouts)} />
+                            <Column field="supplier_stockout_rate" header="Stockout Rate" sortable body={(r) => fmt.pct((r.supplier_stockout_rate ?? 0) * 100)} />
+                            <Column field="inv_total_stockouts" header="Inv. Stockouts" sortable body={(r) => fmt.number(r.inv_total_stockouts)} />
+                            <Column field="inv_stockout_rate" header="Inv. Stockout Rate" sortable body={(r) => fmt.pct((r.inv_stockout_rate ?? 0) * 100)} />
+                            <Column field="inv_total_products" header="Total Products" sortable body={(r) => fmt.number(r.inv_total_products)} />
+                            <Column field="inv_total_current_stock" header="Current Stock" sortable body={(r) => fmt.number(r.inv_total_current_stock)} />
                         </DataTable>
                     </div>
                 </Card>

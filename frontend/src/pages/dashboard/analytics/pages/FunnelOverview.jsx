@@ -157,6 +157,7 @@ export default function FunnelOverview() {
         const byReferrer  = a.funnel_by_referrer?.data  ?? [];
         const hvVsReg     = a.high_value_vs_regular?.data ?? [];
         const abandonVsConv = a.abandoned_vs_converted?.data ?? [];
+        const highValueFunnel = a.high_value_funnel?.data ?? [];
 
         if (byDevice.length === 0 && byReferrer.length === 0) return null;
 
@@ -269,7 +270,7 @@ export default function FunnelOverview() {
             funnelStepsData, convByDeviceData, convByRefData,
             funnelByDeviceData, funnelByRefData, avgValByDeviceData, hvDoughnutData,
             hvBarData, abandonBarData,
-            byDevice, byReferrer,
+            byDevice, byReferrer, highValueFunnel,
         };
     }, [rawFunnel]);
 
@@ -491,6 +492,28 @@ export default function FunnelOverview() {
                                 <Column field="high_value_sessions"  header="High-Value"      sortable body={(r) => fmt.number(r.high_value_sessions)} />
                                 <Column field="avg_session_value"    header="Avg Session Val" sortable body={(r) => fmt.currency(r.avg_session_value)} />
                                 <Column field="conversion_rate"      header="Conv. Rate %"    sortable body={(r) => fmt.pct(r.conversion_rate)} />
+                            </DataTable>
+                        </div>
+                    </Card>
+                )}
+                {/* High Value Funnel Sessions Table */}
+                {(derived?.highValueFunnel?.length ?? 0) > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">High Value Funnel Sessions</h3>
+                            <DataTable
+                                value={[...derived.highValueFunnel].sort((a, b) => (+(b.session_monetary_value ?? 0)) - (+(a.session_monetary_value ?? 0)))}
+                                paginator rows={15} stripedRows emptyMessage="No data" className="text-sm"
+                            >
+                                <Column field="session_id"             header="Session ID"          sortable />
+                                <Column field="device_type"            header="Device"              sortable />
+                                <Column field="referrer_source"        header="Referrer"            sortable />
+                                <Column field="total_products_viewed"  header="Products Viewed"     sortable body={(r) => fmt.number(r.total_products_viewed)} />
+                                <Column field="items_added_to_cart"    header="Cart Items"          sortable body={(r) => fmt.number(r.items_added_to_cart)} />
+                                <Column field="orders_from_session"    header="Orders"              sortable body={(r) => fmt.number(r.orders_from_session)} />
+                                <Column field="session_monetary_value" header="Session Value"       sortable body={(r) => fmt.currency(r.session_monetary_value)} />
+                                <Column field="session_engagement_score" header="Engagement"        sortable body={(r) => fmt.decimal(r.session_engagement_score)} />
+                                <Column field="view_to_order_rate"     header="View→Order Rate"     sortable body={(r) => fmt.pct(r.view_to_order_rate)} />
                             </DataTable>
                         </div>
                     </Card>

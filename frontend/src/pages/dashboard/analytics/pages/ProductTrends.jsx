@@ -39,11 +39,7 @@ const LINE_PALETTE = [
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const ANALYTICS_CATEGORIES = [
-    'product_monthly_trends',
-    'category_monthly_trends',
-    'category_monthly_seasonality',
-    'category_calendar_month_seasonality',
-    'category_peak_season',
+    'product_analytics',
 ];
 
 // ---------------------------------------------------------------------------
@@ -136,7 +132,7 @@ export default function ProductTrends() {
             }
             const json = await res.json();
             if (json.mode) setDataMode(json.mode);
-            setRaw(json);
+            setRaw(json.categories?.product_analytics?.analytics ?? {});
         } catch (err) {
             console.error('[ProductTrends] fetch error');
             setError(true);
@@ -170,12 +166,14 @@ export default function ProductTrends() {
             }));
 
         // Time-filtered datasets
-        const catMonthly  = clientFilter(addGrainDate(raw.category_monthly_trends), 'grain_date');
-        const prodMonthly = clientFilter(addGrainDate(raw.product_monthly_trends),  'grain_date');
+        const catMonthly  = clientFilter(addGrainDate(raw.category_monthly_trends?.data ?? []), 'grain_date');
+        const prodMonthly = clientFilter(addGrainDate(raw.product_monthly_trends?.data  ?? []),  'grain_date');
 
         // Static aggregates
-        const catSeasonal = raw.category_monthly_seasonality ?? [];
-        const catPeak     = raw.category_peak_season         ?? [];
+        const catSeasonal    = raw.category_monthly_seasonality?.data          ?? [];
+        const catCalendarSeasonal = raw.category_calendar_month_seasonality?.data ?? [];
+        const catPeak        = raw.category_peak_season?.data                   ?? [];
+        const prodCalendar   = raw.product_calendar_month_seasonality?.data     ?? [];
 
         // ---- KPIs -------------------------------------------------------
         const totalUnits  = catMonthly.reduce((s, r) => s + (r.units_sold   ?? 0), 0);
@@ -298,10 +296,47 @@ export default function ProductTrends() {
         // ---- Per-category metrics cards (static, top 6 by peak revenue) -
         const top6PeakCats = peakSorted.slice(0, 6);
 
+        // ---- Category Calendar Month Seasonality (units, orders — no revenue) ---
+        const calSeasonalCats = [...new Set(catCalendarSeasonal.map((r) => r.category))].slice(0, 8);
+        const calSeasonalUnitsMap = {};
+        catCalendarSeasonal.forEach((r) => {
+            if (!calSeasonalUnitsMap[r.category]) calSeasonalUnitsMap[r.category] = {};
+            calSeasonalUnitsMap[r.category][r.calendar_month] = (calSeasonalUnitsMap[r.category][r.calendar_month] ?? 0) + (r.units_sold ?? 0);
+        });
+        const catCalendarSeasonalData = {
+            labels: MONTH_NAMES,
+            datasets: calSeasonalCats.map((cat, i) => ({
+                label: cat,
+                data: Array.from({ length: 12 }, (_, j) => calSeasonalUnitsMap[cat]?.[j + 1] ?? 0),
+                backgroundColor: PALETTE[i % PALETTE.length],
+                stack: 'calSeasonal',
+            })),
+        };
+
+        // ---- Product Calendar Month Seasonality (top 10 products by total units) ---
+        const prodCalAgg = {};
+        prodCalendar.forEach((r) => {
+            const k = r.product_name ?? r.product_id ?? 'Unknown';
+            if (!prodCalAgg[k]) prodCalAgg[k] = { total: 0, months: {} };
+            prodCalAgg[k].total += r.units_sold ?? 0;
+            prodCalAgg[k].months[r.calendar_month] = (prodCalAgg[k].months[r.calendar_month] ?? 0) + (r.units_sold ?? 0);
+        });
+        const top10ProdCalNames = Object.entries(prodCalAgg).sort((a, b) => b[1].total - a[1].total).slice(0, 10).map(([k]) => k);
+        const prodCalendarData = {
+            labels: MONTH_NAMES,
+            datasets: top10ProdCalNames.map((name, i) => ({
+                label: name.length > 20 ? name.slice(0, 20) + '…' : name,
+                data: Array.from({ length: 12 }, (_, j) => prodCalAgg[name]?.months[j + 1] ?? 0),
+                backgroundColor: PALETTE[i % PALETTE.length],
+                stack: 'prodCal',
+            })),
+        };
+
         return {
             totalUnits, totalOrders, peakRow,
             catUnitsLineData, catOrdersBarData,
             catSeasonalUnitsData, catSeasonalRevData, catPeakBarData,
+            catCalendarSeasonalData, prodCalendarData,
             top10Products, peakSorted, top6PeakCats,
             sortedMonthKeys,
         };
@@ -591,6 +626,40 @@ export default function ProductTrends() {
                     </DataTable>
                 </div>
             </Card>
+
+            {/* ── Category Calendar Month Seasonality (static) ───────────── */}
+            {(derived?.catCalendarSeasonalData?.datasets?.length ?? 0) > 0 && (
+                <section className="mb-8">
+                    <div className="flex items-center gap-2 mb-4">
+                        <span className="text-2xl">📅</span>
+                        <h2 className="text-xl font-bold text-gray-800">Category Calendar Seasonality *</h2>
+                    </div>
+                    {staticNote}
+                    <ChartWrapper title="Category Units by Calendar Month (Orders Volume) *" height={360}>
+                        <Bar
+                            data={derived.catCalendarSeasonalData}
+                            options={barOpts('Category Units Sold by Calendar Month (Order Volume) *', true)}
+                        />
+                    </ChartWrapper>
+                </section>
+            )}
+
+            {/* ── Product Calendar Month Seasonality (static) ────────────── */}
+            {(derived?.prodCalendarData?.datasets?.length ?? 0) > 0 && (
+                <section className="mb-8">
+                    <div className="flex items-center gap-2 mb-4">
+                        <span className="text-2xl">🛍️</span>
+                        <h2 className="text-xl font-bold text-gray-800">Product Calendar Seasonality (Top 10) *</h2>
+                    </div>
+                    {staticNote}
+                    <ChartWrapper title="Top 10 Products — Units Sold by Calendar Month *" height={360}>
+                        <Bar
+                            data={derived.prodCalendarData}
+                            options={barOpts('Top 10 Products Units Sold by Calendar Month *', true)}
+                        />
+                    </ChartWrapper>
+                </section>
+            )}
         </div>
     );
 }

@@ -154,6 +154,7 @@ export default function PaymentMethods() {
         const successRates      = a.payment_method_success_rates?.data             ?? [];
         const aovByMethod       = a.payment_method_aov?.data                       ?? [];
         const countsByCountry   = a.payment_counts_by_country_method?.data         ?? [];
+        const countsByState     = a.payment_counts_by_state_method?.data           ?? [];
         const successByCountry  = a.payment_method_success_rates_by_country?.data  ?? [];
 
         if (successRates.length === 0 && aovByMethod.length === 0) return null;
@@ -265,7 +266,7 @@ export default function PaymentMethods() {
             kpis: { totalMethods, totalPayments, overallSuccessRate, topMethod, totalRevenue },
             successBarData, paymentDoughnutData, aovBarData, revenueBarData, revDoughnutData,
             ordersBarData, countryBarData, successByCountryData,
-            successRates, aovByMethod,
+            successRates, aovByMethod, countsByState,
         };
     }, [rawPayment]);
 
@@ -499,6 +500,27 @@ export default function PaymentMethods() {
                                 <Column field="order_count"             header="Orders"            sortable body={(r) => fmt.number(r.order_count)} />
                                 <Column field="total_revenue"           header="Total Revenue"     sortable body={(r) => fmt.currency(r.total_revenue)} />
                                 <Column field="avg_order_value_method"  header="Avg Order Value"   sortable body={(r) => fmt.currency(r.avg_order_value_method)} />
+                            </DataTable>
+                        </div>
+                    </Card>
+                )}
+
+                {/* Payment Counts by State & Method Table */}
+                {(derived?.countsByState?.length ?? 0) > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">
+                                Payment Counts by State &amp; Method
+                            </h3>
+                            <DataTable
+                                value={[...derived.countsByState].sort((a, b) => (+(b.payment_count ?? 0)) - (+(a.payment_count ?? 0)))}
+                                paginator rows={10} stripedRows emptyMessage="No data" className="text-sm"
+                            >
+                                <Column field="country"        header="Country"         sortable />
+                                <Column field="state_province" header="State/Province"  sortable />
+                                <Column field="payment_method" header="Payment Method"  sortable />
+                                <Column field="payment_count"  header="Payments"        sortable body={(r) => fmt.number(r.payment_count)} />
+                                <Column field="order_count"    header="Orders"          sortable body={(r) => fmt.number(r.order_count)} />
                             </DataTable>
                         </div>
                     </Card>
