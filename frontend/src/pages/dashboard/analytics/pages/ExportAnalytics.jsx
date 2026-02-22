@@ -347,6 +347,14 @@ const LABEL_COL_RE =
 // Column-name pattern for picking the primary numeric value in a bar chart
 const VALUE_COL_RE =
     /revenue|total|count|orders|amount|value|sales|profit|rate|score|spend|clicks|impressions/;
+// Column-name pattern for proportion / distribution data → prefer pie chart
+const PIE_COL_RE = /share|pct|percentage|ratio|proportion|distribution/;
+// Pie chart radius (mm)
+const PIE_CHART_R = 26;
+// Minimum slice angle (radians) to draw a pie slice — avoids zero-area artifacts
+const MIN_SLICE_ANGLE = 0.001;
+// Max data points before dots are suppressed on line/area charts (prevents clutter)
+const MAX_DOTS_THRESHOLD = 40;
 
 /** Human-readable column header from snake_case key */
 const colHeader = (key) =>
@@ -491,7 +499,7 @@ const drawLineChart = (doc, rows, xKey, yKeys, x, y, w, chartH = 42) => {
         });
         // Dots (only when not too many points)
         doc.setFillColor(lr, lg, lb);
-        if (n <= 40) {
+        if (n <= MAX_DOTS_THRESHOLD) {
             rows.forEach((row, i) => {
                 const px = bx + (i / (n - 1)) * plotW;
                 const py = by + plotH - ((Number(row[yk] ?? 0) - minV) / range) * plotH;
@@ -548,6 +556,230 @@ const drawKPICards = (doc, row, x, y, w, maxCards = 24) => {
     return y + rowsCount * (CARD_H + 3) + 4;
 };
 
+/**
+ * Vertical bar chart for ≤10 categories. Returns Y after chart.
+ */
+const drawVBar = (doc, rows, labelKey, valueKey, x, y, w, maxBars = 10) => {
+    const items = rows.slice(0, maxBars);
+    if (!items.length) return y;
+    const vals = items.map((r) => Math.max(0, Number(r[valueKey] ?? 0)));
+    const maxV = vals.reduce((acc, v) => (v > acc ? v : acc), 1);
+    const CHART_H = 48, ML = 14, MR = 4, MB = 16, MT = 2;
+    const plotW = w - ML - MR, plotH = CHART_H - MT - MB;
+    const n = items.length;
+    const barW = Math.max(4, Math.min(18, (plotW / n) * 0.65));
+    const spacing = (plotW - barW * n) / (n + 1);
+    const bx = x + ML, by = y + MT;
+    // Background
+    doc.setFillColor(249, 250, 251);
+    doc.rect(bx, by, plotW, plotH, 'F');
+    // Horizontal grid lines
+    doc.setDrawColor(229, 231, 235);
+    doc.setLineWidth(0.15);
+    [0, 0.25, 0.5, 0.75, 1].forEach((frac) => {
+        const gy = by + frac * plotH;
+        doc.line(bx, gy, bx + plotW, gy);
+        if (frac === 0 || frac === 0.5 || frac === 1) {
+            doc.setFontSize(4.5);
+            doc.setTextColor(156, 163, 175);
+            doc.text(fmtCell(maxV * (1 - frac)), bx - 1, gy + 1.5, { align: 'right' });
+        }
+    });
+    // Border
+    doc.setDrawColor(209, 213, 219);
+    doc.setLineWidth(0.2);
+    doc.rect(bx, by, plotW, plotH, 'S');
+    // Bars and labels
+    items.forEach((row, i) => {
+        const barH = Math.max(0.5, (vals[i] / maxV) * plotH);
+        const barX = bx + spacing + i * (barW + spacing);
+        const barY = by + plotH - barH;
+        const [r, g, b] = PALETTE[i % PALETTE.length];
+        doc.setFillColor(r, g, b);
+        doc.rect(barX, barY, barW, barH, 'F');
+        // Value on top
+        doc.setFontSize(5.0);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(55, 65, 81);
+        doc.text(fmtCell(vals[i]), barX + barW / 2, Math.max(by + 3, barY - 1.5), { align: 'center' });
+        // X-axis label below
+        doc.setFontSize(4.8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(107, 114, 128);
+        doc.text(
+            String(row[labelKey] ?? '').substring(0, 14),
+            barX + barW / 2, by + plotH + 5,
+            { align: 'center' }
+        );
+    });
+    let endY = y + CHART_H + 2;
+    if (rows.length > maxBars) {
+        doc.setFontSize(5.5);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(156, 163, 175);
+        doc.text(`… and ${rows.length - maxBars} more`, bx, endY + 2.5);
+        endY += 6;
+    }
+    return endY;
+};
+
+/**
+ * Pie chart for proportional data (≤8 slices). Returns Y after chart.
+ * Uses jsPDF doc.lines() polygon approximation for each sector.
+ */
+const drawPieChart = (doc, rows, labelKey, valueKey, x, y, w, maxSlices = 8) => {
+    const items = rows.slice(0, maxSlices);
+    if (!items.length) return y;
+    const vals = items.map((r) => Math.max(0, Number(r[valueKey] ?? 0)));
+    const total = vals.reduce((s, v) => s + v, 0);
+    // Fall back to horizontal bar if all values are zero
+    if (total === 0) return drawHBar(doc, rows, labelKey, valueKey, x, y, w);
+    const PIE_R = PIE_CHART_R; // radius mm
+    const cx = x + PIE_R + 2;
+    const cy = y + PIE_R + 2;
+    let currentAngle = -Math.PI / 2; // start from 12 o'clock
+    items.forEach((row, i) => {
+        const sliceAngle = (vals[i] / total) * 2 * Math.PI;
+        if (sliceAngle < MIN_SLICE_ANGLE) { currentAngle += sliceAngle; return; }
+        const steps = Math.max(4, Math.ceil(36 * (sliceAngle / (2 * Math.PI))));
+        const aStep = sliceAngle / steps;
+        // Polygon: start at center, line to arc start, trace arc, close back to center
+        const lines = [[PIE_R * Math.cos(currentAngle), PIE_R * Math.sin(currentAngle)]];
+        let prevAX = cx + PIE_R * Math.cos(currentAngle);
+        let prevAY = cy + PIE_R * Math.sin(currentAngle);
+        for (let s = 1; s <= steps; s++) {
+            const a = currentAngle + s * aStep;
+            const ax = cx + PIE_R * Math.cos(a);
+            const ay = cy + PIE_R * Math.sin(a);
+            lines.push([ax - prevAX, ay - prevAY]);
+            prevAX = ax;
+            prevAY = ay;
+        }
+        const [r, g, b] = PALETTE[i % PALETTE.length];
+        doc.setFillColor(r, g, b);
+        doc.setDrawColor(255, 255, 255);
+        doc.setLineWidth(0.4);
+        doc.lines(lines, cx, cy, [1, 1], 'FD', true);
+        currentAngle += sliceAngle;
+    });
+    // Legend
+    const legendX = x + PIE_R * 2 + 12;
+    let legendY = y + 6;
+    items.forEach((row, i) => {
+        const pct = ((vals[i] / total) * 100).toFixed(1);
+        const [lr, lg, lb] = PALETTE[i % PALETTE.length];
+        doc.setFillColor(lr, lg, lb);
+        doc.rect(legendX, legendY - 3.2, 5.5, 4, 'F');
+        doc.setFontSize(6.2);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(55, 65, 81);
+        doc.text(
+            `${String(row[labelKey] ?? '').substring(0, MAX_LABEL_LEN)}: ${fmtCell(vals[i])}  (${pct}%)`,
+            legendX + 7.5, legendY
+        );
+        legendY += 8;
+    });
+    if (rows.length > maxSlices) {
+        doc.setFontSize(5.5);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(156, 163, 175);
+        doc.text(`… and ${rows.length - maxSlices} more`, legendX, legendY + 2);
+        legendY += 7;
+    }
+    return Math.max(cy + PIE_R + 4, legendY + 2);
+};
+
+/**
+ * Area chart (filled line) for a single time-series. Returns Y after chart.
+ */
+const drawAreaChart = (doc, rows, xKey, yKey, x, y, w, chartH = 44) => {
+    if (rows.length < 2) return y;
+    const ML = 16, MB = 10, MR = 6, MT = 2;
+    const plotW = w - ML - MR, plotH = chartH - MT - MB;
+    const bx = x + ML, by = y + MT;
+    const n = rows.length;
+    const vals = rows.map((r) => Number(r[yKey] ?? 0));
+    const minV = vals.reduce((a, v) => (v < a ? v : a), vals[0]);
+    const maxV = vals.reduce((a, v) => (v > a ? v : a), minV + 1);
+    const range = maxV - minV;
+    const [pr, pg, pb] = PALETTE[0];
+    // Light fill: blend 30% palette colour into white
+    const fillR = Math.round(pr * 0.30 + 255 * 0.70);
+    const fillG = Math.round(pg * 0.30 + 255 * 0.70);
+    const fillB = Math.round(pb * 0.30 + 255 * 0.70);
+    // Background
+    doc.setFillColor(249, 250, 251);
+    doc.rect(bx, by, plotW, plotH, 'F');
+    // Grid lines
+    doc.setDrawColor(229, 231, 235);
+    doc.setLineWidth(0.15);
+    const baseY = by + plotH;
+    [0, 0.25, 0.5, 0.75, 1].forEach((frac) => {
+        const gy = by + frac * plotH;
+        doc.line(bx, gy, bx + plotW, gy);
+        if (frac === 0 || frac === 0.5 || frac === 1) {
+            doc.setFontSize(4.8);
+            doc.setTextColor(156, 163, 175);
+            doc.text(fmtCell(maxV - frac * range), bx - 1, gy + 1.5, { align: 'right' });
+        }
+    });
+    // Build area polygon: (bx, baseY) → first point → trace → last point → (lastPx, baseY) → close
+    const lines = [];
+    const firstPy = baseY - ((vals[0] - minV) / range) * plotH;
+    lines.push([0, firstPy - baseY]); // go up to first data point
+    let prevX = bx, prevPy = firstPy;
+    for (let i = 1; i < n; i++) {
+        const px = bx + (i / (n - 1)) * plotW;
+        const py = baseY - ((vals[i] - minV) / range) * plotH;
+        lines.push([px - prevX, py - prevPy]);
+        prevX = px;
+        prevPy = py;
+    }
+    lines.push([0, baseY - prevPy]); // go down to bottom-right (close will return to bx, baseY)
+    doc.setFillColor(fillR, fillG, fillB);
+    doc.setDrawColor(fillR, fillG, fillB);
+    doc.setLineWidth(0);
+    doc.lines(lines, bx, baseY, [1, 1], 'F', true);
+    // Line on top
+    doc.setDrawColor(pr, pg, pb);
+    doc.setLineWidth(0.7);
+    for (let i = 1; i < n; i++) {
+        const x1 = bx + ((i - 1) / (n - 1)) * plotW;
+        const y1 = baseY - ((vals[i - 1] - minV) / range) * plotH;
+        const x2 = bx + (i / (n - 1)) * plotW;
+        const y2 = baseY - ((vals[i] - minV) / range) * plotH;
+        doc.line(x1, y1, x2, y2);
+    }
+    // Dots for small datasets
+    doc.setFillColor(pr, pg, pb);
+    if (n <= MAX_DOTS_THRESHOLD) {
+        for (let i = 0; i < n; i++) {
+            const px = bx + (i / (n - 1)) * plotW;
+            const py = baseY - ((vals[i] - minV) / range) * plotH;
+            doc.circle(px, py, 0.9, 'F');
+        }
+    }
+    // X-axis labels (max 10)
+    const step = Math.max(1, Math.ceil(n / 10));
+    rows.forEach((row, i) => {
+        if (i % step !== 0 && i !== n - 1) return;
+        const px = bx + (i / (n - 1)) * plotW;
+        doc.setFontSize(4.8);
+        doc.setTextColor(156, 163, 175);
+        doc.text(String(row[xKey] ?? '').substring(0, MAX_XAXIS_LEN), px, baseY + 7, { align: 'center' });
+    });
+    // Border
+    doc.setDrawColor(209, 213, 219);
+    doc.setLineWidth(0.2);
+    doc.rect(bx, by, plotW, plotH, 'S');
+    // Series label
+    doc.setFontSize(5.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(pr, pg, pb);
+    doc.text(colHeader(yKey), bx, baseY + MB - 1);
+    return y + chartH + 3;
+};
+
 // ---------------------------------------------------------------------------
 // Visualization type detection
 // ---------------------------------------------------------------------------
@@ -586,18 +818,28 @@ const detectViz = (rows, columns) => {
         return typeof v === 'string' && isNaN(Number(v));
     });
 
-    // Time-series → line chart
+    // Time-series → area (single series) or line (multi-series)
     if (dateCol && numericCols.length >= 1 && rows.length >= 3) {
         const yKeys = numericCols.filter((c) => c !== dateCol).slice(0, 3);
-        if (yKeys.length) return { type: 'line', xKey: dateCol, yKeys };
+        if (yKeys.length === 1) return { type: 'area', xKey: dateCol, yKey: yKeys[0] };
+        if (yKeys.length > 1) return { type: 'line', xKey: dateCol, yKeys };
     }
 
-    // Categorical → bar chart
+    // Categorical → choose chart type based on row count and data semantics
     if (strCols.length >= 1 && numericCols.length >= 1) {
         const labelKey =
             strCols.find((c) => LABEL_COL_RE.test(c.toLowerCase())) ?? strCols[0];
         const valueKey =
             numericCols.find((c) => VALUE_COL_RE.test(c.toLowerCase())) ?? numericCols[0];
+        // Pie: small dataset that looks like distribution/proportion data
+        const isProportion =
+            PIE_COL_RE.test(valueKey.toLowerCase()) ||
+            PIE_COL_RE.test(labelKey.toLowerCase()) ||
+            columns.some((c) => PIE_COL_RE.test(c.toLowerCase()));
+        if (rows.length <= 8 && isProportion) return { type: 'pie', labelKey, valueKey };
+        // Vertical bar: small dataset (nice for side-by-side comparison)
+        if (rows.length <= 8) return { type: 'vbar', labelKey, valueKey };
+        // Horizontal bar: many rows
         return { type: 'bar', labelKey, valueKey };
     }
 
@@ -759,8 +1001,14 @@ const buildPDF = ({ businessName, businessId, reportDate, sections, analyticsDat
             // ---- Visualization (chart / KPI cards) ----
             if (viz?.type === 'kpi') {
                 curY = drawKPICards(doc, rows[0], SM + 4, curY, CW - 8);
+            } else if (viz?.type === 'vbar') {
+                curY = drawVBar(doc, rows, viz.labelKey, viz.valueKey, SM + 4, curY, CW - 8);
+            } else if (viz?.type === 'pie') {
+                curY = drawPieChart(doc, rows, viz.labelKey, viz.valueKey, SM + 4, curY, CW - 8);
             } else if (viz?.type === 'bar') {
                 curY = drawHBar(doc, rows, viz.labelKey, viz.valueKey, SM + 4, curY, CW - 8);
+            } else if (viz?.type === 'area') {
+                curY = drawAreaChart(doc, rows, viz.xKey, viz.yKey, SM + 4, curY, CW - 8);
             } else if (viz?.type === 'line') {
                 curY = drawLineChart(doc, rows, viz.xKey, viz.yKeys, SM + 4, curY, CW - 8);
             }
