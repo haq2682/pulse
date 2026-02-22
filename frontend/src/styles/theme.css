@@ -370,3 +370,16 @@ button:focus:not(:focus-visible) {
 .p-tag {
     padding: 3px 8px;
 }
+
+.p-sortable-column {
+    padding: 10px 0px;
+    margin: 0 10px;
+}
+
+.p-sortable-column .p-column-title {
+    padding: 0px 20px;
+}
+
+.p-datatable-tbody > tr > td {
+    padding: 10px 20px;
+}
