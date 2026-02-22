@@ -377,6 +377,8 @@ const fmtCell = (val) => {
 
 // Maximum rows per table to keep PDF size manageable
 const MAX_TABLE_ROWS = 200;
+// Maximum KPI cards shown in a single card grid (3 per row)
+const MAX_KPI_CARDS = 24;
 
 // ---------------------------------------------------------------------------
 // Color palette
@@ -523,7 +525,7 @@ const drawLineChart = (doc, rows, xKey, yKeys, x, y, w, chartH = 42) => {
 /**
  * KPI card grid for single-row datasets (3 cards per row). Returns Y after grid.
  */
-const drawKPICards = (doc, row, x, y, w, maxCards = 24) => {
+const drawKPICards = (doc, row, x, y, w, maxCards = MAX_KPI_CARDS) => {
     const entries = Object.entries(row)
         .filter(([, v]) => v !== null && v !== undefined)
         .slice(0, maxCards);
@@ -856,6 +858,7 @@ const buildPDF = ({ businessName, businessId, reportDate, sections, analyticsDat
     const PAGE_H = doc.internal.pageSize.getHeight();
     const SM = 12;           // side margin
     const CW = PAGE_W - 2 * SM; // usable content width
+    const BOTTOM_MARGIN = 16; // reserved for footer
 
     // Re-usable: draw the indigo accent bar on the left edge
     const accentBar = () => {
@@ -930,6 +933,23 @@ const buildPDF = ({ businessName, businessId, reportDate, sections, analyticsDat
     });
 
     // ---- Section data pages ----
+    // curY tracks the vertical position across items packed onto the same page.
+    // Each section starts on its own page; items within a section are packed
+    // continuously and a new page is only added when there is not enough room.
+    let curY = SM;
+
+    const newPageFn = () => {
+        doc.addPage();
+        doc.setFillColor(249, 250, 251);
+        doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
+        accentBar();
+        curY = SM;
+    };
+
+    const ensureSpace = (needed) => {
+        if (curY + needed > PAGE_H - BOTTOM_MARGIN) newPageFn();
+    };
+
     sections.forEach((sec) => {
         const catData = analyticsData[sec.key] ?? {};
 
@@ -937,66 +957,70 @@ const buildPDF = ({ businessName, businessId, reportDate, sections, analyticsDat
             .map((k) => ({ key: k, rows: catData[k] ?? [] }))
             .filter((item) => item.rows.length > 0);
 
+        // Every section starts on its own fresh page
+        newPageFn();
+
+        // Section heading + divider
+        doc.setTextColor(17, 24, 39);
+        doc.setFontSize(17);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${sec.emoji}  ${sec.label}`, SM + 4, curY + 7);
+        curY += 15;
+        doc.setDrawColor(229, 231, 235);
+        doc.setLineWidth(0.3);
+        doc.line(SM, curY, PAGE_W - SM, curY);
+        curY += 5;
+
         if (analyticsItems.length === 0) {
-            doc.addPage();
-            doc.setFillColor(249, 250, 251);
-            doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
-            accentBar();
-            doc.setTextColor(17, 24, 39);
-            doc.setFontSize(20);
-            doc.setFont('helvetica', 'bold');
-            doc.text(`${sec.emoji}  ${sec.label}`, SM + 4, 22);
-            doc.setFontSize(12);
+            doc.setFontSize(11);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(107, 114, 128);
-            doc.text('No data available for this section.', SM + 4, 40);
+            doc.text('No data available for this section.', SM + 4, curY + 6);
             return;
         }
 
-        analyticsItems.forEach(({ key, rows }, itemIdx) => {
+        analyticsItems.forEach(({ key, rows }) => {
             const tableTitle = colHeader(key);
             const columns = Object.keys(rows[0]);
             const displayRows = rows.slice(0, MAX_TABLE_ROWS);
             const truncated = rows.length > MAX_TABLE_ROWS;
             const viz = detectViz(rows, columns);
 
-            // Each analytics item starts on a fresh page
-            doc.addPage();
-            doc.setFillColor(249, 250, 251);
-            doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
-            accentBar();
+            // Estimate how much vertical space the heading + viz will need so we
+            // can decide whether to start a new page before drawing anything.
+            const estVizH = (() => {
+                if (!viz || viz.type === 'table_only') return 0;
+                if (viz.type === 'kpi') {
+                    const cnt = Math.min(
+                        Object.keys(rows[0]).filter((k) => rows[0][k] != null).length, MAX_KPI_CARDS
+                    );
+                    return Math.ceil(cnt / 3) * 20 + 4;
+                }
+                if (viz.type === 'vbar') return 54;
+                if (viz.type === 'pie') return Math.max(58, Math.min(rows.length, 8) * 8 + 14);
+                if (viz.type === 'bar') return Math.min(rows.length, 12) * 7.4 + 8;
+                return 50; // area / line
+            })();
 
-            let curY = SM;
+            // Need at least heading (13mm) + viz + small gap (8mm)
+            ensureSpace(13 + estVizH + 8);
 
-            // Section header on the first item of this section
-            if (itemIdx === 0) {
-                doc.setTextColor(17, 24, 39);
-                doc.setFontSize(18);
-                doc.setFont('helvetica', 'bold');
-                doc.text(`${sec.emoji}  ${sec.label}`, SM + 4, curY + 7);
-                curY += 16;
-                doc.setDrawColor(229, 231, 235);
-                doc.setLineWidth(0.3);
-                doc.line(SM, curY, PAGE_W - SM, curY);
-                curY += 5;
-            }
-
-            // Analytics item heading
-            doc.setFontSize(13);
+            // Item heading
+            doc.setFontSize(11);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(55, 65, 81);
             doc.text(tableTitle, SM + 4, curY + 4);
-            curY += 9;
+            curY += 8;
 
             // Record count
-            doc.setFontSize(7.5);
+            doc.setFontSize(6.5);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(107, 114, 128);
             doc.text(
                 `${rows.length.toLocaleString()} record${rows.length !== 1 ? 's' : ''}`,
                 SM + 4, curY
             );
-            curY += 6;
+            curY += 5;
 
             // ---- Visualization (chart / KPI cards) ----
             if (viz?.type === 'kpi') {
@@ -1016,14 +1040,14 @@ const buildPDF = ({ businessName, businessId, reportDate, sections, analyticsDat
 
             // Truncation notice
             if (truncated) {
-                doc.setFontSize(7.5);
+                doc.setFontSize(6.5);
                 doc.setFont('helvetica', 'italic');
                 doc.setTextColor(156, 163, 175);
                 doc.text(
                     `Showing first ${MAX_TABLE_ROWS.toLocaleString()} of ${rows.length.toLocaleString()} rows`,
                     SM + 4, curY
                 );
-                curY += 5;
+                curY += 4;
             }
 
             // ---- Full data table (skipped in "Graphs Only" mode) ----
@@ -1060,6 +1084,10 @@ const buildPDF = ({ businessName, businessId, reportDate, sections, analyticsDat
                         doc.rect(0, 0, 6, PAGE_H, 'F');
                     },
                 });
+                // Track Y after autoTable (it may have added pages internally)
+                curY = doc.lastAutoTable.finalY + 6;
+            } else {
+                curY += 5; // small gap between chart items in graphs-only mode
             }
         });
     });
@@ -1069,8 +1097,291 @@ const buildPDF = ({ businessName, businessId, reportDate, sections, analyticsDat
 };
 
 // ---------------------------------------------------------------------------
-// Component
+// HTML builder — inline SVG charts, self-contained file, no external deps
 // ---------------------------------------------------------------------------
+
+const HTML_PALETTE = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#a855f7','#ec4899','#14b8a6'];
+const HTML_MAX_ROWS = 500;
+// Vertical text baseline factor — positions SVG text at ~72% of the row height
+// so it appears vertically centred within a bar row.
+const SVG_TEXT_BASELINE = 0.72;
+
+/** Escape special HTML characters to prevent XSS when inserting into HTML strings */
+const _escHtml = (str) =>
+    String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
+/** Horizontal bar chart SVG */
+const _svgHBar = (rows, labelKey, valueKey, maxBars = 15) => {
+    const items = rows.slice(0, maxBars);
+    if (!items.length) return '';
+    const vals = items.map((r) => Math.max(0, Number(r[valueKey] ?? 0)));
+    const maxV = vals.reduce((a, v) => (v > a ? v : a), 1);
+    const W = 580, LW = 150, AREA = W - LW - 55, RH = 22, GAP = 5;
+    const H = items.length * (RH + GAP) + 24;
+    let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" style="max-width:100%">`;
+    items.forEach((row, i) => {
+        const y = 12 + i * (RH + GAP);
+        const bl = (vals[i] / maxV) * AREA;
+        const c = HTML_PALETTE[i % HTML_PALETTE.length];
+        s += `<text x="${LW - 6}" y="${(y + RH * SVG_TEXT_BASELINE).toFixed(1)}" text-anchor="end" font-family="sans-serif" font-size="11" fill="#374151">${_escHtml(String(row[labelKey] ?? '').substring(0, MAX_LABEL_LEN))}</text>`;
+        s += `<rect x="${LW}" y="${y}" width="${AREA}" height="${RH}" rx="3" fill="#e5e7eb"/>`;
+        if (bl > 0) s += `<rect x="${LW}" y="${y}" width="${bl.toFixed(1)}" height="${RH}" rx="3" fill="${c}"/>`;
+        s += `<text x="${LW + AREA + 6}" y="${(y + RH * SVG_TEXT_BASELINE).toFixed(1)}" font-family="sans-serif" font-size="10" fill="#6b7280">${_escHtml(fmtCell(vals[i]))}</text>`;
+    });
+    if (rows.length > maxBars) s += `<text x="${LW}" y="${H - 2}" font-family="sans-serif" font-size="9" fill="#9ca3af" font-style="italic">… and ${rows.length - maxBars} more</text>`;
+    return s + '</svg>';
+};
+
+/** Vertical bar chart SVG */
+const _svgVBar = (rows, labelKey, valueKey, maxBars = 10) => {
+    const items = rows.slice(0, maxBars);
+    if (!items.length) return '';
+    const vals = items.map((r) => Math.max(0, Number(r[valueKey] ?? 0)));
+    const maxV = vals.reduce((a, v) => (v > a ? v : a), 1);
+    const W = 580, CH = 200, ML = 44, MR = 12, MB = 48, MT = 20;
+    const plotW = W - ML - MR, plotH = CH - MT - MB;
+    const n = items.length;
+    const barW = Math.max(16, Math.min(55, (plotW / n) * 0.6));
+    const spacing = (plotW - barW * n) / (n + 1);
+    let s = `<svg viewBox="0 0 ${W} ${CH}" width="${W}" height="${CH}" xmlns="http://www.w3.org/2000/svg" style="max-width:100%">`;
+    s += `<rect x="${ML}" y="${MT}" width="${plotW}" height="${plotH}" fill="#f9fafb"/>`;
+    [0, 0.25, 0.5, 0.75, 1].forEach((f) => {
+        const gy = MT + f * plotH;
+        s += `<line x1="${ML}" y1="${gy.toFixed(1)}" x2="${ML + plotW}" y2="${gy.toFixed(1)}" stroke="#e5e7eb" stroke-width="0.6"/>`;
+        if (f === 0 || f === 0.5 || f === 1) s += `<text x="${ML - 5}" y="${(gy + 3.5).toFixed(1)}" text-anchor="end" font-family="sans-serif" font-size="9" fill="#9ca3af">${fmtCell(maxV * (1 - f))}</text>`;
+    });
+    items.forEach((row, i) => {
+        const bh = Math.max(1, (vals[i] / maxV) * plotH);
+        const bx = ML + spacing + i * (barW + spacing);
+        const by = MT + plotH - bh;
+        const c = HTML_PALETTE[i % HTML_PALETTE.length];
+        s += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${barW}" height="${bh.toFixed(1)}" rx="3" fill="${c}"/>`;
+        s += `<text x="${(bx + barW / 2).toFixed(1)}" y="${Math.max(MT + 13, by - 3).toFixed(1)}" text-anchor="middle" font-family="sans-serif" font-size="9" font-weight="bold" fill="#374151">${_escHtml(fmtCell(vals[i]))}</text>`;
+        s += `<text x="${(bx + barW / 2).toFixed(1)}" y="${(MT + plotH + 14).toFixed(1)}" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#6b7280">${_escHtml(String(row[labelKey] ?? '').substring(0, 12))}</text>`;
+    });
+    s += `<rect x="${ML}" y="${MT}" width="${plotW}" height="${plotH}" fill="none" stroke="#d1d5db" stroke-width="0.5"/>`;
+    return s + '</svg>';
+};
+
+/** Pie / donut chart SVG */
+const _svgPie = (rows, labelKey, valueKey, maxSlices = 8) => {
+    const items = rows.slice(0, maxSlices);
+    if (!items.length) return '';
+    const vals = items.map((r) => Math.max(0, Number(r[valueKey] ?? 0)));
+    const total = vals.reduce((acc, v) => acc + v, 0);
+    if (total === 0) return _svgHBar(rows, labelKey, valueKey);
+    const R = 95, CX = 115, CY = 120, LX = 235;
+    const W = 580, H = Math.max(260, items.length * 26 + 30);
+    let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" style="max-width:100%">`;
+    let ang = -Math.PI / 2;
+    items.forEach((row, i) => {
+        const sa = (vals[i] / total) * 2 * Math.PI;
+        const ea = ang + sa;
+        const x1 = CX + R * Math.cos(ang), y1 = CY + R * Math.sin(ang);
+        const x2 = CX + R * Math.cos(ea), y2 = CY + R * Math.sin(ea);
+        const lg = sa > Math.PI ? 1 : 0;
+        const c = HTML_PALETTE[i % HTML_PALETTE.length];
+        s += `<path d="M${CX},${CY} L${x1.toFixed(2)},${y1.toFixed(2)} A${R},${R},0,${lg},1,${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${c}" stroke="white" stroke-width="1.5"/>`;
+        ang = ea;
+    });
+    items.forEach((row, i) => {
+        const pct = ((vals[i] / total) * 100).toFixed(1);
+        const c = HTML_PALETTE[i % HTML_PALETTE.length];
+        const ly = 24 + i * 26;
+        s += `<rect x="${LX}" y="${ly - 10}" width="14" height="14" rx="2" fill="${c}"/>`;
+        s += `<text x="${LX + 20}" y="${ly}" font-family="sans-serif" font-size="11" fill="#374151">${_escHtml(String(row[labelKey] ?? '').substring(0, 24))}: ${_escHtml(fmtCell(vals[i]))} (${pct}%)</text>`;
+    });
+    if (rows.length > maxSlices) s += `<text x="${LX}" y="${24 + items.length * 26 + 12}" font-family="sans-serif" font-size="9" fill="#9ca3af" font-style="italic">&#8230; and ${rows.length - maxSlices} more</text>`;
+    return s + '</svg>';
+};
+
+/** Multi-series line chart SVG */
+const _svgLine = (rows, xKey, yKeys) => {
+    if (rows.length < 2) return '';
+    const W = 640, CH = 220, ML = 50, MR = 16, MB = 42, MT = 16;
+    const plotW = W - ML - MR, plotH = CH - MT - MB;
+    const n = rows.length;
+    const allVals = yKeys.flatMap((yk) => rows.map((r) => Number(r[yk] ?? 0)));
+    const minV = allVals.reduce((a, v) => (v < a ? v : a), allVals[0]);
+    const maxV = allVals.reduce((a, v) => (v > a ? v : a), minV + 1);
+    const range = maxV - minV;
+    let s = `<svg viewBox="0 0 ${W} ${CH}" width="${W}" height="${CH}" xmlns="http://www.w3.org/2000/svg" style="max-width:100%">`;
+    s += `<rect x="${ML}" y="${MT}" width="${plotW}" height="${plotH}" fill="#f9fafb"/>`;
+    [0, 0.25, 0.5, 0.75, 1].forEach((f) => {
+        const gy = MT + f * plotH;
+        s += `<line x1="${ML}" y1="${gy.toFixed(1)}" x2="${ML + plotW}" y2="${gy.toFixed(1)}" stroke="#e5e7eb" stroke-width="0.5"/>`;
+        if (f === 0 || f === 0.5 || f === 1) s += `<text x="${ML - 5}" y="${(gy + 3.5).toFixed(1)}" text-anchor="end" font-family="sans-serif" font-size="9" fill="#9ca3af">${fmtCell(maxV - f * range)}</text>`;
+    });
+    const step = Math.max(1, Math.ceil(n / 10));
+    rows.forEach((row, i) => {
+        if (i % step !== 0 && i !== n - 1) return;
+        const px = ML + (i / (n - 1)) * plotW;
+        s += `<text x="${px.toFixed(1)}" y="${(MT + plotH + 14).toFixed(1)}" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#9ca3af">${_escHtml(String(row[xKey] ?? '').substring(0, 10))}</text>`;
+    });
+    yKeys.forEach((yk, si) => {
+        const c = HTML_PALETTE[si % HTML_PALETTE.length];
+        const pts = rows.map((row, i) => {
+            const px = ML + (i / (n - 1)) * plotW;
+            const py = MT + plotH - ((Number(row[yk] ?? 0) - minV) / range) * plotH;
+            return `${px.toFixed(1)},${py.toFixed(1)}`;
+        }).join(' ');
+        s += `<polyline points="${pts}" fill="none" stroke="${c}" stroke-width="2"/>`;
+        if (n <= 40) rows.forEach((row, i) => {
+            const px = ML + (i / (n - 1)) * plotW;
+            const py = MT + plotH - ((Number(row[yk] ?? 0) - minV) / range) * plotH;
+            s += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3" fill="${c}"/>`;
+        });
+        if (yKeys.length > 1) {
+            s += `<rect x="${ML + si * 100}" y="${MT + plotH + MB - 10}" width="14" height="8" rx="1" fill="${c}"/>`;
+            s += `<text x="${ML + si * 100 + 18}" y="${MT + plotH + MB - 3}" font-family="sans-serif" font-size="9" fill="#6b7280">${_escHtml(colHeader(yk))}</text>`;
+        }
+    });
+    s += `<rect x="${ML}" y="${MT}" width="${plotW}" height="${plotH}" fill="none" stroke="#d1d5db" stroke-width="0.5"/>`;
+    return s + '</svg>';
+};
+
+/** Single-series filled area chart SVG */
+const _svgArea = (rows, xKey, yKey) => {
+    if (rows.length < 2) return '';
+    const W = 640, CH = 210, ML = 50, MR = 16, MB = 36, MT = 16;
+    const plotW = W - ML - MR, plotH = CH - MT - MB;
+    const n = rows.length;
+    const vals = rows.map((r) => Number(r[yKey] ?? 0));
+    const minV = vals.reduce((a, v) => (v < a ? v : a), vals[0]);
+    const maxV = vals.reduce((a, v) => (v > a ? v : a), minV + 1);
+    const range = maxV - minV;
+    const baseY = MT + plotH;
+    const c = HTML_PALETTE[0];
+    let pathD = `M ${ML},${baseY}`;
+    rows.forEach((row, i) => {
+        const px = ML + (i / (n - 1)) * plotW;
+        const py = MT + plotH - ((vals[i] - minV) / range) * plotH;
+        pathD += ` L ${px.toFixed(1)},${py.toFixed(1)}`;
+    });
+    pathD += ` L ${ML + plotW},${baseY} Z`;
+    const pts = rows.map((row, i) => {
+        const px = ML + (i / (n - 1)) * plotW;
+        const py = MT + plotH - ((vals[i] - minV) / range) * plotH;
+        return `${px.toFixed(1)},${py.toFixed(1)}`;
+    }).join(' ');
+    let s = `<svg viewBox="0 0 ${W} ${CH}" width="${W}" height="${CH}" xmlns="http://www.w3.org/2000/svg" style="max-width:100%">`;
+    s += `<rect x="${ML}" y="${MT}" width="${plotW}" height="${plotH}" fill="#f9fafb"/>`;
+    [0, 0.25, 0.5, 0.75, 1].forEach((f) => {
+        const gy = MT + f * plotH;
+        s += `<line x1="${ML}" y1="${gy.toFixed(1)}" x2="${ML + plotW}" y2="${gy.toFixed(1)}" stroke="#e5e7eb" stroke-width="0.5"/>`;
+        if (f === 0 || f === 0.5 || f === 1) s += `<text x="${ML - 5}" y="${(gy + 3.5).toFixed(1)}" text-anchor="end" font-family="sans-serif" font-size="9" fill="#9ca3af">${fmtCell(maxV - f * range)}</text>`;
+    });
+    const step = Math.max(1, Math.ceil(n / 10));
+    rows.forEach((row, i) => {
+        if (i % step !== 0 && i !== n - 1) return;
+        const px = ML + (i / (n - 1)) * plotW;
+        s += `<text x="${px.toFixed(1)}" y="${(baseY + 14).toFixed(1)}" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#9ca3af">${_escHtml(String(row[xKey] ?? '').substring(0, 10))}</text>`;
+    });
+    s += `<path d="${pathD}" fill="${c}" opacity="0.2"/>`;
+    s += `<polyline points="${pts}" fill="none" stroke="${c}" stroke-width="2"/>`;
+    if (n <= 40) rows.forEach((row, i) => {
+        const px = ML + (i / (n - 1)) * plotW;
+        const py = MT + plotH - ((vals[i] - minV) / range) * plotH;
+        s += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3" fill="${c}"/>`;
+    });
+    s += `<rect x="${ML}" y="${MT}" width="${plotW}" height="${plotH}" fill="none" stroke="#d1d5db" stroke-width="0.5"/>`;
+    return s + '</svg>';
+};
+
+/** KPI card grid HTML */
+const _htmlKPI = (row) => {
+    const entries = Object.entries(row).filter(([, v]) => v != null);
+    const cards = entries.map(([key, val], i) => {
+        const c = HTML_PALETTE[i % HTML_PALETTE.length];
+        return `<div class="kpi-card"><div class="kpi-accent" style="background:${c}"></div><div class="kpi-value" style="color:${c}">${_escHtml(fmtCell(val))}</div><div class="kpi-label">${_escHtml(colHeader(key))}</div></div>`;
+    }).join('');
+    return `<div class="kpi-grid">${cards}</div>`;
+};
+
+/** Full data table HTML (up to HTML_MAX_ROWS rows) */
+const _htmlTable = (rows, columns) => {
+    const display = rows.slice(0, HTML_MAX_ROWS);
+    const head = columns.map((c) => `<th>${_escHtml(colHeader(c))}</th>`).join('');
+    const body = display.map((row, ri) => {
+        const cls = ri % 2 === 1 ? ' class="alt"' : '';
+        return `<tr${cls}>${columns.map((c) => `<td>${_escHtml(fmtCell(row[c]))}</td>`).join('')}</tr>`;
+    }).join('');
+    const note = rows.length > HTML_MAX_ROWS
+        ? `<p class="trunc">Showing first ${HTML_MAX_ROWS} of ${rows.length.toLocaleString()} records</p>`
+        : '';
+    return `<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>${note}</div>`;
+};
+
+const buildHTML = ({ businessName, businessId, reportDate, sections, analyticsData, graphsOnly = false }) => {
+    const css = `body{font-family:system-ui,sans-serif;background:#f9fafb;color:#111827;margin:0;padding:0}
+.cover{background:#111827;color:#fff;padding:60px 48px;border-left:8px solid #6366f1}
+.cover h1{font-size:2.4rem;margin:0 0 8px}.cover p{color:#d1d5db;margin:4px 0}
+.toc{background:#fff;padding:40px 48px;border-left:8px solid #6366f1;margin-bottom:2px}
+.toc h2{font-size:1.4rem;color:#111827;margin:0 0 20px}
+.toc-item{padding:6px 0;border-bottom:1px solid #f3f4f6;font-size:.95rem}
+.toc-sub{font-size:.8rem;color:#9ca3af;margin-top:3px}
+.section{background:#fff;margin:16px 0;padding:32px 48px;border-top:4px solid #6366f1}
+.section-title{font-size:1.5rem;font-weight:700;color:#111827;margin:0 0 4px}
+.section-hr{border:none;border-top:1px solid #e5e7eb;margin:12px 0 20px}
+.analytic-item{margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid #f3f4f6}
+.analytic-item:last-child{border-bottom:none}
+.analytic-title{font-size:1rem;font-weight:600;color:#374151;margin:0 0 4px}
+.record-count{font-size:.75rem;color:#9ca3af;margin-bottom:12px}
+.kpi-grid{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px}
+.kpi-card{background:#f3f4f6;border-radius:8px;width:200px;overflow:hidden;border:1px solid #e5e7eb}
+.kpi-accent{height:4px}.kpi-value{font-size:1.3rem;font-weight:700;text-align:center;padding:14px 8px 4px}
+.kpi-label{font-size:.72rem;color:#6b7280;text-align:center;padding:0 6px 12px}
+.table-wrap{overflow-x:auto;margin-top:12px}
+table{border-collapse:collapse;width:100%;font-size:.78rem}
+thead tr{background:#6366f1;color:#fff}
+th{padding:7px 10px;text-align:left;white-space:nowrap;font-weight:600}
+td{padding:6px 10px;color:#374151;border-bottom:1px solid #f3f4f6}
+tr.alt td{background:#f9fafb}
+.trunc{font-size:.72rem;color:#9ca3af;margin:6px 0 0;font-style:italic}
+.no-data{color:#9ca3af;font-size:.9rem;padding:16px 0}
+footer{background:#111827;color:#6b7280;text-align:center;padding:24px;font-size:.75rem;margin-top:32px}
+svg{display:block;margin-bottom:12px}`;
+
+    const toc = sections.map((s) => {
+        const sub = s.subItems ? `<div class="toc-sub">${s.subItems.map(_escHtml).join(' · ')}</div>` : '';
+        return `<div class="toc-item">${_escHtml(s.emoji)} <strong>${_escHtml(s.label)}</strong>${sub}</div>`;
+    }).join('');
+
+    const body = sections.map((sec) => {
+        const catData = analyticsData[sec.key] ?? {};
+        const items = sec.analyticsKeys
+            .map((k) => ({ key: k, rows: catData[k] ?? [] }))
+            .filter((item) => item.rows.length > 0);
+
+        const content = items.length === 0
+            ? '<p class="no-data">No data available for this section.</p>'
+            : items.map(({ key, rows }) => {
+                const columns = Object.keys(rows[0]);
+                const viz = detectViz(rows, columns);
+                let chart = '';
+                if (viz?.type === 'kpi') chart = _htmlKPI(rows[0]);
+                else if (viz?.type === 'vbar') chart = _svgVBar(rows, viz.labelKey, viz.valueKey);
+                else if (viz?.type === 'pie') chart = _svgPie(rows, viz.labelKey, viz.valueKey);
+                else if (viz?.type === 'bar') chart = _svgHBar(rows, viz.labelKey, viz.valueKey);
+                else if (viz?.type === 'area') chart = _svgArea(rows, viz.xKey, viz.yKey);
+                else if (viz?.type === 'line') chart = _svgLine(rows, viz.xKey, viz.yKeys);
+                const table = !graphsOnly ? _htmlTable(rows, columns) : '';
+                return `<div class="analytic-item"><h3 class="analytic-title">${_escHtml(colHeader(key))}</h3><p class="record-count">${rows.length.toLocaleString()} record${rows.length !== 1 ? 's' : ''}</p>${chart}${table}</div>`;
+            }).join('');
+
+        return `<div class="section"><h2 class="section-title">${_escHtml(sec.emoji)} ${_escHtml(sec.label)}</h2><hr class="section-hr">${content}</div>`;
+    }).join('');
+
+    const eBizName = _escHtml(businessName);
+    const eBizId = _escHtml(businessId);
+    const eDate = _escHtml(reportDate);
+    return `<!DOCTYPE html>\n<html lang="en">\n<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pulse Analytics \u2014 ${eBizName}</title>\n<style>${css}</style>\n</head><body>\n<div class="cover">\n  <h1>\uD83D\uDCCA Pulse Analytics Report</h1>\n  <p style="font-size:1.1rem;margin:8px 0 20px;color:#e5e7eb">Analytics &amp; Insights Report</p>\n  <p><strong>Business:</strong> ${eBizName}</p>\n  <p><strong>Business ID:</strong> ${eBizId}</p>\n  <p><strong>Generated:</strong> ${eDate}</p>\n  <p><strong>Sections:</strong> ${sections.length}</p>\n</div>\n<div class="toc"><h2>Table of Contents</h2>${toc}</div>\n${body}\n<footer>Pulse Analytics \u00B7 ${eBizName} \u00B7 ${eDate}</footer>\n</body></html>`;
+};
 
 const ExportAnalytics = () => {
     const { businessId } = useParams();
@@ -1184,12 +1495,12 @@ const ExportAnalytics = () => {
             });
 
             // 4. Record export in backend (non-fatal if it fails)
-            const safeBusinessName = businessName.replace(/[^a-zA-Z0-9_-]/g, '_');
+            const filenameSafeName = businessName.replace(/[^a-zA-Z0-9_-]/g, '_');
             const safeDate = new Date()
                 .toISOString()
                 .slice(0, 10)
                 .replace(/-/g, '');
-            const fileName = `Pulse_Analytics_${safeBusinessName}_${safeDate}.pdf`;
+            const fileName = `Pulse_Analytics_${filenameSafeName}_${safeDate}.pdf`;
 
             try {
                 await axiosInstance.post('/analytics/exports', {
@@ -1226,6 +1537,132 @@ const ExportAnalytics = () => {
         }
     }, [businessId, selected, exportMode, user]);
 
+    const handleExportHTML = useCallback(async () => {
+        if (!businessId) {
+            toastRef.current?.show({
+                severity: 'warn',
+                summary: 'No Business Selected',
+                detail: 'Please select a business before exporting.',
+                life: 4000,
+            });
+            return;
+        }
+        if (selected.size === 0) {
+            toastRef.current?.show({
+                severity: 'warn',
+                summary: 'Nothing Selected',
+                detail: 'Please select at least one section to export.',
+                life: 4000,
+            });
+            return;
+        }
+
+        setIsExporting(true);
+        setExportStep('Fetching business info…');
+
+        try {
+            let businessName = businessId;
+            try {
+                const bizRes = await axiosInstance.get('/analytics/get-businesses', {
+                    params: { userId: user?.user_id },
+                });
+                const match = (bizRes.data.businesses ?? []).find(
+                    (b) => b.business_id === businessId
+                );
+                if (match) businessName = match.business_name;
+            } catch {
+                // non-fatal
+            }
+
+            const selectedSections = EXPORT_SECTIONS.filter((s) => selected.has(s.key));
+            const categorySet = new Set();
+            selectedSections.forEach((s) => s.categories.forEach((c) => categorySet.add(c)));
+
+            setExportStep('Fetching analytics data…');
+            const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+            const dataRes = await fetch(
+                `${base}/analytics/data/${businessId}?categories=${encodeURIComponent([...categorySet].join(','))}`
+            );
+            if (!dataRes.ok) {
+                throw new Error('Analytics data not available. Please run the analytics pipeline first.');
+            }
+            const dataJson = await dataRes.json();
+            const cats = dataJson.categories ?? {};
+
+            const analyticsData = {};
+            selectedSections.forEach((sec) => {
+                const lookup = {};
+                sec.categories.forEach((cat) => {
+                    const catAnalytics = cats[cat]?.analytics ?? {};
+                    sec.analyticsKeys.forEach((k) => {
+                        if (catAnalytics[k]) lookup[k] = catAnalytics[k].data ?? [];
+                    });
+                });
+                analyticsData[sec.key] = lookup;
+            });
+
+            setExportStep('Generating HTML…');
+            const reportDate = new Date().toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+
+            const html = buildHTML({
+                businessName,
+                businessId,
+                reportDate,
+                sections: selectedSections,
+                analyticsData,
+                graphsOnly: exportMode === 'graphs_only',
+            });
+
+            const filenameSafeName = businessName.replace(/[^a-zA-Z0-9_-]/g, '_');
+            const safeDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            const fileName = `Pulse_Analytics_${filenameSafeName}_${safeDate}.html`;
+
+            try {
+                await axiosInstance.post('/analytics/exports', {
+                    business_id: businessId,
+                    user_id: user?.user_id,
+                    file_name: fileName,
+                    sections_exported: selectedSections.map((s) => s.label),
+                    total_sections: selectedSections.length,
+                });
+            } catch {
+                // non-fatal
+            }
+
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            toastRef.current?.show({
+                severity: 'success',
+                summary: 'Export Complete',
+                detail: `${fileName} downloaded successfully.`,
+                life: 5000,
+            });
+        } catch (err) {
+            console.error('[ExportAnalytics HTML]', err);
+            toastRef.current?.show({
+                severity: 'error',
+                summary: 'Export Failed',
+                detail: 'Could not generate the HTML report. Please try again.',
+                life: 5000,
+            });
+        } finally {
+            setIsExporting(false);
+            setExportStep('');
+        }
+    }, [businessId, selected, exportMode, user]);
+
     return (
         <div className="p-6 space-y-6 max-w-4xl">
             <Toast ref={toastRef} />
@@ -1236,10 +1673,11 @@ const ExportAnalytics = () => {
                     📤 Export Analytics
                 </Heading>
                 <Text className="text-gray-500 mt-1">
-                    Select the sections you want to include in the PDF report. All data tables
+                    Select the sections you want to include in the exported report. All data tables
                     will be exported in full (no pagination). Use <strong>Graphs &amp; Tables</strong> to
                     include both visualizations and raw data, or <strong>Graphs Only</strong> for a
-                    compact chart-only report.
+                    compact chart-only report. Export as <strong>PDF</strong> for printing or sharing,
+                    or as <strong>HTML</strong> for interactive browsing.
                 </Text>
             </div>
 
@@ -1319,8 +1757,8 @@ const ExportAnalytics = () => {
                 ))}
             </div>
 
-            {/* Export button */}
-            <div className="flex items-center gap-4 pt-2">
+            {/* Export buttons */}
+            <div className="flex flex-wrap items-center gap-4 pt-2">
                 <PrimaryButton
                     label={isExporting ? exportStep || 'Exporting…' : 'Export to PDF'}
                     icon="pi pi-file-pdf"
@@ -1328,6 +1766,13 @@ const ExportAnalytics = () => {
                     loading={isExporting}
                     disabled={isExporting || selected.size === 0 || !businessId}
                     info
+                />
+                <PrimaryButton
+                    label={isExporting ? exportStep || 'Exporting…' : 'Export to HTML'}
+                    icon="pi pi-code"
+                    onClick={handleExportHTML}
+                    loading={isExporting}
+                    disabled={isExporting || selected.size === 0 || !businessId}
                 />
                 {!businessId && (
                     <Text className="text-sm text-amber-600">
