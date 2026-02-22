@@ -82,7 +82,7 @@ export default function InventorySupplier() {
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();
-    const { dateRange, isFiltered, applyQuickFilter, resetFilters, toISODate } = useAnalyticsDateFilter();
+    const { dateRange, applyQuickFilter, resetFilters, toISODate } = useAnalyticsDateFilter();
     const { lastUpdate } = useAnalyticsWebSocket(businessId);
 
     const [rawSupplier, setRawSupplier] = useState(null);
@@ -144,7 +144,6 @@ export default function InventorySupplier() {
         const stockoutBySup    = a.stockout_rate_by_supplier?.data                ?? [];
         const reliability      = a.supplier_reliability?.data                     ?? [];
         const contractExpiry   = a.supplier_contract_expiry?.data                 ?? [];
-        const costEfficiency   = a.storage_cost_efficiency_by_supplier?.data      ?? [];
         const carryingCost     = a.inventory_carrying_cost_by_supplier?.data      ?? [];
 
         // ---- KPIs -----------------------------------------------------------
@@ -336,22 +335,12 @@ export default function InventorySupplier() {
     return (
         <div className="p-6 space-y-8">
             <Toast ref={toastRef} />
-
-            {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Supplier Inventory</h1>
-                    <p className="text-gray-500 mt-1">
-                        Supplier performance, reliability, revenue contribution, stockout rates and contract health
-                    </p>
-                </div>
-                <DateFilterBar
+            <DateFilterBar
                     dateRange={dateRange}
                     onQuickFilter={applyQuickFilter}
                     onReset={resetFilters}
                     toISODate={toISODate}
                 />
-            </div>
 
             {/* ── KPI Cards ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

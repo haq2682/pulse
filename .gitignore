@@ -6,6 +6,7 @@
 !requirements.txt
 !packages.txt
 !ANALYTICS_SCHEMA.txt
+!FORECASTING_SCHEMA.txt
 .vscode
 
 # dependencies

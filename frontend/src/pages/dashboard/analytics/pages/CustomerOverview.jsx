@@ -33,6 +33,8 @@ ChartJS.register(
 // Constants
 // ---------------------------------------------------------------------------
 
+const ANALYTICS_CATEGORIES = 'customer_analytics,geo_analytics';
+
 const PALETTE = [
     'rgba(59,130,246,0.8)',
     'rgba(34,197,94,0.8)',
@@ -144,6 +146,7 @@ const CustomerOverview = () => {
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState(false);
     const [rawData, setRawData] = useState(null);
+    const [rawGeo, setRawGeo] = useState(null);
     const [dataMode, setDataMode] = useState('unknown');
 
     const {
@@ -159,7 +162,7 @@ const CustomerOverview = () => {
 
     const buildUrl = useCallback((from, to) => {
         const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        const params = new URLSearchParams({ categories: 'customer_analytics' });
+        const params = new URLSearchParams({ categories: ANALYTICS_CATEGORIES });
         if (from) params.set('date_from', toISODate(from));
         if (to)   params.set('date_to',   toISODate(to));
         return `${base}/analytics/data/${businessId}?${params.toString()}`;
@@ -183,7 +186,8 @@ const CustomerOverview = () => {
             const json = await res.json();
             if (json.mode) setDataMode(json.mode);
             setRawData(json.categories?.customer_analytics ?? null);
-        } catch (err) {
+            setRawGeo(json.categories?.geo_analytics ?? null);
+        } catch {
             console.error('[fetch] Analytics load error');
             setFetchError(true);
             setRawData(null);
@@ -211,6 +215,7 @@ const CustomerOverview = () => {
     const derived = useMemo(() => {
         if (!rawData) return null;
         const a = rawData.analytics ?? {};
+        const geoA = rawGeo?.analytics ?? {};
 
         // --- Time-filtered analytics ---
 
@@ -259,6 +264,47 @@ const CustomerOverview = () => {
         // new_vs_returning_customer_country — static
         const newVsReturnRaw = a.new_vs_returning_customer_country?.data ?? [];
 
+        // --- Additional static aggregates ---
+        // customer_city_distribution — static
+        const cityDistRaw = a.customer_city_distribution?.data ?? [];
+        // customer_state_distribution — static
+        const stateDistRaw = a.customer_state_distribution?.data ?? [];
+        // new_vs_returning_customer_state — static
+        const newVsReturnStateRaw = a.new_vs_returning_customer_state?.data ?? [];
+        // new_vs_returning_customer_city — static
+        const newVsReturnCityRaw = a.new_vs_returning_customer_city?.data ?? [];
+        // new_customers_geo_acquisition_monthly — static
+        const geoMonthlyRaw = a.new_customers_geo_acquisition_monthly?.data ?? [];
+        // geo_analytics geo_acquisition — static (country/state/city level)
+        const geoAcquisitionRaw = geoA.geo_acquisition?.data ?? [];
+
+        // --- Weekly / Monthly grain variants (static aggregates) ---
+        // new_customers_weekly
+        const newCustWeeklyRaw = a.new_customers_weekly?.data ?? [];
+        // new_customers_monthly
+        const newCustMonthlyRaw = a.new_customers_monthly?.data ?? [];
+        // cumulative_customers_weekly
+        const cumCustWeeklyRaw = a.cumulative_customers_weekly?.data ?? [];
+        // cumulative_customers_monthly
+        const cumCustMonthlyRaw = a.cumulative_customers_monthly?.data ?? [];
+        // customer_account_status_distribution_weekly
+        const acctStatusWeeklyRaw = a.customer_account_status_distribution_weekly?.data ?? [];
+        // customer_account_status_distribution_monthly
+        const acctStatusMonthlyRaw = a.customer_account_status_distribution_monthly?.data ?? [];
+
+        // Aggregate weekly account status by status
+        const acctStatusWeeklyMap = {};
+        acctStatusWeeklyRaw.forEach((r) => {
+            const s = r.account_status ?? 'Unknown';
+            acctStatusWeeklyMap[s] = (acctStatusWeeklyMap[s] ?? 0) + (r.customer_count ?? 0);
+        });
+        // Aggregate monthly account status by status
+        const acctStatusMonthlyMap = {};
+        acctStatusMonthlyRaw.forEach((r) => {
+            const s = r.account_status ?? 'Unknown';
+            acctStatusMonthlyMap[s] = (acctStatusMonthlyMap[s] ?? 0) + (r.customer_count ?? 0);
+        });
+
         return {
             // time-filtered
             newCustFiltered,
@@ -272,8 +318,22 @@ const CustomerOverview = () => {
             countryDistRaw,
             ageSpendingRaw,
             newVsReturnRaw,
+            // additional static
+            cityDistRaw,
+            stateDistRaw,
+            newVsReturnStateRaw,
+            newVsReturnCityRaw,
+            geoMonthlyRaw,
+            geoAcquisitionRaw,
+            // weekly / monthly variants
+            newCustWeeklyRaw,
+            newCustMonthlyRaw,
+            cumCustWeeklyRaw,
+            cumCustMonthlyRaw,
+            acctStatusWeeklyMap,
+            acctStatusMonthlyMap,
         };
-    }, [rawData, clientFilter]);
+    }, [rawData, rawGeo, clientFilter]);
 
     // -----------------------------------------------------------------------
     // Chart configs
@@ -648,6 +708,206 @@ const CustomerOverview = () => {
                         </DataTable>
                     </div>
                 </Card>
+            )}
+
+            {/* State Distribution Table (static) */}
+            {(derived?.stateDistRaw?.length ?? 0) > 0 && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">
+                            Customer State/Province Distribution *
+                        </h3>
+                        <DataTable
+                            value={[...derived.stateDistRaw].sort((a, b) => (b.customer_count ?? 0) - (a.customer_count ?? 0))}
+                            paginator rows={10} stripedRows size="small" className="text-sm"
+                        >
+                            <Column field="country" header="Country" sortable />
+                            <Column field="state_province" header="State/Province" sortable />
+                            <Column field="customer_count" header="Customers" sortable body={(r) => fmt.number(r.customer_count)} />
+                        </DataTable>
+                    </div>
+                </Card>
+            )}
+
+            {/* City Distribution Table (static) */}
+            {(derived?.cityDistRaw?.length ?? 0) > 0 && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">
+                            Customer City Distribution *
+                        </h3>
+                        <DataTable
+                            value={[...derived.cityDistRaw].sort((a, b) => (b.customer_count ?? 0) - (a.customer_count ?? 0))}
+                            paginator rows={10} stripedRows size="small" className="text-sm"
+                        >
+                            <Column field="country" header="Country" sortable />
+                            <Column field="state_province" header="State/Province" sortable />
+                            <Column field="city" header="City" sortable />
+                            <Column field="customer_count" header="Customers" sortable body={(r) => fmt.number(r.customer_count)} />
+                        </DataTable>
+                    </div>
+                </Card>
+            )}
+
+            {/* New vs Returning by State / City (static) */}
+            {(derived?.newVsReturnStateRaw?.length ?? 0) > 0 && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">
+                            New vs Returning Customers by State *
+                        </h3>
+                        <DataTable
+                            value={derived.newVsReturnStateRaw}
+                            paginator rows={10} stripedRows size="small" className="text-sm"
+                        >
+                            <Column field="country" header="Country" sortable />
+                            <Column field="state_province" header="State/Province" sortable />
+                            <Column field="customer_type" header="Customer Type" sortable />
+                            <Column field="customer_count" header="Customers" sortable body={(r) => fmt.number(r.customer_count)} />
+                        </DataTable>
+                    </div>
+                </Card>
+            )}
+
+            {(derived?.newVsReturnCityRaw?.length ?? 0) > 0 && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">
+                            New vs Returning Customers by City *
+                        </h3>
+                        <DataTable
+                            value={derived.newVsReturnCityRaw}
+                            paginator rows={10} stripedRows size="small" className="text-sm"
+                        >
+                            <Column field="country" header="Country" sortable />
+                            <Column field="state_province" header="State/Province" sortable />
+                            <Column field="city" header="City" sortable />
+                            <Column field="customer_type" header="Customer Type" sortable />
+                            <Column field="customer_count" header="Customers" sortable body={(r) => fmt.number(r.customer_count)} />
+                        </DataTable>
+                    </div>
+                </Card>
+            )}
+
+            {/* Geo Acquisition Monthly (static) */}
+            {(derived?.geoMonthlyRaw?.length ?? 0) > 0 && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">
+                            New Customer Geo Acquisition (Monthly) *
+                        </h3>
+                        <DataTable
+                            value={[...derived.geoMonthlyRaw].sort((a, b) => (b.new_customers ?? 0) - (a.new_customers ?? 0))}
+                            paginator rows={10} stripedRows size="small" className="text-sm"
+                        >
+                            <Column field="grain_year" header="Year" sortable />
+                            <Column field="grain_month" header="Month" sortable />
+                            <Column field="country" header="Country" sortable />
+                            <Column field="state_province" header="State/Province" sortable />
+                            <Column field="city" header="City" sortable />
+                            <Column field="new_customers" header="New Customers" sortable body={(r) => fmt.number(r.new_customers)} />
+                        </DataTable>
+                    </div>
+                </Card>
+            )}
+
+            {/* Geographic Acquisition (geo_analytics) (static) */}
+            {(derived?.geoAcquisitionRaw?.length ?? 0) > 0 && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">
+                            Geographic Customer Acquisition *
+                        </h3>
+                        <DataTable
+                            value={[...derived.geoAcquisitionRaw].sort((a, b) => (b.new_customers ?? 0) - (a.new_customers ?? 0))}
+                            paginator rows={10} stripedRows size="small" className="text-sm"
+                        >
+                            <Column field="country" header="Country" sortable />
+                            <Column field="state_province" header="State/Province" sortable />
+                            <Column field="city" header="City" sortable />
+                            <Column field="new_customers" header="New Customers" sortable body={(r) => fmt.number(r.new_customers)} />
+                        </DataTable>
+                    </div>
+                </Card>
+            )}
+
+            {/* Weekly / Monthly Grain Variants */}
+            {(derived?.newCustWeeklyRaw?.length ?? 0) > 0 && (
+                <ChartWrapper title="New Customers (Weekly Trend) *" showUpdateBadge={false}>
+                    <div className="h-[280px] mb-8">
+                        <Bar
+                            data={{
+                                labels: derived.newCustWeeklyRaw.map((r) => `${r.grain_year}-W${String(r.grain_week).padStart(2,'0')}`),
+                                datasets: [{ label: 'New Customers', data: derived.newCustWeeklyRaw.map((r) => r.new_customers ?? 0), backgroundColor: 'rgba(59,130,246,0.8)' }],
+                            }}
+                            options={defaultBarOpts('New Customers per Week')}
+                        />
+                    </div>
+                </ChartWrapper>
+            )}
+
+            {(derived?.newCustMonthlyRaw?.length ?? 0) > 0 && (
+                <ChartWrapper title="New Customers (Monthly Trend) *" showUpdateBadge={false}>
+                    <div className="h-[280px] mb-8">
+                        <Bar
+                            data={{
+                                labels: derived.newCustMonthlyRaw.map((r) => `${r.grain_year}-${String(r.grain_month).padStart(2,'0')}`),
+                                datasets: [{ label: 'New Customers', data: derived.newCustMonthlyRaw.map((r) => r.new_customers ?? 0), backgroundColor: 'rgba(34,197,94,0.8)' }],
+                            }}
+                            options={defaultBarOpts('New Customers per Month')}
+                        />
+                    </div>
+                </ChartWrapper>
+            )}
+
+            {(derived?.cumCustWeeklyRaw?.length ?? 0) > 0 && (
+                <ChartWrapper title="Cumulative Customer Growth (Weekly) *" showUpdateBadge={false}>
+                    <div className="h-[280px] mb-8">
+                        <Line
+                            data={{
+                                labels: derived.cumCustWeeklyRaw.map((r) => `${r.grain_year}-W${String(r.grain_week).padStart(2,'0')}`),
+                                datasets: [{ label: 'Cumulative Customers', data: derived.cumCustWeeklyRaw.map((r) => r.cumulative_customers ?? 0), borderColor: 'rgb(139,92,246)', backgroundColor: 'rgba(139,92,246,0.2)', tension: 0.4, fill: true }],
+                            }}
+                            options={defaultLineOpts('Cumulative Customers (Weekly)')}
+                        />
+                    </div>
+                </ChartWrapper>
+            )}
+
+            {(derived?.cumCustMonthlyRaw?.length ?? 0) > 0 && (
+                <ChartWrapper title="Cumulative Customer Growth (Monthly) *" showUpdateBadge={false}>
+                    <div className="h-[280px] mb-8">
+                        <Line
+                            data={{
+                                labels: derived.cumCustMonthlyRaw.map((r) => `${r.grain_year}-${String(r.grain_month).padStart(2,'0')}`),
+                                datasets: [{ label: 'Cumulative Customers', data: derived.cumCustMonthlyRaw.map((r) => r.cumulative_customers ?? 0), borderColor: 'rgb(249,115,22)', backgroundColor: 'rgba(249,115,22,0.2)', tension: 0.4, fill: true }],
+                            }}
+                            options={defaultLineOpts('Cumulative Customers (Monthly)')}
+                        />
+                    </div>
+                </ChartWrapper>
+            )}
+
+            {Object.keys(derived?.acctStatusWeeklyMap ?? {}).length > 0 && (
+                <ChartWrapper title="Account Status Distribution (Weekly Aggregate) *" showUpdateBadge={false}>
+                    <div className="h-[280px] mb-8">
+                        <Bar
+                            data={{ labels: Object.keys(derived.acctStatusWeeklyMap), datasets: [{ label: 'Customers', data: Object.values(derived.acctStatusWeeklyMap), backgroundColor: PALETTE }] }}
+                            options={defaultBarOpts('Account Status (Weekly)')}
+                        />
+                    </div>
+                </ChartWrapper>
+            )}
+
+            {Object.keys(derived?.acctStatusMonthlyMap ?? {}).length > 0 && (
+                <ChartWrapper title="Account Status Distribution (Monthly Aggregate) *" showUpdateBadge={false}>
+                    <div className="h-[280px] mb-8">
+                        <Bar
+                            data={{ labels: Object.keys(derived.acctStatusMonthlyMap), datasets: [{ label: 'Customers', data: Object.values(derived.acctStatusMonthlyMap), backgroundColor: PALETTE }] }}
+                            options={defaultBarOpts('Account Status (Monthly)')}
+                        />
+                    </div>
+                </ChartWrapper>
             )}
         </div>
     );

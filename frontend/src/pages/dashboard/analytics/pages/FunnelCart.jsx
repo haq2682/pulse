@@ -68,16 +68,8 @@ const KPICard = ({ icon, iconBg, iconColor, value, label }) => (
 const barOpts = (horizontal = false) => ({
     indexAxis: horizontal ? 'y' : 'x',
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { display: false }, title: { display: false } },
-    scales: {
-        x: { grid: { color: 'rgba(0,0,0,0.05)' } },
-        y: { grid: { color: 'rgba(0,0,0,0.05)' } },
-    },
-});
-
-const groupedBarOpts = () => ({
-    responsive: true,
-    plugins: { legend: { position: 'top' }, title: { display: false } },
     scales: {
         x: { grid: { color: 'rgba(0,0,0,0.05)' } },
         y: { grid: { color: 'rgba(0,0,0,0.05)' } },
@@ -86,6 +78,7 @@ const groupedBarOpts = () => ({
 
 const doughnutOpts = () => ({
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { position: 'right' }, title: { display: false } },
 });
 
@@ -122,11 +115,6 @@ export default function FunnelCart() {
             setFetchError(false);
             const res = await fetch(buildUrl());
             if (!res.ok) {
-                toastRef.current?.show({
-                    severity: 'warn', summary: 'No Data',
-                    detail: 'Analytics data not available. Run the analytics pipeline first.',
-                    life: 5000,
-                });
                 setRawCart(null);
                 return;
             }
@@ -137,7 +125,6 @@ export default function FunnelCart() {
             console.error('[FunnelCart] fetch error');
             setFetchError(true);
             setRawCart(null);
-            toastRef.current?.show({ severity: 'error', summary: 'Error', detail: 'Unable to load cart data.', life: 5000 });
         } finally {
             setLoading(false);
         }
@@ -254,17 +241,25 @@ export default function FunnelCart() {
 
     if (fetchError) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="text-center max-w-md">
-                    <i className="pi pi-exclamation-triangle text-5xl text-red-400 mb-4" />
-                    <p className="text-gray-600 text-lg font-medium">Something went wrong</p>
-                    <p className="text-gray-400 text-sm mt-2">Please try refreshing the page.</p>
+            <div className="p-6 min-h-[calc(100vh-120px)]">
+                <Toast ref={toastRef} />
+                <DateFilterBar
+                    quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
+                    dataMode={dataMode}
+                />
+                <div className="flex items-center justify-center min-h-[50vh]">
+                    <div className="text-center">
+                        <i className="pi pi-exclamation-circle text-5xl text-red-400 mb-3 block" />
+                        <p className="text-gray-700 font-medium text-lg">Something went wrong</p>
+                        <p className="text-gray-500 text-sm mt-1">Unable to load cart data. Please try again later.</p>
+                    </div>
                 </div>
             </div>
         );
     }
 
-    if (!hasData) {
+    if (!hasData && !loading && pipelineStatus !== 'loading') {
         return (
             <div className="p-6 space-y-4">
                 <Toast ref={toastRef} />
@@ -291,15 +286,24 @@ export default function FunnelCart() {
     return (
         <div className="p-6 space-y-8">
             <Toast ref={toastRef} />
-
-            {/* Date Filter */}
             <DateFilterBar
-                quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
-                onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
-                dataMode={dataMode}
-            />
+                    quickFilter={quickFilter}
+                    dateRange={dateRange}
+                    isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
+                    onReset={resetFilters}
+                    dataMode={dataMode}
+                />
 
-            {/* KPIs */}
+            {/* ── Static-data notice ─────────────────────────────────────── */}
+            {isFiltered && (
+                <p className="mb-4 text-xs text-gray-400 italic">
+                    * Funnel analytics are static aggregates computed over all available data and do not change with the date filter.
+                </p>
+            )}
+
+            {/* ── KPI Cards ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <KPICard icon="pi-shopping-cart" iconBg="bg-blue-50"   iconColor="text-blue-600"   value={fmt.number(kpis.totalCarts)}      label="Total Carts" />
                 <KPICard icon="pi-list"          iconBg="bg-green-50"  iconColor="text-green-600"  value={fmt.number(kpis.totalCartLines)}   label="Total Cart Lines" />
@@ -307,124 +311,144 @@ export default function FunnelCart() {
                 <KPICard icon="pi-clock"         iconBg="bg-purple-50" iconColor="text-purple-600" value={`${fmt.decimal(kpis.avgTimeInCart)}d`} label="Avg Time in Cart" />
             </div>
 
-            {/* Status distribution doughnut + cart lines bar */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {statusDoughnutData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Cart Status Distribution</h3>
-                        <ChartWrapper><Doughnut data={statusDoughnutData} options={doughnutOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-                {cartLinesBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Cart Lines by Status</h3>
-                        <ChartWrapper><Bar data={cartLinesBarData} options={barOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
+            {/* ── Cart Distribution ──────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-blue-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Cart Distribution</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {statusDoughnutData.labels.length > 0 && (
+                        <ChartWrapper title="Cart Status Distribution" height={280}>
+                            <Doughnut data={statusDoughnutData} options={doughnutOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {cartLinesBarData.labels.length > 0 && (
+                        <ChartWrapper title="Cart Lines by Status" height={340}>
+                            <Bar data={cartLinesBarData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
 
-            {/* Avg value + avg items by status */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {avgValByStatusData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg Cart Value by Status</h3>
-                        <ChartWrapper><Bar data={avgValByStatusData} options={barOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-                {avgItemsByStatusData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg Items in Cart by Status</h3>
-                        <ChartWrapper><Bar data={avgItemsByStatusData} options={barOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
+            {/* ── Cart Value Analysis ────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-green-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Cart Value Analysis</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {avgValByStatusData.labels.length > 0 && (
+                        <ChartWrapper title="Avg Cart Value by Status" height={340}>
+                            <Bar data={avgValByStatusData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {avgItemsByStatusData.labels.length > 0 && (
+                        <ChartWrapper title="Avg Items in Cart by Status" height={340}>
+                            <Bar data={avgItemsByStatusData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {avgTimeByStatusData.labels.length > 0 && (
+                        <ChartWrapper title="Avg Time in Cart by Status (days)" height={340}>
+                            <Bar data={avgTimeByStatusData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {recoveryScoreData.labels.length > 0 && (
+                        <ChartWrapper title="Avg Recovery Potential Score by Status" height={340}>
+                            <Bar data={recoveryScoreData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
 
-            {/* Avg time in cart + recovery potential */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {avgTimeByStatusData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg Time in Cart by Status (days)</h3>
-                        <ChartWrapper><Bar data={avgTimeByStatusData} options={barOpts()} /></ChartWrapper>
+            {/* ── Time to Purchase ───────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-purple-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Time to Purchase</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {ttpByTierData && (
+                        <ChartWrapper title="Time to Purchase by Cart Value Tier" height={340}>
+                            <Bar data={ttpByTierData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {ttpBucketsData && (
+                        <ChartWrapper title="Time-to-Purchase Distribution" height={340}>
+                            <Bar data={ttpBucketsData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
+
+            {/* ── Cart Performance Tables ────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-orange-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Cart Performance Tables</h2>
+                </div>
+
+                {/* Cart Value Stats Table */}
+                {valueStats.length > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Cart Value Stats by Status</h3>
+                            <DataTable value={valueStats} scrollable stripedRows emptyMessage="No data" className="text-sm">
+                                <Column field="cart_status"                 header="Status"              sortable />
+                                <Column field="carts_count"                 header="Carts"               sortable body={(r) => fmt.number(r.carts_count)} />
+                                <Column field="avg_cart_value"              header="Avg Value"            sortable body={(r) => fmt.currency(r.avg_cart_value)} />
+                                <Column field="avg_cart_items"              header="Avg Items"            sortable body={(r) => fmt.decimal(r.avg_cart_items)} />
+                                <Column field="avg_time_in_cart_days"       header="Avg Time (days)"      sortable body={(r) => fmt.decimal(r.avg_time_in_cart_days)} />
+                                <Column field="avg_recovery_potential_score" header="Recovery Score"      sortable body={(r) => (
+                                    <Tag value={fmt.decimal(r.avg_recovery_potential_score, 3)}
+                                        severity={riskColor(r.avg_recovery_potential_score)} />
+                                )} />
+                            </DataTable>
+                        </div>
                     </Card>
                 )}
-                {recoveryScoreData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg Recovery Potential Score by Status</h3>
-                        <ChartWrapper><Bar data={recoveryScoreData} options={barOpts()} /></ChartWrapper>
+
+                {/* Time-to-purchase by tier table */}
+                {ttpByTier.length > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Time to Purchase by Cart Value Tier</h3>
+                            <DataTable value={ttpByTier} scrollable stripedRows emptyMessage="No data" className="text-sm">
+                                <Column field="cart_value_tier"       header="Tier"                sortable />
+                                <Column field="completed_carts"       header="Completed Carts"     sortable body={(r) => fmt.number(r.completed_carts)} />
+                                <Column field="avg_time_in_cart_days" header="Avg Days to Purchase" sortable body={(r) => fmt.decimal(r.avg_time_in_cart_days)} />
+                                <Column field="avg_time_in_cart_hours" header="Avg Hours"          sortable body={(r) => fmt.decimal(r.avg_time_in_cart_hours)} />
+                                <Column field="avg_cart_items_count"  header="Avg Items"           sortable body={(r) => fmt.decimal(r.avg_cart_items_count)} />
+                            </DataTable>
+                        </div>
                     </Card>
                 )}
-            </div>
 
-            {/* Time-to-purchase by tier + buckets */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {ttpByTierData && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Time to Purchase by Cart Value Tier</h3>
-                        <ChartWrapper><Bar data={ttpByTierData} options={barOpts()} /></ChartWrapper>
+                {/* High-Value Abandoned Carts Table */}
+                {highAbandoned.length > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-2 pb-3 border-b border-gray-200">High-Value Abandoned Carts</h3>
+                            <p className="text-xs text-gray-400 mb-4">Carts with highest revenue risk that have been abandoned.</p>
+                            <DataTable value={highAbandoned} paginator rows={10} scrollable stripedRows emptyMessage="No data" className="text-sm">
+                                <Column field="cart_id"                 header="Cart ID"              sortable />
+                                <Column field="customer_id"             header="Customer ID"          sortable />
+                                <Column field="cart_total_value"        header="Cart Value"            sortable body={(r) => fmt.currency(r.cart_total_value)} />
+                                <Column field="cart_items_count"        header="Items"                sortable body={(r) => fmt.number(r.cart_items_count)} />
+                                <Column field="time_in_cart_days"       header="Days in Cart"          sortable body={(r) => fmt.decimal(r.time_in_cart_days)} />
+                                <Column field="recovery_potential_score" header="Recovery Score"      sortable body={(r) => (
+                                    <Tag value={fmt.decimal(r.recovery_potential_score, 3)}
+                                        severity={riskColor(r.recovery_potential_score)} />
+                                )} />
+                                <Column field="abandonment_risk_score"  header="Abandon Risk"         sortable body={(r) => (
+                                    <Tag value={fmt.decimal(r.abandonment_risk_score, 3)}
+                                        severity={riskColor(r.abandonment_risk_score)} />
+                                )} />
+                            </DataTable>
+                        </div>
                     </Card>
                 )}
-                {ttpBucketsData && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Time-to-Purchase Distribution</h3>
-                        <ChartWrapper><Bar data={ttpBucketsData} options={barOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
-
-            {/* Cart Value Stats Table */}
-            {valueStats.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Cart Value Stats by Status</h3>
-                    <DataTable value={valueStats} scrollable stripedRows emptyMessage="No data" className="text-sm">
-                        <Column field="cart_status"                 header="Status"              sortable />
-                        <Column field="carts_count"                 header="Carts"               sortable body={(r) => fmt.number(r.carts_count)} />
-                        <Column field="avg_cart_value"              header="Avg Value"            sortable body={(r) => fmt.currency(r.avg_cart_value)} />
-                        <Column field="avg_cart_items"              header="Avg Items"            sortable body={(r) => fmt.decimal(r.avg_cart_items)} />
-                        <Column field="avg_time_in_cart_days"       header="Avg Time (days)"      sortable body={(r) => fmt.decimal(r.avg_time_in_cart_days)} />
-                        <Column field="avg_recovery_potential_score" header="Recovery Score"      sortable body={(r) => (
-                            <Tag value={fmt.decimal(r.avg_recovery_potential_score, 3)}
-                                severity={riskColor(r.avg_recovery_potential_score)} />
-                        )} />
-                    </DataTable>
-                </Card>
-            )}
-
-            {/* Time-to-purchase by tier table */}
-            {ttpByTier.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Time to Purchase by Cart Value Tier</h3>
-                    <DataTable value={ttpByTier} scrollable stripedRows emptyMessage="No data" className="text-sm">
-                        <Column field="cart_value_tier"       header="Tier"                sortable />
-                        <Column field="completed_carts"       header="Completed Carts"     sortable body={(r) => fmt.number(r.completed_carts)} />
-                        <Column field="avg_time_in_cart_days" header="Avg Days to Purchase" sortable body={(r) => fmt.decimal(r.avg_time_in_cart_days)} />
-                        <Column field="avg_time_in_cart_hours" header="Avg Hours"          sortable body={(r) => fmt.decimal(r.avg_time_in_cart_hours)} />
-                        <Column field="avg_cart_items_count"  header="Avg Items"           sortable body={(r) => fmt.decimal(r.avg_cart_items_count)} />
-                    </DataTable>
-                </Card>
-            )}
-
-            {/* High-Value Abandoned Carts Table */}
-            {highAbandoned.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">High-Value Abandoned Carts</h3>
-                    <p className="text-xs text-gray-400 mb-4">Carts with highest revenue risk that have been abandoned.</p>
-                    <DataTable value={highAbandoned} paginator rows={10} scrollable stripedRows emptyMessage="No data" className="text-sm">
-                        <Column field="cart_id"                 header="Cart ID"              sortable />
-                        <Column field="customer_id"             header="Customer ID"          sortable />
-                        <Column field="cart_total_value"        header="Cart Value"            sortable body={(r) => fmt.currency(r.cart_total_value)} />
-                        <Column field="cart_items_count"        header="Items"                sortable body={(r) => fmt.number(r.cart_items_count)} />
-                        <Column field="time_in_cart_days"       header="Days in Cart"          sortable body={(r) => fmt.decimal(r.time_in_cart_days)} />
-                        <Column field="recovery_potential_score" header="Recovery Score"      sortable body={(r) => (
-                            <Tag value={fmt.decimal(r.recovery_potential_score, 3)}
-                                severity={riskColor(r.recovery_potential_score)} />
-                        )} />
-                        <Column field="abandonment_risk_score"  header="Abandon Risk"         sortable body={(r) => (
-                            <Tag value={fmt.decimal(r.abandonment_risk_score, 3)}
-                                severity={riskColor(r.abandonment_risk_score)} />
-                        )} />
-                    </DataTable>
-                </Card>
-            )}
+            </section>
         </div>
     );
 }

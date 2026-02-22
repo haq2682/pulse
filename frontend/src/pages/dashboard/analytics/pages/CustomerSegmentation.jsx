@@ -184,7 +184,7 @@ const CustomerSegmentation = () => {
             const json = await res.json();
             if (json.mode) setDataMode(json.mode);
             setRawData(json.categories?.customer_analytics ?? null);
-        } catch (err) {
+        } catch {
             console.error('[fetch] Analytics load error');
             setFetchError(true);
             setRawData(null);
@@ -216,6 +216,7 @@ const CustomerSegmentation = () => {
         const rfmSummary       = a.rfm_segment_summary?.data ?? [];
         const custProfitSeg    = a.customer_profit_per_segment?.data ?? [];
         const genderCategory   = a.gender_category_preference?.data ?? [];
+        const genderProduct    = a.gender_product_preference?.data ?? [];
         const sessCvtDist      = a.session_conversion_distribution?.data ?? [];
         const cartAbandonDist  = a.cart_abandonment_distribution?.data ?? [];
         const referrerSummary  = a.referrer_source_summary?.data ?? [];
@@ -231,7 +232,7 @@ const CustomerSegmentation = () => {
         const totalSegmentCustomers = rfmSummary.reduce((s, r) => s + (r.num_customers ?? 0), 0);
 
         return {
-            rfmSummary, custProfitSeg, genderCategory, sessCvtDist,
+            rfmSummary, custProfitSeg, genderCategory, genderProduct, sessCvtDist,
             cartAbandonDist, referrerSummary, deviceCrosstab, paymentSummary,
             rfmChurnCrosstab, segRefCrosstab, topByRevenue, topByProfit,
             bestRfm, totalSegmentCustomers,
@@ -641,6 +642,27 @@ const CustomerSegmentation = () => {
                         </div>
                     </ChartWrapper>
                 </div>
+            )}
+
+            {/* Gender × Product Preference Table */}
+            {(derived?.genderProduct?.length ?? 0) > 0 && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">
+                            Gender × Product Preference *
+                        </h3>
+                        <DataTable
+                            value={[...derived.genderProduct].sort((a, b) => (b.total_units ?? 0) - (a.total_units ?? 0))}
+                            paginator rows={10} stripedRows size="small" className="text-sm"
+                        >
+                            <Column field="gender" header="Gender" sortable />
+                            <Column field="product_name" header="Product" sortable />
+                            <Column field="category" header="Category" sortable />
+                            <Column field="total_units" header="Units Sold" sortable body={(r) => fmt.number(r.total_units)} />
+                            <Column field="orders_count" header="Orders" sortable body={(r) => fmt.number(r.orders_count)} />
+                        </DataTable>
+                    </div>
+                </Card>
             )}
 
             {/* RFM Segment Summary Table */}

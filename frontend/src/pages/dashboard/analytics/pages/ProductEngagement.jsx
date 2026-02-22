@@ -157,7 +157,7 @@ const ProductEngagement = () => {
             const json = await res.json();
             if (json.mode) setDataMode(json.mode);
             setRawData(json.categories?.product_analytics ?? null);
-        } catch (err) {
+        } catch {
             console.error('[fetch] Analytics load error');
             setFetchError(true);
             setRawData(null);
@@ -191,6 +191,9 @@ const ProductEngagement = () => {
         const productAffinityTopPerProd  = a.product_affinity_top_per_product?.data ?? [];
         const recoCoverage               = (a.precomputed_reco_coverage?.data ?? [])[0] ?? {};
         const topVtoP                    = a.top_view_to_purchase_products?.data ?? [];
+        const supplierProductPerf        = a.supplier_product_performance?.data ?? [];
+        const stockoutRateByProduct      = a.stockout_rate_by_product?.data ?? [];
+        const supplierStockoutImpact     = a.supplier_stockout_impact_on_products?.data ?? [];
 
         // KPIs
         const topPopCat     = [...categoryPopularity].sort((a, b) => (b.category_popularity_score ?? 0) - (a.category_popularity_score ?? 0))[0];
@@ -201,6 +204,7 @@ const ProductEngagement = () => {
             categoryViewPatterns, categoryPopularity, productAffinityPairs,
             categoryAffinityPairs, categoryAffinityTopPerCat, productAffinityTopPerProd,
             recoCoverage, topVtoP,
+            supplierProductPerf, stockoutRateByProduct, supplierStockoutImpact,
             topPopCat, topViewCat, totalRevFromViews,
         };
     }, [rawData]);
@@ -498,6 +502,63 @@ const ProductEngagement = () => {
                             <Column field="revenue_per_view" header="Revenue / View" sortable body={(r) => fmt.currency(r.revenue_per_view)} />
                             <Column field="total_units_sold" header="Units Sold" sortable body={(r) => fmt.number(r.total_units_sold)} />
                             <Column field="total_orders" header="Orders" sortable body={(r) => fmt.number(r.total_orders)} />
+                        </DataTable>
+                    </div>
+                </Card>
+            )}
+
+            {/* DataTable — Supplier Product Performance */}
+            {(derived?.supplierProductPerf?.length ?? 0) > 0 && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">Supplier Product Performance *</h3>
+                        <DataTable value={[...derived.supplierProductPerf].sort((a, b) => (b.supplier_performance_score ?? 0) - (a.supplier_performance_score ?? 0))} paginator rows={10} stripedRows size="small">
+                            <Column field="product_name" header="Product" sortable />
+                            <Column field="category" header="Category" sortable />
+                            <Column field="supplier_id" header="Supplier ID" sortable />
+                            <Column field="total_units_sold" header="Units Sold" sortable body={(r) => fmt.number(r.total_units_sold)} />
+                            <Column field="total_revenue" header="Revenue" sortable body={(r) => fmt.currency(r.total_revenue)} />
+                            <Column field="profit_margin" header="Margin" sortable body={(r) => fmt.pct(r.profit_margin)} />
+                            <Column field="supplier_performance_score" header="Perf. Score" sortable body={(r) => fmt.decimal(r.supplier_performance_score, 2)} />
+                            <Column field="supplier_reliability_score" header="Reliability" sortable body={(r) => fmt.decimal(r.supplier_reliability_score, 2)} />
+                        </DataTable>
+                    </div>
+                </Card>
+            )}
+
+            {/* DataTable — Stockout Rate by Product */}
+            {(derived?.stockoutRateByProduct?.length ?? 0) > 0 && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">Stockout Rate by Product *</h3>
+                        <DataTable value={[...derived.stockoutRateByProduct].sort((a, b) => (b.stockout_frequency ?? 0) - (a.stockout_frequency ?? 0))} paginator rows={10} stripedRows size="small">
+                            <Column field="product_name" header="Product" sortable />
+                            <Column field="category" header="Category" sortable />
+                            <Column field="supplier_id" header="Supplier ID" sortable />
+                            <Column field="stockout_frequency" header="Stockout Freq." sortable body={(r) => fmt.number(r.stockout_frequency)} />
+                            <Column field="reorder_point_breach_count" header="Reorder Breaches" sortable body={(r) => fmt.number(r.reorder_point_breach_count)} />
+                            <Column field="current_stock" header="Current Stock" sortable body={(r) => fmt.number(r.current_stock)} />
+                            <Column field="days_of_supply" header="Days of Supply" sortable body={(r) => fmt.decimal(r.days_of_supply, 1)} />
+                            <Column field="stock_status" header="Stock Status" sortable />
+                        </DataTable>
+                    </div>
+                </Card>
+            )}
+
+            {/* DataTable — Supplier Stockout Impact on Products */}
+            {(derived?.supplierStockoutImpact?.length ?? 0) > 0 && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">Supplier Stockout Impact on Products *</h3>
+                        <DataTable value={[...derived.supplierStockoutImpact].sort((a, b) => (b.sup_stockout_rate ?? 0) - (a.sup_stockout_rate ?? 0))} paginator rows={10} stripedRows size="small">
+                            <Column field="product_name" header="Product" sortable />
+                            <Column field="category" header="Category" sortable />
+                            <Column field="supplier_id" header="Supplier ID" sortable />
+                            <Column field="total_revenue" header="Revenue" sortable body={(r) => fmt.currency(r.total_revenue)} />
+                            <Column field="sup_total_stockouts" header="Supplier Stockouts" sortable body={(r) => fmt.number(r.sup_total_stockouts)} />
+                            <Column field="sup_stockout_rate" header="Stockout Rate" sortable body={(r) => fmt.pct(r.sup_stockout_rate)} />
+                            <Column field="supplier_performance_score" header="Perf. Score" sortable body={(r) => fmt.decimal(r.supplier_performance_score, 2)} />
+                            <Column field="supplier_reliability_score" header="Reliability" sortable body={(r) => fmt.decimal(r.supplier_reliability_score, 2)} />
                         </DataTable>
                     </div>
                 </Card>

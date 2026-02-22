@@ -8,6 +8,7 @@ from services.pipeline_service import PipelineService
 from services.websocket_manager import WebSocketManager
 from services.analytics_service import AnalyticsService
 from services.analytics_watcher_service import get_analytics_watcher
+from services.forecasting_service import ForecastingService
 from fastapi.responses import Response
 import numpy as np
 import json
@@ -48,6 +49,9 @@ websocket_manager = WebSocketManager()
 
 # Analytics service
 analytics_service = AnalyticsService()
+
+# Forecasting service
+forecasting_service = ForecastingService()
 
 @router.get("/get-businesses")
 async def get_businesses(userId: str, db=Depends(get_db)):
@@ -403,11 +407,228 @@ async def trigger_analytics_update(business_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/exports")
+async def record_export(request: Request, db=Depends(get_db)):
+    """
+    Record metadata for a generated analytics PDF export.
+
+    Request body:
+        - business_id: Business ID
+        - user_id: User ID
+        - file_name: Name of the exported file
+        - sections_exported: List of section labels that were exported
+        - total_sections: Total number of sections exported
+
+    Returns:
+        Created export record metadata
+    """
+    try:
+        body = await request.json()
+        business_id = body.get("business_id")
+        user_id = body.get("user_id")
+        file_name = body.get("file_name")
+        sections_exported = body.get("sections_exported", [])
+        total_sections = body.get("total_sections", 0)
+
+        if not business_id or not user_id or not file_name:
+            raise HTTPException(status_code=400, detail="business_id, user_id, and file_name are required")
+
+        # Verify business belongs to user
+        result = db.execute(
+            text("SELECT business_id FROM businesses WHERE business_id = :business_id AND user_id = :user_id"),
+            {"business_id": business_id, "user_id": user_id},
+        ).fetchone()
+        if not result:
+            raise HTTPException(status_code=404, detail="Business not found or access denied")
+
+        import uuid
+        export_id = str(uuid.uuid4())
+        db.execute(
+            text(
+                """
+                INSERT INTO analytics_exports
+                    (export_id, business_id, user_id, file_name, sections_exported, total_sections)
+                VALUES
+                    (:export_id, :business_id, :user_id, :file_name, CAST(:sections_exported AS jsonb), :total_sections)
+                """
+            ),
+            {
+                "export_id": export_id,
+                "business_id": business_id,
+                "user_id": user_id,
+                "file_name": file_name,
+                "sections_exported": json.dumps(sections_exported),
+                "total_sections": total_sections,
+            },
+        )
+        db.commit()
+
+        return {
+            "export_id": export_id,
+            "business_id": business_id,
+            "file_name": file_name,
+            "total_sections": total_sections,
+            "created_at": datetime.utcnow().isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error recording export: {e}")
+        raise HTTPException(status_code=500, detail="Failed to record export")
+
+
+@router.get("/exports/{business_id}")
+async def list_exports(business_id: str, user_id: str = Query(...), db=Depends(get_db)):
+    """
+    List all export records for a business.
+
+    Args:
+        business_id: Business ID
+        user_id: User ID (query param for ownership verification)
+
+    Returns:
+        List of export records
+    """
+    try:
+        # Verify ownership
+        biz = db.execute(
+            text("SELECT business_id FROM businesses WHERE business_id = :business_id AND user_id = :user_id"),
+            {"business_id": business_id, "user_id": user_id},
+        ).fetchone()
+        if not biz:
+            raise HTTPException(status_code=404, detail="Business not found or access denied")
+
+        rows = db.execute(
+            text(
+                """
+                SELECT export_id, file_name, sections_exported, total_sections, created_at
+                FROM analytics_exports
+                WHERE business_id = :business_id
+                ORDER BY created_at DESC
+                LIMIT 50
+                """
+            ),
+            {"business_id": business_id},
+        ).fetchall()
+
+        return {
+            "exports": [
+                {
+                    "export_id": r[0],
+                    "file_name": r[1],
+                    "sections_exported": r[2],
+                    "total_sections": r[3],
+                    "created_at": r[4].isoformat() if r[4] else None,
+                }
+                for r in rows
+            ]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error listing exports: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve export history")
+
+
+@router.get("/forecasts/{business_id}")
+async def get_all_forecasts(
+    business_id: str,
+    groups: str = Query(None, description="Comma-separated list of inference groups to fetch"),
+    row_limit: int = Query(500, ge=1, le=10000, description="Maximum rows per inference (default 500)"),
+):
+    """
+    Fetch all available ML inference results for a business.
+
+    Inference results are read from the business's own MinIO bucket at
+    machine-learning/{type}/predictions/{output_name}[/|.parquet].
+    Missing inferences are silently skipped so the response only contains
+    what has actually been run for this business.
+
+    Args:
+        business_id: Business ID (also the MinIO bucket name)
+        groups: Optional comma-separated filter of inference groups
+                (general_classification, general_clustering, general_regression,
+                 specific_classification, specific_clustering, specific_regression)
+        row_limit: Cap on rows returned per inference — prevents OOM on large datasets
+
+    Returns:
+        JSON with available inference results grouped by type
+    """
+    try:
+        group_list = None
+        if groups:
+            group_list = [g.strip() for g in groups.split(",")]
+
+        result = await forecasting_service.fetch_all_inferences(business_id, group_list, row_limit=row_limit)
+        json_str = json.dumps(result, cls=AnalyticsJSONEncoder, allow_nan=False)
+        return Response(content=json_str, media_type="application/json")
+
+    except Exception as e:
+        print(f"Error fetching forecasts for {business_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load forecast data")
+
+
+@router.get("/forecasts/{business_id}/inference/{inference_name}")
+async def get_single_forecast(
+    business_id: str,
+    inference_name: str,
+    row_limit: int = Query(500, ge=1, le=10000, description="Maximum rows to return (default 500)"),
+):
+    """
+    Fetch a single ML inference result for a business.
+
+    Args:
+        business_id: Business ID (MinIO bucket name)
+        inference_name: Inference identifier (key from INFERENCE_CATALOG)
+        row_limit: Cap on rows returned — prevents OOM on large datasets
+
+    Returns:
+        JSON with inference result data, or 404 if not available
+    """
+    try:
+        if inference_name not in forecasting_service.INFERENCE_CATALOG:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown inference: {inference_name}",
+            )
+
+        result = await forecasting_service.fetch_inference(business_id, inference_name, row_limit=row_limit)
+        if result is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Inference results not available for this business",
+            )
+
+        json_str = json.dumps(result, cls=AnalyticsJSONEncoder, allow_nan=False)
+        return Response(content=json_str, media_type="application/json")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching inference {inference_name} for {business_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load inference data")
+
+
+@router.post("/forecasts/clear-cache/{business_id}")
+async def clear_forecasts_cache(business_id: str):
+    """Clear the forecasting cache for a specific business."""
+    try:
+        forecasting_service.clear_cache(business_id)
+        return {"message": f"Forecast cache cleared for business {business_id}"}
+    except Exception as e:
+        print(f"Error clearing forecast cache: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear cache")
+
+
+
 @router.get("/monitoring-status")
 async def get_monitoring_status():
     """
     Get status of analytics monitoring service.
-    
+
     Returns:
         List of monitored businesses and their status
     """

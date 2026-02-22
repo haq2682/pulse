@@ -87,7 +87,7 @@ export default function InventoryHealth() {
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();
-    const { dateRange, isFiltered, applyQuickFilter, resetFilters, toISODate } = useAnalyticsDateFilter();
+    const { dateRange, applyQuickFilter, resetFilters, toISODate } = useAnalyticsDateFilter();
     const { lastUpdate } = useAnalyticsWebSocket(businessId);
 
     const [rawData, setRawData] = useState(null);
@@ -309,22 +309,12 @@ export default function InventoryHealth() {
     return (
         <div className="p-6 space-y-8">
             <Toast ref={toastRef} />
-
-            {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Inventory Health</h1>
-                    <p className="text-gray-500 mt-1">
-                        Stock health scores, reorder urgency, dead stock and turnover across your catalog
-                    </p>
-                </div>
-                <DateFilterBar
+            <DateFilterBar
                     dateRange={dateRange}
                     onQuickFilter={applyQuickFilter}
                     onReset={resetFilters}
                     toISODate={toISODate}
                 />
-            </div>
 
             {/* ── KPI Cards ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

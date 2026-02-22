@@ -66,6 +66,7 @@ const KPICard = ({ icon, iconBg, iconColor, value, label }) => (
 const barOpts = (horizontal = false, stacked = false) => ({
     indexAxis: horizontal ? 'y' : 'x',
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { display: stacked, position: 'top' }, title: { display: false } },
     scales: {
         x: { stacked, grid: { color: 'rgba(0,0,0,0.05)' } },
@@ -75,6 +76,7 @@ const barOpts = (horizontal = false, stacked = false) => ({
 
 const groupedBarOpts = () => ({
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { position: 'top' }, title: { display: false } },
     scales: {
         x: { grid: { color: 'rgba(0,0,0,0.05)' } },
@@ -84,6 +86,7 @@ const groupedBarOpts = () => ({
 
 const doughnutOpts = () => ({
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { position: 'right' }, title: { display: false } },
 });
 
@@ -120,11 +123,6 @@ export default function FunnelOverview() {
             setFetchError(false);
             const res = await fetch(buildUrl());
             if (!res.ok) {
-                toastRef.current?.show({
-                    severity: 'warn', summary: 'No Data',
-                    detail: 'Analytics data not available. Run the analytics pipeline first.',
-                    life: 5000,
-                });
                 setRawFunnel(null);
                 return;
             }
@@ -135,7 +133,6 @@ export default function FunnelOverview() {
             console.error('[FunnelOverview] fetch error');
             setFetchError(true);
             setRawFunnel(null);
-            toastRef.current?.show({ severity: 'error', summary: 'Error', detail: 'Unable to load funnel data.', life: 5000 });
         } finally {
             setLoading(false);
         }
@@ -160,6 +157,7 @@ export default function FunnelOverview() {
         const byReferrer  = a.funnel_by_referrer?.data  ?? [];
         const hvVsReg     = a.high_value_vs_regular?.data ?? [];
         const abandonVsConv = a.abandoned_vs_converted?.data ?? [];
+        const highValueFunnel = a.high_value_funnel?.data ?? [];
 
         if (byDevice.length === 0 && byReferrer.length === 0) return null;
 
@@ -169,9 +167,6 @@ export default function FunnelOverview() {
         const totalCart         = byDevice.reduce((s, r) => s + (+(r.sessions_with_cart ?? 0)), 0);
         const totalOrders       = byDevice.reduce((s, r) => s + (+(r.sessions_with_orders ?? 0)), 0);
         const totalHighValue    = byDevice.reduce((s, r) => s + (+(r.high_value_sessions ?? 0)), 0);
-        const avgConvRate       = byDevice.length > 0
-            ? byDevice.reduce((s, r) => s + (+(r.conversion_rate ?? 0)), 0) / byDevice.length
-            : 0;
         const overallConvRate   = totalSessions > 0 ? (totalOrders / totalSessions) * 100 : 0;
         const viewToCartRate    = totalViews > 0 ? (totalCart / totalViews) * 100 : 0;
         const cartToOrderRate   = totalCart > 0 ? (totalOrders / totalCart) * 100 : 0;
@@ -272,7 +267,7 @@ export default function FunnelOverview() {
             funnelStepsData, convByDeviceData, convByRefData,
             funnelByDeviceData, funnelByRefData, avgValByDeviceData, hvDoughnutData,
             hvBarData, abandonBarData,
-            byDevice, byReferrer,
+            byDevice, byReferrer, highValueFunnel,
         };
     }, [rawFunnel]);
 
@@ -293,17 +288,25 @@ export default function FunnelOverview() {
 
     if (fetchError) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="text-center max-w-md">
-                    <i className="pi pi-exclamation-triangle text-5xl text-red-400 mb-4" />
-                    <p className="text-gray-600 text-lg font-medium">Something went wrong</p>
-                    <p className="text-gray-400 text-sm mt-2">Please try refreshing the page.</p>
+            <div className="p-6 min-h-[calc(100vh-120px)]">
+                <Toast ref={toastRef} />
+                <DateFilterBar
+                    quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
+                    dataMode={dataMode}
+                />
+                <div className="flex items-center justify-center min-h-[50vh]">
+                    <div className="text-center">
+                        <i className="pi pi-exclamation-circle text-5xl text-red-400 mb-3 block" />
+                        <p className="text-gray-700 font-medium text-lg">Something went wrong</p>
+                        <p className="text-gray-500 text-sm mt-1">Unable to load funnel data. Please try again later.</p>
+                    </div>
                 </div>
             </div>
         );
     }
 
-    if (!hasData) {
+    if (!hasData && !loading && pipelineStatus !== 'loading') {
         return (
             <div className="p-6 space-y-4">
                 <Toast ref={toastRef} />
@@ -330,15 +333,24 @@ export default function FunnelOverview() {
     return (
         <div className="p-6 space-y-8">
             <Toast ref={toastRef} />
-
-            {/* Date Filter */}
             <DateFilterBar
-                quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
-                onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
-                dataMode={dataMode}
-            />
+                    quickFilter={quickFilter}
+                    dateRange={dateRange}
+                    isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
+                    onReset={resetFilters}
+                    dataMode={dataMode}
+                />
 
-            {/* KPIs */}
+            {/* ── Static-data notice ─────────────────────────────────────── */}
+            {isFiltered && (
+                <p className="mb-4 text-xs text-gray-400 italic">
+                    * Funnel analytics are static aggregates computed over all available data and do not change with the date filter.
+                </p>
+            )}
+
+            {/* ── KPI Cards ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <KPICard icon="pi-users"      iconBg="bg-blue-50"   iconColor="text-blue-600"   value={fmt.number(kpis.totalSessions)}    label="Total Sessions" />
                 <KPICard icon="pi-check-circle" iconBg="bg-green-50" iconColor="text-green-600" value={fmt.pct(kpis.overallConvRate)}      label="Overall Conv. Rate" />
@@ -354,109 +366,148 @@ export default function FunnelOverview() {
                 <KPICard icon="pi-star-fill"  iconBg="bg-pink-50"   iconColor="text-pink-600"   value={fmt.number(kpis.totalHighValue)}   label="High-Value Sessions" />
             </div>
 
-            {/* Funnel Waterfall + High-Value doughnut */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Conversion Funnel Steps (All Devices)</h3>
-                    <ChartWrapper><Bar data={funnelStepsData} options={barOpts(false, false)} /></ChartWrapper>
-                </Card>
-                {hvDoughnutData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">High-Value Sessions by Device</h3>
-                        <ChartWrapper><Doughnut data={hvDoughnutData} options={doughnutOpts()} /></ChartWrapper>
+            {/* ── Funnel Overview ────────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-blue-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Funnel Overview</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <ChartWrapper title="Conversion Funnel Steps (All Devices)" height={340}>
+                        <Bar data={funnelStepsData} options={barOpts(false, false)} />
+                    </ChartWrapper>
+                    {hvDoughnutData.labels.length > 0 && (
+                        <ChartWrapper title="High-Value Sessions by Device" height={280}>
+                            <Doughnut data={hvDoughnutData} options={doughnutOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
+
+            {/* ── Conversion Rates ───────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-green-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Conversion Rates</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {convByDeviceData.labels.length > 0 && (
+                        <ChartWrapper title="Conversion Rate % by Device" height={340}>
+                            <Bar data={convByDeviceData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {convByRefData.labels.length > 0 && (
+                        <ChartWrapper title="Conversion Rate % by Referrer" height={340}>
+                            <Bar data={convByRefData} options={barOpts(true)} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
+
+            {/* ── Funnel Breakdown ───────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-purple-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Funnel Breakdown</h2>
+                </div>
+                <div className="grid grid-cols-1 gap-6">
+                    {funnelByDeviceData.labels.length > 0 && (
+                        <ChartWrapper title="Funnel Steps by Device" height={340}>
+                            <Bar data={funnelByDeviceData} options={groupedBarOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {funnelByRefData.labels.length > 0 && (
+                        <ChartWrapper title="Funnel Steps by Referrer Source" height={340}>
+                            <Bar data={funnelByRefData} options={groupedBarOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {avgValByDeviceData.labels.length > 0 && (
+                        <ChartWrapper title="Avg Session Value by Device" height={340}>
+                            <Bar data={avgValByDeviceData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
+
+            {/* ── Session Analysis ───────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-orange-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Session Analysis</h2>
+                </div>
+                <div className="grid grid-cols-1 gap-6">
+                    {hvBarData && (
+                        <ChartWrapper title="High-Value vs Regular Sessions" height={340}>
+                            <Bar data={hvBarData} options={groupedBarOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {abandonBarData && (
+                        <ChartWrapper title="Abandoned vs Converted Sessions" height={340}>
+                            <Bar data={abandonBarData} options={groupedBarOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+
+                {/* By Device Table */}
+                {byDevice.length > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Funnel Breakdown by Device</h3>
+                            <DataTable value={byDevice} scrollable stripedRows emptyMessage="No data" className="text-sm">
+                                <Column field="device_type"          header="Device"          sortable />
+                                <Column field="total_sessions"       header="Total Sessions"  sortable body={(r) => fmt.number(r.total_sessions)} />
+                                <Column field="sessions_with_views"  header="With Views"      sortable body={(r) => fmt.number(r.sessions_with_views)} />
+                                <Column field="sessions_with_cart"   header="With Cart"       sortable body={(r) => fmt.number(r.sessions_with_cart)} />
+                                <Column field="sessions_with_orders" header="With Orders"     sortable body={(r) => fmt.number(r.sessions_with_orders)} />
+                                <Column field="high_value_sessions"  header="High-Value"      sortable body={(r) => fmt.number(r.high_value_sessions)} />
+                                <Column field="avg_session_value"    header="Avg Session Val" sortable body={(r) => fmt.currency(r.avg_session_value)} />
+                                <Column field="conversion_rate"      header="Conv. Rate %"    sortable body={(r) => fmt.pct(r.conversion_rate)} />
+                            </DataTable>
+                        </div>
                     </Card>
                 )}
-            </div>
 
-            {/* Conversion rate by device + referrer */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {convByDeviceData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Conversion Rate % by Device</h3>
-                        <ChartWrapper><Bar data={convByDeviceData} options={barOpts()} /></ChartWrapper>
+                {/* By Referrer Table */}
+                {byReferrer.length > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Funnel Breakdown by Referrer</h3>
+                            <DataTable value={byReferrer} scrollable stripedRows emptyMessage="No data" className="text-sm">
+                                <Column field="referrer_source"      header="Referrer"        sortable />
+                                <Column field="total_sessions"       header="Total Sessions"  sortable body={(r) => fmt.number(r.total_sessions)} />
+                                <Column field="sessions_with_views"  header="With Views"      sortable body={(r) => fmt.number(r.sessions_with_views)} />
+                                <Column field="sessions_with_cart"   header="With Cart"       sortable body={(r) => fmt.number(r.sessions_with_cart)} />
+                                <Column field="sessions_with_orders" header="With Orders"     sortable body={(r) => fmt.number(r.sessions_with_orders)} />
+                                <Column field="high_value_sessions"  header="High-Value"      sortable body={(r) => fmt.number(r.high_value_sessions)} />
+                                <Column field="avg_session_value"    header="Avg Session Val" sortable body={(r) => fmt.currency(r.avg_session_value)} />
+                                <Column field="conversion_rate"      header="Conv. Rate %"    sortable body={(r) => fmt.pct(r.conversion_rate)} />
+                            </DataTable>
+                        </div>
                     </Card>
                 )}
-                {convByRefData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Conversion Rate % by Referrer</h3>
-                        <ChartWrapper><Bar data={convByRefData} options={barOpts(true)} /></ChartWrapper>
+                {/* High Value Funnel Sessions Table */}
+                {(derived?.highValueFunnel?.length ?? 0) > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">High Value Funnel Sessions</h3>
+                            <DataTable
+                                value={[...derived.highValueFunnel].sort((a, b) => (+(b.session_monetary_value ?? 0)) - (+(a.session_monetary_value ?? 0)))}
+                                paginator rows={15} stripedRows emptyMessage="No data" className="text-sm"
+                            >
+                                <Column field="session_id"             header="Session ID"          sortable />
+                                <Column field="device_type"            header="Device"              sortable />
+                                <Column field="referrer_source"        header="Referrer"            sortable />
+                                <Column field="total_products_viewed"  header="Products Viewed"     sortable body={(r) => fmt.number(r.total_products_viewed)} />
+                                <Column field="items_added_to_cart"    header="Cart Items"          sortable body={(r) => fmt.number(r.items_added_to_cart)} />
+                                <Column field="orders_from_session"    header="Orders"              sortable body={(r) => fmt.number(r.orders_from_session)} />
+                                <Column field="session_monetary_value" header="Session Value"       sortable body={(r) => fmt.currency(r.session_monetary_value)} />
+                                <Column field="session_engagement_score" header="Engagement"        sortable body={(r) => fmt.decimal(r.session_engagement_score)} />
+                                <Column field="view_to_order_rate"     header="View→Order Rate"     sortable body={(r) => fmt.pct(r.view_to_order_rate)} />
+                            </DataTable>
+                        </div>
                     </Card>
                 )}
-            </div>
-
-            {/* Funnel steps by device grouped bar */}
-            {funnelByDeviceData.labels.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Funnel Steps by Device</h3>
-                    <ChartWrapper><Bar data={funnelByDeviceData} options={groupedBarOpts()} /></ChartWrapper>
-                </Card>
-            )}
-
-            {/* Funnel steps by referrer grouped bar */}
-            {funnelByRefData.labels.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Funnel Steps by Referrer Source</h3>
-                    <ChartWrapper><Bar data={funnelByRefData} options={groupedBarOpts()} /></ChartWrapper>
-                </Card>
-            )}
-
-            {/* Avg session value by device */}
-            {avgValByDeviceData.labels.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg Session Value by Device</h3>
-                    <ChartWrapper><Bar data={avgValByDeviceData} options={barOpts()} /></ChartWrapper>
-                </Card>
-            )}
-
-            {/* High-Value vs Regular */}
-            {hvBarData && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">High-Value vs Regular Sessions</h3>
-                    <ChartWrapper><Bar data={hvBarData} options={groupedBarOpts()} /></ChartWrapper>
-                </Card>
-            )}
-
-            {/* Abandoned vs Converted */}
-            {abandonBarData && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Abandoned vs Converted Sessions</h3>
-                    <ChartWrapper><Bar data={abandonBarData} options={groupedBarOpts()} /></ChartWrapper>
-                </Card>
-            )}
-
-            {/* By Device Table */}
-            {byDevice.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Funnel Breakdown by Device</h3>
-                    <DataTable value={byDevice} scrollable stripedRows emptyMessage="No data" className="text-sm">
-                        <Column field="device_type"          header="Device"          sortable />
-                        <Column field="total_sessions"       header="Total Sessions"  sortable body={(r) => fmt.number(r.total_sessions)} />
-                        <Column field="sessions_with_views"  header="With Views"      sortable body={(r) => fmt.number(r.sessions_with_views)} />
-                        <Column field="sessions_with_cart"   header="With Cart"       sortable body={(r) => fmt.number(r.sessions_with_cart)} />
-                        <Column field="sessions_with_orders" header="With Orders"     sortable body={(r) => fmt.number(r.sessions_with_orders)} />
-                        <Column field="high_value_sessions"  header="High-Value"      sortable body={(r) => fmt.number(r.high_value_sessions)} />
-                        <Column field="avg_session_value"    header="Avg Session Val" sortable body={(r) => fmt.currency(r.avg_session_value)} />
-                        <Column field="conversion_rate"      header="Conv. Rate %"    sortable body={(r) => fmt.pct(r.conversion_rate)} />
-                    </DataTable>
-                </Card>
-            )}
-
-            {/* By Referrer Table */}
-            {byReferrer.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Funnel Breakdown by Referrer</h3>
-                    <DataTable value={byReferrer} scrollable stripedRows emptyMessage="No data" className="text-sm">
-                        <Column field="referrer_source"      header="Referrer"        sortable />
-                        <Column field="total_sessions"       header="Total Sessions"  sortable body={(r) => fmt.number(r.total_sessions)} />
-                        <Column field="sessions_with_views"  header="With Views"      sortable body={(r) => fmt.number(r.sessions_with_views)} />
-                        <Column field="sessions_with_cart"   header="With Cart"       sortable body={(r) => fmt.number(r.sessions_with_cart)} />
-                        <Column field="sessions_with_orders" header="With Orders"     sortable body={(r) => fmt.number(r.sessions_with_orders)} />
-                        <Column field="high_value_sessions"  header="High-Value"      sortable body={(r) => fmt.number(r.high_value_sessions)} />
-                        <Column field="avg_session_value"    header="Avg Session Val" sortable body={(r) => fmt.currency(r.avg_session_value)} />
-                        <Column field="conversion_rate"      header="Conv. Rate %"    sortable body={(r) => fmt.pct(r.conversion_rate)} />
-                    </DataTable>
-                </Card>
-            )}
+            </section>
         </div>
     );
 }

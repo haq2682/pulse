@@ -81,7 +81,7 @@ export default function SupplierOperations() {
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();
-    const { dateRange, setDateRange, quickFilter, isFiltered, applyQuickFilter, resetFilters, toISODate } = useAnalyticsDateFilter();
+    const { dateRange, setDateRange, quickFilter, isFiltered, applyQuickFilter, resetFilters } = useAnalyticsDateFilter();
     const { lastUpdate } = useAnalyticsWebSocket(businessId);
 
     const [rawSupplier, setRawSupplier] = useState(null);
@@ -106,11 +106,6 @@ export default function SupplierOperations() {
             setFetchError(false);
             const res = await fetch(buildUrl());
             if (!res.ok) {
-                toastRef.current?.show({
-                    severity: 'warn', summary: 'No Data',
-                    detail: 'Analytics data not available. Run the analytics pipeline first.',
-                    life: 5000,
-                });
                 setRawSupplier(null);
                 return;
             }
@@ -121,7 +116,6 @@ export default function SupplierOperations() {
             console.error('[SupplierOperations] fetch error');
             setFetchError(true);
             setRawSupplier(null);
-            toastRef.current?.show({ severity: 'error', summary: 'Error', detail: 'Unable to load supplier data.', life: 5000 });
         } finally {
             setLoading(false);
         }
@@ -142,11 +136,11 @@ export default function SupplierOperations() {
         if (!rawSupplier) return null;
         const a = rawSupplier.analytics ?? {};
 
-        const fulfillment   = a.supplier_fulfillment_performance?.data ?? [];
-        const stockoutBySup = a.stockout_rate_by_supplier?.data        ?? [];
-        const lastRestock   = a.supplier_days_since_last_restock?.data ?? [];
-        const contractExp   = a.supplier_contract_expiry?.data         ?? [];
-        const rankingCore   = a.supplier_ranking_core?.data            ?? [];
+        const fulfillment    = a.supplier_fulfillment_performance?.data ?? [];
+        const stockoutBySup  = a.stockout_rate_by_supplier?.data        ?? [];
+        const supplierStockouts = a.supplier_stockouts?.data            ?? [];
+        const lastRestock    = a.supplier_days_since_last_restock?.data ?? [];
+        const contractExp    = a.supplier_contract_expiry?.data         ?? [];
 
         if (fulfillment.length === 0 && stockoutBySup.length === 0 && contractExp.length === 0) return null;
 
@@ -278,7 +272,7 @@ export default function SupplierOperations() {
             totalOrdersFulfilled, avgLeadTime, avgStockoutRate, expiringContracts,
             leadTimeBarData, stockoutBarData, totalStockoutsBarData, ordersBarData,
             restockBarData, healthBarData, contractBarData,
-            mergedOps, contractExp,
+            mergedOps, contractExp, supplierStockouts,
         };
     }, [rawSupplier]);
 
@@ -350,7 +344,7 @@ export default function SupplierOperations() {
         );
     }
 
-    if (!hasData) {
+    if (!hasData && !loading && pipelineStatus !== 'loading') {
         return (
             <div className="p-6 min-h-[calc(100vh-120px)]">
                 <Toast ref={toastRef} />
@@ -384,16 +378,7 @@ export default function SupplierOperations() {
     return (
         <div className="p-6 space-y-8">
             <Toast ref={toastRef} />
-
-            {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Supplier Operations</h1>
-                    <p className="text-gray-500 mt-1">
-                        Fulfillment performance, stockout patterns, restock timing, and contract monitoring
-                    </p>
-                </div>
-                <DateFilterBar
+            <DateFilterBar
                     quickFilter={quickFilter}
                     dateRange={dateRange}
                     isFiltered={isFiltered}
@@ -402,7 +387,13 @@ export default function SupplierOperations() {
                     onReset={resetFilters}
                     dataMode={dataMode}
                 />
-            </div>
+
+            {/* ── Static-data notice ─────────────────────────────────────── */}
+            {isFiltered && (
+                <p className="mb-4 text-xs text-gray-400 italic">
+                    * Supplier analytics are static aggregates computed over all available data and do not change with the date filter.
+                </p>
+            )}
 
             {/* ── KPI Cards ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -570,6 +561,29 @@ export default function SupplierOperations() {
                                 body={(r) => fmt.decimal(r.supplier_performance_score, 1)} />
                             <Column field="supplier_reliability_score_effective" header="Reliability" sortable
                                 body={(r) => fmt.decimal(r.supplier_reliability_score_effective, 1)} />
+                        </DataTable>
+                    </div>
+                </Card>
+            )}
+            {/* Supplier Stockouts Detail Table */}
+            {(derived?.supplierStockouts?.length ?? 0) > 0 && (
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">
+                            Supplier Stockouts Detail
+                        </h3>
+                        <DataTable
+                            value={[...derived.supplierStockouts].sort((a, b) => (b.total_stockouts ?? 0) - (a.total_stockouts ?? 0))}
+                            paginator rows={15} rowsPerPageOptions={[15, 25]}
+                            className="p-datatable-sm" stripedRows sortMode="multiple"
+                        >
+                            <Column field="supplier_id" header="Supplier" sortable body={(r) => suppLabel(r.supplier_id)} />
+                            <Column field="total_stockouts" header="Total Stockouts" sortable body={(r) => fmt.number(r.total_stockouts)} />
+                            <Column field="supplier_stockout_rate" header="Stockout Rate" sortable body={(r) => fmt.pct((r.supplier_stockout_rate ?? 0) * 100)} />
+                            <Column field="inv_total_stockouts" header="Inv. Stockouts" sortable body={(r) => fmt.number(r.inv_total_stockouts)} />
+                            <Column field="inv_stockout_rate" header="Inv. Stockout Rate" sortable body={(r) => fmt.pct((r.inv_stockout_rate ?? 0) * 100)} />
+                            <Column field="inv_total_products" header="Total Products" sortable body={(r) => fmt.number(r.inv_total_products)} />
+                            <Column field="inv_total_current_stock" header="Current Stock" sortable body={(r) => fmt.number(r.inv_total_current_stock)} />
                         </DataTable>
                     </div>
                 </Card>

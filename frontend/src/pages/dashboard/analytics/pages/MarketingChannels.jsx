@@ -123,6 +123,7 @@ const KPICard = ({ icon, iconBg, iconColor, value, label }) => (
 const barOpts = (horizontal = false) => ({
     indexAxis: horizontal ? 'y' : 'x',
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { display: false }, title: { display: false } },
     scales: {
         x: { grid: { color: 'rgba(0,0,0,0.05)' } },
@@ -132,6 +133,7 @@ const barOpts = (horizontal = false) => ({
 
 const groupedBarOpts = () => ({
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { position: 'top' }, title: { display: false } },
     scales: {
         x: { grid: { color: 'rgba(0,0,0,0.05)' } },
@@ -141,6 +143,7 @@ const groupedBarOpts = () => ({
 
 const doughnutOpts = () => ({
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { position: 'right' }, title: { display: false } },
 });
 
@@ -177,11 +180,6 @@ export default function MarketingChannels() {
             setFetchError(false);
             const res = await fetch(buildUrl());
             if (!res.ok) {
-                toastRef.current?.show({
-                    severity: 'warn', summary: 'No Data',
-                    detail: 'Analytics data not available. Run the analytics pipeline first.',
-                    life: 5000,
-                });
                 setRawMarketing(null);
                 return;
             }
@@ -192,7 +190,6 @@ export default function MarketingChannels() {
             console.error('[MarketingChannels] fetch error');
             setFetchError(true);
             setRawMarketing(null);
-            toastRef.current?.show({ severity: 'error', summary: 'Error', detail: 'Unable to load channel data.', life: 5000 });
         } finally {
             setLoading(false);
         }
@@ -309,7 +306,7 @@ export default function MarketingChannels() {
     }, [rawMarketing]);
 
     // -------------------------------------------------------------------------
-    // Render
+    // Render states
     // -------------------------------------------------------------------------
 
     const hasData = derived !== null;
@@ -325,23 +322,39 @@ export default function MarketingChannels() {
 
     if (fetchError) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="text-center max-w-md">
-                    <i className="pi pi-exclamation-triangle text-5xl text-red-400 mb-4" />
-                    <p className="text-gray-600 text-lg font-medium">Something went wrong</p>
-                    <p className="text-gray-400 text-sm mt-2">Please try refreshing the page.</p>
+            <div className="p-6 min-h-[calc(100vh-120px)]">
+                <Toast ref={toastRef} />
+                <DateFilterBar
+                    quickFilter={quickFilter}
+                    dateRange={dateRange}
+                    isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
+                    onReset={resetFilters}
+                    dataMode={dataMode}
+                />
+                <div className="flex items-center justify-center min-h-[50vh]">
+                    <div className="text-center">
+                        <i className="pi pi-exclamation-circle text-5xl text-red-400 mb-3 block" />
+                        <p className="text-gray-700 font-medium text-lg">Something went wrong</p>
+                        <p className="text-gray-500 text-sm mt-1">Unable to load data. Please try again later.</p>
+                    </div>
                 </div>
             </div>
         );
     }
 
-    if (!hasData) {
+    if (!hasData && !loading && pipelineStatus !== 'loading') {
         return (
-            <div className="p-6 space-y-4">
+            <div className="p-6 min-h-[calc(100vh-120px)]">
                 <Toast ref={toastRef} />
                 <DateFilterBar
-                    quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
-                    onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
+                    quickFilter={quickFilter}
+                    dateRange={dateRange}
+                    isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
+                    onReset={resetFilters}
                     dataMode={dataMode}
                 />
                 <div className="flex items-center justify-center min-h-[50vh]">
@@ -361,15 +374,24 @@ export default function MarketingChannels() {
     return (
         <div className="p-6 space-y-8">
             <Toast ref={toastRef} />
-
-            {/* Date Filter */}
             <DateFilterBar
-                quickFilter={quickFilter} dateRange={dateRange} isFiltered={isFiltered}
-                onQuickFilter={applyQuickFilter} onDateChange={setDateRange} onReset={resetFilters}
-                dataMode={dataMode}
-            />
+                    quickFilter={quickFilter}
+                    dateRange={dateRange}
+                    isFiltered={isFiltered}
+                    onQuickFilter={applyQuickFilter}
+                    onDateChange={setDateRange}
+                    onReset={resetFilters}
+                    dataMode={dataMode}
+                />
 
-            {/* KPIs */}
+            {/* ── Static-data notice ─────────────────────────────────────── */}
+            {isFiltered && (
+                <p className="mb-4 text-xs text-gray-400 italic">
+                    * All analytics on this page are static aggregates computed over all available data and do not change with the date filter.
+                </p>
+            )}
+
+            {/* ── KPI Cards ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <KPICard icon="pi-sitemap"    iconBg="bg-blue-50"   iconColor="text-blue-600"   value={fmt.number(kpis.totalChannels)}    label="Channel Types" />
                 <KPICard icon="pi-eye"        iconBg="bg-green-50"  iconColor="text-green-600"  value={fmt.short(kpis.totalImpressions)}  label="Total Impressions" />
@@ -377,107 +399,129 @@ export default function MarketingChannels() {
                 <KPICard icon="pi-trophy"     iconBg="bg-purple-50" iconColor="text-purple-600" value={kpis.bestROIChannel}               label="Best ROI Channel" />
             </div>
 
-            {/* Revenue + ROAS */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {revenueBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Total Revenue by Channel</h3>
-                        <ChartWrapper><Bar data={revenueBarData} options={barOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-                {roasBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg ROAS by Channel</h3>
-                        <ChartWrapper><Bar data={roasBarData} options={barOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
+            {/* ── Revenue & ROAS ─────────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-blue-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Revenue & ROAS</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {revenueBarData.labels.length > 0 && (
+                        <ChartWrapper title="Total Revenue by Channel" height={340}>
+                            <Bar data={revenueBarData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {roasBarData.labels.length > 0 && (
+                        <ChartWrapper title="Avg ROAS by Channel" height={340}>
+                            <Bar data={roasBarData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
 
-            {/* ROI + CTR */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {roiBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg ROI % by Channel</h3>
-                        <ChartWrapper><Bar data={roiBarData} options={barOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-                {ctrBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Click-Through Rate % by Channel</h3>
-                        <ChartWrapper><Bar data={ctrBarData} options={barOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
+            {/* ── ROI & CTR ──────────────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-green-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">ROI & CTR</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {roiBarData.labels.length > 0 && (
+                        <ChartWrapper title="Avg ROI % by Channel" height={340}>
+                            <Bar data={roiBarData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {ctrBarData.labels.length > 0 && (
+                        <ChartWrapper title="Click-Through Rate % by Channel" height={340}>
+                            <Bar data={ctrBarData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
 
-            {/* Conversion + Efficiency */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {cvrBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg Conversion Rate % by Channel</h3>
-                        <ChartWrapper><Bar data={cvrBarData} options={barOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-                {effBarData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Avg Efficiency Score by Channel</h3>
-                        <ChartWrapper><Bar data={effBarData} options={barOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
+            {/* ── Conversion & Efficiency ────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-purple-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Conversion & Efficiency</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {cvrBarData.labels.length > 0 && (
+                        <ChartWrapper title="Avg Conversion Rate % by Channel" height={340}>
+                            <Bar data={cvrBarData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {effBarData.labels.length > 0 && (
+                        <ChartWrapper title="Avg Efficiency Score by Channel" height={340}>
+                            <Bar data={effBarData} options={barOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
 
-            {/* Budget vs Spend + Impressions vs Clicks */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {budgetVsSpendData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Budget vs Total Spend by Channel</h3>
-                        <ChartWrapper><Bar data={budgetVsSpendData} options={groupedBarOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-                {impVsClicksData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Impressions vs Clicks by Channel</h3>
-                        <ChartWrapper><Bar data={impVsClicksData} options={groupedBarOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
+            {/* ── Budget & Impressions ───────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-orange-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Budget & Impressions</h2>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {budgetVsSpendData.labels.length > 0 && (
+                        <ChartWrapper title="Budget vs Total Spend by Channel" height={340}>
+                            <Bar data={budgetVsSpendData} options={groupedBarOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {impVsClicksData.labels.length > 0 && (
+                        <ChartWrapper title="Impressions vs Clicks by Channel" height={340}>
+                            <Bar data={impVsClicksData} options={groupedBarOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
 
-            {/* Doughnuts */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {revDoughnutData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Revenue Share by Channel</h3>
-                        <ChartWrapper><Doughnut data={revDoughnutData} options={doughnutOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-                {ordersDoughnutData.labels.length > 0 && (
-                    <Card className="rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Orders Share by Channel</h3>
-                        <ChartWrapper><Doughnut data={ordersDoughnutData} options={doughnutOpts()} /></ChartWrapper>
-                    </Card>
-                )}
-            </div>
+            {/* ── Channel Distribution ───────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-1 w-8 bg-cyan-500 rounded-full" />
+                    <h2 className="text-xl font-bold text-gray-800">Channel Distribution</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {revDoughnutData.labels.length > 0 && (
+                        <ChartWrapper title="Revenue Share by Channel" height={280}>
+                            <Doughnut data={revDoughnutData} options={doughnutOpts()} />
+                        </ChartWrapper>
+                    )}
+                    {ordersDoughnutData.labels.length > 0 && (
+                        <ChartWrapper title="Orders Share by Channel" height={280}>
+                            <Doughnut data={ordersDoughnutData} options={doughnutOpts()} />
+                        </ChartWrapper>
+                    )}
+                </div>
+            </section>
 
-            {/* Channel Summary Table */}
+            {/* ── Channel Performance Table ──────────────────────────────── */}
             {channelTable.length > 0 && (
-                <Card className="rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Channel Performance Summary</h3>
-                    <DataTable value={channelTable} scrollable stripedRows
-                        emptyMessage="No channel data" className="text-sm">
-                        <Column field="channel"           header="Channel Type"   sortable />
-                        <Column field="campaigns"         header="Campaigns"      sortable body={(r) => fmt.number(r.campaigns)} />
-                        <Column field="total_impressions" header="Impressions"    sortable body={(r) => fmt.short(r.total_impressions)} />
-                        <Column field="total_clicks"      header="Clicks"         sortable body={(r) => fmt.short(r.total_clicks)} />
-                        <Column field="ctr"               header="CTR %"          sortable body={(r) => fmt.pct(r.ctr)} />
-                        <Column field="total_orders"      header="Orders"         sortable body={(r) => fmt.number(r.total_orders)} />
-                        <Column field="avg_cvr"           header="Conv. Rate %"   sortable body={(r) => r.avg_cvr != null ? fmt.pct(r.avg_cvr) : '—'} />
-                        <Column field="total_revenue"     header="Revenue"        sortable body={(r) => fmt.currency(r.total_revenue)} />
-                        <Column field="total_spend"       header="Spend"          sortable body={(r) => fmt.currency(r.total_spend)} />
-                        <Column field="total_budget"      header="Budget"         sortable body={(r) => fmt.currency(r.total_budget)} />
-                        <Column field="avg_roas"          header="Avg ROAS"       sortable body={(r) => r.avg_roas != null ? fmt.decimal(r.avg_roas) : '—'} />
-                        <Column field="avg_roi"           header="Avg ROI %"      sortable body={(r) => r.avg_roi  != null ? fmt.pct(r.avg_roi)  : '—'} />
-                        <Column field="avg_aov"           header="Avg AOV"        sortable body={(r) => r.avg_aov  != null ? fmt.currency(r.avg_aov) : '—'} />
-                        <Column field="avg_eff"           header="Avg Eff. Score" sortable body={(r) => r.avg_eff  != null ? fmt.decimal(r.avg_eff)  : '—'} />
-                    </DataTable>
+                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                    <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Channel Performance Summary</h3>
+                        <DataTable value={channelTable} scrollable stripedRows
+                            emptyMessage="No channel data" className="text-sm">
+                            <Column field="channel"           header="Channel Type"   sortable />
+                            <Column field="campaigns"         header="Campaigns"      sortable body={(r) => fmt.number(r.campaigns)} />
+                            <Column field="total_impressions" header="Impressions"    sortable body={(r) => fmt.short(r.total_impressions)} />
+                            <Column field="total_clicks"      header="Clicks"         sortable body={(r) => fmt.short(r.total_clicks)} />
+                            <Column field="ctr"               header="CTR %"          sortable body={(r) => fmt.pct(r.ctr)} />
+                            <Column field="total_orders"      header="Orders"         sortable body={(r) => fmt.number(r.total_orders)} />
+                            <Column field="avg_cvr"           header="Conv. Rate %"   sortable body={(r) => r.avg_cvr != null ? fmt.pct(r.avg_cvr) : '—'} />
+                            <Column field="total_revenue"     header="Revenue"        sortable body={(r) => fmt.currency(r.total_revenue)} />
+                            <Column field="total_spend"       header="Spend"          sortable body={(r) => fmt.currency(r.total_spend)} />
+                            <Column field="total_budget"      header="Budget"         sortable body={(r) => fmt.currency(r.total_budget)} />
+                            <Column field="avg_roas"          header="Avg ROAS"       sortable body={(r) => r.avg_roas != null ? fmt.decimal(r.avg_roas) : '—'} />
+                            <Column field="avg_roi"           header="Avg ROI %"      sortable body={(r) => r.avg_roi  != null ? fmt.pct(r.avg_roi)  : '—'} />
+                            <Column field="avg_aov"           header="Avg AOV"        sortable body={(r) => r.avg_aov  != null ? fmt.currency(r.avg_aov) : '—'} />
+                            <Column field="avg_eff"           header="Avg Eff. Score" sortable body={(r) => r.avg_eff  != null ? fmt.decimal(r.avg_eff)  : '—'} />
+                        </DataTable>
+                    </div>
                 </Card>
             )}
         </div>
