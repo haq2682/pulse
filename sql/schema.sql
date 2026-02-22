@@ -146,6 +146,38 @@ BEFORE UPDATE ON pipeline_status
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
+-- Chat Sessions table for storing Gemini AI chat conversation metadata
+CREATE TABLE chat_sessions (
+    session_id VARCHAR(50) PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    business_id VARCHAR(50) NOT NULL,
+    title VARCHAR(500) NOT NULL DEFAULT 'New Chat',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (business_id) REFERENCES businesses(business_id) ON DELETE CASCADE
+);
+
+CREATE TRIGGER update_chat_sessions_updated_at
+BEFORE UPDATE ON chat_sessions
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+CREATE INDEX idx_chat_sessions_user_id ON chat_sessions(user_id);
+CREATE INDEX idx_chat_sessions_business_id ON chat_sessions(business_id);
+
+-- Chat Messages table for storing individual messages within a chat session
+CREATE TABLE chat_messages (
+    message_id VARCHAR(50) PRIMARY KEY,
+    session_id VARCHAR(50) NOT NULL,
+    role VARCHAR(5) NOT NULL CHECK (role IN ('user', 'model')),
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES chat_sessions(session_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_chat_messages_session_id ON chat_messages(session_id);
+
 -- Analytics Exports table for tracking generated PDF reports
 CREATE TABLE analytics_exports (
     export_id VARCHAR(50) PRIMARY KEY,
