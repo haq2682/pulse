@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { ProgressSpinner } from 'primereact/progressspinner';
 import { Toast } from 'primereact/toast';
 import { Checkbox } from 'primereact/checkbox';
+import { RadioButton } from 'primereact/radiobutton';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import SecondaryButton from '@/components/global/Button/SecondaryButton';
 import Heading from '@/components/global/Typography/Heading';
@@ -607,7 +608,7 @@ const detectViz = (rows, columns) => {
 // PDF builder
 // ---------------------------------------------------------------------------
 
-const buildPDF = ({ businessName, businessId, reportDate, sections, analyticsData }) => {
+const buildPDF = ({ businessName, businessId, reportDate, sections, analyticsData, graphsOnly = false }) => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const PAGE_W = doc.internal.pageSize.getWidth();
     const PAGE_H = doc.internal.pageSize.getHeight();
@@ -777,39 +778,41 @@ const buildPDF = ({ businessName, businessId, reportDate, sections, analyticsDat
                 curY += 5;
             }
 
-            // ---- Full data table ----
-            // Scale font + min-col-width by column count to prevent vertical character wrapping
-            const colCount = columns.length;
-            const tFontSize = colCount > 20 ? 5.5 : colCount > 12 ? 6.5 : 7.5;
-            const minCW = colCount > 20 ? 14 : colCount > 12 ? 17 : 20;
+            // ---- Full data table (skipped in "Graphs Only" mode) ----
+            if (!graphsOnly) {
+                // Scale font + min-col-width by column count to prevent vertical character wrapping
+                const colCount = columns.length;
+                const tFontSize = colCount > 20 ? 5.5 : colCount > 12 ? 6.5 : 7.5;
+                const minCW = colCount > 20 ? 14 : colCount > 12 ? 17 : 20;
 
-            autoTable(doc, {
-                head: [columns.map(colHeader)],
-                body: displayRows.map((row) => columns.map((c) => fmtCell(row[c]))),
-                startY: curY,
-                margin: { left: SM, right: SM },
-                styles: {
-                    fontSize: tFontSize,
-                    cellPadding: { top: 1.5, right: 2, bottom: 1.5, left: 2 },
-                    overflow: 'ellipsize',
-                    minCellWidth: minCW,
-                    halign: 'left',
-                },
-                headStyles: {
-                    fillColor: [99, 102, 241],
-                    textColor: 255,
-                    fontStyle: 'bold',
-                    fontSize: tFontSize,
-                },
-                alternateRowStyles: { fillColor: [243, 244, 246] },
-                tableLineColor: [209, 213, 219],
-                tableLineWidth: 0.2,
-                // Re-draw the accent bar on pages autoTable creates internally
-                didDrawPage: () => {
-                    doc.setFillColor(99, 102, 241);
-                    doc.rect(0, 0, 6, PAGE_H, 'F');
-                },
-            });
+                autoTable(doc, {
+                    head: [columns.map(colHeader)],
+                    body: displayRows.map((row) => columns.map((c) => fmtCell(row[c]))),
+                    startY: curY,
+                    margin: { left: SM, right: SM },
+                    styles: {
+                        fontSize: tFontSize,
+                        cellPadding: { top: 1.5, right: 2, bottom: 1.5, left: 2 },
+                        overflow: 'ellipsize',
+                        minCellWidth: minCW,
+                        halign: 'left',
+                    },
+                    headStyles: {
+                        fillColor: [99, 102, 241],
+                        textColor: 255,
+                        fontStyle: 'bold',
+                        fontSize: tFontSize,
+                    },
+                    alternateRowStyles: { fillColor: [243, 244, 246] },
+                    tableLineColor: [209, 213, 219],
+                    tableLineWidth: 0.2,
+                    // Re-draw the accent bar on pages autoTable creates internally
+                    didDrawPage: () => {
+                        doc.setFillColor(99, 102, 241);
+                        doc.rect(0, 0, 6, PAGE_H, 'F');
+                    },
+                });
+            }
         });
     });
 
@@ -828,6 +831,7 @@ const ExportAnalytics = () => {
 
     const allKeys = EXPORT_SECTIONS.map((s) => s.key);
     const [selected, setSelected] = useState(new Set(allKeys));
+    const [exportMode, setExportMode] = useState('graphs_and_tables');
     const [isExporting, setIsExporting] = useState(false);
     const [exportStep, setExportStep] = useState('');
 
@@ -928,6 +932,7 @@ const ExportAnalytics = () => {
                 reportDate,
                 sections: selectedSections,
                 analyticsData,
+                graphsOnly: exportMode === 'graphs_only',
             });
 
             // 4. Record export in backend (non-fatal if it fails)
@@ -971,7 +976,7 @@ const ExportAnalytics = () => {
             setIsExporting(false);
             setExportStep('');
         }
-    }, [businessId, selected, user]);
+    }, [businessId, selected, exportMode, user]);
 
     return (
         <div className="p-6 space-y-6 max-w-4xl">
@@ -984,9 +989,37 @@ const ExportAnalytics = () => {
                 </Heading>
                 <Text className="text-gray-500 mt-1">
                     Select the sections you want to include in the PDF report. All data tables
-                    will be exported in full (no pagination). Charts are represented as their
-                    underlying data tables for maximum detail.
+                    will be exported in full (no pagination). Use <strong>Graphs &amp; Tables</strong> to
+                    include both visualizations and raw data, or <strong>Graphs Only</strong> for a
+                    compact chart-only report.
                 </Text>
+            </div>
+
+            {/* Export mode radio buttons */}
+            <div className="flex items-center gap-6 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                <span className="text-sm font-semibold text-gray-700 mr-1">Export Format:</span>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <RadioButton
+                        inputId="mode_graphs_only"
+                        name="exportMode"
+                        value="graphs_only"
+                        checked={exportMode === 'graphs_only'}
+                        onChange={(e) => setExportMode(e.value)}
+                        disabled={isExporting}
+                    />
+                    <span className="text-sm text-gray-700">Insert Graphs Only</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <RadioButton
+                        inputId="mode_graphs_and_tables"
+                        name="exportMode"
+                        value="graphs_and_tables"
+                        checked={exportMode === 'graphs_and_tables'}
+                        onChange={(e) => setExportMode(e.value)}
+                        disabled={isExporting}
+                    />
+                    <span className="text-sm text-gray-700">Insert Graphs &amp; Tables</span>
+                </label>
             </div>
 
             {/* Select All / None */}
