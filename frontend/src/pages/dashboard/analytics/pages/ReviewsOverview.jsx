@@ -340,7 +340,7 @@ export default function ReviewsOverview() {
     const {
         kpis, tierDoughnut, catRatingBarData, catReviewsBarData, catReviewsDoughnut,
         topRatedBarData, bottomRatedBarData, tierVelGrouped,
-        tierPerProduct, tierVelocity, sentByCat,
+        tierPerProduct, tierVelocity,
     } = derived;
 
     return (

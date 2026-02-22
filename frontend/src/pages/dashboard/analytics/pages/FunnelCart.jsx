@@ -76,16 +76,6 @@ const barOpts = (horizontal = false) => ({
     },
 });
 
-const groupedBarOpts = () => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { position: 'top' }, title: { display: false } },
-    scales: {
-        x: { grid: { color: 'rgba(0,0,0,0.05)' } },
-        y: { grid: { color: 'rgba(0,0,0,0.05)' } },
-    },
-});
-
 const doughnutOpts = () => ({
     responsive: true,
     maintainAspectRatio: false,

@@ -187,7 +187,7 @@ const CustomerOverview = () => {
             if (json.mode) setDataMode(json.mode);
             setRawData(json.categories?.customer_analytics ?? null);
             setRawGeo(json.categories?.geo_analytics ?? null);
-        } catch (err) {
+        } catch {
             console.error('[fetch] Analytics load error');
             setFetchError(true);
             setRawData(null);

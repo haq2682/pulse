@@ -98,7 +98,7 @@ export default function ProductTrends() {
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();
-    const { clientFilter, dateRange, setDateRange, quickFilter, isFiltered, applyQuickFilter, resetFilters, toISODate } = useAnalyticsDateFilter();
+    const { clientFilter, dateRange, setDateRange, quickFilter, isFiltered, applyQuickFilter, resetFilters } = useAnalyticsDateFilter();
     const { lastUpdate } = useAnalyticsWebSocket(businessId);
 
     const [raw, setRaw] = useState(null);
@@ -133,7 +133,7 @@ export default function ProductTrends() {
             const json = await res.json();
             if (json.mode) setDataMode(json.mode);
             setRaw(json.categories?.product_analytics?.analytics ?? {});
-        } catch (err) {
+        } catch {
             console.error('[ProductTrends] fetch error');
             setError(true);
             setRaw(null);
@@ -143,13 +143,13 @@ export default function ProductTrends() {
         }
     }, [buildUrl, businessId]);
 
-    useEffect(() => { fetchData(); }, []);
-    useEffect(() => { if (raw !== null) fetchData(); }, [dateRange]);
+    useEffect(() => { fetchData(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { if (raw !== null) fetchData(); }, [dateRange]); // eslint-disable-line react-hooks/exhaustive-deps
     useEffect(() => {
         if (!lastUpdate) return;
         fetchData();
         toastRef.current?.show({ severity: 'info', summary: 'Data Updated', detail: 'Analytics pipeline completed — refreshing trends.', life: 3000 });
-    }, [lastUpdate]);
+    }, [lastUpdate]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // -------------------------------------------------------------------------
     // Derived data
@@ -340,7 +340,7 @@ export default function ProductTrends() {
             top10Products, peakSorted, top6PeakCats,
             sortedMonthKeys,
         };
-    }, [raw, clientFilter, isFiltered]);
+    }, [raw, clientFilter]);
 
     const hasData = !!(derived && (derived.sortedMonthKeys.length > 0 || derived.peakSorted.length > 0));
 

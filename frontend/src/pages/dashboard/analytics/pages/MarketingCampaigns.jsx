@@ -273,7 +273,6 @@ export default function MarketingCampaigns() {
             kpis: { totalCampaigns, totalSpend, totalRevenue, avgROI, avgROAS },
             revenueBarData, roasBarData, roiBarData, budgetVsSpentData, convBarData, effBarData,
             statusDoughnutData, typeDoughnutData, tierDoughnutData,
-            summaryTable: summary,
             perfTable: perf,
             wastefulTable: wasteful,
         };
@@ -344,7 +343,7 @@ export default function MarketingCampaigns() {
 
     const { kpis, revenueBarData, roasBarData, roiBarData, budgetVsSpentData, convBarData, effBarData,
             statusDoughnutData, typeDoughnutData, tierDoughnutData,
-            summaryTable, perfTable, wastefulTable } = derived;
+            perfTable, wastefulTable } = derived;
 
     return (
         <div className="p-6 space-y-8">

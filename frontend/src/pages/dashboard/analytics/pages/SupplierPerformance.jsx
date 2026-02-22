@@ -66,7 +66,7 @@ export default function SupplierPerformance() {
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();
-    const { dateRange, setDateRange, quickFilter, isFiltered, applyQuickFilter, resetFilters, toISODate } = useAnalyticsDateFilter();
+    const { dateRange, setDateRange, quickFilter, isFiltered, applyQuickFilter, resetFilters } = useAnalyticsDateFilter();
     const { lastUpdate } = useAnalyticsWebSocket(businessId);
 
     const [rawSupplier, setRawSupplier] = useState(null);
@@ -349,7 +349,7 @@ export default function SupplierPerformance() {
     }
 
     const {
-        totalSuppliers, preferredCount, verifiedCount, avgPerfScore, bestRow,
+        totalSuppliers, preferredCount, avgPerfScore, bestRow,
         perfBarData, relBarData, effBarData, healthBarData,
         preferredDoughnut, statusDoughnut, verifiedDoughnut,
         mergedRanking,

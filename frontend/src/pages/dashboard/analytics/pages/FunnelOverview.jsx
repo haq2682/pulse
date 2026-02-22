@@ -167,9 +167,6 @@ export default function FunnelOverview() {
         const totalCart         = byDevice.reduce((s, r) => s + (+(r.sessions_with_cart ?? 0)), 0);
         const totalOrders       = byDevice.reduce((s, r) => s + (+(r.sessions_with_orders ?? 0)), 0);
         const totalHighValue    = byDevice.reduce((s, r) => s + (+(r.high_value_sessions ?? 0)), 0);
-        const avgConvRate       = byDevice.length > 0
-            ? byDevice.reduce((s, r) => s + (+(r.conversion_rate ?? 0)), 0) / byDevice.length
-            : 0;
         const overallConvRate   = totalSessions > 0 ? (totalOrders / totalSessions) * 100 : 0;
         const viewToCartRate    = totalViews > 0 ? (totalCart / totalViews) * 100 : 0;
         const cartToOrderRate   = totalCart > 0 ? (totalOrders / totalCart) * 100 : 0;

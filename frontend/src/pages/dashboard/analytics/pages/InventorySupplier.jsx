@@ -82,7 +82,7 @@ export default function InventorySupplier() {
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();
-    const { dateRange, isFiltered, applyQuickFilter, resetFilters, toISODate } = useAnalyticsDateFilter();
+    const { dateRange, applyQuickFilter, resetFilters, toISODate } = useAnalyticsDateFilter();
     const { lastUpdate } = useAnalyticsWebSocket(businessId);
 
     const [rawSupplier, setRawSupplier] = useState(null);
@@ -144,7 +144,6 @@ export default function InventorySupplier() {
         const stockoutBySup    = a.stockout_rate_by_supplier?.data                ?? [];
         const reliability      = a.supplier_reliability?.data                     ?? [];
         const contractExpiry   = a.supplier_contract_expiry?.data                 ?? [];
-        const costEfficiency   = a.storage_cost_efficiency_by_supplier?.data      ?? [];
         const carryingCost     = a.inventory_carrying_cost_by_supplier?.data      ?? [];
 
         // ---- KPIs -----------------------------------------------------------

@@ -147,10 +147,8 @@ export default function FunnelWishlist() {
 
         const summary          = a.wishlist_overall_summary?.data          ?? [];
         const byProduct        = a.wishlist_by_product?.data               ?? [];
-        const byCustomer       = a.wishlist_by_customer?.data              ?? [];
         const ttpStats         = a.wishlist_time_to_purchase_stats?.data   ?? [];
         const ttpDist          = a.wishlist_time_to_purchase_distribution?.data ?? [];
-        const abandonedItems   = a.abandoned_wishlist_items?.data          ?? [];
         const abandonByProduct = a.abandoned_wishlist_by_product?.data     ?? [];
         const abandonByCustomer = a.abandoned_wishlist_by_customer?.data   ?? [];
         const addsByMonth      = a.wishlist_adds_by_month?.data            ?? [];

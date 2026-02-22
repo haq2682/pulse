@@ -82,16 +82,6 @@ const barOpts = (horizontal = false) => ({
     },
 });
 
-const groupedBarOpts = () => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { position: 'top' }, title: { display: false } },
-    scales: {
-        x: { grid: { color: 'rgba(0,0,0,0.05)' } },
-        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
-    },
-});
-
 const lineOpts = () => ({
     responsive: true,
     maintainAspectRatio: false,
@@ -172,7 +162,6 @@ export default function PaymentFinancialMetrics() {
         const a = rawRevenue.analytics ?? {};
 
         const aovMonthly      = a.aov_trend_monthly?.data              ?? [];
-        const aovDaily        = a.aov_trend_daily?.data                ?? [];
         const aovWeekly       = a.aov_trend_weekly?.data               ?? [];
         const revBySegment    = a.rev_by_customer_segment?.data        ?? [];
         const revByRfm        = a.rev_by_rfm_segment?.data             ?? [];
@@ -334,7 +323,7 @@ export default function PaymentFinancialMetrics() {
             kpis: { totalRevenue, latestMonthAov, topSegmentByRev, lowMarginCount, carryingCostVal },
             aovLineData, revBySegBarData, revByRfmBarData, revRfmDoughnutData, revPerCustRfmData,
             aovByRfmBarData, revByDeviceBarData, revByReferrerBarData, lowMarginBarData, revByLabelBarData,
-            revBySegment, revByRfm, lowMarginCats, aovRfmSorted,
+            revByRfm, lowMarginCats, aovRfmSorted,
             aovWeekly, revByCountryCity,
         };
     }, [rawRevenue]);
@@ -394,10 +383,12 @@ export default function PaymentFinancialMetrics() {
         );
     }
 
+    if (!derived) return null;
+
     const {
         kpis, aovLineData, revBySegBarData, revByRfmBarData, revRfmDoughnutData, revPerCustRfmData,
         aovByRfmBarData, revByDeviceBarData, revByReferrerBarData, lowMarginBarData, revByLabelBarData,
-        revBySegment, revByRfm, lowMarginCats, aovRfmSorted,
+        revByRfm, lowMarginCats, aovRfmSorted,
     } = derived;
 
     return (

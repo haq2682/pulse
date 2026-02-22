@@ -81,7 +81,7 @@ export default function SupplierOperations() {
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();
-    const { dateRange, setDateRange, quickFilter, isFiltered, applyQuickFilter, resetFilters, toISODate } = useAnalyticsDateFilter();
+    const { dateRange, setDateRange, quickFilter, isFiltered, applyQuickFilter, resetFilters } = useAnalyticsDateFilter();
     const { lastUpdate } = useAnalyticsWebSocket(businessId);
 
     const [rawSupplier, setRawSupplier] = useState(null);
@@ -141,7 +141,6 @@ export default function SupplierOperations() {
         const supplierStockouts = a.supplier_stockouts?.data            ?? [];
         const lastRestock    = a.supplier_days_since_last_restock?.data ?? [];
         const contractExp    = a.supplier_contract_expiry?.data         ?? [];
-        const rankingCore    = a.supplier_ranking_core?.data            ?? [];
 
         if (fulfillment.length === 0 && stockoutBySup.length === 0 && contractExp.length === 0) return null;
 

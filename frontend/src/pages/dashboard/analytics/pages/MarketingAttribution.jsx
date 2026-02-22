@@ -40,8 +40,6 @@ const fmt = {
     pct:      (v) => `${(+(v ?? 0)).toFixed(1)}%`,
 };
 
-const camLabel = (r, idField = 'campaign_id') => r.campaign_name || `Campaign ${r[idField]}`;
-
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -63,16 +61,6 @@ const barOpts = (horizontal = false) => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: { legend: { display: false }, title: { display: false } },
-    scales: {
-        x: { grid: { color: 'rgba(0,0,0,0.05)' } },
-        y: { grid: { color: 'rgba(0,0,0,0.05)' } },
-    },
-});
-
-const groupedBarOpts = () => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { position: 'top' }, title: { display: false } },
     scales: {
         x: { grid: { color: 'rgba(0,0,0,0.05)' } },
         y: { grid: { color: 'rgba(0,0,0,0.05)' } },

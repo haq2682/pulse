@@ -285,7 +285,7 @@ export default function PaymentRefunds() {
             kpis: { totalRefunds, overallRefundRate, worstMethod, fastestMethod, topRefundProduct },
             refundRateBarData, refundAmtBarData, avgRefundBarData, refundDoughnutData,
             topProdRefundBarData, topProdAmtBarData, refundTrendData, ttpBarData,
-            refundByMethod, refundByProduct, monthsSorted, ttpSorted,
+            refundByMethod, refundByProduct, ttpSorted,
         };
     }, [rawPayment]);
 
@@ -347,7 +347,7 @@ export default function PaymentRefunds() {
     const {
         kpis, refundRateBarData, refundAmtBarData, avgRefundBarData, refundDoughnutData,
         topProdRefundBarData, topProdAmtBarData, refundTrendData, ttpBarData,
-        refundByMethod, refundByProduct, monthsSorted, ttpSorted,
+        refundByMethod, refundByProduct, ttpSorted,
     } = derived;
 
     return (

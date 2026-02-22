@@ -371,7 +371,7 @@ const ExecutiveOverview = () => {
             bhWeeklyRaw: kpisCategory?.analytics?.business_health_weekly?.data ?? [],
             bhMonthlyRaw: kpisCategory?.analytics?.business_health_monthly?.data ?? [],
         };
-    }, [rawCategories, clientFilter, isFiltered]);
+    }, [rawCategories, clientFilter]);
 
     // -----------------------------------------------------------------------
     // Chart configs
