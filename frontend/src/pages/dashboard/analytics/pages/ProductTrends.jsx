@@ -111,8 +111,9 @@ export default function ProductTrends() {
     // -------------------------------------------------------------------------
 
     const buildUrl = useCallback(() => {
+        const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
         const params = new URLSearchParams({ categories: ANALYTICS_CATEGORIES.join(',') });
-        return `/analytics/data/${businessId}?${params.toString()}`;
+        return `${base}/analytics/data/${businessId}?${params.toString()}`;
     }, [businessId]);
 
     const fetchData = useCallback(async () => {
