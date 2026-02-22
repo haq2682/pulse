@@ -343,6 +343,9 @@ export default function Forecasts() {
         );
     }
 
+    // Guard against derived being null while the pipeline is loading
+    if (!derived) return null;
+
     const {
         availableCount, totalCatalog,
         churnRows, segClsRows, segClustRows, aovRows, clvRows,
