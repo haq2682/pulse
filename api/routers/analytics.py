@@ -403,11 +403,137 @@ async def trigger_analytics_update(business_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/exports")
+async def record_export(request: Request, db=Depends(get_db)):
+    """
+    Record metadata for a generated analytics PDF export.
+
+    Request body:
+        - business_id: Business ID
+        - user_id: User ID
+        - file_name: Name of the exported file
+        - sections_exported: List of section labels that were exported
+        - total_sections: Total number of sections exported
+
+    Returns:
+        Created export record metadata
+    """
+    try:
+        body = await request.json()
+        business_id = body.get("business_id")
+        user_id = body.get("user_id")
+        file_name = body.get("file_name")
+        sections_exported = body.get("sections_exported", [])
+        total_sections = body.get("total_sections", 0)
+
+        if not business_id or not user_id or not file_name:
+            raise HTTPException(status_code=400, detail="business_id, user_id, and file_name are required")
+
+        # Verify business belongs to user
+        result = db.execute(
+            text("SELECT business_id FROM businesses WHERE business_id = :business_id AND user_id = :user_id"),
+            {"business_id": business_id, "user_id": user_id},
+        ).fetchone()
+        if not result:
+            raise HTTPException(status_code=404, detail="Business not found or access denied")
+
+        import uuid
+        export_id = str(uuid.uuid4())
+        db.execute(
+            text(
+                """
+                INSERT INTO analytics_exports
+                    (export_id, business_id, user_id, file_name, sections_exported, total_sections)
+                VALUES
+                    (:export_id, :business_id, :user_id, :file_name, :sections_exported::jsonb, :total_sections)
+                """
+            ),
+            {
+                "export_id": export_id,
+                "business_id": business_id,
+                "user_id": user_id,
+                "file_name": file_name,
+                "sections_exported": json.dumps(sections_exported),
+                "total_sections": total_sections,
+            },
+        )
+        db.commit()
+
+        return {
+            "export_id": export_id,
+            "business_id": business_id,
+            "file_name": file_name,
+            "total_sections": total_sections,
+            "created_at": datetime.utcnow().isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error recording export: {e}")
+        raise HTTPException(status_code=500, detail="Failed to record export")
+
+
+@router.get("/exports/{business_id}")
+async def list_exports(business_id: str, user_id: str = Query(...), db=Depends(get_db)):
+    """
+    List all export records for a business.
+
+    Args:
+        business_id: Business ID
+        user_id: User ID (query param for ownership verification)
+
+    Returns:
+        List of export records
+    """
+    try:
+        # Verify ownership
+        biz = db.execute(
+            text("SELECT business_id FROM businesses WHERE business_id = :business_id AND user_id = :user_id"),
+            {"business_id": business_id, "user_id": user_id},
+        ).fetchone()
+        if not biz:
+            raise HTTPException(status_code=404, detail="Business not found or access denied")
+
+        rows = db.execute(
+            text(
+                """
+                SELECT export_id, file_name, sections_exported, total_sections, created_at
+                FROM analytics_exports
+                WHERE business_id = :business_id
+                ORDER BY created_at DESC
+                LIMIT 50
+                """
+            ),
+            {"business_id": business_id},
+        ).fetchall()
+
+        return {
+            "exports": [
+                {
+                    "export_id": r[0],
+                    "file_name": r[1],
+                    "sections_exported": r[2],
+                    "total_sections": r[3],
+                    "created_at": r[4].isoformat() if r[4] else None,
+                }
+                for r in rows
+            ]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error listing exports: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve export history")
+
+
 @router.get("/monitoring-status")
 async def get_monitoring_status():
     """
     Get status of analytics monitoring service.
-    
+
     Returns:
         List of monitored businesses and their status
     """

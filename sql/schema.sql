@@ -145,3 +145,16 @@ CREATE TRIGGER update_pipeline_status_updated_at
 BEFORE UPDATE ON pipeline_status
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
+
+-- Analytics Exports table for tracking generated PDF reports
+CREATE TABLE analytics_exports (
+    export_id VARCHAR(50) PRIMARY KEY,
+    business_id VARCHAR(50) NOT NULL,
+    user_id VARCHAR(50) NOT NULL,
+    file_name VARCHAR(500) NOT NULL,
+    sections_exported JSONB NOT NULL DEFAULT '[]',
+    total_sections INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (business_id) REFERENCES businesses(business_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
