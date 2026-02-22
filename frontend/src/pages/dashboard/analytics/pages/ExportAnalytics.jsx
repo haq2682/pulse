@@ -331,6 +331,41 @@ const EXPORT_SECTIONS = [
             'device_conversion_rates',
         ],
     },
+    {
+        key: 'forecasts',
+        label: 'Forecasts & Predictions',
+        emoji: '🔮',
+        isForecast: true,      // signals different fetch endpoint
+        categories: [],         // not used for forecast fetch
+        analyticsKeys: [
+            'cart_abandonment_predictions',
+            'customer_churn_predictions',
+            'customer_segment_predictions',
+            'payment_success_predictions',
+            'review_sentiment_predictions',
+            'stock_status_predictions',
+            'customer_segmentation',
+            'geographic_clustering',
+            'session_behavior_clustering',
+            'supplier_clustering',
+            'aov_prediction',
+            'clv_predictions',
+            'restock_quantity',
+            'safety_stock_adjusted',
+            'session_conversion_value',
+            'stockout_probability',
+            'fulfillment_risk_predictions',
+            'product_bundling_predictions',
+            'product_affinity_clustering',
+            'product_lifecycle_clustering',
+            'campaign_roi',
+            'delivery_time',
+            'demand_forecast',
+            'price_optimization',
+            'revenue_forecast',
+            'seasonal_trends',
+        ],
+    },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1444,26 +1479,50 @@ const ExportAnalytics = () => {
                 // non-fatal — use id as fallback
             }
 
-            // 2. Collect unique categories needed for selected sections
+            // 2. Collect unique categories needed for selected non-forecast sections
             const selectedSections = EXPORT_SECTIONS.filter((s) => selected.has(s.key));
+            const regularSections  = selectedSections.filter((s) => !s.isForecast);
+            const forecastSection  = selectedSections.find((s) => s.isForecast);
+
             const categorySet = new Set();
-            selectedSections.forEach((s) => s.categories.forEach((c) => categorySet.add(c)));
-            const categoriesParam = [...categorySet].join(',');
+            regularSections.forEach((s) => s.categories.forEach((c) => categorySet.add(c)));
 
             setExportStep('Fetching analytics data…');
             const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-            const dataRes = await fetch(
-                `${base}/analytics/data/${businessId}?categories=${encodeURIComponent(categoriesParam)}`
-            );
-            if (!dataRes.ok) {
-                throw new Error('Analytics data not available. Please run the analytics pipeline first.');
-            }
-            const dataJson = await dataRes.json();
-            const cats = dataJson.categories ?? {};
 
-            // 3. Build per-section flat lookup: section.key → { analyticsKey → rows[] }
+            // 3a. Fetch regular analytics (skip if only forecasts selected)
+            let cats = {};
+            if (categorySet.size > 0) {
+                const dataRes = await fetch(
+                    `${base}/analytics/data/${businessId}?categories=${encodeURIComponent([...categorySet].join(','))}`
+                );
+                if (!dataRes.ok) {
+                    throw new Error('Analytics data not available. Please run the analytics pipeline first.');
+                }
+                const dataJson = await dataRes.json();
+                cats = dataJson.categories ?? {};
+            }
+
+            // 3b. Fetch forecast inferences (if forecasts section selected)
+            let forecastInferences = {};
+            if (forecastSection) {
+                setExportStep('Fetching forecast data…');
+                try {
+                    const fRes = await fetch(`${base}/analytics/forecasts/${businessId}`);
+                    if (fRes.ok) {
+                        const fJson = await fRes.json();
+                        forecastInferences = fJson.inferences ?? {};
+                    }
+                } catch (e) {
+                    // Non-fatal: ML pipeline may not have run yet; section will show
+                    // "No data available" in the exported report instead of failing.
+                    console.warn('[ExportAnalytics] forecast fetch unavailable:', e?.message);
+                }
+            }
+
+            // 3c. Build per-section flat lookup: section.key → { analyticsKey → rows[] }
             const analyticsData = {};
-            selectedSections.forEach((sec) => {
+            regularSections.forEach((sec) => {
                 const lookup = {};
                 sec.categories.forEach((cat) => {
                     const catAnalytics = cats[cat]?.analytics ?? {};
@@ -1475,6 +1534,15 @@ const ExportAnalytics = () => {
                 });
                 analyticsData[sec.key] = lookup;
             });
+            if (forecastSection) {
+                const lookup = {};
+                forecastSection.analyticsKeys.forEach((k) => {
+                    if (forecastInferences[k]?.data?.length) {
+                        lookup[k] = forecastInferences[k].data;
+                    }
+                });
+                analyticsData[forecastSection.key] = lookup;
+            }
 
             setExportStep('Generating PDF…');
             const reportDate = new Date().toLocaleString('en-US', {
@@ -1575,22 +1643,45 @@ const ExportAnalytics = () => {
             }
 
             const selectedSections = EXPORT_SECTIONS.filter((s) => selected.has(s.key));
+            const regularSections  = selectedSections.filter((s) => !s.isForecast);
+            const forecastSection  = selectedSections.find((s) => s.isForecast);
+
             const categorySet = new Set();
-            selectedSections.forEach((s) => s.categories.forEach((c) => categorySet.add(c)));
+            regularSections.forEach((s) => s.categories.forEach((c) => categorySet.add(c)));
 
             setExportStep('Fetching analytics data…');
             const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-            const dataRes = await fetch(
-                `${base}/analytics/data/${businessId}?categories=${encodeURIComponent([...categorySet].join(','))}`
-            );
-            if (!dataRes.ok) {
-                throw new Error('Analytics data not available. Please run the analytics pipeline first.');
+
+            let cats = {};
+            if (categorySet.size > 0) {
+                const dataRes = await fetch(
+                    `${base}/analytics/data/${businessId}?categories=${encodeURIComponent([...categorySet].join(','))}`
+                );
+                if (!dataRes.ok) {
+                    throw new Error('Analytics data not available. Please run the analytics pipeline first.');
+                }
+                const dataJson = await dataRes.json();
+                cats = dataJson.categories ?? {};
             }
-            const dataJson = await dataRes.json();
-            const cats = dataJson.categories ?? {};
+
+            let forecastInferences = {};
+            if (forecastSection) {
+                setExportStep('Fetching forecast data…');
+                try {
+                    const fRes = await fetch(`${base}/analytics/forecasts/${businessId}`);
+                    if (fRes.ok) {
+                        const fJson = await fRes.json();
+                        forecastInferences = fJson.inferences ?? {};
+                    }
+                } catch (e) {
+                    // Non-fatal: ML pipeline may not have run yet; section will show
+                    // "No data available" in the exported report instead of failing.
+                    console.warn('[ExportAnalytics HTML] forecast fetch unavailable:', e?.message);
+                }
+            }
 
             const analyticsData = {};
-            selectedSections.forEach((sec) => {
+            regularSections.forEach((sec) => {
                 const lookup = {};
                 sec.categories.forEach((cat) => {
                     const catAnalytics = cats[cat]?.analytics ?? {};
@@ -1600,6 +1691,15 @@ const ExportAnalytics = () => {
                 });
                 analyticsData[sec.key] = lookup;
             });
+            if (forecastSection) {
+                const lookup = {};
+                forecastSection.analyticsKeys.forEach((k) => {
+                    if (forecastInferences[k]?.data?.length) {
+                        lookup[k] = forecastInferences[k].data;
+                    }
+                });
+                analyticsData[forecastSection.key] = lookup;
+            }
 
             setExportStep('Generating HTML…');
             const reportDate = new Date().toLocaleString('en-US', {
