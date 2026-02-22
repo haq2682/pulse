@@ -912,9 +912,6 @@ const Dashboard = () => {
 
                     {/* Right Side - Notifications & Avatar */}
                     <div className="flex items-center gap-3">
-                        <button className="p-2 hover:bg-gray-100 rounded-full transition-colors relative">
-                            <i className="pi pi-bell text-xl text-gray-700"></i>
-                        </button>
                         
                         {/* PROFILE DROPDOWN CONTAINER */}
                         <div className="relative" ref={profileRef}>
@@ -968,6 +965,7 @@ const Dashboard = () => {
 
                 {/* Main Content Area */}
                 <main className="flex-1 overflow-y-auto p-4 md:p-6">
+                    {!pathname.includes('/xai') && (
                     <div className="flex items-center justify-between">
                         <div className="mx-10 flex items-center gap-2">
                             {/* Add Business Button */}
@@ -1012,6 +1010,7 @@ const Dashboard = () => {
                             />
                         </div>
                     </div>
+                    )}
                     
                     {/* Show inline pipeline progress when business is selected */}
                     {businessId ? (

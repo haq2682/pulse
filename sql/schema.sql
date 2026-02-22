@@ -158,3 +158,32 @@ CREATE TABLE analytics_exports (
     FOREIGN KEY (business_id) REFERENCES businesses(business_id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
+
+-- XAI Chat Conversations table
+CREATE TABLE xai_conversations (
+    conversation_id VARCHAR(50) PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    business_id VARCHAR(50) NOT NULL,
+    title VARCHAR(500) DEFAULT 'New Chat',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (business_id) REFERENCES businesses(business_id) ON DELETE CASCADE
+);
+
+CREATE TRIGGER update_xai_conversations_updated_at
+BEFORE UPDATE ON xai_conversations
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+-- XAI Chat Messages table
+CREATE TABLE xai_messages (
+    message_id VARCHAR(50) PRIMARY KEY,
+    conversation_id VARCHAR(50) NOT NULL,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant', 'notification')),
+    content TEXT NOT NULL,
+    metadata JSONB DEFAULT '{}',
+    severity VARCHAR(20) DEFAULT 'info' CHECK (severity IN ('info', 'warning', 'error', 'success')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES xai_conversations(conversation_id) ON DELETE CASCADE
+);

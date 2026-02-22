@@ -50,6 +50,7 @@ services:
       - SPARK_MASTER_URL=spark://10.5.0.3:7077
       - PYSPARK_PYTHON=python3.10
       - PYSPARK_DRIVER_PYTHON=python3.10
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - postgresql
       - python
