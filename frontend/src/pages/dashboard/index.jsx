@@ -52,6 +52,9 @@ import ReviewsImpact from './analytics/pages/ReviewsImpact';
 import EngagementMetrics from './analytics/pages/EngagementMetrics';
 import EngagementBehavior from './analytics/pages/EngagementBehavior';
 import EngagementConversion from './analytics/pages/EngagementConversion';
+import Forecasts from './analytics/pages/Forecasts';
+import ExplainableAI from './analytics/pages/ExplainableAI';
+import ExportAnalytics from './analytics/pages/ExportAnalytics';
 
 // ---------------------------------------------------------------------------
 // Insight Catalog — every insight mapped to a page route segment
@@ -784,6 +787,18 @@ const Dashboard = () => {
 
         if (pathname.includes('/engagement/conversion')) {
             return <EngagementConversion />;
+        }
+
+        if (pathname.includes('/forecasts')) {
+            return <Forecasts />;
+        }
+
+        if (pathname.includes('/xai')) {
+            return <ExplainableAI />;
+        }
+
+        if (pathname.includes('/export')) {
+            return <ExportAnalytics />;
         }
 
         // Default fallback for unrecognized routes

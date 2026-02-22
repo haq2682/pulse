@@ -150,31 +150,19 @@ const Sidebar = ({ isOpen, onClose }) => {
             icon: 'pi pi-chart-bar',
             label: 'Forecasts & Predictions',
             emoji: '🔮',
-            subItems: [
-                { label: 'Revenue Forecast', path: `${basePath}/forecasts/revenue` },
-                { label: 'Demand Forecast', path: `${basePath}/forecasts/demand` },
-                { label: 'Churn Prediction', path: `${basePath}/forecasts/churn` },
-            ]
+            path: `${basePath}/forecasts`,
         },
         {
             icon: 'pi pi-eye',
             label: 'Explainable AI',
             emoji: '🤖',
-            subItems: [
-                { label: 'Feature Importance', path: `${basePath}/xai/features` },
-                { label: 'Model Insights', path: `${basePath}/xai/insights` },
-                { label: 'Decision Explanations', path: `${basePath}/xai/decisions` },
-            ]
+            path: `${basePath}/xai`,
         },
         {
             icon: 'pi pi-download',
             label: 'Export Analytics',
             emoji: '📤',
-            subItems: [
-                { label: 'Export Reports', path: `${basePath}/export/reports` },
-                { label: 'Schedule Exports', path: `${basePath}/export/schedule` },
-                { label: 'Export History', path: `${basePath}/export/history` },
-            ]
+            path: `${basePath}/export`,
         },
     ];
 
