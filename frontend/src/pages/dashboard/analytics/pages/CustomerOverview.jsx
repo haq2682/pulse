@@ -33,6 +33,8 @@ ChartJS.register(
 // Constants
 // ---------------------------------------------------------------------------
 
+const ANALYTICS_CATEGORIES = 'customer_analytics,geo_analytics';
+
 const PALETTE = [
     'rgba(59,130,246,0.8)',
     'rgba(34,197,94,0.8)',
@@ -160,7 +162,7 @@ const CustomerOverview = () => {
 
     const buildUrl = useCallback((from, to) => {
         const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        const params = new URLSearchParams({ categories: 'customer_analytics,geo_analytics' });
+        const params = new URLSearchParams({ categories: ANALYTICS_CATEGORIES });
         if (from) params.set('date_from', toISODate(from));
         if (to)   params.set('date_to',   toISODate(to));
         return `${base}/analytics/data/${businessId}?${params.toString()}`;
