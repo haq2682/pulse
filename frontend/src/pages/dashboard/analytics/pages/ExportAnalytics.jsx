@@ -437,7 +437,13 @@ const drawLineChart = (doc, rows, xKey, yKeys, x, y, w, chartH = 42) => {
     const plotW = w - ML - MR, plotH = chartH - MT - MB;
     const bx = x + ML, by = y + MT;
     const allVals = yKeys.flatMap((yk) => rows.map((r) => Number(r[yk] ?? 0)));
-    const minV = Math.min(...allVals), maxV = Math.max(...allVals, minV + 1);
+    if (!allVals.length) return y;
+    // Use reduce instead of spread to avoid RangeError: Maximum call stack size exceeded
+    // on large datasets (JS spread passes each element as a function argument, which
+    // hits engine limits when allVals has tens-of-thousands of elements).
+    const minV = allVals.reduce((acc, v) => (v < acc ? v : acc), allVals[0]);
+    // Start maxV at minV+1 to guarantee range > 0 (prevents division-by-zero in scaling).
+    const maxV = allVals.reduce((acc, v) => (v > acc ? v : acc), minV + 1);
     const range = maxV - minV;
     // Plot background
     doc.setFillColor(249, 250, 251);
@@ -945,7 +951,7 @@ const ExportAnalytics = () => {
             }
 
             // 5. Download
-            doc.save(fileName);
+            await doc.save(fileName);
 
             toastRef.current?.show({
                 severity: 'success',

@@ -445,7 +445,7 @@ async def record_export(request: Request, db=Depends(get_db)):
                 INSERT INTO analytics_exports
                     (export_id, business_id, user_id, file_name, sections_exported, total_sections)
                 VALUES
-                    (:export_id, :business_id, :user_id, :file_name, :sections_exported::jsonb, :total_sections)
+                    (:export_id, :business_id, :user_id, :file_name, CAST(:sections_exported AS jsonb), :total_sections)
                 """
             ),
             {
