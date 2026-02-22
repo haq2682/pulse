@@ -230,6 +230,10 @@ export default function Forecasts() {
 
         const get = (name) => inferences[name]?.data ?? null;
         const meta = (name) => inferences[name]?.meta ?? null;
+        // Full-dataset row count (before row_limit truncation)
+        const rowCount = (name) => inferences[name]?.row_count ?? null;
+        // Server-side aggregate stats computed on the full dataset
+        const summaryStats = (name) => inferences[name]?.meta?.summary_stats ?? {};
 
         // ── Customer Intelligence ──────────────────────────────────────────────
 
@@ -295,6 +299,8 @@ export default function Forecasts() {
             sentimentRows, paymentRows, bundleRows, affinityRows, lifecycleRows,
             // metas
             getMeta: meta,
+            getRowCount: rowCount,
+            getSummaryStats: summaryStats,
         };
     }, [rawData]);
 
@@ -354,6 +360,7 @@ export default function Forecasts() {
         campaignRows, revRows, seasonRows, geoRows,
         cartRows, sessionClust, sessConvRows,
         sentimentRows, paymentRows, bundleRows, affinityRows, lifecycleRows,
+        getRowCount, getSummaryStats,
     } = derived;
 
     // =========================================================================
@@ -394,7 +401,8 @@ export default function Forecasts() {
         labels: topRestock.map((r) => String(r.product_id ?? '').slice(0, 12)),
         datasets: [{ label: 'Restock Qty', data: topRestock.map((r) => +(r.recommended_restock_quantity ?? 0)), backgroundColor: PALETTE[2] }],
     } : null;
-    const totalRestockCost = restockRows ? restockRows.reduce((s, r) => s + (+(r.estimated_cost ?? 0)), 0) : 0;
+    const totalRestockCost = getSummaryStats('restock_quantity').total_estimated_cost
+        ?? (restockRows ? restockRows.reduce((s, r) => s + (+(r.estimated_cost ?? 0)), 0) : 0);
 
     // ── Safety Stock ──────────────────────────────────────────────────────────
     const safetyDist = safetyRows ? distBarData(countBy(safetyRows, 'demand_pattern')) : null;
@@ -439,7 +447,8 @@ export default function Forecasts() {
         const entries = Object.entries(bins).filter(([, v]) => v > 0);
         return entries.length ? { labels: entries.map(([k]) => k), datasets: [{ data: entries.map(([, v]) => v), backgroundColor: PALETTE }] } : null;
     })();
-    const avgDeliveryDays = deliveryRows && deliveryRows.length > 0 ? (deliveryRows.reduce((s, r) => s + (+(r.predicted_delivery_days ?? 0)), 0) / deliveryRows.length) : 0;
+    const avgDeliveryDays = getSummaryStats('delivery_time').avg_delivery_days
+        ?? (deliveryRows && deliveryRows.length > 0 ? (deliveryRows.reduce((s, r) => s + (+(r.predicted_delivery_days ?? 0)), 0) / deliveryRows.length) : 0);
 
     // ── Supplier Clustering ───────────────────────────────────────────────────
     const supplierTierDist = supplierClust ? distDoughnutData(countBy(supplierClust, 'performance_tier')) : null;
@@ -450,7 +459,8 @@ export default function Forecasts() {
         labels: topCampaigns.map((r) => String(r.campaign_id ?? '').slice(0, 16)),
         datasets: [{ label: 'Predicted ROI (%)', data: topCampaigns.map((r) => +(r.predicted_roi ?? 0).toFixed(1)), backgroundColor: PALETTE }],
     } : null;
-    const totalCampaignRev = campaignRows ? campaignRows.reduce((s, r) => s + (+(r.predicted_revenue ?? 0)), 0) : 0;
+    const totalCampaignRev = getSummaryStats('campaign_roi').total_predicted_revenue
+        ?? (campaignRows ? campaignRows.reduce((s, r) => s + (+(r.predicted_revenue ?? 0)), 0) : 0);
 
     // ── Revenue Forecast ──────────────────────────────────────────────────────
     const revSorted = revRows ? [...revRows].sort((a, b) => String(a.forecast_date ?? '').localeCompare(String(b.forecast_date ?? ''))) : [];
@@ -463,7 +473,8 @@ export default function Forecasts() {
             fill: true, tension: 0.3,
         }],
     } : null;
-    const totalPredRevenue = revRows ? revRows.reduce((s, r) => s + (+(r.predicted_revenue ?? 0)), 0) : 0;
+    const totalPredRevenue = getSummaryStats('revenue_forecast').total_predicted_revenue
+        ?? (revRows ? revRows.reduce((s, r) => s + (+(r.predicted_revenue ?? 0)), 0) : 0);
 
     // ── Seasonal Trends ───────────────────────────────────────────────────────
     const seasonSorted = seasonRows ? [...seasonRows].sort((a, b) => (+(a.forecast_month ?? 0)) - (+(b.forecast_month ?? 0))) : [];
@@ -538,9 +549,12 @@ export default function Forecasts() {
                 <KPICard icon="pi-database" iconBg="bg-blue-100" iconColor="text-blue-600"
                     value={`${availableCount} / ${totalCatalog}`} label="Catalog Coverage" />
                 <KPICard icon="pi-users" iconBg="bg-purple-100" iconColor="text-purple-600"
-                    value={churnRows ? fmt.number(churnRows.length) : '—'} label="Churn Predictions" />
+                    value={churnRows ? fmt.number(getRowCount('customer_churn_predictions') ?? churnRows.length) : '—'} label="Churn Predictions" />
                 <KPICard icon="pi-box" iconBg="bg-amber-100" iconColor="text-amber-600"
-                    value={stockoutRows ? fmt.number(stockoutRows.filter((r) => ['Critical', 'High'].includes(r.stockout_risk_level)).length) : '—'}
+                    value={stockoutRows ? fmt.number(
+                        getSummaryStats('stockout_probability').high_risk_count
+                        ?? stockoutRows.filter((r) => ['Critical', 'High'].includes(r.stockout_risk_level)).length
+                    ) : '—'}
                     label="High Stockout Risk Products" />
             </div>
 
@@ -556,7 +570,7 @@ export default function Forecasts() {
                         label="Customer Churn Predictions"
                         modelType={churnRows ? 'directory' : null}
                         description="Classifies each customer's churn risk (High / Medium / Low) with contributing factors."
-                        count={churnRows?.length}
+                        count={getRowCount('customer_churn_predictions') ?? churnRows?.length}
                     />
                     {churnRows ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -590,7 +604,7 @@ export default function Forecasts() {
                         label="Customer Segment Predictions (Classification)"
                         modelType={segClsRows ? 'directory' : null}
                         description="RFM-based segment classification per customer."
-                        count={segClsRows?.length}
+                        count={getRowCount('customer_segment_predictions') ?? segClsRows?.length}
                     />
                     {segClsRows ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -624,7 +638,7 @@ export default function Forecasts() {
                         label="Customer Segmentation (RFM Clustering)"
                         modelType={segClustRows ? 'file' : null}
                         description="K-Means clusters customers into semantic personas based on Recency, Frequency, Monetary scores."
-                        count={segClustRows?.length}
+                        count={getRowCount('customer_segmentation') ?? segClustRows?.length}
                     />
                     {segClustRows ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -656,7 +670,7 @@ export default function Forecasts() {
                 {/* AOV + CLV */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-4">
-                        <InferenceHeader label="AOV Prediction" modelType={aovRows ? 'directory' : null} description="Predicted next average order value per customer." count={aovRows?.length} />
+                        <InferenceHeader label="AOV Prediction" modelType={aovRows ? 'directory' : null} description="Predicted next average order value per customer." count={getRowCount('aov_prediction') ?? aovRows?.length} />
                         {aovBarData ? (
                             <ChartWrapper title="Top 12 Customers — Predicted AOV">
                                 <div style={{ height: 280 }}>
@@ -666,7 +680,7 @@ export default function Forecasts() {
                         ) : <NoInferenceNotice label="AOV Prediction" />}
                     </div>
                     <div className="space-y-4">
-                        <InferenceHeader label="Customer Lifetime Value Prediction" modelType={clvRows ? 'directory' : null} description="1-year CLV forecast per customer with confidence intervals." count={clvRows?.length} />
+                        <InferenceHeader label="Customer Lifetime Value Prediction" modelType={clvRows ? 'directory' : null} description="1-year CLV forecast per customer with confidence intervals." count={getRowCount('clv_predictions') ?? clvRows?.length} />
                         {clvBarData ? (
                             <ChartWrapper title="Top 12 Customers — Predicted CLV">
                                 <div style={{ height: 280 }}>
@@ -700,7 +714,7 @@ export default function Forecasts() {
 
                 {/* Stock Status */}
                 <div className="space-y-4">
-                    <InferenceHeader label="Stock Status Predictions" modelType={stockRows ? 'directory' : null} description="Predicts In Stock / Low Stock / Out of Stock / Overstock per product." count={stockRows?.length} />
+                    <InferenceHeader label="Stock Status Predictions" modelType={stockRows ? 'directory' : null} description="Predicts In Stock / Low Stock / Out of Stock / Overstock per product." count={getRowCount('stock_status_predictions') ?? stockRows?.length} />
                     {stockRows ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <ChartWrapper title="Predicted Stock Status Distribution">
@@ -727,7 +741,7 @@ export default function Forecasts() {
 
                 {/* Stockout Probability */}
                 <div className="space-y-4">
-                    <InferenceHeader label="Stockout Probability Predictions" modelType={stockoutRows ? 'directory' : null} description="Forecasts stockout risk level and expected days until stockout." count={stockoutRows?.length} />
+                    <InferenceHeader label="Stockout Probability Predictions" modelType={stockoutRows ? 'directory' : null} description="Forecasts stockout risk level and expected days until stockout." count={getRowCount('stockout_probability') ?? stockoutRows?.length} />
                     {stockoutRows ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <ChartWrapper title="Stockout Risk Distribution">
@@ -756,7 +770,7 @@ export default function Forecasts() {
                 {/* Restock + Safety */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-4">
-                        <InferenceHeader label="Restock Quantity Predictions" modelType={restockRows ? 'directory' : null} description={`Recommended restock units per product. Total estimated cost: ${fmt.currency(totalRestockCost)}`} count={restockRows?.length} />
+                        <InferenceHeader label="Restock Quantity Predictions" modelType={restockRows ? 'directory' : null} description={`Recommended restock units per product. Total estimated cost: ${fmt.currency(totalRestockCost)}`} count={getRowCount('restock_quantity') ?? restockRows?.length} />
                         {restockBarData ? (
                             <ChartWrapper title="Top 12 Products — Recommended Restock Qty">
                                 <div style={{ height: 280 }}>
@@ -766,7 +780,7 @@ export default function Forecasts() {
                         ) : <NoInferenceNotice label="Restock Quantity" />}
                     </div>
                     <div className="space-y-4">
-                        <InferenceHeader label="Safety Stock Adjustment" modelType={safetyRows ? 'directory' : null} description="ML-adjusted safety stock levels by demand pattern." count={safetyRows?.length} />
+                        <InferenceHeader label="Safety Stock Adjustment" modelType={safetyRows ? 'directory' : null} description="ML-adjusted safety stock levels by demand pattern." count={getRowCount('safety_stock_adjusted') ?? safetyRows?.length} />
                         {safetyDist ? (
                             <ChartWrapper title="Demand Pattern Distribution">
                                 <div style={{ height: 280 }}>
@@ -782,7 +796,7 @@ export default function Forecasts() {
                 {/* Demand Forecast + Price Optimization */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-4">
-                        <InferenceHeader label="Product Demand Forecast" modelType={demandRows ? 'directory' : null} description="Predicted demand units with seasonality and trend factors." count={demandRows?.length} />
+                        <InferenceHeader label="Product Demand Forecast" modelType={demandRows ? 'directory' : null} description="Predicted demand units with seasonality and trend factors." count={getRowCount('demand_forecast') ?? demandRows?.length} />
                         {demandBarData ? (
                             <ChartWrapper title="Top 12 Products — Predicted Demand">
                                 <div style={{ height: 280 }}>
@@ -792,7 +806,7 @@ export default function Forecasts() {
                         ) : <NoInferenceNotice label="Demand Forecast" />}
                     </div>
                     <div className="space-y-4">
-                        <InferenceHeader label="Price Optimization" modelType={priceRows ? 'directory' : null} description="Optimal price recommendations based on elasticity and expected units." count={priceRows?.length} />
+                        <InferenceHeader label="Price Optimization" modelType={priceRows ? 'directory' : null} description="Optimal price recommendations based on elasticity and expected units." count={getRowCount('price_optimization') ?? priceRows?.length} />
                         {priceGroupedData ? (
                             <ChartWrapper title="Current vs Optimal Price — Top 10 Price Gaps">
                                 <div style={{ height: 280 }}>
@@ -826,7 +840,7 @@ export default function Forecasts() {
 
                 {/* Fulfillment Risk */}
                 <div className="space-y-4">
-                    <InferenceHeader label="Order Fulfillment Risk" modelType={fulfillRows ? 'directory' : null} description="Classifies fulfillment risk (Low / Medium / High / Critical) per order." count={fulfillRows?.length} />
+                    <InferenceHeader label="Order Fulfillment Risk" modelType={fulfillRows ? 'directory' : null} description="Classifies fulfillment risk (Low / Medium / High / Critical) per order." count={getRowCount('fulfillment_risk_predictions') ?? fulfillRows?.length} />
                     {fulfillRows ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <ChartWrapper title="Risk Level Distribution">
@@ -855,7 +869,7 @@ export default function Forecasts() {
                 {/* Delivery Time + Supplier Clustering */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-4">
-                        <InferenceHeader label="Delivery Time Prediction" modelType={deliveryRows ? 'directory' : null} description={`Predicted delivery days per order. Avg: ${fmt.days(avgDeliveryDays)}.`} count={deliveryRows?.length} />
+                        <InferenceHeader label="Delivery Time Prediction" modelType={deliveryRows ? 'directory' : null} description={`Predicted delivery days per order. Avg: ${fmt.days(avgDeliveryDays)}.`} count={getRowCount('delivery_time') ?? deliveryRows?.length} />
                         {deliveryBuckets ? (
                             <ChartWrapper title="Delivery Day Buckets">
                                 <div style={{ height: 280 }}>
@@ -865,7 +879,7 @@ export default function Forecasts() {
                         ) : <NoInferenceNotice label="Delivery Time Prediction" />}
                     </div>
                     <div className="space-y-4">
-                        <InferenceHeader label="Supplier Performance Clustering" modelType={supplierClust ? 'file' : null} description="Supplier segments: Strategic Partners, Reliable Performers, Risk Suppliers, etc." count={supplierClust?.length} />
+                        <InferenceHeader label="Supplier Performance Clustering" modelType={supplierClust ? 'file' : null} description="Supplier segments: Strategic Partners, Reliable Performers, Risk Suppliers, etc." count={getRowCount('supplier_clustering') ?? supplierClust?.length} />
                         {supplierTierDist ? (
                             <ChartWrapper title="Performance Tier Distribution">
                                 <div style={{ height: 280 }}>
@@ -899,7 +913,7 @@ export default function Forecasts() {
 
                 {/* Revenue Forecast */}
                 <div className="space-y-4">
-                    <InferenceHeader label="Revenue Forecast" modelType={revRows ? 'directory' : null} description={`Total predicted revenue: ${fmt.currency(totalPredRevenue)} across ${revRows?.length ?? 0} forecast dates.`} count={revRows?.length} />
+                    <InferenceHeader label="Revenue Forecast" modelType={revRows ? 'directory' : null} description={`Total predicted revenue: ${fmt.currency(totalPredRevenue)} across ${getRowCount('revenue_forecast') ?? revRows?.length ?? 0} forecast dates.`} count={getRowCount('revenue_forecast') ?? revRows?.length} />
                     {revLineData ? (
                         <ChartWrapper title="Predicted Revenue Over Forecast Dates">
                             <div style={{ height: 300 }}>
@@ -913,7 +927,7 @@ export default function Forecasts() {
 
                 {/* Seasonal Trends */}
                 <div className="space-y-4">
-                    <InferenceHeader label="Seasonal Trends Forecast" modelType={seasonRows ? 'directory' : null} description="Seasonal index per forecast month (> 1.0 = above average, < 1.0 = below average)." count={seasonRows?.length} />
+                    <InferenceHeader label="Seasonal Trends Forecast" modelType={seasonRows ? 'directory' : null} description="Seasonal index per forecast month (> 1.0 = above average, < 1.0 = below average)." count={getRowCount('seasonal_trends') ?? seasonRows?.length} />
                     {seasonBarData ? (
                         <ChartWrapper title="Seasonal Index by Forecast Month (green = peak, red = low season)">
                             <div style={{ height: 280 }}>
@@ -941,7 +955,7 @@ export default function Forecasts() {
 
                 {/* Campaign ROI */}
                 <div className="space-y-4">
-                    <InferenceHeader label="Campaign ROI Prediction" modelType={campaignRows ? 'directory' : null} description={`Predicted total campaign revenue: ${fmt.currency(totalCampaignRev)}.`} count={campaignRows?.length} />
+                    <InferenceHeader label="Campaign ROI Prediction" modelType={campaignRows ? 'directory' : null} description={`Predicted total campaign revenue: ${fmt.currency(totalCampaignRev)}.`} count={getRowCount('campaign_roi') ?? campaignRows?.length} />
                     {campaignBarData ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <ChartWrapper title="Top 10 Campaigns — Predicted ROI (%)">
@@ -969,7 +983,7 @@ export default function Forecasts() {
 
                 {/* Geographic Clustering */}
                 <div className="space-y-4">
-                    <InferenceHeader label="Geographic Sales Clustering" modelType={geoRows ? 'file' : null} description="Groups regions by sales performance and market potential." count={geoRows?.length} />
+                    <InferenceHeader label="Geographic Sales Clustering" modelType={geoRows ? 'file' : null} description="Groups regions by sales performance and market potential." count={getRowCount('geographic_clustering') ?? geoRows?.length} />
                     {geoDist ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <ChartWrapper title="Market Segment Distribution">
@@ -1002,7 +1016,7 @@ export default function Forecasts() {
 
                 {/* Cart Abandonment */}
                 <div className="space-y-4">
-                    <InferenceHeader label="Cart Abandonment Predictions" modelType={cartRows ? 'directory' : null} description="Predicts whether each active cart will be abandoned or converted." count={cartRows?.length} />
+                    <InferenceHeader label="Cart Abandonment Predictions" modelType={cartRows ? 'directory' : null} description="Predicts whether each active cart will be abandoned or converted." count={getRowCount('cart_abandonment_predictions') ?? cartRows?.length} />
                     {cartRows ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <ChartWrapper title="Predicted Cart Status Distribution">
@@ -1031,7 +1045,7 @@ export default function Forecasts() {
                 {/* Session Behavior + Session Conversion */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-4">
-                        <InferenceHeader label="Session Behavior Clustering" modelType={sessionClust ? 'file' : null} description="Behavior personas: Quick Buyers, Researchers, Cart Abandoners, etc." count={sessionClust?.length} />
+                        <InferenceHeader label="Session Behavior Clustering" modelType={sessionClust ? 'file' : null} description="Behavior personas: Quick Buyers, Researchers, Cart Abandoners, etc." count={getRowCount('session_behavior_clustering') ?? sessionClust?.length} />
                         {sessionBehavDist ? (
                             <ChartWrapper title="Behavior Type Distribution">
                                 <div style={{ height: 280 }}>
@@ -1041,7 +1055,7 @@ export default function Forecasts() {
                         ) : <NoInferenceNotice label="Session Behavior Clustering" />}
                     </div>
                     <div className="space-y-4">
-                        <InferenceHeader label="Session Conversion Value Prediction" modelType={sessConvRows ? 'directory' : null} description="Predicted order value if a session converts, with engagement recommendations." count={sessConvRows?.length} />
+                        <InferenceHeader label="Session Conversion Value Prediction" modelType={sessConvRows ? 'directory' : null} description="Predicted order value if a session converts, with engagement recommendations." count={getRowCount('session_conversion_value') ?? sessConvRows?.length} />
                         {sessConvBarData ? (
                             <ChartWrapper title="Top 12 Sessions — Predicted Conversion Value">
                                 <div style={{ height: 280 }}>
@@ -1074,7 +1088,7 @@ export default function Forecasts() {
 
                 {/* Review Sentiment */}
                 <div className="space-y-4">
-                    <InferenceHeader label="Review Sentiment Predictions" modelType={sentimentRows ? 'directory' : null} description="Classifies each review as Positive / Neutral / Negative." count={sentimentRows?.length} />
+                    <InferenceHeader label="Review Sentiment Predictions" modelType={sentimentRows ? 'directory' : null} description="Classifies each review as Positive / Neutral / Negative." count={getRowCount('review_sentiment_predictions') ?? sentimentRows?.length} />
                     {sentimentRows ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <ChartWrapper title="Sentiment Distribution">
@@ -1102,7 +1116,7 @@ export default function Forecasts() {
 
                 {/* Payment Success */}
                 <div className="space-y-4">
-                    <InferenceHeader label="Payment Success Predictions" modelType={paymentRows ? 'directory' : null} description="Predicts whether each payment will succeed or fail." count={paymentRows?.length} />
+                    <InferenceHeader label="Payment Success Predictions" modelType={paymentRows ? 'directory' : null} description="Predicts whether each payment will succeed or fail." count={getRowCount('payment_success_predictions') ?? paymentRows?.length} />
                     {paymentRows ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <ChartWrapper title="Predicted Payment Status Distribution">
@@ -1130,7 +1144,7 @@ export default function Forecasts() {
 
                 {/* Product Bundling */}
                 <div className="space-y-4">
-                    <InferenceHeader label="Product Bundling Predictions" modelType={bundleRows ? 'directory' : null} description="Complementary product pairs with affinity scores and expected bundle revenue." count={bundleRows?.length} />
+                    <InferenceHeader label="Product Bundling Predictions" modelType={bundleRows ? 'directory' : null} description="Complementary product pairs with affinity scores and expected bundle revenue." count={getRowCount('product_bundling_predictions') ?? bundleRows?.length} />
                     {bundleRows ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <ChartWrapper title="Bundle Category Distribution">
@@ -1159,7 +1173,7 @@ export default function Forecasts() {
                 {/* Product Affinity + Lifecycle */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-4">
-                        <InferenceHeader label="Product Affinity Clustering" modelType={affinityRows ? 'file' : null} description="Products clustered by co-purchase patterns for cross-sell." count={affinityRows?.length} />
+                        <InferenceHeader label="Product Affinity Clustering" modelType={affinityRows ? 'file' : null} description="Products clustered by co-purchase patterns for cross-sell." count={getRowCount('product_affinity_clustering') ?? affinityRows?.length} />
                         {affinityDist ? (
                             <ChartWrapper title="Products per Affinity Cluster">
                                 <div style={{ height: 280 }}>
@@ -1181,7 +1195,7 @@ export default function Forecasts() {
                         )}
                     </div>
                     <div className="space-y-4">
-                        <InferenceHeader label="Product Lifecycle Clustering" modelType={lifecycleRows ? 'file' : null} description="Introduction / Growth / Maturity / Decline stage per product." count={lifecycleRows?.length} />
+                        <InferenceHeader label="Product Lifecycle Clustering" modelType={lifecycleRows ? 'file' : null} description="Introduction / Growth / Maturity / Decline stage per product." count={getRowCount('product_lifecycle_clustering') ?? lifecycleRows?.length} />
                         {lifecycleDist ? (
                             <ChartWrapper title="Lifecycle Stage Distribution">
                                 <div style={{ height: 280 }}>

@@ -265,6 +265,87 @@ class ForecastingService:
         return bool(cached_at and datetime.now() - cached_at < self._ttl)
 
     # ------------------------------------------------------------------
+    # Per-inference aggregate summary stats (computed on FULL dataset)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _compute_summary_stats(inference_name: str, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Compute exact aggregate statistics on the FULL DataFrame before any
+        row-limit truncation.  These values are exposed in meta.summary_stats
+        so that the frontend can display correct totals even when only a
+        sample of rows is returned in data[].
+        """
+        stats: Dict[str, Any] = {}
+        try:
+            if inference_name == "customer_churn_predictions":
+                if "predicted_churn_risk" in df.columns:
+                    stats["high_churn_count"] = int(
+                        (df["predicted_churn_risk"] == "High").sum()
+                    )
+                    stats["medium_churn_count"] = int(
+                        (df["predicted_churn_risk"] == "Medium").sum()
+                    )
+                    stats["low_churn_count"] = int(
+                        (df["predicted_churn_risk"] == "Low").sum()
+                    )
+
+            elif inference_name == "stockout_probability":
+                if "stockout_risk_level" in df.columns:
+                    stats["high_risk_count"] = int(
+                        df["stockout_risk_level"].isin(["Critical", "High"]).sum()
+                    )
+                    stats["critical_count"] = int(
+                        (df["stockout_risk_level"] == "Critical").sum()
+                    )
+
+            elif inference_name == "restock_quantity":
+                if "estimated_cost" in df.columns:
+                    stats["total_estimated_cost"] = float(
+                        pd.to_numeric(df["estimated_cost"], errors="coerce")
+                        .fillna(0)
+                        .sum()
+                    )
+
+            elif inference_name == "campaign_roi":
+                if "predicted_revenue" in df.columns:
+                    stats["total_predicted_revenue"] = float(
+                        pd.to_numeric(df["predicted_revenue"], errors="coerce")
+                        .fillna(0)
+                        .sum()
+                    )
+
+            elif inference_name == "revenue_forecast":
+                if "predicted_revenue" in df.columns:
+                    stats["total_predicted_revenue"] = float(
+                        pd.to_numeric(df["predicted_revenue"], errors="coerce")
+                        .fillna(0)
+                        .sum()
+                    )
+
+            elif inference_name == "delivery_time":
+                if "predicted_delivery_days" in df.columns:
+                    series = pd.to_numeric(
+                        df["predicted_delivery_days"], errors="coerce"
+                    ).dropna()
+                    stats["avg_delivery_days"] = float(series.mean()) if len(series) > 0 else 0.0
+
+            elif inference_name == "fulfillment_risk_predictions":
+                if "predicted_risk_label" in df.columns:
+                    mask = df["predicted_risk_label"].str.contains(
+                        "High", case=False, na=False
+                    ) | (df["predicted_risk_label"] == "Critical Risk")
+                    stats["high_risk_count"] = int(mask.sum())
+
+        except Exception as exc:  # pragma: no cover
+            # Non-fatal — summary stats are best-effort
+            print(
+                f"[ForecastingService] summary_stats error for {inference_name}: "
+                f"{type(exc).__name__}"
+            )
+        return stats
+
+    # ------------------------------------------------------------------
     # DataFrame sanitisation
     # ------------------------------------------------------------------
 
@@ -374,6 +455,12 @@ class ForecastingService:
                 return None
 
             total_row_count = len(df)
+
+            # Compute aggregate stats on the FULL dataset before truncation so
+            # the frontend can display correct totals even with a row-limited
+            # sample in data[].
+            summary_stats = self._compute_summary_stats(inference_name, df)
+
             # Cap the payload to prevent browser OOM on large ML inference datasets
             if row_limit > 0 and len(df) > row_limit:
                 df = df.head(row_limit)
@@ -391,6 +478,7 @@ class ForecastingService:
                     "description": meta["description"],
                     "group": meta["group"],
                     "model_type": meta.get("path_type"),
+                    "summary_stats": summary_stats,
                 },
                 "fetched_at": datetime.now().isoformat(),
             }
