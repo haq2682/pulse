@@ -189,7 +189,7 @@ export default function Forecasts() {
 
     const buildUrl = useCallback(() => {
         const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        return `${base}/analytics/forecasts/${businessId}`;
+        return `${base}/analytics/forecasts/${businessId}?row_limit=500`;
     }, [businessId]);
 
     const fetchData = useCallback(async () => {

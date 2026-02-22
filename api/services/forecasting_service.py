@@ -254,7 +254,9 @@ class ForecastingService:
     # ------------------------------------------------------------------
 
     def _cache_key(self, business_id: str, inference_name: str) -> str:
-        return f"{business_id}:{inference_name}"
+        # Use '|' separator — neither business_id (UUID) nor inference_name
+        # (snake_case) can contain '|', so no collision risk.
+        return f"{business_id}|{inference_name}"
 
     def _cache_valid(self, entry: Optional[Dict]) -> bool:
         if not entry:
@@ -303,18 +305,29 @@ class ForecastingService:
     # ------------------------------------------------------------------
 
     async def fetch_inference(
-        self, business_id: str, inference_name: str
+        self,
+        business_id: str,
+        inference_name: str,
+        row_limit: int = 500,
     ) -> Optional[Dict[str, Any]]:
         """
         Fetch ML inference results for one inference type.
 
         Returns a dict with keys: data, columns, row_count, meta — or None if
         the inference does not exist for this business.
+
+        Args:
+            business_id: Business ID (MinIO bucket name)
+            inference_name: Inference identifier (key from INFERENCE_CATALOG)
+            row_limit: Maximum number of rows to return per inference (default 500).
+                       Caps the payload size to prevent browser OOM on large datasets.
         """
         if inference_name not in self.INFERENCE_CATALOG:
             return None
 
-        cache_key = self._cache_key(business_id, inference_name)
+        # Include row_limit in cache key so different limit values have separate entries.
+        # The '|' separator is safe: business_id is a UUID and inference_name is snake_case.
+        cache_key = self._cache_key(business_id, f"{inference_name}|{row_limit}")
         if cache_key in self._cache and self._cache_valid(self._cache[cache_key]):
             return self._cache[cache_key]["data"]
 
@@ -360,12 +373,18 @@ class ForecastingService:
             if df is None or df.empty:
                 return None
 
+            total_row_count = len(df)
+            # Cap the payload to prevent browser OOM on large ML inference datasets
+            if row_limit > 0 and len(df) > row_limit:
+                df = df.head(row_limit)
+
             result: Dict[str, Any] = {
                 "data": self._sanitize(
                     df.where(pd.notna(df), None).to_dict(orient="records")
                 ),
                 "columns": list(df.columns),
-                "row_count": len(df),
+                "row_count": total_row_count,
+                "returned_count": len(df),
                 "meta": {
                     "inference_name": inference_name,
                     "label": meta["label"],
@@ -394,12 +413,18 @@ class ForecastingService:
         self,
         business_id: str,
         groups: Optional[List[str]] = None,
+        row_limit: int = 500,
     ) -> Dict[str, Any]:
         """
         Fetch all available ML inference results for a business.
 
         Missing inferences are silently skipped — callers receive only what
         actually exists in the bucket.
+
+        Args:
+            business_id: Business ID (MinIO bucket name)
+            groups: Optional list of inference group names to fetch
+            row_limit: Maximum rows per inference (default 500).
         """
         names = [
             name
@@ -409,7 +434,7 @@ class ForecastingService:
 
         results: Dict[str, Any] = {}
         for name in names:
-            result = await self.fetch_inference(business_id, name)
+            result = await self.fetch_inference(business_id, name, row_limit=row_limit)
             if result is not None:
                 results[name] = result
 

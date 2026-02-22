@@ -1508,7 +1508,7 @@ const ExportAnalytics = () => {
             if (forecastSection) {
                 setExportStep('Fetching forecast data…');
                 try {
-                    const fRes = await fetch(`${base}/analytics/forecasts/${businessId}`);
+                    const fRes = await fetch(`${base}/analytics/forecasts/${businessId}?row_limit=500`);
                     if (fRes.ok) {
                         const fJson = await fRes.json();
                         forecastInferences = fJson.inferences ?? {};
@@ -1668,7 +1668,7 @@ const ExportAnalytics = () => {
             if (forecastSection) {
                 setExportStep('Fetching forecast data…');
                 try {
-                    const fRes = await fetch(`${base}/analytics/forecasts/${businessId}`);
+                    const fRes = await fetch(`${base}/analytics/forecasts/${businessId}?row_limit=500`);
                     if (fRes.ok) {
                         const fJson = await fRes.json();
                         forecastInferences = fJson.inferences ?? {};

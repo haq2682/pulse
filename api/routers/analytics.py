@@ -537,6 +537,7 @@ async def list_exports(business_id: str, user_id: str = Query(...), db=Depends(g
 async def get_all_forecasts(
     business_id: str,
     groups: str = Query(None, description="Comma-separated list of inference groups to fetch"),
+    row_limit: int = Query(500, ge=1, le=10000, description="Maximum rows per inference (default 500)"),
 ):
     """
     Fetch all available ML inference results for a business.
@@ -551,6 +552,7 @@ async def get_all_forecasts(
         groups: Optional comma-separated filter of inference groups
                 (general_classification, general_clustering, general_regression,
                  specific_classification, specific_clustering, specific_regression)
+        row_limit: Cap on rows returned per inference — prevents OOM on large datasets
 
     Returns:
         JSON with available inference results grouped by type
@@ -560,7 +562,7 @@ async def get_all_forecasts(
         if groups:
             group_list = [g.strip() for g in groups.split(",")]
 
-        result = await forecasting_service.fetch_all_inferences(business_id, group_list)
+        result = await forecasting_service.fetch_all_inferences(business_id, group_list, row_limit=row_limit)
         json_str = json.dumps(result, cls=AnalyticsJSONEncoder, allow_nan=False)
         return Response(content=json_str, media_type="application/json")
 
@@ -570,13 +572,18 @@ async def get_all_forecasts(
 
 
 @router.get("/forecasts/{business_id}/inference/{inference_name}")
-async def get_single_forecast(business_id: str, inference_name: str):
+async def get_single_forecast(
+    business_id: str,
+    inference_name: str,
+    row_limit: int = Query(500, ge=1, le=10000, description="Maximum rows to return (default 500)"),
+):
     """
     Fetch a single ML inference result for a business.
 
     Args:
         business_id: Business ID (MinIO bucket name)
         inference_name: Inference identifier (key from INFERENCE_CATALOG)
+        row_limit: Cap on rows returned — prevents OOM on large datasets
 
     Returns:
         JSON with inference result data, or 404 if not available
@@ -588,7 +595,7 @@ async def get_single_forecast(business_id: str, inference_name: str):
                 detail=f"Unknown inference: {inference_name}",
             )
 
-        result = await forecasting_service.fetch_inference(business_id, inference_name)
+        result = await forecasting_service.fetch_inference(business_id, inference_name, row_limit=row_limit)
         if result is None:
             raise HTTPException(
                 status_code=404,
