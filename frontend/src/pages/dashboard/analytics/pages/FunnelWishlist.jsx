@@ -145,13 +145,15 @@ export default function FunnelWishlist() {
         if (!rawWishlist) return null;
         const a = rawWishlist.analytics ?? {};
 
-        const summary          = a.wishlist_overall_summary?.data          ?? [];
-        const byProduct        = a.wishlist_by_product?.data               ?? [];
-        const ttpStats         = a.wishlist_time_to_purchase_stats?.data   ?? [];
-        const ttpDist          = a.wishlist_time_to_purchase_distribution?.data ?? [];
-        const abandonByProduct = a.abandoned_wishlist_by_product?.data     ?? [];
-        const abandonByCustomer = a.abandoned_wishlist_by_customer?.data   ?? [];
-        const addsByMonth      = a.wishlist_adds_by_month?.data            ?? [];
+        const summary           = a.wishlist_overall_summary?.data               ?? [];
+        const byProduct         = a.wishlist_by_product?.data                  ?? [];
+        const byCustomer        = a.wishlist_by_customer?.data                 ?? [];
+        const ttpStats          = a.wishlist_time_to_purchase_stats?.data      ?? [];
+        const ttpDist           = a.wishlist_time_to_purchase_distribution?.data ?? [];
+        const abandonedItems    = a.abandoned_wishlist_items?.data             ?? [];
+        const abandonByProduct  = a.abandoned_wishlist_by_product?.data        ?? [];
+        const abandonByCustomer = a.abandoned_wishlist_by_customer?.data       ?? [];
+        const addsByMonth       = a.wishlist_adds_by_month?.data               ?? [];
 
         if (summary.length === 0 && byProduct.length === 0) return null;
 
@@ -233,7 +235,7 @@ export default function FunnelWishlist() {
             kpis: { totalItems, customersUsing, productsInList, convRate },
             topAddsBarData, topPurchBarData, convRateBarData, addVsPurchBarData,
             addsByMonthData, ttpDistData, ttpDoughnutData, abandonProdBarData,
-            byProduct, ttpStats, ttpDist, abandonByCustomer,
+            byProduct, byCustomer, ttpStats, ttpDist, abandonByCustomer, abandonedItems,
         };
     }, [rawWishlist]);
 
@@ -451,6 +453,24 @@ export default function FunnelWishlist() {
                     </Card>
                 )}
 
+                {/* Wishlist by Customer */}
+                {(derived?.byCustomer?.length ?? 0) > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Wishlist Activity by Customer</h3>
+                            <DataTable
+                                value={[...derived.byCustomer].sort((a, b) => (+(b.wishlist_adds ?? 0)) - (+(a.wishlist_adds ?? 0)))}
+                                paginator rows={15} stripedRows emptyMessage="No data" className="text-sm"
+                            >
+                                <Column field="customer_id"              header="Customer ID"       sortable />
+                                <Column field="wishlist_adds"            header="Wishlist Adds"     sortable body={(r) => fmt.number(r.wishlist_adds)} />
+                                <Column field="wishlist_purchases"       header="Purchases"         sortable body={(r) => fmt.number(r.wishlist_purchases)} />
+                                <Column field="wishlist_conversion_rate" header="Conv. Rate %"      sortable body={(r) => fmt.pct(r.wishlist_conversion_rate)} />
+                            </DataTable>
+                        </div>
+                    </Card>
+                )}
+
                 {/* Abandoned Wishlist by Customer */}
                 {(derived?.abandonByCustomer?.length ?? 0) > 0 && (
                     <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
@@ -462,6 +482,26 @@ export default function FunnelWishlist() {
                             >
                                 <Column field="customer_id"              header="Customer ID"          sortable />
                                 <Column field="abandoned_wishlist_count" header="Abandoned Items"      sortable body={(r) => fmt.number(r.abandoned_wishlist_count)} />
+                            </DataTable>
+                        </div>
+                    </Card>
+                )}
+
+                {/* Abandoned Wishlist Items Detail */}
+                {(derived?.abandonedItems?.length ?? 0) > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Abandoned Wishlist Items Detail</h3>
+                            <DataTable
+                                value={derived.abandonedItems}
+                                paginator rows={15} stripedRows emptyMessage="No data" className="text-sm"
+                            >
+                                <Column field="wishlist_id"    header="Wishlist ID"    sortable />
+                                <Column field="customer_id"    header="Customer ID"    sortable />
+                                <Column field="product_id"     header="Product ID"     sortable />
+                                <Column field="added_date"     header="Added Date"     sortable />
+                                <Column field="purchased_date" header="Purchased Date" sortable body={(r) => r.purchased_date ?? '—'} />
+                                <Column field="removed_date"   header="Removed Date"   sortable body={(r) => r.removed_date ?? '—'} />
                             </DataTable>
                         </div>
                     </Card>

@@ -163,6 +163,7 @@ export default function PaymentFinancialMetrics() {
 
         const aovMonthly      = a.aov_trend_monthly?.data              ?? [];
         const aovWeekly       = a.aov_trend_weekly?.data               ?? [];
+        const aovDaily        = a.aov_trend_daily?.data                ?? [];
         const revBySegment    = a.rev_by_customer_segment?.data        ?? [];
         const revByRfm        = a.rev_by_rfm_segment?.data             ?? [];
         const revByLabel      = a.rev_by_segment_label?.data           ?? [];
@@ -324,7 +325,7 @@ export default function PaymentFinancialMetrics() {
             aovLineData, revBySegBarData, revByRfmBarData, revRfmDoughnutData, revPerCustRfmData,
             aovByRfmBarData, revByDeviceBarData, revByReferrerBarData, lowMarginBarData, revByLabelBarData,
             revByRfm, lowMarginCats, aovRfmSorted,
-            aovWeekly, revByCountryCity,
+            aovWeekly, aovDaily, revByCountryCity,
         };
     }, [rawRevenue]);
 
@@ -628,6 +629,33 @@ export default function PaymentFinancialMetrics() {
                                             borderColor: 'rgb(139,92,246)',
                                             backgroundColor: 'rgba(139,92,246,0.15)',
                                             tension: 0.4, fill: true,
+                                        }],
+                                    }}
+                                    options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false, ticks: { callback: (v) => '$' + v.toLocaleString() } } } }}
+                                />
+                            </div>
+                        </div>
+                    </Card>
+                )}
+
+                {/* AOV Daily Trend */}
+                {(derived?.aovDaily?.length ?? 0) > 0 && (
+                    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">
+                                AOV Trend (Daily)
+                            </h3>
+                            <div className="h-[260px]">
+                                <Line
+                                    data={{
+                                        labels: derived.aovDaily.map((r) => r.order_date ?? ''),
+                                        datasets: [{
+                                            label: 'Avg Order Value',
+                                            data: derived.aovDaily.map((r) => +(r.avg_order_value ?? 0)),
+                                            borderColor: 'rgb(6,182,212)',
+                                            backgroundColor: 'rgba(6,182,212,0.15)',
+                                            tension: 0.4, fill: true,
+                                            pointRadius: 2,
                                         }],
                                     }}
                                     options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false, ticks: { callback: (v) => '$' + v.toLocaleString() } } } }}
