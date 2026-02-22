@@ -10,6 +10,7 @@ import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import { SecondaryButton } from '@/components/global/Button';
 import axiosInstance from '@/services/api/axiosInstance';
 import { useAuth } from '@/context/AuthContext';
+import usePageTitle from '@/hooks/usePageTitle';
 
 // Utility functions for formatting names
 const formatColumnName = (columnName) => {
@@ -35,6 +36,7 @@ const formatColumnWithTable = (column, table) => {
 };
 
 const Mapping = () => {
+    usePageTitle('Onboarding - Map Data');
     const navigate = useNavigate();
     const location = useLocation();
     const pathname = location.pathname;

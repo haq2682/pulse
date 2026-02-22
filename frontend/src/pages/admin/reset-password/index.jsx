@@ -6,8 +6,10 @@ import Text from '@/components/global/Typography/Text';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import RegistrationBackground from '@/assets/registration-background.png'; // Admin BG
 import adminApi from '@/services/api/adminApi'; // Use Admin API directly
+import usePageTitle from '@/hooks/usePageTitle';
 
 const AdminResetPassword = () => {
+    usePageTitle('Admin Reset Password');
     const navigate = useNavigate();
     
     // 1. Get Token from URL

@@ -10,8 +10,10 @@ import { AutoComplete } from 'primereact/autocomplete';
 import axiosInstance from '@/services/api/axiosInstance';
 import { useAuth } from '@/context/AuthContext';
 import { useLocation } from 'react-router-dom';
+import usePageTitle from '@/hooks/usePageTitle';
 
 const AddBusiness = () => {
+    usePageTitle('Onboarding - Business Info');
     const navigate = useNavigate();
     const [businessName, setBusinessName] = useState('');
     const [currency, setCurrency] = useState(null);

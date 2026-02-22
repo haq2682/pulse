@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Sidebar from './Sidebar';
 import Heading from '@/components/global/Typography/Heading';
 import Text from '@/components/global/Typography/Text';
@@ -55,6 +55,7 @@ import EngagementConversion from './analytics/pages/EngagementConversion';
 import Forecasts from './analytics/pages/Forecasts';
 import ExplainableAI from './analytics/pages/ExplainableAI';
 import ExportAnalytics from './analytics/pages/ExportAnalytics';
+import usePageTitle from '@/hooks/usePageTitle';
 
 // ---------------------------------------------------------------------------
 // Insight Catalog — every insight mapped to a page route segment
@@ -282,6 +283,7 @@ const INSIGHT_CATALOG = [
 ];
 
 const Dashboard = () => {
+    usePageTitle('Dashboard');
     const { logout, user } = useAuth();
     const { startPipeline } = usePipelineProgress();
     const [sidebarOpen, setSidebarOpen] = useState(false);

@@ -7,9 +7,11 @@ import { Heading, Text, CustomLink } from '@/components/global/Typography';
 import RegistrationBackground from '@/assets/registration-background.png';
 // Import Auth Hook
 import { useAuth } from '@/context/AuthContext';
+import usePageTitle from '@/hooks/usePageTitle';
 
 const Login = () => {
     // Get login functions
+    usePageTitle('Log In'); // <--- Set Page Title
     const { login, loginWithGoogle, loading, error } = useAuth();
     const navigate = useNavigate(); // <--- 2. Initialize Hook
     

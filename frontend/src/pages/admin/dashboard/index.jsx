@@ -7,8 +7,10 @@ import Heading from '@/components/global/Typography/Heading';
 import Text from '@/components/global/Typography/Text';
 import { useAdminAuth } from '@/context/AdminAuthContext';
 import adminApi from '@/services/api/adminApi';
+import usePageTitle from '@/hooks/usePageTitle';
 
 const AdminDashboard = () => {
+    usePageTitle('Admin Dashboard');
     const { logout, admin } = useAdminAuth();
     const [stats, setStats] = useState({ total_users: 0, total_businesses: 0 });
     const [tableData, setTableData] = useState([]);

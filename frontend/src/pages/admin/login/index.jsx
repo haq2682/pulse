@@ -6,8 +6,10 @@ import { PrimaryButton } from '@/components/global/Button';
 import { Heading, Text, CustomLink } from '@/components/global/Typography';
 import RegistrationBackground from '@/assets/registration-background.png';
 import { useAdminAuth } from '@/context/AdminAuthContext';
+import usePageTitle from '@/hooks/usePageTitle';
 
 const AdminLogin = () => {
+    usePageTitle('Admin Log In'); // <--- Set Page Title
     const { login, actionLoading, error } = useAdminAuth();
     const navigate = useNavigate(); // <--- 2. Initialize Hook
     

@@ -13,6 +13,7 @@ import { ProgressSpinner } from 'primereact/progressspinner';
 import { Dialog } from 'primereact/dialog';
 import { Message } from 'primereact/message';
 import { SecondaryButton } from '@/components/global/Button';
+import usePageTitle from '@/hooks/usePageTitle';
 
 const CHUNK_SIZE = 5 * 1024 * 1024;
 const MAPPING_STATUS_POLL_INTERVAL = 3000; // 3 seconds
@@ -20,6 +21,7 @@ const MAPPING_STATUS_POLL_INTERVAL = 3000; // 3 seconds
 const NIFI_UPLOAD_URL = 'http://localhost:8082/upload';
 
 const Connect = () => {
+    usePageTitle('Onboarding - Connect');
     const navigate = useNavigate();
     const location = useLocation();
     const pathname = location.pathname;

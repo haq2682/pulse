@@ -7,8 +7,10 @@ import CustomLink from '@/components/global/Typography/CustomLink';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import HeroBackground from '@/assets/hero-background.png';
 import { useAuth } from '@/context/AuthContext';
+import usePageTitle from '@/hooks/usePageTitle';
 
 const ForgotPassword = () => {
+    usePageTitle('Forgot Password');
     const { forgotPassword } = useAuth();
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);

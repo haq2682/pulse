@@ -1,10 +1,10 @@
-import React from 'react';
 import HeroBackground from '@/assets/hero-background.png';
 import Illustration1 from '@/assets/illustration1.png';
 import ProcedureIllustration1 from '@/assets/procedure-illustration-1.png';
 import ProcedureIllustration2 from '@/assets/procedure-illustration-2.png';
 import BenefitsIllustration from '@/assets/benefits-illustration.png';
 import PreviewBackground from '@/assets/preview-background.png';
+import DashboardPreview from '@/assets/dashboard-preview.png';
 import {
     PiChartLineUpBold,
     PiPackageBold,
@@ -558,7 +558,7 @@ const Landing = () => {
                         {/* Right Dashboard Image */}
                         <div className="dashboard-preview-image-container">
                             <img
-                                src="/dashboard-preview.png"
+                                src={DashboardPreview}
                                 alt="Dashboard Preview"
                                 className="dashboard-preview-image"
                             />

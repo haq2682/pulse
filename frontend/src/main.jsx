@@ -18,8 +18,6 @@ import GuestRoute from '@/components/auth/GuestRoute';
 
 // User Pages
 import Landing from "@/pages/landing/index.jsx";
-import ThemeReference from "@/pages/ThemeReference/index.jsx";
-import ThemeReferenceV2 from "@/pages/ThemeReferenceV2/index.jsx";
 import Signup from "@/pages/signup/index.jsx";
 import Login from "@/pages/login/index.jsx";
 import ForgotPassword from '@/pages/forgot-password/index.jsx';
@@ -59,8 +57,6 @@ createRoot(document.getElementById('root')).render(
                 <Routes>
                     {/* PUBLIC ROUTES */}
                     <Route path="/" element={<GuestRoute><Landing /></GuestRoute>} />
-                    <Route path="/theme" element={<ThemeReference />} />
-                    <Route path="/theme2" element={<ThemeReferenceV2 />} />
 
                     {/* USER GUEST ROUTES */}
                     <Route path="/signup" element={<GuestRoute><Signup /></GuestRoute>} />
