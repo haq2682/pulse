@@ -336,6 +336,17 @@ const EXPORT_SECTIONS = [
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Maximum characters shown in bar-chart row labels
+const MAX_LABEL_LEN = 22;
+// Maximum characters shown on line-chart x-axis ticks
+const MAX_XAXIS_LEN = 12;
+// Column-name pattern for picking the categorical label in a bar chart
+const LABEL_COL_RE =
+    /name|category|product|supplier|country|state|city|segment|status|type|method|device|referrer|tier|source|channel|campaign|gender|group|brand|reason|bucket/;
+// Column-name pattern for picking the primary numeric value in a bar chart
+const VALUE_COL_RE =
+    /revenue|total|count|orders|amount|value|sales|profit|rate|score|spend|clicks|impressions/;
+
 /** Human-readable column header from snake_case key */
 const colHeader = (key) =>
     key
@@ -343,18 +354,248 @@ const colHeader = (key) =>
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(' ');
 
-/** Format a cell value for display in the PDF table */
+/** Format a cell value for display in the PDF */
 const fmtCell = (val) => {
     if (val === null || val === undefined) return '';
     if (typeof val === 'number') {
         if (Number.isNaN(val) || !Number.isFinite(val)) return '';
-        return Number.isInteger(val) ? val.toLocaleString() : val.toFixed(2);
+        return Number.isInteger(val)
+            ? val.toLocaleString()
+            : parseFloat(val.toFixed(2)).toLocaleString();
     }
     return String(val);
 };
 
-// Maximum rows per table to keep PDF file sizes manageable
+// Maximum rows per table to keep PDF size manageable
 const MAX_TABLE_ROWS = 200;
+
+// ---------------------------------------------------------------------------
+// Color palette
+// ---------------------------------------------------------------------------
+const PALETTE = [
+    [99, 102, 241],  // indigo
+    [16, 185, 129],  // emerald
+    [245, 158, 11],  // amber
+    [239, 68, 68],   // red
+    [59, 130, 246],  // blue
+    [168, 85, 247],  // purple
+    [236, 72, 153],  // pink
+    [20, 184, 166],  // teal
+];
+
+// ---------------------------------------------------------------------------
+// Chart drawing helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Horizontal bar chart. Returns the Y coordinate after the last element.
+ */
+const drawHBar = (doc, rows, labelKey, valueKey, x, y, w, maxBars = 12) => {
+    const items = rows.slice(0, maxBars);
+    if (!items.length) return y;
+    const vals = items.map((r) => Math.max(0, Number(r[valueKey] ?? 0)));
+    const maxV = Math.max(...vals, 1);
+    const LABEL_W = 46, BAR_AREA = w - LABEL_W - 24, ROW_H = 5.5, GAP = 1.8;
+    items.forEach((row, i) => {
+        const ry = y + i * (ROW_H + GAP);
+        const barLen = (vals[i] / maxV) * BAR_AREA;
+        doc.setFontSize(6.2);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(55, 65, 81);
+        doc.text(String(row[labelKey] ?? '').substring(0, MAX_LABEL_LEN), x + LABEL_W, ry + ROW_H - 0.5, { align: 'right' });
+        // Track (background bar)
+        doc.setFillColor(229, 231, 235);
+        doc.rect(x + LABEL_W + 2, ry, BAR_AREA, ROW_H, 'F');
+        // Filled bar
+        if (barLen > 0) {
+            const [r, g, b] = PALETTE[i % PALETTE.length];
+            doc.setFillColor(r, g, b);
+            doc.rect(x + LABEL_W + 2, ry, barLen, ROW_H, 'F');
+        }
+        // Value label
+        doc.setFontSize(5.8);
+        doc.setTextColor(75, 85, 99);
+        doc.text(fmtCell(vals[i]), x + LABEL_W + BAR_AREA + 4, ry + ROW_H - 0.5);
+    });
+    let endY = y + items.length * (ROW_H + GAP) + 1;
+    if (rows.length > maxBars) {
+        doc.setFontSize(6);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(156, 163, 175);
+        doc.text(`… and ${rows.length - maxBars} more`, x + LABEL_W + 2, endY + 3);
+        endY += 6;
+    }
+    return endY;
+};
+
+/**
+ * Line chart for time-series data (up to 3 y-series). Returns Y after chart.
+ */
+const drawLineChart = (doc, rows, xKey, yKeys, x, y, w, chartH = 42) => {
+    if (rows.length < 2) return y;
+    const ML = 15, MB = 10, MR = 6, MT = 2;
+    const plotW = w - ML - MR, plotH = chartH - MT - MB;
+    const bx = x + ML, by = y + MT;
+    const allVals = yKeys.flatMap((yk) => rows.map((r) => Number(r[yk] ?? 0)));
+    const minV = Math.min(...allVals), maxV = Math.max(...allVals, minV + 1);
+    const range = maxV - minV;
+    // Plot background
+    doc.setFillColor(249, 250, 251);
+    doc.rect(bx, by, plotW, plotH, 'F');
+    // Grid lines
+    doc.setDrawColor(229, 231, 235);
+    doc.setLineWidth(0.15);
+    [0, 0.25, 0.5, 0.75, 1].forEach((frac) => {
+        const gy = by + frac * plotH;
+        doc.line(bx, gy, bx + plotW, gy);
+        if (frac === 0 || frac === 0.5 || frac === 1) {
+            doc.setFontSize(4.8);
+            doc.setTextColor(156, 163, 175);
+            doc.text(fmtCell(maxV - frac * range), bx - 1, gy + 1.5, { align: 'right' });
+        }
+    });
+    // Border
+    doc.setDrawColor(209, 213, 219);
+    doc.setLineWidth(0.2);
+    doc.rect(bx, by, plotW, plotH, 'S');
+    // X-axis labels (max 10)
+    const n = rows.length;
+    const step = Math.max(1, Math.ceil(n / 10));
+    rows.forEach((row, i) => {
+        if (i % step !== 0 && i !== n - 1) return;
+        const px = bx + (i / (n - 1)) * plotW;
+        doc.setFontSize(4.8);
+        doc.setTextColor(156, 163, 175);
+        doc.text(String(row[xKey] ?? '').substring(0, MAX_XAXIS_LEN), px, by + plotH + 7, { align: 'center' });
+    });
+    // Series
+    yKeys.forEach((yk, si) => {
+        const [lr, lg, lb] = PALETTE[si % PALETTE.length];
+        doc.setDrawColor(lr, lg, lb);
+        doc.setLineWidth(0.65);
+        rows.forEach((row, i) => {
+            if (i === 0) return;
+            const prev = rows[i - 1];
+            const x1 = bx + ((i - 1) / (n - 1)) * plotW;
+            const x2 = bx + (i / (n - 1)) * plotW;
+            const y1 = by + plotH - ((Number(prev[yk] ?? 0) - minV) / range) * plotH;
+            const y2 = by + plotH - ((Number(row[yk] ?? 0) - minV) / range) * plotH;
+            doc.line(x1, y1, x2, y2);
+        });
+        // Dots (only when not too many points)
+        doc.setFillColor(lr, lg, lb);
+        if (n <= 40) {
+            rows.forEach((row, i) => {
+                const px = bx + (i / (n - 1)) * plotW;
+                const py = by + plotH - ((Number(row[yk] ?? 0) - minV) / range) * plotH;
+                doc.circle(px, py, 0.9, 'F');
+            });
+        }
+        // Legend (multi-series only)
+        if (yKeys.length > 1) {
+            const lx = bx + si * 40;
+            const ly = by + plotH + MB;
+            doc.setFillColor(lr, lg, lb);
+            doc.rect(lx, ly - 2.5, 4, 2.5, 'F');
+            doc.setFontSize(5.5);
+            doc.setTextColor(75, 85, 99);
+            doc.text(colHeader(yk), lx + 5.5, ly);
+        }
+    });
+    return y + chartH + (yKeys.length > 1 ? 6 : 2);
+};
+
+/**
+ * KPI card grid for single-row datasets (3 cards per row). Returns Y after grid.
+ */
+const drawKPICards = (doc, row, x, y, w, maxCards = 24) => {
+    const entries = Object.entries(row)
+        .filter(([, v]) => v !== null && v !== undefined)
+        .slice(0, maxCards);
+    const COLS = 3, CARD_W = (w - (COLS - 1) * 3) / COLS, CARD_H = 17;
+    entries.forEach(([key, val], idx) => {
+        const col = idx % COLS, rowIdx = Math.floor(idx / COLS);
+        const cx = x + col * (CARD_W + 3), cy = y + rowIdx * (CARD_H + 3);
+        // Card background
+        doc.setFillColor(243, 244, 246);
+        doc.rect(cx, cy, CARD_W, CARD_H, 'F');
+        doc.setDrawColor(229, 231, 235);
+        doc.setLineWidth(0.2);
+        doc.rect(cx, cy, CARD_W, CARD_H, 'S');
+        // Coloured top accent strip
+        const [r, g, b] = PALETTE[idx % PALETTE.length];
+        doc.setFillColor(r, g, b);
+        doc.rect(cx, cy, CARD_W, 2, 'F');
+        // Value
+        doc.setTextColor(r, g, b);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text(fmtCell(val), cx + CARD_W / 2, cy + 10, { align: 'center' });
+        // Label
+        doc.setFontSize(5.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(107, 114, 128);
+        doc.text(colHeader(key), cx + CARD_W / 2, cy + 14.5, { align: 'center' });
+    });
+    const rowsCount = Math.ceil(entries.length / COLS);
+    return y + rowsCount * (CARD_H + 3) + 4;
+};
+
+// ---------------------------------------------------------------------------
+// Visualization type detection
+// ---------------------------------------------------------------------------
+
+const _DATE_FIELDS = new Set([
+    'date', 'order_date', 'week_start', 'month_start', 'year_month',
+    'review_date', 'week', 'month', 'year', 'period', 'created_at', 'month_year',
+]);
+
+const detectViz = (rows, columns) => {
+    if (!rows?.length) return null;
+    if (rows.length === 1) return { type: 'kpi' };
+    const sample = rows[0];
+
+    // Detect a date/time column
+    const dateCol = columns.find((c) => {
+        const lc = c.toLowerCase();
+        if (_DATE_FIELDS.has(lc)) return true;
+        if (
+            lc.endsWith('_date') ||
+            lc.includes('year_month') ||
+            lc.includes('week_start') ||
+            lc.includes('month_start')
+        ) return true;
+        // Inspect actual value format
+        return /^\d{4}[-/]/.test(String(sample[c] ?? ''));
+    });
+
+    const numericCols = columns.filter((c) => {
+        const v = sample[c];
+        return typeof v === 'number' || (typeof v === 'string' && v !== '' && !isNaN(Number(v)));
+    });
+
+    const strCols = columns.filter((c) => {
+        const v = sample[c];
+        return typeof v === 'string' && isNaN(Number(v));
+    });
+
+    // Time-series → line chart
+    if (dateCol && numericCols.length >= 1 && rows.length >= 3) {
+        const yKeys = numericCols.filter((c) => c !== dateCol).slice(0, 3);
+        if (yKeys.length) return { type: 'line', xKey: dateCol, yKeys };
+    }
+
+    // Categorical → bar chart
+    if (strCols.length >= 1 && numericCols.length >= 1) {
+        const labelKey =
+            strCols.find((c) => LABEL_COL_RE.test(c.toLowerCase())) ?? strCols[0];
+        const valueKey =
+            numericCols.find((c) => VALUE_COL_RE.test(c.toLowerCase())) ?? numericCols[0];
+        return { type: 'bar', labelKey, valueKey };
+    }
+
+    return { type: 'table_only' };
+};
 
 // ---------------------------------------------------------------------------
 // PDF builder
@@ -364,67 +605,63 @@ const buildPDF = ({ businessName, businessId, reportDate, sections, analyticsDat
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const PAGE_W = doc.internal.pageSize.getWidth();
     const PAGE_H = doc.internal.pageSize.getHeight();
+    const SM = 12;           // side margin
+    const CW = PAGE_W - 2 * SM; // usable content width
 
-    // Helper: add a page footer with page number
+    // Re-usable: draw the indigo accent bar on the left edge
+    const accentBar = () => {
+        doc.setFillColor(99, 102, 241);
+        doc.rect(0, 0, 6, PAGE_H, 'F');
+    };
+
+    // Add running footer to every page after all content is drawn
     const addFooter = () => {
-        const totalPages = doc.getNumberOfPages();
-        for (let i = 1; i <= totalPages; i++) {
+        const total = doc.getNumberOfPages();
+        for (let i = 1; i <= total; i++) {
             doc.setPage(i);
-            doc.setFontSize(8);
+            doc.setFontSize(7.5);
             doc.setTextColor(150);
             doc.text(
-                `Pulse Analytics Report  |  ${businessName}  |  ${reportDate}  |  Page ${i} of ${totalPages}`,
+                `Pulse Analytics Report  ·  ${businessName}  ·  ${reportDate}  ·  Page ${i} of ${total}`,
                 PAGE_W / 2,
-                PAGE_H - 6,
+                PAGE_H - 5,
                 { align: 'center' }
             );
         }
     };
 
     // ---- Cover page ----
-    doc.setFillColor(17, 24, 39); // gray-900
+    doc.setFillColor(17, 24, 39);
     doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
-
-    // Gradient-like accent bar
-    doc.setFillColor(99, 102, 241); // indigo-500
-    doc.rect(0, 0, 6, PAGE_H, 'F');
-
+    accentBar();
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(36);
     doc.setFont('helvetica', 'bold');
     doc.text('Pulse Analytics', PAGE_W / 2, PAGE_H / 2 - 28, { align: 'center' });
-
     doc.setFontSize(18);
     doc.setFont('helvetica', 'normal');
     doc.text('Analytics & Insights Report', PAGE_W / 2, PAGE_H / 2 - 12, { align: 'center' });
-
     doc.setFontSize(13);
-    doc.setTextColor(209, 213, 219); // gray-300
+    doc.setTextColor(209, 213, 219);
     doc.text(`Business: ${businessName}`, PAGE_W / 2, PAGE_H / 2 + 6, { align: 'center' });
     doc.text(`Business ID: ${businessId}`, PAGE_W / 2, PAGE_H / 2 + 16, { align: 'center' });
     doc.text(`Generated: ${reportDate}`, PAGE_W / 2, PAGE_H / 2 + 26, { align: 'center' });
-
     doc.setFontSize(10);
     doc.setTextColor(107, 114, 128);
     doc.text(
         `This report contains ${sections.length} section(s) with full analytics data.`,
-        PAGE_W / 2,
-        PAGE_H / 2 + 44,
-        { align: 'center' }
+        PAGE_W / 2, PAGE_H / 2 + 44, { align: 'center' }
     );
 
     // ---- Table of Contents ----
     doc.addPage();
-    doc.setFillColor(249, 250, 251); // gray-50
+    doc.setFillColor(249, 250, 251);
     doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
-    doc.setFillColor(99, 102, 241);
-    doc.rect(0, 0, 6, PAGE_H, 'F');
-
+    accentBar();
     doc.setTextColor(17, 24, 39);
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
     doc.text('Table of Contents', 20, 22);
-
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(55, 65, 81);
@@ -443,104 +680,129 @@ const buildPDF = ({ businessName, businessId, reportDate, sections, analyticsDat
         }
     });
 
-    // ---- Section pages ----
+    // ---- Section data pages ----
     sections.forEach((sec) => {
         const catData = analyticsData[sec.key] ?? {};
 
-        // Gather tables that have at least 1 row
-        const tables = sec.analyticsKeys
+        const analyticsItems = sec.analyticsKeys
             .map((k) => ({ key: k, rows: catData[k] ?? [] }))
-            .filter((t) => t.rows.length > 0);
+            .filter((item) => item.rows.length > 0);
 
-        if (tables.length === 0) {
-            // No data page for this section
+        if (analyticsItems.length === 0) {
             doc.addPage();
             doc.setFillColor(249, 250, 251);
             doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
-            doc.setFillColor(99, 102, 241);
-            doc.rect(0, 0, 6, PAGE_H, 'F');
-
+            accentBar();
             doc.setTextColor(17, 24, 39);
             doc.setFontSize(20);
             doc.setFont('helvetica', 'bold');
-            doc.text(`${sec.emoji}  ${sec.label}`, 18, 22);
-
+            doc.text(`${sec.emoji}  ${sec.label}`, SM + 4, 22);
             doc.setFontSize(12);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(107, 114, 128);
-            doc.text('No data available for this section.', 18, 40);
+            doc.text('No data available for this section.', SM + 4, 40);
             return;
         }
 
-        let isFirstTableInSection = true;
-
-        tables.forEach(({ key, rows }) => {
+        analyticsItems.forEach(({ key, rows }, itemIdx) => {
             const tableTitle = colHeader(key);
+            const columns = Object.keys(rows[0]);
             const displayRows = rows.slice(0, MAX_TABLE_ROWS);
             const truncated = rows.length > MAX_TABLE_ROWS;
+            const viz = detectViz(rows, columns);
 
-            // Column headers from first row
-            const columns = Object.keys(displayRows[0]);
-            const head = [columns.map(colHeader)];
-            const body = displayRows.map((row) => columns.map((c) => fmtCell(row[c])));
-
+            // Each analytics item starts on a fresh page
             doc.addPage();
             doc.setFillColor(249, 250, 251);
             doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
-            doc.setFillColor(99, 102, 241);
-            doc.rect(0, 0, 6, PAGE_H, 'F');
+            accentBar();
 
-            let startY = 12;
+            let curY = SM;
 
-            if (isFirstTableInSection) {
-                // Section header
+            // Section header on the first item of this section
+            if (itemIdx === 0) {
                 doc.setTextColor(17, 24, 39);
-                doc.setFontSize(20);
+                doc.setFontSize(18);
                 doc.setFont('helvetica', 'bold');
-                doc.text(`${sec.emoji}  ${sec.label}`, 18, startY + 6);
-                startY += 16;
-                isFirstTableInSection = false;
+                doc.text(`${sec.emoji}  ${sec.label}`, SM + 4, curY + 7);
+                curY += 16;
+                doc.setDrawColor(229, 231, 235);
+                doc.setLineWidth(0.3);
+                doc.line(SM, curY, PAGE_W - SM, curY);
+                curY += 5;
             }
 
-            // Table title
+            // Analytics item heading
             doc.setFontSize(13);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(55, 65, 81);
-            doc.text(tableTitle, 18, startY + 2);
-            startY += 8;
+            doc.text(tableTitle, SM + 4, curY + 4);
+            curY += 9;
 
+            // Record count
+            doc.setFontSize(7.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(107, 114, 128);
+            doc.text(
+                `${rows.length.toLocaleString()} record${rows.length !== 1 ? 's' : ''}`,
+                SM + 4, curY
+            );
+            curY += 6;
+
+            // ---- Visualization (chart / KPI cards) ----
+            if (viz?.type === 'kpi') {
+                curY = drawKPICards(doc, rows[0], SM + 4, curY, CW - 8);
+            } else if (viz?.type === 'bar') {
+                curY = drawHBar(doc, rows, viz.labelKey, viz.valueKey, SM + 4, curY, CW - 8);
+            } else if (viz?.type === 'line') {
+                curY = drawLineChart(doc, rows, viz.xKey, viz.yKeys, SM + 4, curY, CW - 8);
+            }
+            curY += 3;
+
+            // Truncation notice
             if (truncated) {
-                doc.setFontSize(8);
+                doc.setFontSize(7.5);
                 doc.setFont('helvetica', 'italic');
                 doc.setTextColor(156, 163, 175);
                 doc.text(
-                    `Showing first ${MAX_TABLE_ROWS} of ${rows.length} rows`,
-                    18,
-                    startY
+                    `Showing first ${MAX_TABLE_ROWS.toLocaleString()} of ${rows.length.toLocaleString()} rows`,
+                    SM + 4, curY
                 );
-                startY += 5;
+                curY += 5;
             }
 
+            // ---- Full data table ----
+            // Scale font + min-col-width by column count to prevent vertical character wrapping
+            const colCount = columns.length;
+            const tFontSize = colCount > 20 ? 5.5 : colCount > 12 ? 6.5 : 7.5;
+            const minCW = colCount > 20 ? 14 : colCount > 12 ? 17 : 20;
+
             autoTable(doc, {
-                head,
-                body,
-                startY,
-                margin: { left: 12, right: 12 },
+                head: [columns.map(colHeader)],
+                body: displayRows.map((row) => columns.map((c) => fmtCell(row[c]))),
+                startY: curY,
+                margin: { left: SM, right: SM },
                 styles: {
-                    fontSize: 7.5,
-                    cellPadding: 2,
-                    overflow: 'linebreak',
+                    fontSize: tFontSize,
+                    cellPadding: { top: 1.5, right: 2, bottom: 1.5, left: 2 },
+                    overflow: 'ellipsize',
+                    minCellWidth: minCW,
                     halign: 'left',
                 },
                 headStyles: {
                     fillColor: [99, 102, 241],
                     textColor: 255,
                     fontStyle: 'bold',
-                    fontSize: 8,
+                    fontSize: tFontSize,
                 },
                 alternateRowStyles: { fillColor: [243, 244, 246] },
                 tableLineColor: [209, 213, 219],
                 tableLineWidth: 0.2,
+                // Re-draw the accent bar on pages autoTable creates internally
+                didDrawPage: () => {
+                    doc.setFillColor(99, 102, 241);
+                    doc.rect(0, 0, 6, PAGE_H, 'F');
+                },
             });
         });
     });
