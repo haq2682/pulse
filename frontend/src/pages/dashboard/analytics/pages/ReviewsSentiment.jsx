@@ -347,16 +347,7 @@ export default function ReviewsSentiment() {
     return (
         <div className="p-6 space-y-8">
             <Toast ref={toastRef} />
-
-            {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Review Sentiment</h1>
-                    <p className="text-gray-500 mt-1">
-                        Positive, neutral, and negative review breakdown by category, sentiment scores, and monthly trends
-                    </p>
-                </div>
-                <DateFilterBar
+            <DateFilterBar
                     quickFilter={quickFilter}
                     dateRange={dateRange}
                     isFiltered={isFiltered}
@@ -365,7 +356,6 @@ export default function ReviewsSentiment() {
                     onReset={resetFilters}
                     dataMode={dataMode}
                 />
-            </div>
 
             {/* ── Static-data notice ─────────────────────────────────────── */}
             {isFiltered && (

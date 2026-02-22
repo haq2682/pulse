@@ -306,22 +306,12 @@ export default function InventoryReorderManagement() {
     return (
         <div className="p-6 space-y-8">
             <Toast ref={toastRef} />
-
-            {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Reorder Management</h1>
-                    <p className="text-gray-500 mt-1">
-                        Reorder urgency, stockout risk, replenishment priorities and breach frequency
-                    </p>
-                </div>
-                <DateFilterBar
+            <DateFilterBar
                     dateRange={dateRange}
                     onQuickFilter={applyQuickFilter}
                     onReset={resetFilters}
                     toISODate={toISODate}
                 />
-            </div>
 
             {/* ── KPI Cards ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -30,12 +30,10 @@ const Sidebar = ({ isOpen, onClose }) => {
             icon: 'pi pi-home',
             label: 'Executive Overview',
             path: `${basePath}`,
-            emoji: '📊'
         },
         {
             icon: 'pi pi-users',
             label: 'Customers',
-            emoji: '👥',
             subItems: [
                 { label: 'Overview', path: `${basePath}/customers/overview` },
                 { label: 'Segmentation', path: `${basePath}/customers/segmentation` },
@@ -46,7 +44,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         {
             icon: 'pi pi-box',
             label: 'Products',
-            emoji: '🛍️',
             subItems: [
                 { label: 'Performance', path: `${basePath}/products/performance` },
                 { label: 'Profitability', path: `${basePath}/products/profitability` },
@@ -57,7 +54,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         {
             icon: 'pi pi-inbox',
             label: 'Inventory',
-            emoji: '📦',
             subItems: [
                 { label: 'Health', path: `${basePath}/inventory/health` },
                 { label: 'Reorder Management', path: `${basePath}/inventory/reorder` },
@@ -68,7 +64,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         {
             icon: 'pi pi-building',
             label: 'Suppliers',
-            emoji: '🤝',
             subItems: [
                 { label: 'Performance', path: `${basePath}/suppliers/performance` },
                 { label: 'Operations', path: `${basePath}/suppliers/operations` },
@@ -78,7 +73,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         {
             icon: 'pi pi-megaphone',
             label: 'Marketing',
-            emoji: '🎯',
             subItems: [
                 { label: 'Campaigns', path: `${basePath}/marketing/campaigns` },
                 { label: 'Attribution', path: `${basePath}/marketing/attribution` },
@@ -88,7 +82,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         {
             icon: 'pi pi-shopping-cart',
             label: 'Conversion Funnel',
-            emoji: '🛒',
             subItems: [
                 { label: 'Funnel Overview', path: `${basePath}/funnel/overview` },
                 { label: 'Cart Analysis', path: `${basePath}/funnel/cart` },
@@ -99,7 +92,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         {
             icon: 'pi pi-credit-card',
             label: 'Payments & Finance',
-            emoji: '💳',
             subItems: [
                 { label: 'Payment Methods', path: `${basePath}/payments/methods` },
                 { label: 'Refunds', path: `${basePath}/payments/refunds` },
@@ -109,7 +101,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         {
             icon: 'pi pi-truck',
             label: 'Operations',
-            emoji: '📦',
             subItems: [
                 { label: 'Processing', path: `${basePath}/operations/processing` },
                 { label: 'Delivery', path: `${basePath}/operations/delivery` },
@@ -119,7 +110,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         {
             icon: 'pi pi-link',
             label: 'Recommendations',
-            emoji: '🔗',
             subItems: [
                 { label: 'Product Affinity', path: `${basePath}/recommendations/product` },
                 { label: 'Category Affinity', path: `${basePath}/recommendations/category` },
@@ -129,7 +119,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         {
             icon: 'pi pi-star',
             label: 'Reviews & Sentiment',
-            emoji: '⭐',
             subItems: [
                 { label: 'Overview', path: `${basePath}/reviews/overview` },
                 { label: 'Sentiment', path: `${basePath}/reviews/sentiment` },
@@ -139,7 +128,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         {
             icon: 'pi pi-chart-line',
             label: 'Engagement',
-            emoji: '🎯',
             subItems: [
                 { label: 'Metrics', path: `${basePath}/engagement/metrics` },
                 { label: 'Behavior', path: `${basePath}/engagement/behavior` },
@@ -149,19 +137,16 @@ const Sidebar = ({ isOpen, onClose }) => {
         {
             icon: 'pi pi-chart-bar',
             label: 'Forecasts & Predictions',
-            emoji: '🔮',
             path: `${basePath}/forecasts`,
         },
         {
             icon: 'pi pi-eye',
             label: 'Explainable AI',
-            emoji: '🤖',
             path: `${basePath}/xai`,
         },
         {
             icon: 'pi pi-download',
             label: 'Export Analytics',
-            emoji: '📤',
             path: `${basePath}/export`,
         },
     ];
@@ -226,7 +211,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                                                 }
                                             `}
                                         >
-                                            <span className="text-base">{item.emoji}</span>
+                                            <i className={`${item.icon} text-base`} />
                                             <span className="text-sm flex-1">{item.label}</span>
                                             <i className={`pi ${expandedSections[item.label] ? 'pi-chevron-down' : 'pi-chevron-right'} text-xs transition-transform`} />
                                         </button>
@@ -268,7 +253,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                                             }
                                         `}
                                     >
-                                        <span className="text-base">{item.emoji}</span>
+                                        <i className={`${item.icon} text-base`} />
                                         <span className="text-sm">{item.label}</span>
                                     </button>
                                 )}

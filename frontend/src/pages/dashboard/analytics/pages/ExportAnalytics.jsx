@@ -21,7 +21,7 @@ const EXPORT_SECTIONS = [
     {
         key: 'executive_overview',
         label: 'Executive Overview',
-        emoji: '📊',
+        icon: 'pi-home',
         categories: ['kpis'],
         analyticsKeys: [
             'business_health_daily',
@@ -37,7 +37,7 @@ const EXPORT_SECTIONS = [
     {
         key: 'customers',
         label: 'Customers',
-        emoji: '👥',
+        icon: 'pi-users',
         subItems: ['Overview', 'Segmentation', 'Health & Retention', 'Value Analysis'],
         categories: ['customer_analytics', 'geo_analytics'],
         analyticsKeys: [
@@ -95,7 +95,7 @@ const EXPORT_SECTIONS = [
     {
         key: 'products',
         label: 'Products',
-        emoji: '🛍️',
+        icon: 'pi-box',
         subItems: ['Performance', 'Profitability', 'Engagement', 'Trends'],
         categories: ['product_analytics'],
         analyticsKeys: [
@@ -128,7 +128,7 @@ const EXPORT_SECTIONS = [
     {
         key: 'inventory',
         label: 'Inventory',
-        emoji: '📦',
+        icon: 'pi-inbox',
         subItems: ['Health', 'Reorder Management', 'Efficiency', 'Supplier Inventory'],
         categories: ['product_analytics'],
         analyticsKeys: [
@@ -152,7 +152,7 @@ const EXPORT_SECTIONS = [
     {
         key: 'suppliers',
         label: 'Suppliers',
-        emoji: '🤝',
+        icon: 'pi-building',
         subItems: ['Performance', 'Operations', 'Economics'],
         categories: ['supplier_analytics'],
         analyticsKeys: [
@@ -171,7 +171,7 @@ const EXPORT_SECTIONS = [
     {
         key: 'marketing',
         label: 'Marketing',
-        emoji: '🎯',
+        icon: 'pi-megaphone',
         subItems: ['Campaigns', 'Attribution', 'Channels'],
         categories: ['marketing_analytics'],
         analyticsKeys: [
@@ -187,7 +187,7 @@ const EXPORT_SECTIONS = [
     {
         key: 'conversion_funnel',
         label: 'Conversion Funnel',
-        emoji: '🛒',
+        icon: 'pi-shopping-cart',
         subItems: ['Funnel Overview', 'Cart Analysis', 'Checkout', 'Wishlist'],
         categories: ['funnel_analytics', 'cart_analytics', 'wishlist_analytics'],
         analyticsKeys: [
@@ -221,7 +221,7 @@ const EXPORT_SECTIONS = [
     {
         key: 'payments_finance',
         label: 'Payments & Finance',
-        emoji: '💳',
+        icon: 'pi-credit-card',
         subItems: ['Payment Methods', 'Refunds', 'Financial Metrics'],
         categories: ['payment_analytics', 'revenue_analytics'],
         analyticsKeys: [
@@ -251,7 +251,7 @@ const EXPORT_SECTIONS = [
     {
         key: 'operations',
         label: 'Operations',
-        emoji: '🚚',
+        icon: 'pi-truck',
         subItems: ['Processing', 'Delivery', 'Shipping'],
         categories: ['operations_analytics'],
         analyticsKeys: [
@@ -276,7 +276,7 @@ const EXPORT_SECTIONS = [
     {
         key: 'recommendations',
         label: 'Recommendations',
-        emoji: '🔗',
+        icon: 'pi-link',
         subItems: ['Product Affinity', 'Category Affinity', 'Coverage'],
         categories: ['product_analytics'],
         analyticsKeys: [
@@ -291,7 +291,7 @@ const EXPORT_SECTIONS = [
     {
         key: 'reviews_sentiment',
         label: 'Reviews & Sentiment',
-        emoji: '⭐',
+        icon: 'pi-star',
         subItems: ['Overview', 'Sentiment', 'Impact'],
         categories: ['review_analytics'],
         analyticsKeys: [
@@ -308,7 +308,7 @@ const EXPORT_SECTIONS = [
     {
         key: 'engagement',
         label: 'Engagement',
-        emoji: '📈',
+        icon: 'pi-chart-line',
         subItems: ['Metrics', 'Behavior', 'Conversion'],
         categories: ['kpis', 'customer_analytics', 'funnel_analytics'],
         analyticsKeys: [
@@ -334,7 +334,7 @@ const EXPORT_SECTIONS = [
     {
         key: 'forecasts',
         label: 'Forecasts & Predictions',
-        emoji: '🔮',
+        icon: 'pi-chart-bar',
         isForecast: true,      // signals different fetch endpoint
         categories: [],         // not used for forecast fetch
         analyticsKeys: [
@@ -954,7 +954,7 @@ const buildPDF = ({ businessName, businessId, reportDate, sections, analyticsDat
     doc.setTextColor(55, 65, 81);
     let tocY = 36;
     sections.forEach((sec, idx) => {
-        doc.text(`${idx + 1}.  ${sec.emoji}  ${sec.label}`, 22, tocY);
+        doc.text(`${idx + 1}.  ${sec.label}`, 22, tocY);
         if (sec.subItems?.length) {
             doc.setFontSize(9);
             doc.setTextColor(107, 114, 128);
@@ -999,7 +999,7 @@ const buildPDF = ({ businessName, businessId, reportDate, sections, analyticsDat
         doc.setTextColor(17, 24, 39);
         doc.setFontSize(17);
         doc.setFont('helvetica', 'bold');
-        doc.text(`${sec.emoji}  ${sec.label}`, SM + 4, curY + 7);
+        doc.text(`${sec.label}`, SM + 4, curY + 7);
         curY += 15;
         doc.setDrawColor(229, 231, 235);
         doc.setLineWidth(0.3);
@@ -1384,7 +1384,7 @@ svg{display:block;margin-bottom:12px}`;
 
     const toc = sections.map((s) => {
         const sub = s.subItems ? `<div class="toc-sub">${s.subItems.map(_escHtml).join(' · ')}</div>` : '';
-        return `<div class="toc-item">${_escHtml(s.emoji)} <strong>${_escHtml(s.label)}</strong>${sub}</div>`;
+        return `<div class="toc-item"><strong>${_escHtml(s.label)}</strong>${sub}</div>`;
     }).join('');
 
     const body = sections.map((sec) => {
@@ -1409,13 +1409,13 @@ svg{display:block;margin-bottom:12px}`;
                 return `<div class="analytic-item"><h3 class="analytic-title">${_escHtml(colHeader(key))}</h3><p class="record-count">${rows.length.toLocaleString()} record${rows.length !== 1 ? 's' : ''}</p>${chart}${table}</div>`;
             }).join('');
 
-        return `<div class="section"><h2 class="section-title">${_escHtml(sec.emoji)} ${_escHtml(sec.label)}</h2><hr class="section-hr">${content}</div>`;
+        return `<div class="section"><h2 class="section-title">${_escHtml(sec.label)}</h2><hr class="section-hr">${content}</div>`;
     }).join('');
 
     const eBizName = _escHtml(businessName);
     const eBizId = _escHtml(businessId);
     const eDate = _escHtml(reportDate);
-    return `<!DOCTYPE html>\n<html lang="en">\n<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pulse Analytics \u2014 ${eBizName}</title>\n<style>${css}</style>\n</head><body>\n<div class="cover">\n  <h1>\uD83D\uDCCA Pulse Analytics Report</h1>\n  <p style="font-size:1.1rem;margin:8px 0 20px;color:#e5e7eb">Analytics &amp; Insights Report</p>\n  <p><strong>Business:</strong> ${eBizName}</p>\n  <p><strong>Business ID:</strong> ${eBizId}</p>\n  <p><strong>Generated:</strong> ${eDate}</p>\n  <p><strong>Sections:</strong> ${sections.length}</p>\n</div>\n<div class="toc"><h2>Table of Contents</h2>${toc}</div>\n${body}\n<footer>Pulse Analytics \u00B7 ${eBizName} \u00B7 ${eDate}</footer>\n</body></html>`;
+    return `<!DOCTYPE html>\n<html lang="en">\n<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pulse Analytics \u2014 ${eBizName}</title>\n<style>${css}</style>\n</head><body>\n<div class="cover">\n  <h1>Pulse Analytics Report</h1>\n  <p style="font-size:1.1rem;margin:8px 0 20px;color:#e5e7eb">Analytics &amp; Insights Report</p>\n  <p><strong>Business:</strong> ${eBizName}</p>\n  <p><strong>Business ID:</strong> ${eBizId}</p>\n  <p><strong>Generated:</strong> ${eDate}</p>\n  <p><strong>Sections:</strong> ${sections.length}</p>\n</div>\n<div class="toc"><h2>Table of Contents</h2>${toc}</div>\n${body}\n<footer>Pulse Analytics \u00B7 ${eBizName} \u00B7 ${eDate}</footer>\n</body></html>`;
 };
 
 const ExportAnalytics = () => {
@@ -1770,7 +1770,7 @@ const ExportAnalytics = () => {
             {/* Page header */}
             <div>
                 <Heading level={2} className="text-2xl font-bold text-gray-800">
-                    📤 Export Analytics
+                    <i className="pi pi-file-export mr-2 text-indigo-600" />Export Analytics
                 </Heading>
                 <Text className="text-gray-500 mt-1">
                     Select the sections you want to include in the exported report. All data tables
@@ -1841,7 +1841,7 @@ const ExportAnalytics = () => {
                             onChange={() => toggleSection(sec.key)}
                             disabled={isExporting}
                         />
-                        <span className="text-xl leading-none select-none">{sec.emoji}</span>
+                        <i className={`pi ${sec.icon} text-base text-indigo-600`} />
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-gray-900">{sec.label}</p>
                             {sec.subItems && (
@@ -1876,7 +1876,8 @@ const ExportAnalytics = () => {
                 />
                 {!businessId && (
                     <Text className="text-sm text-amber-600">
-                        ⚠️ Select a business from the dropdown above to enable export.
+                        <i className="pi pi-exclamation-triangle mr-1" />
+                        Select a business from the dropdown above to enable export.
                     </Text>
                 )}
             </div>

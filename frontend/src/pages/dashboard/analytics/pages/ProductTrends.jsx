@@ -446,16 +446,7 @@ export default function ProductTrends() {
     return (
         <div className="p-6 space-y-8">
             <Toast ref={toastRef} />
-
-            {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Product Trends</h1>
-                    <p className="text-gray-500 mt-1">
-                        Monthly performance and seasonal demand patterns across your product catalog
-                    </p>
-                </div>
-                <DateFilterBar
+            <DateFilterBar
                     quickFilter={quickFilter}
                     dateRange={dateRange}
                     isFiltered={isFiltered}
@@ -464,7 +455,6 @@ export default function ProductTrends() {
                     onReset={resetFilters}
                     dataMode={dataMode}
                 />
-            </div>
 
             {/* ── KPI Cards ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

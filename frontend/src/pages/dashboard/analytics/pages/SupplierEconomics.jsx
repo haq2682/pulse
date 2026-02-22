@@ -397,16 +397,7 @@ export default function SupplierEconomics() {
     return (
         <div className="p-6 space-y-8">
             <Toast ref={toastRef} />
-
-            {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Supplier Economics</h1>
-                    <p className="text-gray-500 mt-1">
-                        Revenue contribution, profit margins, inventory carrying costs, and storage efficiency
-                    </p>
-                </div>
-                <DateFilterBar
+            <DateFilterBar
                     quickFilter={quickFilter}
                     dateRange={dateRange}
                     isFiltered={isFiltered}
@@ -415,7 +406,6 @@ export default function SupplierEconomics() {
                     onReset={resetFilters}
                     dataMode={dataMode}
                 />
-            </div>
 
             {/* ── Static-data notice ─────────────────────────────────────── */}
             {isFiltered && (

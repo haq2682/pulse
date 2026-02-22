@@ -387,16 +387,7 @@ export default function EngagementBehavior() {
     return (
         <div className="p-6 space-y-8">
             <Toast ref={toastRef} />
-
-            {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Engagement Behavior</h1>
-                    <p className="text-gray-500 mt-1">
-                        Customer session activity, page-view and cart abandonment distributions, funnel behavior by device and referrer
-                    </p>
-                </div>
-                <DateFilterBar
+            <DateFilterBar
                     quickFilter={quickFilter}
                     dateRange={dateRange}
                     isFiltered={isFiltered}
@@ -405,7 +396,6 @@ export default function EngagementBehavior() {
                     onReset={resetFilters}
                     dataMode={dataMode}
                 />
-            </div>
 
             {/* ── Static-data notice ─────────────────────────────────────── */}
             {isFiltered && (
