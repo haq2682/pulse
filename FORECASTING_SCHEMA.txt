@@ -1,8 +1,10 @@
 ============================================================
 📋 MACHINE LEARNING INFERENCE — OUTPUT DIRECTORIES & SCHEMAS
 ============================================================
-All paths use MinIO bucket: pulse-bucket-1
-Base prefix: s3a://pulse-bucket-1/machine-learning/
+MinIO bucket: {businessId}  — each business has its own bucket named after
+its UUID (the businessId).  All ML inference output is written into that
+business's bucket, NOT into a shared "pulse-bucket-1" bucket.
+Base prefix: s3a://{businessId}/machine-learning/
 
 Organised by:
   1. GENERAL  — Classification  (6 files)
@@ -13,6 +15,34 @@ Organised by:
   6. SPECIFIC — Regression      (6 files)
 ============================================================
 
+NOTE ON DISCREPANCIES WITH ML_MODELS_DOCUMENTATION.md
+------------------------------------------------------
+The schemas documented below are derived from the actual inference source
+code (infer_*.py files) and take precedence over the design schemas in
+ML_MODELS_DOCUMENTATION.md in the following cases:
+
+1. Cart Abandonment (1.1):
+   Actual output does NOT include key_risk_factors or recommended_actions
+   columns described in the documentation schema.
+
+2. Safety Stock (3.5):
+   The actual inference uses an adjustment-factor approach; output schema
+   contains theoretical_safety_stock, adjustment_factor, demand_pattern,
+   adjustment_reasoning, model_type — NOT the variability-based columns
+   (demand_variability, lead_time_variability, holding_cost_impact,
+   confidence_interval_lower/upper) described in the documentation.
+
+3. Customer Segmentation Clustering (2.1):
+   The semantic label column is customer_label (not cluster_label as in docs).
+
+4. Supplier Clustering (2.4):
+   Additional columns in actual output: business_persona, confidence_score,
+   validation_flag, action_urgency — not present in documentation schema.
+
+5. Fulfillment Risk (4.1) and Seasonal Trends (6.6):
+   These are "specific" inferences not covered in the main documentation
+   classification/regression sections; schemas here are ground-truth.
+------------------------------------------------------
 
 ============================================================
 1. GENERAL — CLASSIFICATION
@@ -595,7 +625,7 @@ Schema:
 ============================================================
 SUMMARY — OUTPUT PATH QUICK REFERENCE
 ============================================================
-{BUCKET} = pulse-bucket-1
+{BUCKET} = {businessId}   (each business's own MinIO bucket)
 
 GENERAL CLASSIFICATION
   cart_abandonment_predictions       → s3a://{BUCKET}/machine-learning/classification/predictions/cart_abandonment_predictions

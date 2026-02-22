@@ -8,6 +8,7 @@ from services.pipeline_service import PipelineService
 from services.websocket_manager import WebSocketManager
 from services.analytics_service import AnalyticsService
 from services.analytics_watcher_service import get_analytics_watcher
+from services.forecasting_service import ForecastingService
 from fastapi.responses import Response
 import numpy as np
 import json
@@ -48,6 +49,9 @@ websocket_manager = WebSocketManager()
 
 # Analytics service
 analytics_service = AnalyticsService()
+
+# Forecasting service
+forecasting_service = ForecastingService()
 
 @router.get("/get-businesses")
 async def get_businesses(userId: str, db=Depends(get_db)):
@@ -527,6 +531,90 @@ async def list_exports(business_id: str, user_id: str = Query(...), db=Depends(g
     except Exception as e:
         print(f"Error listing exports: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve export history")
+
+
+@router.get("/forecasts/{business_id}")
+async def get_all_forecasts(
+    business_id: str,
+    groups: str = Query(None, description="Comma-separated list of inference groups to fetch"),
+):
+    """
+    Fetch all available ML inference results for a business.
+
+    Inference results are read from the business's own MinIO bucket at
+    machine-learning/{type}/predictions/{output_name}[/|.parquet].
+    Missing inferences are silently skipped so the response only contains
+    what has actually been run for this business.
+
+    Args:
+        business_id: Business ID (also the MinIO bucket name)
+        groups: Optional comma-separated filter of inference groups
+                (general_classification, general_clustering, general_regression,
+                 specific_classification, specific_clustering, specific_regression)
+
+    Returns:
+        JSON with available inference results grouped by type
+    """
+    try:
+        group_list = None
+        if groups:
+            group_list = [g.strip() for g in groups.split(",")]
+
+        result = await forecasting_service.fetch_all_inferences(business_id, group_list)
+        json_str = json.dumps(result, cls=AnalyticsJSONEncoder, allow_nan=False)
+        return Response(content=json_str, media_type="application/json")
+
+    except Exception as e:
+        print(f"Error fetching forecasts for {business_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load forecast data")
+
+
+@router.get("/forecasts/{business_id}/inference/{inference_name}")
+async def get_single_forecast(business_id: str, inference_name: str):
+    """
+    Fetch a single ML inference result for a business.
+
+    Args:
+        business_id: Business ID (MinIO bucket name)
+        inference_name: Inference identifier (key from INFERENCE_CATALOG)
+
+    Returns:
+        JSON with inference result data, or 404 if not available
+    """
+    try:
+        if inference_name not in forecasting_service.INFERENCE_CATALOG:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown inference: {inference_name}",
+            )
+
+        result = await forecasting_service.fetch_inference(business_id, inference_name)
+        if result is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Inference results not available for this business",
+            )
+
+        json_str = json.dumps(result, cls=AnalyticsJSONEncoder, allow_nan=False)
+        return Response(content=json_str, media_type="application/json")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching inference {inference_name} for {business_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load inference data")
+
+
+@router.post("/forecasts/clear-cache/{business_id}")
+async def clear_forecasts_cache(business_id: str):
+    """Clear the forecasting cache for a specific business."""
+    try:
+        forecasting_service.clear_cache(business_id)
+        return {"message": f"Forecast cache cleared for business {business_id}"}
+    except Exception as e:
+        print(f"Error clearing forecast cache: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear cache")
+
 
 
 @router.get("/monitoring-status")
