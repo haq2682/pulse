@@ -52,7 +52,7 @@ ML_MODELS_DOCUMENTATION.md in the following cases:
 1.1  infer_cart_abandonment.py
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/classification/predictions/cart_abandonment_predictions
+  s3a://{businessId}/machine-learning/classification/predictions/cart_abandonment_predictions
 
 Schema:
   prediction_id              String      — UUID per prediction row
@@ -70,7 +70,7 @@ Schema:
 1.2  infer_customer_churn.py
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/classification/predictions/customer_churn_predictions
+  s3a://{businessId}/machine-learning/classification/predictions/customer_churn_predictions
 
 Schema:
   prediction_id              String      — UUID per prediction row
@@ -87,7 +87,7 @@ Schema:
 1.3  infer_customer_segments.py
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/classification/predictions/customer_segment_predictions
+  s3a://{businessId}/machine-learning/classification/predictions/customer_segment_predictions
 
 Schema:
   prediction_id              String      — UUID per prediction row
@@ -104,7 +104,7 @@ Schema:
 1.4  infer_payment_success.py
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/classification/predictions/payment_success_predictions
+  s3a://{businessId}/machine-learning/classification/predictions/payment_success_predictions
 
 Schema:
   prediction_id              String      — UUID per prediction row
@@ -122,7 +122,7 @@ Schema:
 1.5  infer_review_sentiment.py
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/classification/predictions/review_sentiment_predictions
+  s3a://{businessId}/machine-learning/classification/predictions/review_sentiment_predictions
 
 Schema:
   prediction_id              String      — UUID per prediction row
@@ -140,7 +140,7 @@ Schema:
 1.6  infer_stock_status.py
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/classification/predictions/stock_status_predictions
+  s3a://{businessId}/machine-learning/classification/predictions/stock_status_predictions
 
 Schema:
   prediction_id              String      — UUID per prediction row
@@ -160,8 +160,10 @@ Schema:
 ------------------------------------------------------------
 2.1  infer_customer_segment.py  (Customer Segmentation)
 ------------------------------------------------------------
-Output Directory:
-  s3a://pulse-bucket-1/machine-learning/clustering/predictions/customer_segmentation.parquet
+Output Directory (Spark partitioned directory):
+  s3a://{businessId}/machine-learning/clustering/predictions/customer_segmentation.parquet/
+  NOTE: Spark .write.parquet() always creates a directory even when the path ends in .parquet.
+        Actual files: customer_segmentation.parquet/part-00000-*.snappy.parquet
 
 Schema:
   clustering_id              String      — Composite ID: customer_id + "_current"
@@ -179,8 +181,10 @@ Schema:
 ------------------------------------------------------------
 2.2  infer_geo_cluster.py  (Geographic Sales Clustering)
 ------------------------------------------------------------
-Output Directory:
-  s3a://pulse-bucket-1/machine-learning/clustering/predictions/geographic_clustering.parquet
+Output Directory (Spark partitioned directory):
+  s3a://{businessId}/machine-learning/clustering/predictions/geographic_clustering.parquet/
+  NOTE: Spark .write.parquet() always creates a directory even when the path ends in .parquet.
+        Actual files: geographic_clustering.parquet/part-00000-*.snappy.parquet
 
 Schema:
   clustering_id              String      — Composite ID: country + "_" + state_province + "_" + city + "_current"
@@ -199,8 +203,10 @@ Schema:
 ------------------------------------------------------------
 2.3  infer_session_behavior.py  (Session Behavior Clustering)
 ------------------------------------------------------------
-Output Directory:
-  s3a://pulse-bucket-1/machine-learning/clustering/predictions/session_behavior_clustering.parquet
+Output Directory (Spark partitioned directory):
+  s3a://{businessId}/machine-learning/clustering/predictions/session_behavior_clustering.parquet/
+  NOTE: Spark .write.parquet() always creates a directory even when the path ends in .parquet.
+        Actual files: session_behavior_clustering.parquet/part-00000-*.snappy.parquet
 
 Schema:
   clustering_id              String      — Composite ID: session_id + "_current"
@@ -219,8 +225,10 @@ Schema:
 ------------------------------------------------------------
 2.4  infer_supplier_performance.py  (Supplier Performance Clustering)
 ------------------------------------------------------------
-Output Directory:
-  s3a://pulse-bucket-1/machine-learning/clustering/predictions/supplier_clustering.parquet
+Output Directory (Spark partitioned directory):
+  s3a://{businessId}/machine-learning/clustering/predictions/supplier_clustering.parquet/
+  NOTE: Spark .write.parquet() always creates a directory even when the path ends in .parquet.
+        Actual files: supplier_clustering.parquet/part-00000-*.snappy.parquet
 
 Schema:
   clustering_id              String      — Composite ID: supplier_id + "_current"
@@ -245,7 +253,7 @@ Schema:
 3.1  infer_aov.py  (Average Order Value Prediction — v1)
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/regression/predictions/aov_prediction/
+  s3a://{businessId}/machine-learning/regression/predictions/aov_prediction/
 
 Schema:
   prediction_id              String      — UUID per prediction row
@@ -265,7 +273,7 @@ Note: infer_aov_v2.py (below) is the improved version and writes to the same dir
 3.2  infer_aov_v2.py  (Average Order Value Prediction — v2 Fixed)
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/regression/predictions/aov_prediction/
+  s3a://{businessId}/machine-learning/regression/predictions/aov_prediction/
 
 Schema:
   prediction_id              String      — UUID per prediction row
@@ -285,7 +293,7 @@ Note: Fixes weighted discount_sensitivity and applies scaling only for linear_re
 3.3  infer_clv.py  (Customer Lifetime Value Prediction)
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/regression/predictions/clv_predictions/
+  s3a://{businessId}/machine-learning/regression/predictions/clv_predictions/
 
 Schema:
   prediction_id              String      — UUID per prediction row
@@ -303,7 +311,7 @@ Schema:
 3.4  infer_restock_quantity.py  (Inventory Restock Quantity Prediction)
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/regression/predictions/restock_quantity/
+  s3a://{businessId}/machine-learning/regression/predictions/restock_quantity/
 
 Schema:
   prediction_id                 String   — UUID per prediction row
@@ -322,7 +330,7 @@ Schema:
 3.5  infer_safety_stock.py  (Safety Stock Adjustment Factor Prediction)
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/regression/predictions/safety_stock_adjusted/
+  s3a://{businessId}/machine-learning/regression/predictions/safety_stock_adjusted/
 
 Schema:
   prediction_id                 String   — UUID per prediction row
@@ -346,7 +354,7 @@ Schema:
 3.6  infer_session_conversion.py  (Session Conversion Value Prediction)
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/regression/predictions/session_conversion_value/
+  s3a://{businessId}/machine-learning/regression/predictions/session_conversion_value/
 
 Schema:
   prediction_id                String   — UUID per prediction row
@@ -364,7 +372,7 @@ Schema:
 3.7  infer_stockout_probability.py  (Stockout Probability Prediction)
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/regression/predictions/stockout_probability/
+  s3a://{businessId}/machine-learning/regression/predictions/stockout_probability/
 
 Schema:
   prediction_id                 String   — UUID per prediction row
@@ -391,7 +399,7 @@ Schema:
 4.1  infer_fulfillment_risk.py  (Order Fulfillment Risk Classification)
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/classification/predictions/fulfillment_risk_predictions
+  s3a://{businessId}/machine-learning/classification/predictions/fulfillment_risk_predictions
 
 Schema:
   prediction_id                      String    — UUID per prediction row
@@ -432,7 +440,7 @@ Schema:
 4.2  infer_product_bundling.py  (Product Bundling Classification)
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/classification/predictions/product_bundling_predictions
+  s3a://{businessId}/machine-learning/classification/predictions/product_bundling_predictions
 
 Schema:
   prediction_id              String    — UUID per prediction row
@@ -458,8 +466,10 @@ Schema:
 ------------------------------------------------------------
 5.1  infer_product_affinity.py  (Product Affinity Clustering)
 ------------------------------------------------------------
-Output Directory:
-  s3a://pulse-bucket-1/machine-learning/clustering/predictions/product_affinity_clustering.parquet
+Output Directory (Spark partitioned directory):
+  s3a://{businessId}/machine-learning/clustering/predictions/product_affinity_clustering.parquet/
+  NOTE: Spark .write.parquet() always creates a directory even when the path ends in .parquet.
+        Actual files: product_affinity_clustering.parquet/part-00000-*.snappy.parquet
 
 Schema:
   clustering_id              String    — Composite ID: product_id + "_current"
@@ -476,8 +486,10 @@ Schema:
 ------------------------------------------------------------
 5.2  infer_product_lifecycle.py  (Product Lifecycle Clustering)
 ------------------------------------------------------------
-Output Directory:
-  s3a://pulse-bucket-1/machine-learning/clustering/predictions/product_lifecycle_clustering.parquet
+Output Directory (Spark partitioned directory):
+  s3a://{businessId}/machine-learning/clustering/predictions/product_lifecycle_clustering.parquet/
+  NOTE: Spark .write.parquet() always creates a directory even when the path ends in .parquet.
+        Actual files: product_lifecycle_clustering.parquet/part-00000-*.snappy.parquet
 
 Schema:
   clustering_id              String    — Composite ID: product_id + "_v1"
@@ -499,7 +511,7 @@ Schema:
 6.1  infer_campaign_roi.py  (Campaign ROI Prediction)
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/regression/predictions/campaign_roi/
+  s3a://{businessId}/machine-learning/regression/predictions/campaign_roi/
 
 Schema:
   prediction_id              String    — UUID per prediction row
@@ -522,7 +534,7 @@ Schema:
 6.2  infer_delivery_time.py  (Delivery Time Prediction)
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/regression/predictions/delivery_time/
+  s3a://{businessId}/machine-learning/regression/predictions/delivery_time/
 
 Schema:
   prediction_id              String    — UUID per prediction row
@@ -541,7 +553,7 @@ Schema:
 6.3  infer_demand_forecast.py  (Product Demand Forecasting)
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/regression/predictions/demand_forecast/
+  s3a://{businessId}/machine-learning/regression/predictions/demand_forecast/
 
 Schema:
   prediction_id              String    — UUID per prediction row
@@ -562,7 +574,7 @@ Schema:
 6.4  infer_price_optimization.py  (Product Price Optimization)
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/regression/predictions/price_optimization/
+  s3a://{businessId}/machine-learning/regression/predictions/price_optimization/
 
 Schema:
   prediction_id              String    — UUID per prediction row
@@ -582,7 +594,7 @@ Schema:
 6.5  infer_revenue_forecast.py  (Revenue Forecasting)
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/regression/predictions/revenue_forecast/
+  s3a://{businessId}/machine-learning/regression/predictions/revenue_forecast/
 
 Schema:
   prediction_id              String    — UUID per prediction row
@@ -603,7 +615,7 @@ Schema:
 6.6  infer_seasonal_trends.py  (Seasonal Trends Forecasting)
 ------------------------------------------------------------
 Output Directory:
-  s3a://pulse-bucket-1/machine-learning/regression/predictions/seasonal_trends/
+  s3a://{businessId}/machine-learning/regression/predictions/seasonal_trends/
 
 Schema:
   prediction_id              String    — UUID per prediction row
@@ -635,11 +647,11 @@ GENERAL CLASSIFICATION
   review_sentiment_predictions       → s3a://{BUCKET}/machine-learning/classification/predictions/review_sentiment_predictions
   stock_status_predictions           → s3a://{BUCKET}/machine-learning/classification/predictions/stock_status_predictions
 
-GENERAL CLUSTERING
-  customer_segmentation.parquet      → s3a://{BUCKET}/machine-learning/clustering/predictions/customer_segmentation.parquet
-  geographic_clustering.parquet      → s3a://{BUCKET}/machine-learning/clustering/predictions/geographic_clustering.parquet
-  session_behavior_clustering.parquet → s3a://{BUCKET}/machine-learning/clustering/predictions/session_behavior_clustering.parquet
-  supplier_clustering.parquet        → s3a://{BUCKET}/machine-learning/clustering/predictions/supplier_clustering.parquet
+GENERAL CLUSTERING  (Spark writes .parquet as directory, not single file)
+  customer_segmentation.parquet/      → s3a://{BUCKET}/machine-learning/clustering/predictions/customer_segmentation.parquet/
+  geographic_clustering.parquet/      → s3a://{BUCKET}/machine-learning/clustering/predictions/geographic_clustering.parquet/
+  session_behavior_clustering.parquet/ → s3a://{BUCKET}/machine-learning/clustering/predictions/session_behavior_clustering.parquet/
+  supplier_clustering.parquet/        → s3a://{BUCKET}/machine-learning/clustering/predictions/supplier_clustering.parquet/
 
 GENERAL REGRESSION
   aov_prediction/                    → s3a://{BUCKET}/machine-learning/regression/predictions/aov_prediction/
@@ -653,9 +665,9 @@ SPECIFIC CLASSIFICATION
   fulfillment_risk_predictions       → s3a://{BUCKET}/machine-learning/classification/predictions/fulfillment_risk_predictions
   product_bundling_predictions       → s3a://{BUCKET}/machine-learning/classification/predictions/product_bundling_predictions
 
-SPECIFIC CLUSTERING
-  product_affinity_clustering.parquet → s3a://{BUCKET}/machine-learning/clustering/predictions/product_affinity_clustering.parquet
-  product_lifecycle_clustering.parquet → s3a://{BUCKET}/machine-learning/clustering/predictions/product_lifecycle_clustering.parquet
+SPECIFIC CLUSTERING  (Spark writes .parquet as directory, not single file)
+  product_affinity_clustering.parquet/ → s3a://{BUCKET}/machine-learning/clustering/predictions/product_affinity_clustering.parquet/
+  product_lifecycle_clustering.parquet/ → s3a://{BUCKET}/machine-learning/clustering/predictions/product_lifecycle_clustering.parquet/
 
 SPECIFIC REGRESSION
   campaign_roi/                      → s3a://{BUCKET}/machine-learning/regression/predictions/campaign_roi/
