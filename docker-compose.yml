@@ -52,6 +52,7 @@ services:
       - PYSPARK_PYTHON=python3.10
       - PYSPARK_DRIVER_PYTHON=python3.10
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL}
     depends_on:
       - postgresql
       - python
