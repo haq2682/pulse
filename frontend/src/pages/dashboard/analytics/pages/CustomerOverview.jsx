@@ -23,6 +23,7 @@ import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
+import { useFormatters } from '@/hooks/useFormatters';
 
 ChartJS.register(
     CategoryScale, LinearScale, PointElement, LineElement,
@@ -47,20 +48,6 @@ const PALETTE = [
     'rgba(20,184,166,0.8)',
     'rgba(168,85,247,0.8)',
 ];
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    currency: (v) =>
-        new Intl.NumberFormat('en-US', {
-            style: 'currency', currency: 'USD',
-            minimumFractionDigits: 0, maximumFractionDigits: 0,
-        }).format(v ?? 0),
-    number: (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-    pct: (v) => `${(v ?? 0).toFixed(1)}%`,
-};
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -139,6 +126,7 @@ const defaultDoughnutOpts = (title) => ({
 // ---------------------------------------------------------------------------
 
 const CustomerOverview = () => {
+    const fmt = useFormatters();
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();

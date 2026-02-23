@@ -16,6 +16,7 @@ import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
+import { useFormatters } from '@/hooks/useFormatters';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 
@@ -29,18 +30,6 @@ const PALETTE = [
     'rgba(234,179,8,0.82)',  'rgba(236,72,153,0.82)', 'rgba(20,184,166,0.82)',
     'rgba(168,85,247,0.82)',
 ];
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    number:   (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-    currency: (v) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v ?? 0),
-    compact:  (v) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short', maximumFractionDigits: 1 }).format(v ?? 0),
-    decimal:  (v, d = 2) => (v ?? 0).toFixed(d),
-    pct:      (v) => `${(v ?? 0).toFixed(2)}%`,
-};
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -63,6 +52,7 @@ const KPICard = ({ icon, iconBg, iconColor, value, label }) => (
 // ---------------------------------------------------------------------------
 
 export default function InventoryEfficiency() {
+    const fmt = useFormatters();
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();

@@ -15,6 +15,7 @@ import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
+import { useFormatters } from '@/hooks/useFormatters';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 
@@ -28,23 +29,6 @@ const PALETTE = [
     'rgba(234,179,8,0.82)',  'rgba(236,72,153,0.82)', 'rgba(20,184,166,0.82)',
     'rgba(168,85,247,0.82)',
 ];
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    number:   (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-    currency: (v) => `$${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v ?? 0)}`,
-    decimal:  (v, d = 2) => (+(v ?? 0)).toFixed(d),
-    pct:      (v) => `${(+(v ?? 0)).toFixed(1)}%`,
-    short:    (v) => {
-        const n = +(v ?? 0);
-        if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-        if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`;
-        return String(n);
-    },
-};
 
 // ---------------------------------------------------------------------------
 // Aggregation helper — group campaign_performance_summary by campaign_type
@@ -152,6 +136,7 @@ const doughnutOpts = () => ({
 // ---------------------------------------------------------------------------
 
 export default function MarketingChannels() {
+    const fmt = useFormatters();
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();

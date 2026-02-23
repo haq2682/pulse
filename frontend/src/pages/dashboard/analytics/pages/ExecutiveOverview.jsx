@@ -21,6 +21,7 @@ import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import useAnalyticsDateFilter, { aggregateDailyRows } from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
+import { useFormatters } from '@/hooks/useFormatters';
 
 // Register Chart.js components
 ChartJS.register(
@@ -46,24 +47,6 @@ const ANALYTICS_CATEGORIES = [
     'operations_analytics',
     'marketing_analytics',
 ];
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    currency: (v) =>
-        new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(v ?? 0),
-    number: (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-    pct: (v) => `${(v ?? 0).toFixed(1)}%`,
-    hours: (v) => `${(v ?? 0).toFixed(1)} hrs`,
-    days: (v) => `${(v ?? 0).toFixed(1)} days`,
-};
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -113,6 +96,7 @@ const MetricsCard = ({ title, rows }) => {
 // ---------------------------------------------------------------------------
 
 const ExecutiveOverview = () => {
+    const fmt = useFormatters();
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();

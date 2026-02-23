@@ -16,6 +16,7 @@ import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
+import { useFormatters } from '@/hooks/useFormatters';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 
@@ -36,17 +37,6 @@ const riskColor = (score) => {
     if (s >= 0.7) return 'danger';
     if (s >= 0.4) return 'warning';
     return 'success';
-};
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    number:   (v) => new Intl.NumberFormat('en-US').format(Math.round(v ?? 0)),
-    currency: (v) => `$${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v ?? 0)}`,
-    decimal:  (v, d = 2) => (+(v ?? 0)).toFixed(d),
-    pct:      (v) => `${(+(v ?? 0)).toFixed(1)}%`,
 };
 
 // ---------------------------------------------------------------------------
@@ -92,6 +82,7 @@ export default function FunnelCart() {
     const { pipelineStatus } = usePipelineProgress();
     const { dateRange, setDateRange, quickFilter, isFiltered, applyQuickFilter, resetFilters } = useAnalyticsDateFilter();
     const { lastUpdate } = useAnalyticsWebSocket(businessId);
+    const fmt = useFormatters();
 
     const [rawCart, setRawCart] = useState(null);
     const [loading, setLoading] = useState(true);

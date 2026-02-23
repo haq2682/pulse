@@ -16,6 +16,7 @@ import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
+import { useFormatters } from '@/hooks/useFormatters';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 
@@ -48,16 +49,6 @@ const URGENCY_COLOR = {
 };
 
 // ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    number:  (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-    decimal: (v, d = 2) => (v ?? 0).toFixed(d),
-    currency: (v) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(v ?? 0),
-};
-
-// ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
@@ -78,6 +69,7 @@ const KPICard = ({ icon, iconBg, iconColor, value, label }) => (
 // ---------------------------------------------------------------------------
 
 export default function InventoryReorderManagement() {
+    const fmt = useFormatters();
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();

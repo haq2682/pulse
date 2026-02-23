@@ -16,6 +16,7 @@ import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
+import { useFormatters } from '@/hooks/useFormatters';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 
@@ -34,16 +35,6 @@ const STRENGTH_COLORS = {
     'Strong':   'rgba(34,197,94,0.82)',
     'Moderate': 'rgba(234,179,8,0.82)',
     'Weak':     'rgba(156,163,175,0.82)',
-};
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    number:  (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-    decimal: (v, d = 3) => (+(v ?? 0)).toFixed(d),
-    pct:     (v) => `${(+(v ?? 0)).toFixed(1)}%`,
 };
 
 const truncate = (s, n = 22) => (s && s.length > n ? `${s.slice(0, n)}…` : (s ?? '—'));
@@ -100,6 +91,7 @@ const doughnutOpts = () => ({
 // ---------------------------------------------------------------------------
 
 export default function RecommendationsProductAffinity() {
+    const fmt = useFormatters();
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();

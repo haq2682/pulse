@@ -17,6 +17,7 @@ import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
+import { useFormatters } from '@/hooks/useFormatters';
 
 ChartJS.register(
     CategoryScale, LinearScale, PointElement, LineElement,
@@ -54,22 +55,6 @@ const COHORT_LINE_COLORS = [
     'rgb(6,182,212)',
     'rgb(236,72,153)',
 ];
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    currency: (v) =>
-        new Intl.NumberFormat('en-US', {
-            style: 'currency', currency: 'USD',
-            minimumFractionDigits: 0, maximumFractionDigits: 0,
-        }).format(v ?? 0),
-    number: (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-    pct: (v) => `${(v ?? 0).toFixed(1)}%`,
-    decimal: (v) => (v ?? 0).toFixed(2),
-    days: (v) => `${(v ?? 0).toFixed(0)} days`,
-};
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -122,7 +107,7 @@ const CustomerHealthRetention = () => {
     const [fetchError, setFetchError] = useState(false);
     const [rawData, setRawData] = useState(null);
     const [dataMode, setDataMode] = useState('unknown');
-
+    const fmt = useFormatters();
     const {
         dateRange, setDateRange, quickFilter, isFiltered,
         applyQuickFilter, resetFilters, toISODate,

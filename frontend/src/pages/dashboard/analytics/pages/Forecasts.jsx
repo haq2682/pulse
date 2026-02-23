@@ -15,6 +15,7 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { useAnalyticsWebSocket } from '../../../../hooks/useAnalyticsWebSocket';
 import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
+import { useFormatters } from '@/hooks/useFormatters';
 
 ChartJS.register(
     CategoryScale, LinearScale, BarElement, ArcElement,
@@ -35,19 +36,6 @@ const PALETTE = [
 const RISK_COLOR = {
     High: 'danger', Medium: 'warning', Low: 'success',
     Critical: 'danger', 'High Risk': 'danger', 'Medium Risk': 'warning', 'Low Risk': 'success',
-};
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    number:   (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-    currency: (v) => `$${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v ?? 0)}`,
-    decimal:  (v, d = 2) => (+(v ?? 0)).toFixed(d),
-    pct:      (v) => `${(+(v ?? 0) * 100).toFixed(1)}%`,
-    pct100:   (v) => `${(+(v ?? 0)).toFixed(1)}%`,
-    days:     (v) => `${(+(v ?? 0)).toFixed(1)} d`,
 };
 
 // ---------------------------------------------------------------------------
@@ -79,6 +67,7 @@ const SectionHeader = ({ color, title, badge }) => (
 );
 
 const InferenceHeader = ({ label, modelType, description, count }) => {
+    const fmt = useFormatters();
     const modelColors = {
         directory: 'bg-blue-50 text-blue-700',
         file: 'bg-purple-50 text-purple-700',
@@ -174,6 +163,7 @@ const distDoughnutData = (pairs) => ({
 // ---------------------------------------------------------------------------
 
 export default function Forecasts() {
+    const fmt = useFormatters();
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();

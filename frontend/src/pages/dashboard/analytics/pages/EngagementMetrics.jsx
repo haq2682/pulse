@@ -13,18 +13,9 @@ import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
+import { useFormatters } from '@/hooks/useFormatters';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    number:  (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-    decimal: (v, d = 2) => (+(v ?? 0)).toFixed(d),
-    pct:     (v) => `${(+(v ?? 0)).toFixed(1)}%`,
-};
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -68,6 +59,7 @@ const doughnutOpts = () => ({
 // ---------------------------------------------------------------------------
 
 export default function EngagementMetrics() {
+    const fmt = useFormatters();
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();

@@ -17,6 +17,7 @@ import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
+import { useFormatters } from '@/hooks/useFormatters';
 
 ChartJS.register(
     CategoryScale, LinearScale, PointElement, LineElement,
@@ -39,21 +40,6 @@ const PALETTE = [
     'rgba(20,184,166,0.8)',
     'rgba(168,85,247,0.8)',
 ];
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    currency: (v) =>
-        new Intl.NumberFormat('en-US', {
-            style: 'currency', currency: 'USD',
-            minimumFractionDigits: 0, maximumFractionDigits: 0,
-        }).format(v ?? 0),
-    number: (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-    pct: (v) => `${(v ?? 0).toFixed(2)}%`,
-    decimal: (v) => (v ?? 0).toFixed(4),
-};
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -119,6 +105,7 @@ const CorrelationCard = ({ label, value, description }) => {
 // ---------------------------------------------------------------------------
 
 const CustomerValueAnalysis = () => {
+    const fmt = useFormatters();
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();

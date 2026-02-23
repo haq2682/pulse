@@ -16,6 +16,7 @@ import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
+import { useFormatters } from '@/hooks/useFormatters';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 
@@ -32,23 +33,6 @@ const PALETTE = [
 
 const STATUS_SEVERITY = { active: 'success', completed: 'secondary', paused: 'warning', cancelled: 'danger' };
 const TIER_SEVERITY   = { top: 'success', mid: 'info', low: 'warning', poor: 'danger' };
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    number:   (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-    currency: (v) => `$${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v ?? 0)}`,
-    decimal:  (v, d = 2) => (+(v ?? 0)).toFixed(d),
-    pct:      (v) => `${(+(v ?? 0)).toFixed(1)}%`,
-    short:    (v) => {
-        const n = +(v ?? 0);
-        if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-        if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`;
-        return String(n);
-    },
-};
 
 const camLabel = (r) => r.campaign_name || `Campaign ${r.campaign_id}`;
 
@@ -103,6 +87,7 @@ const doughnutOpts = (title) => ({
 // ---------------------------------------------------------------------------
 
 export default function MarketingCampaigns() {
+    const fmt = useFormatters();
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();
