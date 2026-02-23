@@ -44,7 +44,110 @@ from cleaning_utils import (
     get_file_paths_from_minio
 )
 from incremental_cleaner import IncrementalCleaner
-from pyspark.sql.functions import regexp_extract, col, when
+from pyspark.sql.functions import regexp_extract, col, when, udf
+from pyspark.sql.types import DoubleType
+from currency_converter import CurrencyConverter
+
+
+def convert_currency_columns(dataframes, bucket_name):
+    """
+    Convert price columns from source currency to target currency.
+
+    This function:
+    1. Identifies the source currency column (from orders table)
+    2. Fetches target currency from PostgreSQL (based on business_id)
+    3. Converts all price-related columns to target currency
+
+    Args:
+        dataframes: Dictionary of DataFrames
+        bucket_name: Business ID (used to fetch target currency)
+
+    Returns:
+        dict: Updated dataframes with converted prices
+    """
+    print("\n💱 Converting currencies...")
+
+    try:
+        # Initialize currency converter with business_id
+        converter = CurrencyConverter(bucket_name)
+        target_currency = converter.get_target_currency()
+        print(f"   Target currency: {target_currency}")
+
+        # Define tables and their price columns
+        price_columns_map = {
+            'products': ['cost_price', 'sell_price'],
+            'orders': ['subtotal', 'tax_amount', 'shipping_cost', 'total_discount', 'total_amount'],
+            'order_items': ['discount_amount', 'product_price'],
+            'payments': ['processing_fee', 'refund_amount'],
+            'inventory': ['storage_cost'],
+            'marketing_campaigns': ['budget', 'spent_amount'],
+            'cart_items': ['unit_price', 'total_price']
+        }
+
+        # Check if orders table has currency column
+        source_currency = None
+        if 'orders' in dataframes:
+            orders_df = dataframes['orders']
+            if 'currency' in orders_df.columns:
+                # Get the first currency value as source (assuming consistent currency in source data)
+                currency_row = orders_df.select('currency').filter(col('currency').isNotNull()).first()
+                if currency_row:
+                    source_currency = currency_row['currency']
+                    print(f"   Source currency detected: {source_currency}")
+
+        # If no source currency found, assume USD
+        if not source_currency:
+            print(f"   No source currency found in orders table, assuming USD")
+            source_currency = 'USD'
+
+        # If source and target are the same, skip conversion
+        if source_currency.upper() == target_currency.upper():
+            print(f"   Source and target currencies are the same ({target_currency}), skipping conversion")
+            return dataframes
+
+        # Get exchange rate once for all conversions
+        exchange_rate = converter.get_exchange_rate(source_currency)
+
+        if exchange_rate is None:
+            print(f"   ⚠️  Failed to fetch exchange rate, skipping currency conversion")
+            return dataframes
+
+        print(f"   Exchange rate: 1 {source_currency} = {exchange_rate:.4f} {target_currency}")
+
+        # Create UDF for currency conversion
+        def convert_price(price):
+            if price is None:
+                return None
+            return float(price) * exchange_rate
+
+        convert_udf = udf(convert_price, DoubleType())
+
+        # Convert price columns in each table
+        converted_count = 0
+        for table_name, price_columns in price_columns_map.items():
+            if table_name in dataframes:
+                df = dataframes[table_name]
+
+                for price_col in price_columns:
+                    if price_col in df.columns:
+                        # Convert the price column
+                        df = df.withColumn(price_col, convert_udf(col(price_col)))
+                        converted_count += 1
+
+                dataframes[table_name] = df
+
+        # Update currency column in orders table to target currency
+        if 'orders' in dataframes and 'currency' in dataframes['orders'].columns:
+            from pyspark.sql.functions import lit
+            dataframes['orders'] = dataframes['orders'].withColumn('currency', lit(target_currency))
+
+        print(f"   ✅ Converted {converted_count} price columns to {target_currency}")
+
+    except Exception as e:
+        print(f"   ⚠️  Error during currency conversion: {e}")
+        print(f"   Continuing without currency conversion...")
+
+    return dataframes
 
 
 def main(bucket_name=None, incremental=True, force_full=False):
@@ -219,17 +322,22 @@ def main(bucket_name=None, incremental=True, force_full=False):
     # 18. Final data validation
     print("\n📌 Step 18: Running final data validation...")
     dataframes = validate_all_cleaned_data(dataframes)
-    # 19. Display summary
-    print("\n📌 Step 19: Generating summary...")
+
+    # 19. Convert currency columns
+    print("\n📌 Step 19: Converting currency columns...")
+    dataframes = convert_currency_columns(dataframes, bucket_name)
+
+    # 20. Display summary
+    print("\n📌 Step 20: Generating summary...")
     display_summary(dataframes)
-    
-    # 20. Save cleaned data
-    print("\n📌 Step 20: Saving cleaned data to MinIO...")
+
+    # 21. Save cleaned data
+    print("\n📌 Step 21: Saving cleaned data to MinIO...")
     save_data_to_minio(dataframes, minio_client, bucket_name)
 
-    # 20a. Mark files as processed if in incremental mode
+    # 21a. Mark files as processed if in incremental mode
     if incremental and cleaner:
-        print("\n📌 Step 20a: Marking files as processed...")
+        print("\n📌 Step 21a: Marking files as processed...")
         file_records = {}
         for table_name, file_path in processed_file_paths.items():
             if table_name in dataframes:
@@ -242,8 +350,8 @@ def main(bucket_name=None, incremental=True, force_full=False):
                 }
         cleaner.mark_multiple_processed(file_records)
 
-    # 21. Stop Spark session
-    print("\n📌 Step 21: Stopping Spark session...")
+    # 22. Stop Spark session
+    print("\n📌 Step 22: Stopping Spark session...")
     spark.stop()
     print("✅ Spark session stopped")
 
