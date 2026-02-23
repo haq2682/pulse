@@ -15,7 +15,7 @@ import { Bar, Doughnut } from 'react-chartjs-2';
 import { useAnalyticsWebSocket } from '../../../../hooks/useAnalyticsWebSocket';
 import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
-import { useCurrency } from '@/context/CurrencyContext';
+import { useFormatters } from '@/hooks/useFormatters';
 import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
 
@@ -93,19 +93,12 @@ const ProductPerformance = () => {
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();
-    const { formatCurrency } = useCurrency();
+    const fmt = useFormatters();
 
     const [loading, setLoading]   = useState(true);
     const [fetchError, setFetchError] = useState(false);
     const [rawData, setRawData]   = useState(null);
 
-    // Create currency formatter that uses the dynamic currency
-    const fmt = useMemo(() => ({
-        currency: (v) => formatCurrency(v, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-        number:   (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-        pct:      (v) => `${(v ?? 0).toFixed(1)}%`,
-        decimal:  (v, d = 2) => (v ?? 0).toFixed(d),
-    }), [formatCurrency]);
     const [dataMode, setDataMode] = useState('unknown');
 
     const { dateRange, setDateRange, quickFilter, isFiltered, applyQuickFilter, resetFilters, toISODate } = useAnalyticsDateFilter();
