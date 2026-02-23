@@ -22,7 +22,36 @@ router = APIRouter(
     tags=["xai"],
 )
 
+# Initialise once — constructor validates GEMINI_API_KEY and logs SDK info
 xai_service = XAIService()
+
+# ------------------------------------------------------------------
+# Error code → (user-facing message, severity)
+# ------------------------------------------------------------------
+_ERROR_MESSAGES = {
+    "quota_exceeded": (
+        "The AI service rate limit has been reached. Please wait a moment and try again.",
+        "warning",
+    ),
+    "auth_error": (
+        "The AI service is not configured correctly (invalid API key). "
+        "Please contact support.",
+        "error",
+    ),
+    "gemini_error": (
+        "The AI service encountered an error while processing your request. "
+        "Please try again.",
+        "error",
+    ),
+}
+
+
+def _error_response(error_code: str) -> tuple[str, str]:
+    """Return (user_message, severity) for a given error code."""
+    return _ERROR_MESSAGES.get(
+        error_code,
+        ("An unexpected error occurred. Please try again.", "error"),
+    )
 
 
 # ------------------------------------------------------------------
@@ -40,37 +69,49 @@ def _authenticate_ws(websocket: WebSocket) -> dict | None:
 # ------------------------------------------------------------------
 # Helper: get or create conversation
 # ------------------------------------------------------------------
-def _get_or_create_conversation(db, user_id: str, business_id: str, conversation_id: str = None) -> str:
+def _get_or_create_conversation(
+    db, user_id: str, business_id: str, conversation_id: str = None
+) -> str:
     """Return an existing conversation_id or create a new one."""
     if conversation_id:
         row = db.execute(
-            text("SELECT conversation_id FROM xai_conversations WHERE conversation_id = :cid AND user_id = :uid AND business_id = :bid"),
-            {"cid": conversation_id, "uid": user_id, "bid": business_id}
+            text(
+                "SELECT conversation_id FROM xai_conversations "
+                "WHERE conversation_id = :cid AND user_id = :uid AND business_id = :bid"
+            ),
+            {"cid": conversation_id, "uid": user_id, "bid": business_id},
         ).fetchone()
         if row:
             return row[0]
 
-    # Create new conversation
     new_id = str(uuid.uuid4())
     db.execute(
-        text("""
-            INSERT INTO xai_conversations (conversation_id, user_id, business_id, title)
-            VALUES (:cid, :uid, :bid, :title)
-        """),
-        {"cid": new_id, "uid": user_id, "bid": business_id, "title": "New Chat"}
+        text(
+            "INSERT INTO xai_conversations (conversation_id, user_id, business_id, title) "
+            "VALUES (:cid, :uid, :bid, :title)"
+        ),
+        {"cid": new_id, "uid": user_id, "bid": business_id, "title": "New Chat"},
     )
     db.commit()
     return new_id
 
 
-def _save_message(db, conversation_id: str, role: str, content: str, metadata: dict = None, severity: str = "info"):
+def _save_message(
+    db,
+    conversation_id: str,
+    role: str,
+    content: str,
+    metadata: dict = None,
+    severity: str = "info",
+) -> str:
     """Persist a chat message to the database."""
     msg_id = str(uuid.uuid4())
     db.execute(
-        text("""
-            INSERT INTO xai_messages (message_id, conversation_id, role, content, metadata, severity)
-            VALUES (:mid, :cid, :role, :content, :meta, :severity)
-        """),
+        text(
+            "INSERT INTO xai_messages "
+            "(message_id, conversation_id, role, content, metadata, severity) "
+            "VALUES (:mid, :cid, :role, :content, :meta, :severity)"
+        ),
         {
             "mid": msg_id,
             "cid": conversation_id,
@@ -78,17 +119,16 @@ def _save_message(db, conversation_id: str, role: str, content: str, metadata: d
             "content": content,
             "meta": json.dumps(metadata or {}),
             "severity": severity,
-        }
+        },
     )
     db.commit()
     return msg_id
 
 
 def _update_conversation_title(db, conversation_id: str, title: str):
-    """Update conversation title (from first user message)."""
     db.execute(
         text("UPDATE xai_conversations SET title = :title WHERE conversation_id = :cid"),
-        {"title": title[:500], "cid": conversation_id}
+        {"title": title[:500], "cid": conversation_id},
     )
     db.commit()
 
@@ -101,26 +141,23 @@ async def xai_websocket(websocket: WebSocket, business_id: str):
     """
     WebSocket chat endpoint.
 
-    Client sends JSON messages:
+    Client sends JSON:
         { "type": "query", "content": "...", "conversationId": "..." | null }
 
-    Server sends JSON messages:
-        { "type": "user_echo", "messageId": "...", "content": "...", "conversationId": "...", "createdAt": "..." }
-        { "type": "assistant", "messageId": "...", "content": "...", "context": {...}, "conversationId": "...", "createdAt": "..." }
+    Server sends JSON:
+        { "type": "user_echo",    "messageId": "...", "content": "...", "conversationId": "...", "createdAt": "..." }
+        { "type": "assistant",    "messageId": "...", "content": "...", "context": {}, "conversationId": "...", "createdAt": "..." }
         { "type": "notification", "content": "...", "severity": "info|error|warning", "conversationId": "..." }
         { "type": "conversation_created", "conversationId": "..." }
     """
-    # Authenticate
     session = _authenticate_ws(websocket)
     if not session:
         await websocket.close(code=4001, reason="Unauthorized")
         return
 
     user_id = session.get("user_id")
-
     await websocket.accept()
 
-    # Send connection confirmation
     await websocket.send_json({
         "type": "notification",
         "content": "Connected to Pulse AI. Ask me anything about your analytics!",
@@ -132,7 +169,6 @@ async def xai_websocket(websocket: WebSocket, business_id: str):
         while True:
             raw = await websocket.receive_text()
 
-            # Handle keep-alive pings
             if raw == "ping":
                 await websocket.send_text("pong")
                 continue
@@ -155,32 +191,33 @@ async def xai_websocket(websocket: WebSocket, business_id: str):
             if msg_type != "query" or not content:
                 continue
 
-            # Get a DB connection for this interaction
             db = get_db_connection()
             try:
-                # Get or create conversation
-                conversation_id = _get_or_create_conversation(db, user_id, business_id, conversation_id)
+                conversation_id = _get_or_create_conversation(
+                    db, user_id, business_id, conversation_id
+                )
 
-                # Notify client of conversation ID
                 await websocket.send_json({
                     "type": "conversation_created",
                     "conversationId": conversation_id,
                 })
 
-                # Save user message
                 now = datetime.utcnow().isoformat()
                 user_msg_id = _save_message(db, conversation_id, "user", content)
 
-                # Update title on first message
+                # Update title on first user message
                 msg_count = db.execute(
-                    text("SELECT COUNT(*) FROM xai_messages WHERE conversation_id = :cid AND role = 'user'"),
-                    {"cid": conversation_id}
+                    text(
+                        "SELECT COUNT(*) FROM xai_messages "
+                        "WHERE conversation_id = :cid AND role = 'user'"
+                    ),
+                    {"cid": conversation_id},
                 ).scalar()
                 if msg_count <= 1:
                     title = content[:100] + ("..." if len(content) > 100 else "")
                     _update_conversation_title(db, conversation_id, title)
 
-                # Echo user message back
+                # Echo user message back to client immediately
                 await websocket.send_json({
                     "type": "user_echo",
                     "messageId": user_msg_id,
@@ -189,19 +226,15 @@ async def xai_websocket(websocket: WebSocket, business_id: str):
                     "createdAt": now,
                 })
 
-                # Process with Gemini (two-pass)
+                # ── AI processing ──────────────────────────────────
                 try:
                     result = await xai_service.process_query(content, business_id)
 
                     if result["error"]:
-                        # Map internal error codes to user-friendly messages
-                        if result["error"] == "quota_exceeded":
-                            error_msg = "AI conversation quota has been exceeded. Please try again later or contact support."
-                            severity = "warning"
-                        else:
-                            error_msg = "An error occurred while analyzing your data. Please try again."
-                            severity = "error"
-                        _save_message(db, conversation_id, "notification", error_msg, severity=severity)
+                        error_msg, severity = _error_response(result["error"])
+                        _save_message(
+                            db, conversation_id, "notification", error_msg, severity=severity
+                        )
                         await websocket.send_json({
                             "type": "notification",
                             "content": error_msg,
@@ -209,10 +242,12 @@ async def xai_websocket(websocket: WebSocket, business_id: str):
                             "conversationId": conversation_id,
                         })
                     else:
-                        # Save and send assistant response
                         assistant_msg_id = _save_message(
-                            db, conversation_id, "assistant", result["answer"],
-                            metadata={"context": result["context"]}
+                            db,
+                            conversation_id,
+                            "assistant",
+                            result["answer"],
+                            metadata={"context": result["context"]},
                         )
                         await websocket.send_json({
                             "type": "assistant",
@@ -224,7 +259,8 @@ async def xai_websocket(websocket: WebSocket, business_id: str):
                         })
 
                 except Exception as e:
-                    error_text = "An unknown error occurred while processing your query."
+                    print(f"[XAI] Unhandled query processing error: {type(e).__name__}: {e}")
+                    error_text = "An unexpected error occurred while processing your query."
                     _save_message(db, conversation_id, "notification", error_text, severity="error")
                     await websocket.send_json({
                         "type": "notification",
@@ -232,15 +268,14 @@ async def xai_websocket(websocket: WebSocket, business_id: str):
                         "severity": "error",
                         "conversationId": conversation_id,
                     })
-                    print(f"[XAI] Query processing error: {e}")
 
             finally:
                 db.close()
 
     except WebSocketDisconnect:
-        print(f"[XAI] WebSocket disconnected for user {user_id}, business {business_id}")
+        print(f"[XAI] WebSocket disconnected — user={user_id}, business={business_id}")
     except Exception as e:
-        print(f"[XAI] Unexpected WebSocket error: {e}")
+        print(f"[XAI] Unexpected WebSocket error: {type(e).__name__}: {e}")
         try:
             await websocket.close(code=1011)
         except Exception:
@@ -251,16 +286,18 @@ async def xai_websocket(websocket: WebSocket, business_id: str):
 # REST endpoints — Chat history
 # ------------------------------------------------------------------
 @router.get("/conversations/{business_id}")
-async def get_conversations(business_id: str, userId: str = Query(...), db=Depends(get_db)):
+async def get_conversations(
+    business_id: str, userId: str = Query(...), db=Depends(get_db)
+):
     """List all conversations for a user + business, newest first."""
     rows = db.execute(
-        text("""
-            SELECT conversation_id, title, created_at, updated_at
-            FROM xai_conversations
-            WHERE user_id = :uid AND business_id = :bid
-            ORDER BY updated_at DESC
-        """),
-        {"uid": userId, "bid": business_id}
+        text(
+            "SELECT conversation_id, title, created_at, updated_at "
+            "FROM xai_conversations "
+            "WHERE user_id = :uid AND business_id = :bid "
+            "ORDER BY updated_at DESC"
+        ),
+        {"uid": userId, "bid": business_id},
     ).fetchall()
 
     return {
@@ -277,24 +314,25 @@ async def get_conversations(business_id: str, userId: str = Query(...), db=Depen
 
 
 @router.get("/conversation/{conversation_id}/messages")
-async def get_messages(conversation_id: str, userId: str = Query(...), db=Depends(get_db)):
+async def get_messages(
+    conversation_id: str, userId: str = Query(...), db=Depends(get_db)
+):
     """Get all messages for a conversation."""
-    # Verify ownership
     conv = db.execute(
         text("SELECT user_id FROM xai_conversations WHERE conversation_id = :cid"),
-        {"cid": conversation_id}
+        {"cid": conversation_id},
     ).fetchone()
     if not conv or conv[0] != userId:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     rows = db.execute(
-        text("""
-            SELECT message_id, role, content, metadata, severity, created_at
-            FROM xai_messages
-            WHERE conversation_id = :cid
-            ORDER BY created_at ASC
-        """),
-        {"cid": conversation_id}
+        text(
+            "SELECT message_id, role, content, metadata, severity, created_at "
+            "FROM xai_messages "
+            "WHERE conversation_id = :cid "
+            "ORDER BY created_at ASC"
+        ),
+        {"cid": conversation_id},
     ).fetchall()
 
     return {
@@ -313,18 +351,20 @@ async def get_messages(conversation_id: str, userId: str = Query(...), db=Depend
 
 
 @router.delete("/conversation/{conversation_id}")
-async def delete_conversation(conversation_id: str, userId: str = Query(...), db=Depends(get_db)):
+async def delete_conversation(
+    conversation_id: str, userId: str = Query(...), db=Depends(get_db)
+):
     """Delete a conversation and all its messages."""
     conv = db.execute(
         text("SELECT user_id FROM xai_conversations WHERE conversation_id = :cid"),
-        {"cid": conversation_id}
+        {"cid": conversation_id},
     ).fetchone()
     if not conv or conv[0] != userId:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     db.execute(
         text("DELETE FROM xai_conversations WHERE conversation_id = :cid"),
-        {"cid": conversation_id}
+        {"cid": conversation_id},
     )
     db.commit()
     return {"status": "deleted"}
