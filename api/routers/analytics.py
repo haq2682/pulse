@@ -60,6 +60,40 @@ async def get_businesses(userId: str, db=Depends(get_db)):
     return {"businesses": businesses}
 
 
+@router.get("/get-business-currency/{business_id}")
+async def get_business_currency(business_id: str, db=Depends(get_db)):
+    """
+    Fetch the currency configured for a specific business.
+
+    Args:
+        business_id: Business ID
+
+    Returns:
+        JSON with business currency information
+    """
+    try:
+        result = db.execute(
+            text("SELECT business_currency FROM businesses WHERE business_id = :business_id"),
+            {"business_id": business_id}
+        ).fetchone()
+
+        if not result:
+            raise HTTPException(status_code=404, detail="Business not found")
+
+        currency = result[0] if result[0] else "USD"
+
+        return {
+            "business_id": business_id,
+            "currency": currency
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching business currency: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/delete-business")
 async def delete_business(request: Request, db=Depends(get_db)):
     """

@@ -11,6 +11,7 @@ import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import SecondaryButton from '@/components/global/Button/SecondaryButton';
 import { useAuth } from '@/context/AuthContext';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
+import { CurrencyProvider } from '@/context/CurrencyContext';
 import axiosInstance from '@/services/api/axiosInstance';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import InlinePipelineProgress from '@/components/global/InlinePipelineProgress';
@@ -1014,14 +1015,14 @@ const Dashboard = () => {
                     
                     {/* Show inline pipeline progress when business is selected */}
                     {businessId ? (
-                        <>
-                            <InlinePipelineProgress 
+                        <CurrencyProvider businessId={businessId}>
+                            <InlinePipelineProgress
                                 businessId={businessId}
                                 onStartAnalysis={handleStartAnalysis}
                             />
                             {/* Render appropriate analytics content based on route */}
                             {renderAnalyticsContent()}
-                        </>
+                        </CurrencyProvider>
                     ) : (
                         <div className="flex items-center justify-center min-h-[60vh]">
                             <div className="text-center max-w-md">

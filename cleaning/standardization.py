@@ -18,6 +18,8 @@ from pyspark.sql.functions import (
     upper,
     initcap,
     lower,
+    lit,
+    udf,
 )
 from pyspark.sql.types import (
     DateType,
@@ -30,6 +32,7 @@ from pyspark.sql.types import (
     DecimalType,
 )
 import re
+from currency_converter import CurrencyConverter
 
 
 def remove_outliers(dataframes, table_name, columns):
@@ -564,15 +567,224 @@ def detect_gibberish_patterns(dataframes):
                     F.lit(None)
                 ),
             )
-            
+
             # Clean up temporary columns
             df = df.drop(field_name + "_raw", field_name + "_normalized")
-            
+
             dataframes[table_name] = df
             print(f"✅ Cleaned and normalized {field_name} in {table_name}")
 
     print("=" * 60)
     print("✅ PATTERN DETECTION COMPLETED")
     print("=" * 60)
+
+
+def convert_currency_columns(dataframes, bucket_name):
+    """
+    Convert price columns from source currency to target currency.
+
+    This function:
+    1. Identifies the source currency for each order (from orders table)
+    2. Fetches target currency from PostgreSQL (based on business_id)
+    3. Converts all price-related columns to target currency
+    4. Handles missing currency values gracefully by skipping conversion
+    5. Preserves original currency column for tracking
+
+    Args:
+        dataframes: Dictionary of DataFrames
+        bucket_name: Business ID (used to fetch target currency)
+
+    Returns:
+        dict: Updated dataframes with converted prices
+    """
+    print("\n💱 Converting currencies...")
+
+    try:
+        # Initialize currency converter with business_id
+        converter = CurrencyConverter(bucket_name)
+        target_currency = converter.get_target_currency()
+        print(f"   Target currency: {target_currency}")
+
+        # Check if orders table exists and has currency column
+        if 'orders' not in dataframes:
+            print(f"   ⚠️  Orders table not found, skipping currency conversion")
+            return dataframes
+
+        orders_df = dataframes['orders']
+        if 'currency' not in orders_df.columns:
+            print(f"   ⚠️  Currency column not found in orders table, skipping conversion")
+            return dataframes
+
+        # Collect unique currencies and their exchange rates
+        unique_currencies = orders_df.select('currency').filter(col('currency').isNotNull()).distinct().collect()
+
+        if not unique_currencies:
+            print(f"   ⚠️  No currency values found in orders, skipping conversion")
+            return dataframes
+
+        currency_rates = {}
+        all_same_as_target = True
+
+        for row in unique_currencies:
+            source_currency = row['currency']
+            if source_currency.upper() != target_currency.upper():
+                all_same_as_target = False
+                rate = converter.get_exchange_rate(source_currency)
+                if rate is not None:
+                    currency_rates[source_currency] = rate
+                    print(f"   Exchange rate: 1 {source_currency} = {rate:.4f} {target_currency}")
+                else:
+                    print(f"   ⚠️  Failed to fetch exchange rate for {source_currency}")
+                    currency_rates[source_currency] = None
+            else:
+                currency_rates[source_currency] = 1.0
+
+        # If all currencies are the same as target, skip conversion
+        if all_same_as_target:
+            print(f"   All currencies match target ({target_currency}), skipping conversion")
+            return dataframes
+
+        # Create a currency mapping for orders
+        # Add a temp column with exchange rates to orders table
+
+        # Build a case statement for currency conversion
+        rate_expr = when(col('currency').isNull(), lit(None))
+        for curr, rate in currency_rates.items():
+            if rate is not None:
+                rate_expr = rate_expr.when(col('currency') == curr, lit(rate))
+            else:
+                rate_expr = rate_expr.when(col('currency') == curr, lit(None))
+        rate_expr = rate_expr.otherwise(lit(None))
+
+        # Add exchange_rate column to orders
+        orders_with_rate = orders_df.withColumn('_exchange_rate', rate_expr)
+
+        # Convert price columns in orders table
+        converted_count = 0
+        order_price_columns = ['subtotal', 'tax_amount', 'shipping_cost', 'total_discount', 'total_amount']
+
+        for price_col in order_price_columns:
+            if price_col in orders_with_rate.columns:
+                # Convert only where exchange_rate is not null
+                orders_with_rate = orders_with_rate.withColumn(
+                    price_col,
+                    when(col('_exchange_rate').isNotNull(),
+                         col(price_col) * col('_exchange_rate')
+                    ).otherwise(col(price_col))
+                )
+                converted_count += 1
+
+        # Drop the temporary exchange_rate column before saving
+        orders_with_rate = orders_with_rate.drop('_exchange_rate')
+        dataframes['orders'] = orders_with_rate
+
+        # Now handle order_items and payments which are linked to orders
+        # We need to join with orders to get the exchange rate
+        if 'order_items' in dataframes and 'order_id' in orders_df.columns:
+            order_items_df = dataframes['order_items']
+            if 'order_id' in order_items_df.columns:
+                # Create a mapping of order_id to exchange_rate
+                order_rates = orders_df.select('order_id', 'currency').withColumn('_exchange_rate', rate_expr)
+
+                # Join order_items with order rates
+                order_items_with_rate = order_items_df.join(
+                    order_rates.select('order_id', '_exchange_rate'),
+                    'order_id',
+                    'left'
+                )
+
+                # Convert price columns
+                item_price_columns = ['discount_amount', 'product_price']
+                for price_col in item_price_columns:
+                    if price_col in order_items_with_rate.columns:
+                        order_items_with_rate = order_items_with_rate.withColumn(
+                            price_col,
+                            when(col('_exchange_rate').isNotNull(),
+                                 col(price_col) * col('_exchange_rate')
+                            ).otherwise(col(price_col))
+                        )
+                        converted_count += 1
+
+                # Drop temporary column
+                order_items_with_rate = order_items_with_rate.drop('_exchange_rate')
+                dataframes['order_items'] = order_items_with_rate
+
+        if 'payments' in dataframes and 'order_id' in orders_df.columns:
+            payments_df = dataframes['payments']
+            if 'order_id' in payments_df.columns:
+                # Create a mapping of order_id to exchange_rate
+                order_rates = orders_df.select('order_id', 'currency').withColumn('_exchange_rate', rate_expr)
+
+                # Join payments with order rates
+                payments_with_rate = payments_df.join(
+                    order_rates.select('order_id', '_exchange_rate'),
+                    'order_id',
+                    'left'
+                )
+
+                # Convert price columns
+                payment_price_columns = ['processing_fee', 'refund_amount']
+                for price_col in payment_price_columns:
+                    if price_col in payments_with_rate.columns:
+                        payments_with_rate = payments_with_rate.withColumn(
+                            price_col,
+                            when(col('_exchange_rate').isNotNull(),
+                                 col(price_col) * col('_exchange_rate')
+                            ).otherwise(col(price_col))
+                        )
+                        converted_count += 1
+
+                # Drop temporary column
+                payments_with_rate = payments_with_rate.drop('_exchange_rate')
+                dataframes['payments'] = payments_with_rate
+
+        # Handle products, inventory, marketing_campaigns, cart_items
+        # These don't have direct order linkage, so we'll use a default conversion if all source currencies are the same
+        # Otherwise, we skip conversion for these tables
+
+        if len(currency_rates) == 1:
+            # Single source currency, convert these tables
+            source_currency = list(currency_rates.keys())[0]
+            rate = currency_rates[source_currency]
+
+            if rate is not None and rate != 1.0:
+                # Define tables and their price columns for non-order tables
+                other_tables_map = {
+                    'products': ['cost_price', 'sell_price'],
+                    'inventory': ['storage_cost'],
+                    'marketing_campaigns': ['budget', 'spent_amount'],
+                    'cart_items': ['unit_price', 'total_price']
+                }
+
+                # Create UDF for currency conversion
+                def convert_price(price):
+                    if price is None:
+                        return None
+                    return float(price) * rate
+
+                convert_udf = udf(convert_price, DoubleType())
+
+                for table_name, price_columns in other_tables_map.items():
+                    if table_name in dataframes:
+                        df = dataframes[table_name]
+
+                        for price_col in price_columns:
+                            if price_col in df.columns:
+                                df = df.withColumn(price_col, convert_udf(col(price_col)))
+                                converted_count += 1
+
+                        dataframes[table_name] = df
+        else:
+            print(f"   ℹ️  Multiple source currencies detected, skipping conversion for non-order tables")
+
+        # Note: We do NOT update the currency column in orders - it's preserved as-is
+        print(f"   ✅ Converted {converted_count} price columns to {target_currency}")
+        print(f"   ℹ️  Original currency values preserved in orders table")
+
+    except Exception as e:
+        print(f"   ⚠️  Error during currency conversion: {e}")
+        import traceback
+        traceback.print_exc()
+        print(f"   Continuing without currency conversion...")
 
     return dataframes

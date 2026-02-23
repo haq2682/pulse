@@ -36,6 +36,7 @@ from standardization import (
     normalize_dates_and_timestamps,
     validate_dates_and_timestamps,
     detect_gibberish_patterns,
+    convert_currency_columns,
 )
 from cleaning_utils import (
     load_data_from_minio,
@@ -44,7 +45,7 @@ from cleaning_utils import (
     get_file_paths_from_minio
 )
 from incremental_cleaner import IncrementalCleaner
-from pyspark.sql.functions import regexp_extract, col, when
+from pyspark.sql.functions import regexp_extract, col
 
 
 def main(bucket_name=None, incremental=True, force_full=False):
@@ -219,17 +220,22 @@ def main(bucket_name=None, incremental=True, force_full=False):
     # 18. Final data validation
     print("\n📌 Step 18: Running final data validation...")
     dataframes = validate_all_cleaned_data(dataframes)
-    # 19. Display summary
-    print("\n📌 Step 19: Generating summary...")
+
+    # 19. Convert currency columns
+    print("\n📌 Step 19: Converting currency columns...")
+    dataframes = convert_currency_columns(dataframes, bucket_name)
+
+    # 20. Display summary
+    print("\n📌 Step 20: Generating summary...")
     display_summary(dataframes)
-    
-    # 20. Save cleaned data
-    print("\n📌 Step 20: Saving cleaned data to MinIO...")
+
+    # 21. Save cleaned data
+    print("\n📌 Step 21: Saving cleaned data to MinIO...")
     save_data_to_minio(dataframes, minio_client, bucket_name)
 
-    # 20a. Mark files as processed if in incremental mode
+    # 21a. Mark files as processed if in incremental mode
     if incremental and cleaner:
-        print("\n📌 Step 20a: Marking files as processed...")
+        print("\n📌 Step 21a: Marking files as processed...")
         file_records = {}
         for table_name, file_path in processed_file_paths.items():
             if table_name in dataframes:
@@ -242,8 +248,8 @@ def main(bucket_name=None, incremental=True, force_full=False):
                 }
         cleaner.mark_multiple_processed(file_records)
 
-    # 21. Stop Spark session
-    print("\n📌 Step 21: Stopping Spark session...")
+    # 22. Stop Spark session
+    print("\n📌 Step 22: Stopping Spark session...")
     spark.stop()
     print("✅ Spark session stopped")
 
