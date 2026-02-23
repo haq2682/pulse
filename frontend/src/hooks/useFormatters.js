@@ -37,7 +37,7 @@ export const useFormatters = () => {
          * @param {number} decimals - Number of decimal places
          * @returns {string} Formatted percentage string
          */
-        pct: (v, decimals = 1) => `${((v ?? 0) * 100).toFixed(decimals)}%`,
+        pct: (v, decimals = 2) => `${((v ?? 0)).toFixed(decimals)}%`,
 
         /**
          * Format a value as percentage (raw value, e.g., 50 for 50%)
@@ -74,7 +74,7 @@ export const useFormatters = () => {
          * @param {number} v - Value to format
          * @returns {string} Formatted compact currency
          */
-        currencyCompact: (v) => {
+        currencyShort: (v) => {
             if (v === null || v === undefined || isNaN(v)) {
                 return formatCurrency(0, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
             }
@@ -90,7 +90,10 @@ export const useFormatters = () => {
             const symbol = currencyStr.replace(/[0-9,]/g, '').trim();
 
             return v < 0 ? `-${symbol}${compactNum}` : `${symbol}${compactNum}`;
-        }
+        },
+
+        hours: (v) => `${(v ?? 0).toFixed(1)} hrs`,
+        days: (v) => `${(v ?? 0).toFixed(1)} days`,
     }), [formatCurrency]);
 
     return fmt;

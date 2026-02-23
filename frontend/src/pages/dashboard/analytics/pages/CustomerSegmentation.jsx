@@ -17,6 +17,7 @@ import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
+import { useFormatters } from '@/hooks/useFormatters';
 
 ChartJS.register(
     CategoryScale, LinearScale, PointElement, LineElement,
@@ -52,21 +53,6 @@ const RFM_COLORS = {
     'Cannot Lose Them':    'rgba(239,68,68,0.9)',
     'Hibernating':         'rgba(107,114,128,0.85)',
     'Lost':                'rgba(156,163,175,0.85)',
-};
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    currency: (v) =>
-        new Intl.NumberFormat('en-US', {
-            style: 'currency', currency: 'USD',
-            minimumFractionDigits: 0, maximumFractionDigits: 0,
-        }).format(v ?? 0),
-    number: (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-    pct: (v) => `${(v ?? 0).toFixed(1)}%`,
-    decimal: (v) => (v ?? 0).toFixed(2),
 };
 
 // ---------------------------------------------------------------------------
@@ -138,6 +124,7 @@ const doughnutOpts = () => ({
 // ---------------------------------------------------------------------------
 
 const CustomerSegmentation = () => {
+    const fmt = useFormatters();
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();

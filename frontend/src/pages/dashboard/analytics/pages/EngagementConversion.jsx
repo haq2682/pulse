@@ -15,6 +15,7 @@ import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
+import { useFormatters } from '@/hooks/useFormatters';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 
@@ -28,17 +29,6 @@ const PALETTE = [
     'rgba(234,179,8,0.82)',  'rgba(236,72,153,0.82)', 'rgba(20,184,166,0.82)',
     'rgba(168,85,247,0.82)',
 ];
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    number:   (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-    currency: (v) => `$${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v ?? 0)}`,
-    decimal:  (v, d = 2) => (+(v ?? 0)).toFixed(d),
-    pct:      (v) => `${(+(v ?? 0)).toFixed(1)}%`,
-};
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -92,6 +82,7 @@ const doughnutOpts = () => ({
 // ---------------------------------------------------------------------------
 
 export default function EngagementConversion() {
+    const fmt = useFormatters();
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();

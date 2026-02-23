@@ -17,6 +17,7 @@ import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
+import { useFormatters } from '@/hooks/useFormatters';
 
 ChartJS.register(
     CategoryScale, LinearScale, BarElement, PointElement, LineElement,
@@ -39,16 +40,6 @@ const TIER_SEVERITY = {
     'Good':      'info',
     'Average':   'warning',
     'Poor':      'danger',
-};
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    number:   (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-    currency: (v) => `$${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v ?? 0)}`,
-    decimal:  (v, d = 2) => (+(v ?? 0)).toFixed(d),
 };
 
 const truncate = (s, n = 28) => (s && s.length > n ? `${s.slice(0, n)}…` : (s ?? '—'));
@@ -115,6 +106,7 @@ const lineOpts = () => ({
 // ---------------------------------------------------------------------------
 
 export default function ReviewsImpact() {
+    const fmt = useFormatters();
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();

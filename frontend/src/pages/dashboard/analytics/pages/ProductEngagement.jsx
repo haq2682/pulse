@@ -17,6 +17,7 @@ import ChartWrapper from '../components/ChartWrapper';
 import { usePipelineProgress } from '@/context/PipelineProgressContext';
 import useAnalyticsDateFilter from '@/hooks/useAnalyticsDateFilter';
 import DateFilterBar from '../components/DateFilterBar';
+import { useFormatters } from '@/hooks/useFormatters';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Title, Tooltip, Legend);
 
@@ -35,17 +36,6 @@ const AFFINITY_COLORS = {
     'Strong':   'rgba(34,197,94,0.85)',
     'Moderate': 'rgba(59,130,246,0.85)',
     'Weak':     'rgba(234,179,8,0.85)',
-};
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-const fmt = {
-    currency: (v) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v ?? 0),
-    number:   (v) => new Intl.NumberFormat('en-US').format(v ?? 0),
-    pct:      (v) => `${(v ?? 0).toFixed(1)}%`,
-    decimal:  (v, d = 3) => (v ?? 0).toFixed(d),
 };
 
 // ---------------------------------------------------------------------------
@@ -87,38 +77,42 @@ const MetricsCard = ({ title, rows }) => {
 };
 
 // Coverage Gauge Card
-const CoverageCard = ({ total, withRecs, rate }) => (
-    <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
-        <div className="p-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">Recommendation Coverage *</h3>
-            <div className="flex flex-col gap-4">
-                <div className="text-center py-4">
-                    <p className="text-5xl font-bold text-blue-600 mb-2">{fmt.pct((rate ?? 0) * 100)}</p>
-                    <p className="text-sm text-gray-500">of products have recommendations</p>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div className="bg-blue-500 h-3 rounded-full transition-all duration-700" style={{ width: `${Math.min((rate ?? 0) * 100, 100)}%` }} />
-                </div>
-                <div className="grid grid-cols-2 gap-4 mt-2">
-                    <div className="text-center p-3 bg-blue-50 rounded-lg">
-                        <p className="text-xl font-bold text-blue-700">{fmt.number(withRecs)}</p>
-                        <p className="text-xs text-gray-500">With recommendations</p>
+const CoverageCard = ({ total, withRecs, rate }) => {
+    const fmt = useFormatters();
+    return (
+        <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+            <div className="p-6">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200">Recommendation Coverage *</h3>
+                <div className="flex flex-col gap-4">
+                    <div className="text-center py-4">
+                        <p className="text-5xl font-bold text-blue-600 mb-2">{fmt.pct((rate ?? 0) * 100)}</p>
+                        <p className="text-sm text-gray-500">of products have recommendations</p>
                     </div>
-                    <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="text-xl font-bold text-gray-700">{fmt.number(total)}</p>
-                        <p className="text-xs text-gray-500">Total products</p>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div className="bg-blue-500 h-3 rounded-full transition-all duration-700" style={{ width: `${Math.min((rate ?? 0) * 100, 100)}%` }} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mt-2">
+                        <div className="text-center p-3 bg-blue-50 rounded-lg">
+                            <p className="text-xl font-bold text-blue-700">{fmt.number(withRecs)}</p>
+                            <p className="text-xs text-gray-500">With recommendations</p>
+                        </div>
+                        <div className="text-center p-3 bg-gray-50 rounded-lg">
+                            <p className="text-xl font-bold text-gray-700">{fmt.number(total)}</p>
+                            <p className="text-xs text-gray-500">Total products</p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </Card>
-);
+        </Card>
+    );
+};
 
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
 const ProductEngagement = () => {
+    const fmt = useFormatters();
     const { businessId } = useParams();
     const toastRef = useRef(null);
     const { pipelineStatus } = usePipelineProgress();
