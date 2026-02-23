@@ -45,19 +45,27 @@ converted_price = converter.convert_price(100.0, "USD")  # Converts 100 USD to E
 #### 2. Cleaning Pipeline Integration (`cleaning/cleaning.py`)
 
 The `convert_currency_columns()` function:
-1. Detects source currency from the orders table
+1. Detects source currency from the orders table (per-order basis)
 2. Fetches target currency from PostgreSQL
-3. Converts all price columns using a cached exchange rate
-4. Updates the currency column in the orders table
+3. Converts all price columns using cached exchange rates
+4. **Preserves** the original currency column in the orders table for tracking
+5. Handles missing currency values gracefully by skipping conversion for those rows
+
+**Important Notes:**
+- The `orders.currency` column is **NOT modified** - it remains in its original state
+- Conversion is applied per-order based on each order's currency value
+- For `order_items` and `payments`, the function joins with orders to get the appropriate exchange rate
+- For tables without order linkage (`products`, `inventory`, `marketing_campaigns`, `cart_items`), conversion is only applied if all orders use the same source currency
+- Rows with NULL currency values are skipped gracefully
 
 **Price Columns Converted:**
-- `products`: cost_price, sell_price
 - `orders`: subtotal, tax_amount, shipping_cost, total_discount, total_amount
-- `order_items`: discount_amount, product_price
-- `payments`: processing_fee, refund_amount
-- `inventory`: storage_cost
-- `marketing_campaigns`: budget, spent_amount
-- `cart_items`: unit_price, total_price
+- `order_items`: discount_amount, product_price (joined by order_id)
+- `payments`: processing_fee, refund_amount (joined by order_id)
+- `products`: cost_price, sell_price (only if single source currency)
+- `inventory`: storage_cost (only if single source currency)
+- `marketing_campaigns`: budget, spent_amount (only if single source currency)
+- `cart_items`: unit_price, total_price (only if single source currency)
 
 #### 3. API Endpoint (`api/routers/analytics.py`)
 
@@ -184,18 +192,32 @@ See `CurrencyContext.jsx` for the complete list.
 ```
 1. Load data from MinIO (mapped folder)
    ↓
-2. Detect source currency from orders.currency column
+2. Detect unique currencies from orders.currency column
    ↓
 3. Fetch target currency from PostgreSQL (businesses table)
    ↓
-4. Get exchange rate from api.exchangerate.host (or Redis cache)
+4. Get exchange rates for each unique source currency from api.exchangerate.host (or Redis cache)
    ↓
-5. Convert all price columns using the exchange rate
+5. Convert price columns in orders table (per-order based on currency value)
    ↓
-6. Update orders.currency to target currency
+6. Join order_items and payments with orders to get per-order exchange rates
    ↓
-7. Save converted data to MinIO (cleaned folder)
+7. Convert prices in order_items and payments (per-order)
+   ↓
+8. For tables without order linkage (products, inventory, etc.), apply conversion only if single source currency
+   ↓
+9. PRESERVE orders.currency column (do not modify)
+   ↓
+10. Skip conversion for rows with NULL currency values
+   ↓
+11. Save converted data to MinIO (cleaned folder)
 ```
+
+**Key Behavior:**
+- Orders with NULL currency values are skipped gracefully
+- Each order's prices are converted based on its own currency value
+- Related tables (order_items, payments) inherit the exchange rate from their parent order
+- Non-order tables are only converted if all orders use the same source currency
 
 ### Frontend Data Flow
 
