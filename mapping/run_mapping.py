@@ -323,7 +323,8 @@ def run_db_mode(config: dict):
             os.environ["MANUAL_MAPPINGS"] = json.dumps(manual_mappings)
         
         try:
-            run_streaming()
+            trigger_once = config.get("trigger_once", False)
+            run_streaming(trigger_once=trigger_once)
         except Exception as e:
             error_msg = f"DB mode error: Streaming failed: {str(e)}"
             print(f"❌ {error_msg}")
@@ -337,7 +338,9 @@ def run_db_mode(config: dict):
         sys.exit(1)
 
 
-def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_bootstrap: Optional[str] = None):
+def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10,
+                 kafka_bootstrap: Optional[str] = None,
+                 poll_duration: int = 0, trigger_once: bool = False):
     """
     API mode: Ingest from API endpoint -> Kafka -> Spark Streaming -> mapped folder.
     
@@ -389,9 +392,10 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_
             run_api_ingestion(
                 api_url=api_url,
                 poll_interval=poll_interval,
-                kafka_bootstrap=kafka_bootstrap
+                kafka_bootstrap=kafka_bootstrap,
+                max_duration=poll_duration if poll_duration > 0 else None,
             )
-        
+
         # Function to run Spark streaming in a separate process
         def run_spark_consumer():
             print("Starting Spark streaming consumer...")
@@ -400,7 +404,7 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_
             os.environ["BUSINESS_ID"] = bucket_name  # For saving mapping results
             if manual_mappings:
                 os.environ["MANUAL_MAPPINGS"] = json.dumps(manual_mappings)
-            run_streaming()
+            run_streaming(trigger_once=trigger_once)
         
         # Run both processes
         print("Starting parallel processes:")
@@ -449,12 +453,18 @@ def main():
     parser.add_argument('--db-tables', type=str, help='Comma-separated list of database tables (for db mode)')
     parser.add_argument('--api-url', type=str, help='API endpoint URL (for api mode)')
     parser.add_argument('--api-poll-interval', type=int, help='API polling interval in seconds (for api mode)')
+    parser.add_argument('--trigger-once', action='store_true',
+                        help='Process all available Kafka messages then exit (db/api mode, Airflow-friendly)')
+    parser.add_argument('--poll-duration', type=int, default=0,
+                        help='For api mode: run ingestion for N seconds then stop (0=run forever)')
     
     args = parser.parse_args()
     
     # Use command-line args if provided, otherwise use CONFIG
     mode = args.mode if args.mode else CONFIG["mode"]
     bucket_name = args.business_id if args.business_id else CONFIG["bucket_name"]
+    trigger_once = args.trigger_once
+    poll_duration = args.poll_duration
     
     # Wrap execution in try-except to catch any uncaught errors
     try:
@@ -488,7 +498,8 @@ def main():
             run_db_mode({
                 "db_uri": db_uri,
                 "db_tables": db_tables,
-                "bucket_name": bucket_name
+                "bucket_name": bucket_name,
+                "trigger_once": trigger_once,
             })
 
         elif mode == "api":
@@ -500,7 +511,8 @@ def main():
             print(f"  Poll interval: {poll_interval}s", flush=True)
             print(f"{'='*60}\n", flush=True)
             
-            run_api_mode(api_url, bucket_name, poll_interval, kafka_bootstrap)
+            run_api_mode(api_url, bucket_name, poll_interval, kafka_bootstrap,
+                         poll_duration=poll_duration, trigger_once=trigger_once)
 
         else:
             error_msg = f"Invalid mode '{mode}'. Valid modes: batch, db, api"

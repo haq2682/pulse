@@ -360,12 +360,19 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
     print(f"   Data saved to {OUTPUT_BUCKET}/{target_folder}/")
 
 
-def run_streaming():
-    """Main streaming pipeline"""
+def run_streaming(trigger_once: bool = False):
+    """Main streaming pipeline.
+
+    Args:
+        trigger_once: When True, uses Spark's availableNow trigger so the job
+                      processes all pending Kafka messages and then exits cleanly.
+                      Use this for Airflow-managed micro-batch execution.
+    """
     print("Starting Spark Streaming Pipeline")
     print(f"Kafka: {KAFKA_BOOTSTRAP}")
     print(f"Checkpoint: {CHECKPOINT_LOCATION}")
-    print(f"Output bucket: {OUTPUT_BUCKET}\n")
+    print(f"Output bucket: {OUTPUT_BUCKET}")
+    print(f"Trigger-once mode: {trigger_once}\n")
     
     # Retrieve manual mappings from environment variable
     manual_mappings = None
@@ -408,16 +415,22 @@ def run_streaming():
     json_stream = read_kafka_stream(spark)
     
     # Process with foreachBatch
-    query = (
+    writer = (
         json_stream.writeStream
         .foreachBatch(lambda df, id: process_microbatch(df, id, columns_info, minio_client, manual_mappings, business_id))
         .outputMode("append")
         .option("checkpointLocation", CHECKPOINT_LOCATION)
-        .start()
     )
-    
-    print("Streaming query started. Press Ctrl+C to stop.\n")
-    
+
+    if trigger_once:
+        # availableNow: process all pending Kafka messages then stop (Airflow-friendly)
+        writer = writer.trigger(availableNow=True)
+        print("Streaming query started in trigger-once mode (availableNow).\n")
+    else:
+        print("Streaming query started. Press Ctrl+C to stop.\n")
+
+    query = writer.start()
+
     try:
         query.awaitTermination()
     except KeyboardInterrupt:

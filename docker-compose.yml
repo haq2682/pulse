@@ -312,6 +312,149 @@ services:
         ipv4_address: 10.5.0.12
     restart: always
 
+  # ─────────────────────────────────────────────────────────────────────────
+  # Apache Airflow  (webserver + scheduler, LocalExecutor)
+  # UI:  http://localhost:8090   admin / admin  (change via AIRFLOW_ADMIN_*)
+  # ─────────────────────────────────────────────────────────────────────────
+
+  # One-shot init container: create the metadata DB and the admin user.
+  # It exits after completing; docker restart policy is "on-failure" so it
+  # won't loop if it succeeds.
+  airflow-init:
+    image: apache/airflow:2.8.0-python3.10
+    container_name: airflow-init
+    depends_on:
+      - postgresql
+      - redis
+    env_file:
+      - .env
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLt0jJgrg=}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-pulse_secret_key_change_me}
+      - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
+      - AIRFLOW__CORE__PLUGINS_FOLDER=/opt/airflow/plugins
+      - AIRFLOW__LOGGING__BASE_LOG_FOLDER=/opt/airflow/logs
+      # Pipeline env vars forwarded to tasks
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - KAFKA_BOOTSTRAP=${KAFKA_BOOTSTRAP}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE_NAME=${POSTGRES_DATABASE_NAME}
+      - POSTGRES_SERVER=${POSTGRES_SERVER}
+      - REDIS_HOST=${REDIS_HOST:-10.5.0.11}
+      - DEBEZIUM_URL=http://10.5.0.10:8083
+      - PIPELINE_PYTHON_CONTAINER=python
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/utils:/opt/airflow/utils
+      - ./airflow/config:/opt/airflow/config
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: >
+      bash -c "
+        airflow db init &&
+        airflow users create
+          --username ${AIRFLOW_ADMIN_USER:-admin}
+          --password ${AIRFLOW_ADMIN_PASSWORD:-admin}
+          --firstname Pulse
+          --lastname Admin
+          --role Admin
+          --email admin@pulse.local
+      "
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.16
+    restart: on-failure
+
+  airflow-webserver:
+    image: apache/airflow:2.8.0-python3.10
+    container_name: airflow-webserver
+    depends_on:
+      - airflow-init
+      - postgresql
+      - redis
+    env_file:
+      - .env
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLt0jJgrg=}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-pulse_secret_key_change_me}
+      - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
+      - AIRFLOW__CORE__PLUGINS_FOLDER=/opt/airflow/plugins
+      - AIRFLOW__LOGGING__BASE_LOG_FOLDER=/opt/airflow/logs
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - KAFKA_BOOTSTRAP=${KAFKA_BOOTSTRAP}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE_NAME=${POSTGRES_DATABASE_NAME}
+      - POSTGRES_SERVER=${POSTGRES_SERVER}
+      - REDIS_HOST=${REDIS_HOST:-10.5.0.11}
+      - DEBEZIUM_URL=http://10.5.0.10:8083
+      - PIPELINE_PYTHON_CONTAINER=python
+      - PYTHONPATH=/opt/airflow/utils:/opt/airflow/config
+    ports:
+      - "8090:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/utils:/opt/airflow/utils
+      - ./airflow/config:/opt/airflow/config
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: webserver
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.17
+    restart: always
+
+  airflow-scheduler:
+    image: apache/airflow:2.8.0-python3.10
+    container_name: airflow-scheduler
+    depends_on:
+      - airflow-webserver
+    env_file:
+      - .env
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLt0jJgrg=}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-pulse_secret_key_change_me}
+      - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
+      - AIRFLOW__CORE__PLUGINS_FOLDER=/opt/airflow/plugins
+      - AIRFLOW__LOGGING__BASE_LOG_FOLDER=/opt/airflow/logs
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - KAFKA_BOOTSTRAP=${KAFKA_BOOTSTRAP}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE_NAME=${POSTGRES_DATABASE_NAME}
+      - POSTGRES_SERVER=${POSTGRES_SERVER}
+      - REDIS_HOST=${REDIS_HOST:-10.5.0.11}
+      - DEBEZIUM_URL=http://10.5.0.10:8083
+      - PIPELINE_PYTHON_CONTAINER=python
+      - PYTHONPATH=/opt/airflow/utils:/opt/airflow/config
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/utils:/opt/airflow/utils
+      - ./airflow/config:/opt/airflow/config
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: scheduler
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.18
+    restart: always
+
   nginx:
     build:
       context: .
@@ -357,3 +500,4 @@ volumes:
   app:
   redis_data:
   nifi_data:
+  airflow_logs:
