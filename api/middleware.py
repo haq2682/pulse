@@ -19,6 +19,8 @@ public_paths = [
     "/auth/google/callback",
     "/",
     "/health",
+    # Ingest stream is polled by api_ingest_service.py without browser auth
+    "/ingest",
 ]
 
 async def auth_middleware(request: Request, call_next):

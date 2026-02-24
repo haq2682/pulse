@@ -21,6 +21,7 @@ from routers.onboarding import router as onboarding_router
 from routers.analytics import router as analytics_router
 from routers.pipeline import router as pipeline_router
 from routers.xai import router as xai_router
+from routers.ingest import router as ingest_router
 
 # Import services for initialization
 from services.websocket_manager import WebSocketManager
@@ -58,6 +59,7 @@ app.include_router(onboarding_router)
 app.include_router(analytics_router)
 app.include_router(pipeline_router)
 app.include_router(xai_router)
+app.include_router(ingest_router)
 
 @app.get("/")
 def read_root():
