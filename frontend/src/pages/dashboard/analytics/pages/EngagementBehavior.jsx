@@ -370,6 +370,7 @@ export default function EngagementBehavior() {
         );
     }
 
+    if (!derived) return null;
     const {
         kpis, sessConvBarData, cartAbandBarData, sessionBucketBar, pagesBucketBar,
         funnelDeviceGrouped, convByDeviceBar, funnelReferrerGrouped, convByReferrerBar,

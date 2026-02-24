@@ -306,7 +306,7 @@ export default function RecommendationsProductAffinity() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         kpis, liftBarData, scoreBarData, coBarData,
         strengthDoughnut, catDoughnut, confGrouped, recoBarData,

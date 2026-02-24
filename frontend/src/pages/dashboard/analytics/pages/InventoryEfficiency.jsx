@@ -281,7 +281,7 @@ export default function InventoryEfficiency() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         totalCarryingCost, overstockCount, excessCount, avgStorageCostPU,
         carryingBarData, overstockCatData, reservedStackedData, reservedDoughnut,

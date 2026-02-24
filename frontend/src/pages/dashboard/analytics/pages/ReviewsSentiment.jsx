@@ -329,7 +329,7 @@ export default function ReviewsSentiment() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         kpis, posSentBarData, sentScoreBarData, sentStackedData, overallSentDoughnut,
         negShareBarData, monthLineData, monthLineDualOpts,

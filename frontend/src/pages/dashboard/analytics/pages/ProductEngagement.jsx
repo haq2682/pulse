@@ -315,7 +315,7 @@ const ProductEngagement = () => {
             </div>
         );
     }
-
+    if (!derived) return null;
     const rec = derived?.recoCoverage ?? {};
 
     return (

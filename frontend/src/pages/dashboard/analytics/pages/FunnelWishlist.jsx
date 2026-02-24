@@ -286,6 +286,7 @@ export default function FunnelWishlist() {
         );
     }
 
+    if (!derived) return null;
     const { kpis, topAddsBarData, topPurchBarData, convRateBarData, addVsPurchBarData,
             addsByMonthData, ttpDistData, ttpDoughnutData, abandonProdBarData,
             byProduct, ttpStats, ttpDist } = derived;

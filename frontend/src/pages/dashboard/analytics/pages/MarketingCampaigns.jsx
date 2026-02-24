@@ -325,7 +325,7 @@ export default function MarketingCampaigns() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const { kpis, revenueBarData, roasBarData, roiBarData, budgetVsSpentData, convBarData, effBarData,
             statusDoughnutData, typeDoughnutData, tierDoughnutData,
             perfTable, wastefulTable } = derived;

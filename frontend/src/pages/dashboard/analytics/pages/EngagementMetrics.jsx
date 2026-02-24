@@ -284,6 +284,7 @@ export default function EngagementMetrics() {
         );
     }
 
+    if (!derived) return null;
     const {
         kpis, funnelStagesData, convRatesData, cartDoughnut, sessionAvgData, custEngAvgData,
         funnelSum, cartSum, engSummary,

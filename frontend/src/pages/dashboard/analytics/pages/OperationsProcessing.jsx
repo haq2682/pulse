@@ -351,7 +351,7 @@ export default function OperationsProcessing() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         kpis, catProcBarData, catDelBarData, catGroupedData, catOrdersBarData,
         dowBarData, dowDoughnutData, hourBarData, ordersByHourData,

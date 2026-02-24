@@ -577,8 +577,8 @@ export default function Forecasts() {
                                     <DataTable value={highChurn} rows={8} className="p-datatable-sm" stripedRows>
                                         <Column field="customer_id" header="Customer ID" />
                                         <Column field="predicted_churn_risk" header="Risk" body={(r) => <Tag value={r.predicted_churn_risk ?? '—'} severity={RISK_COLOR[r.predicted_churn_risk] ?? 'info'} />} />
-                                        <Column field="churn_probability" header="Probability" body={(r) => fmt.pct(r.churn_probability)} />
-                                        <Column field="confidence_score" header="Confidence" body={(r) => fmt.pct(r.confidence_score)} />
+                                        <Column field="churn_probability" header="Probability" body={(r) => fmt.probToPct(r.churn_probability)} />
+                                        <Column field="confidence_score" header="Confidence" body={(r) => fmt.probToPct(r.confidence_score)} />
                                     </DataTable>
                                 </div>
                             </Card>
@@ -611,7 +611,7 @@ export default function Forecasts() {
                                     <DataTable value={segClsRows} paginator rows={8} className="p-datatable-sm" stripedRows>
                                         <Column field="customer_id" header="Customer ID" />
                                         <Column field="predicted_segment" header="Segment" />
-                                        <Column field="segment_probability" header="Probability" body={(r) => fmt.pct(r.segment_probability)} />
+                                        <Column field="segment_probability" header="Probability" body={(r) => fmt.probToPct(r.segment_probability)} />
                                         <Column field="rfm_score" header="RFM Score" body={(r) => fmt.decimal(r.rfm_score, 1)} />
                                     </DataTable>
                                 </div>
@@ -689,7 +689,7 @@ export default function Forecasts() {
                                 <Column field="predicted_next_aov" header="Predicted AOV" body={(r) => fmt.currency(r.predicted_next_aov)} sortable />
                                 <Column field="confidence_interval_lower" header="CI Lower" body={(r) => fmt.currency(r.confidence_interval_lower)} />
                                 <Column field="confidence_interval_upper" header="CI Upper" body={(r) => fmt.currency(r.confidence_interval_upper)} />
-                                <Column field="confidence_score" header="Confidence" body={(r) => fmt.pct(r.confidence_score)} sortable />
+                                <Column field="confidence_score" header="Confidence" body={(r) => fmt.probToPct(r.confidence_score)} sortable />
                             </DataTable>
                         </div>
                     </Card>
@@ -745,7 +745,7 @@ export default function Forecasts() {
                                     <DataTable value={criticalStockout} rows={8} className="p-datatable-sm" stripedRows>
                                         <Column field="product_id" header="Product ID" />
                                         <Column field="stockout_risk_level" header="Risk" body={(r) => <Tag value={r.stockout_risk_level ?? '—'} severity={r.stockout_risk_level === 'Critical' ? 'danger' : 'warning'} />} />
-                                        <Column field="stockout_probability" header="Probability" body={(r) => fmt.pct(r.stockout_probability)} sortable />
+                                        <Column field="stockout_probability" header="Probability" body={(r) => fmt.probToPct(r.stockout_probability)} sortable />
                                         <Column field="days_until_stockout" header="Days Left" body={(r) => fmt.days(r.days_until_stockout)} sortable />
                                         <Column field="urgency_score" header="Urgency" body={(r) => fmt.decimal(r.urgency_score, 1)} />
                                     </DataTable>
@@ -815,7 +815,7 @@ export default function Forecasts() {
                                 <Column field="required_safety_stock_units" header="Safety Stock (units)" sortable />
                                 <Column field="adjustment_factor" header="Adjustment Factor" body={(r) => fmt.decimal(r.adjustment_factor, 2)} sortable />
                                 <Column field="demand_pattern" header="Demand Pattern" body={(r) => <Tag value={r.demand_pattern ?? '—'} severity={r.demand_pattern === 'Erratic' ? 'danger' : r.demand_pattern === 'Variable' ? 'warning' : 'success'} />} />
-                                <Column field="service_level_target" header="Service Level" body={(r) => fmt.pct100(r.service_level_target ?? 0)} />
+                                <Column field="service_level_target" header="Service Level" body={(r) => fmt.probToPct100(r.service_level_target ?? 0)} />
                             </DataTable>
                         </div>
                     </Card>
@@ -844,7 +844,7 @@ export default function Forecasts() {
                                     <DataTable value={highRiskOrders} rows={8} className="p-datatable-sm" stripedRows>
                                         <Column field="order_id" header="Order ID" />
                                         <Column field="predicted_risk_label" header="Risk" body={(r) => <Tag value={r.predicted_risk_label ?? '—'} severity={RISK_COLOR[r.predicted_risk_label] ?? 'info'} />} />
-                                        <Column field="delay_probability" header="Delay Prob" body={(r) => fmt.pct(r.delay_probability)} sortable />
+                                        <Column field="delay_probability" header="Delay Prob" body={(r) => fmt.probToPct(r.delay_probability)} sortable />
                                         <Column field="expected_delay_days" header="Exp. Delay (d)" sortable />
                                         <Column field="recommended_action" header="Action" style={{ maxWidth: '180px' }} />
                                     </DataTable>
@@ -888,7 +888,7 @@ export default function Forecasts() {
                                 <Column field="business_persona" header="Persona" />
                                 <Column field="performance_tier" header="Tier" body={(r) => <Tag value={r.performance_tier ?? '—'} severity={r.performance_tier === 'Premium' ? 'success' : r.performance_tier === 'At Risk' ? 'danger' : 'info'} />} />
                                 <Column field="action_urgency" header="Urgency" body={(r) => <Tag value={r.action_urgency ?? '—'} severity={['Immediate', 'Urgent'].includes(r.action_urgency) ? 'danger' : r.action_urgency === 'High' ? 'warning' : 'success'} />} />
-                                <Column field="confidence_score" header="Confidence" body={(r) => fmt.pct(r.confidence_score)} />
+                                <Column field="confidence_score" header="Confidence" body={(r) => fmt.probToPct(r.confidence_score)} />
                             </DataTable>
                         </div>
                     </Card>
@@ -961,7 +961,7 @@ export default function Forecasts() {
                                         <Column field="predicted_roi" header="ROI (%)" body={(r) => fmt.decimal(r.predicted_roi, 1)} sortable />
                                         <Column field="predicted_revenue" header="Revenue" body={(r) => fmt.currency(r.predicted_revenue)} sortable />
                                         <Column field="predicted_conversions" header="Conversions" sortable />
-                                        <Column field="confidence_score" header="Confidence" body={(r) => fmt.pct(r.confidence_score)} />
+                                        <Column field="confidence_score" header="Confidence" body={(r) => fmt.probToPct(r.confidence_score)} />
                                     </DataTable>
                                 </div>
                             </Card>
@@ -1020,9 +1020,9 @@ export default function Forecasts() {
                                     <DataTable value={highRiskCarts} rows={8} className="p-datatable-sm" stripedRows>
                                         <Column field="cart_id" header="Cart ID" />
                                         <Column field="customer_id" header="Customer ID" />
-                                        <Column field="abandonment_probability" header="Abandon Prob" body={(r) => fmt.pct(r.abandonment_probability)} sortable />
+                                        <Column field="abandonment_probability" header="Abandon Prob" body={(r) => fmt.probToPct(r.abandonment_probability)} sortable />
                                         <Column field="abandonment_risk_score" header="Risk Score" body={(r) => fmt.decimal(r.abandonment_risk_score, 1)} sortable />
-                                        <Column field="confidence_score" header="Confidence" body={(r) => fmt.pct(r.confidence_score)} />
+                                        <Column field="confidence_score" header="Confidence" body={(r) => fmt.probToPct(r.confidence_score)} />
                                     </DataTable>
                                 </div>
                             </Card>
@@ -1062,7 +1062,7 @@ export default function Forecasts() {
                             <DataTable value={sessionClust} paginator rows={10} className="p-datatable-sm" stripedRows>
                                 <Column field="session_id" header="Session ID" />
                                 <Column field="behavior_type" header="Behavior Type" />
-                                <Column field="confidence_score" header="Confidence" body={(r) => fmt.pct(r.confidence_score)} sortable />
+                                <Column field="confidence_score" header="Confidence" body={(r) => fmt.probToPct(r.confidence_score)} sortable />
                                 <Column field="validation_flag" header="Validation" body={(r) => <Tag value={r.validation_flag ?? '—'} severity={r.validation_flag === 'Confident' ? 'success' : r.validation_flag === 'Review Pattern' ? 'danger' : 'warning'} />} />
                             </DataTable>
                         </div>
@@ -1094,7 +1094,7 @@ export default function Forecasts() {
                                         <Column field="product_id" header="Product ID" />
                                         <Column field="predicted_sentiment" header="Sentiment" body={(r) => <Tag value={r.predicted_sentiment ?? '—'} severity={r.predicted_sentiment === 'Positive' ? 'success' : r.predicted_sentiment === 'Negative' ? 'danger' : 'warning'} />} />
                                         <Column field="sentiment_score" header="Score" body={(r) => fmt.decimal(r.sentiment_score, 2)} sortable />
-                                        <Column field="confidence_score" header="Confidence" body={(r) => fmt.pct(r.confidence_score)} />
+                                        <Column field="confidence_score" header="Confidence" body={(r) => fmt.probToPct(r.confidence_score)} />
                                     </DataTable>
                                 </div>
                             </Card>
@@ -1121,8 +1121,8 @@ export default function Forecasts() {
                                         <Column field="payment_id" header="Payment ID" />
                                         <Column field="order_id" header="Order ID" />
                                         <Column field="predicted_status" header="Status" body={(r) => <Tag value={r.predicted_status ?? '—'} severity={['Failed', 'Failure'].includes(r.predicted_status) ? 'danger' : 'warning'} />} />
-                                        <Column field="success_probability" header="Success Prob" body={(r) => fmt.pct(r.success_probability)} sortable />
-                                        <Column field="confidence_score" header="Confidence" body={(r) => fmt.pct(r.confidence_score)} />
+                                        <Column field="success_probability" header="Success Prob" body={(r) => fmt.probToPct(r.success_probability)} sortable />
+                                        <Column field="confidence_score" header="Confidence" body={(r) => fmt.probToPct(r.confidence_score)} />
                                     </DataTable>
                                 </div>
                             </Card>

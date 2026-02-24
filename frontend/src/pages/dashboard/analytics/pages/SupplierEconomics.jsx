@@ -376,7 +376,7 @@ export default function SupplierEconomics() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         totalRevenue, totalCarryingCost, avgProfitMargin, bestRevenueRow,
         revDoughnut, revBarData, marginBarData, costBarData,

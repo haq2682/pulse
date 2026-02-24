@@ -303,7 +303,7 @@ export default function RecommendationsCategoryAffinity() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         kpis, liftBarData, coBarData, supportBarData,
         baseCatBarData, catVolDoughnut, topPerGrouped,

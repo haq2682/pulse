@@ -269,7 +269,7 @@ export default function FunnelCart() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const { kpis, statusDoughnutData, cartLinesBarData,
             avgValByStatusData, avgItemsByStatusData, avgTimeByStatusData, recoveryScoreData,
             ttpByTierData, ttpBucketsData, valueStats, highAbandoned, ttpByTier } = derived;

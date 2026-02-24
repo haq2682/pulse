@@ -292,7 +292,7 @@ export default function InventoryHealth() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const { totalProducts, criticalCount, deadStockCount, avgHealthScore,
             urgencyData, statusDoughnutData, healthScoreBinsData,
             worst10BarData, deadStockBarData, turnoverBarData,

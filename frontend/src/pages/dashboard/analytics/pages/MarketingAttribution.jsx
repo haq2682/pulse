@@ -315,7 +315,7 @@ export default function MarketingAttribution() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const { kpis, clvBarData, highClvBarData, attributedRevBarData, custBarData,
             topProdsBarData, catRevBarData, catRevDoughnutData, marginBarData, marginRevBarData,
             clvTableData, contribution, margin, nameMap } = derived;

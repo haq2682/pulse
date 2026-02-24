@@ -334,7 +334,7 @@ export default function PaymentRefunds() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         kpis, refundRateBarData, refundAmtBarData, avgRefundBarData, refundDoughnutData,
         topProdRefundBarData, topProdAmtBarData, refundTrendData, ttpBarData,

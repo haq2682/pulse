@@ -358,7 +358,7 @@ export default function SupplierOperations() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         totalOrdersFulfilled, avgLeadTime, avgStockoutRate, expiringContracts,
         leadTimeBarData, stockoutBarData, totalStockoutsBarData, ordersBarData,

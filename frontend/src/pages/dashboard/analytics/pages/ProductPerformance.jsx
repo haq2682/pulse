@@ -308,7 +308,7 @@ const ProductPerformance = () => {
             </div>
         );
     }
-
+    if (!derived) return null;
     return (
         <div className="p-6 bg-gray-50 min-h-[calc(100vh-120px)]">
             <Toast ref={toastRef} />
