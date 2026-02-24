@@ -393,7 +393,6 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10,
                 api_url=api_url,
                 poll_interval=poll_interval,
                 kafka_bootstrap=kafka_bootstrap,
-                max_duration=poll_duration if poll_duration > 0 else None,
             )
 
         # Function to run Spark streaming in a separate process
