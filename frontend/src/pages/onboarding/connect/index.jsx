@@ -19,6 +19,10 @@ const CHUNK_SIZE = 5 * 1024 * 1024;
 const MAPPING_STATUS_POLL_INTERVAL = 3000; // 3 seconds
 // const NIFI_UPLOAD_URL = import.meta.env.VITE_NIFI_UPLOAD_URL || 'http://10.5.0.12:8082/upload';
 const NIFI_UPLOAD_URL = 'http://localhost:8082/upload';
+// Internal (Docker-network) base URL for the Pulse API — used to build the
+// /ingest/stream URL that api_ingest_service.py (running inside Docker) will poll.
+// Override with VITE_PULSE_INTERNAL_API_URL if your setup uses a different address.
+const PULSE_STREAM_BASE = import.meta.env.VITE_PULSE_INTERNAL_API_URL || 'http://10.5.0.9:8000';
 
 const Connect = () => {
     usePageTitle('Onboarding - Connect');
@@ -37,10 +41,24 @@ const Connect = () => {
     const [ingestionTypeLoading, setIngestionTypeLoading] = useState(true);
     const [ingestionType, setIngestionType] = useState('');
     const [errors, setErrors] = useState({db: '', api: '', form: ''});
+    // 'external' = user provides their own API URL
+    // 'pulse'    = upload files; Pulse /ingest/stream endpoint is auto-filled
+    const [apiMode, setApiMode] = useState('external');
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef(null);
     const mappingCheckIntervalRef = useRef(null);
     const isCheckingMappingRef = useRef(false); // Prevent duplicate interval creation
+
+    // When the user switches to Pulse Stream mode, or once businessId is loaded
+    // while already in Pulse Stream mode, auto-fill the endpoint field.
+    useEffect(() => {
+        if (ingestionType === 'api' && apiMode === 'pulse' && businessId) {
+            setApiEndpoint(`${PULSE_STREAM_BASE}/ingest/stream?business_id=${businessId}`);
+        }
+        if (ingestionType === 'api' && apiMode === 'external') {
+            setApiEndpoint('');
+        }
+    }, [apiMode, businessId, ingestionType]);
 
     // Helper function to safely extract onboarding ID from pathname
     const getOnboardingIdFromPath = () => {
@@ -442,18 +460,31 @@ const Connect = () => {
         }
 
         if (ingestionType === 'api') {
-            if (apiEndpoint.trim() === '') {
-                setErrors({ api: "Please enter your API Endpoint." });
-                setLoading(false);
-                return;
+            if (apiMode === 'pulse') {
+                if (uploadedFiles.length === 0) {
+                    setErrors({ api: "Please upload at least one file for Pulse Stream." });
+                    setLoading(false);
+                    return;
+                }
+                const uploading = Object.keys(uploadProgress).length > 0;
+                if (uploading) {
+                    setErrors({ api: "Please wait for all files to finish uploading." });
+                    setLoading(false);
+                    return;
+                }
+            } else {
+                if (apiEndpoint.trim() === '') {
+                    setErrors({ api: "Please enter your API Endpoint." });
+                    setLoading(false);
+                    return;
+                }
+                if (!apiRegex.test(apiEndpoint)) {
+                    setErrors({ api: "Invalid API Endpoint." });
+                    setLoading(false);
+                    return;
+                }
             }
 
-            if (!apiRegex.test(apiEndpoint)) {
-                setErrors({ api: "Invalid API Endpoint." });
-                setLoading(false);
-                return;
-            }
-            
             // Start the mapping pipeline for api mode
             await startMapping();
             return;
@@ -637,7 +668,12 @@ const Connect = () => {
         }
     };
 
-    const isFormValid = uploadedFiles.length > 0 || databaseUri.trim() !== '' || apiEndpoint.trim() !== '';
+    const isFormValid = (
+        (ingestionType === 'batch' && uploadedFiles.length > 0) ||
+        (ingestionType === 'db'    && databaseUri.trim() !== '') ||
+        (ingestionType === 'api'   && apiMode === 'external' && apiEndpoint.trim() !== '') ||
+        (ingestionType === 'api'   && apiMode === 'pulse'    && uploadedFiles.length > 0)
+    );
 
     return (
         <>
@@ -855,62 +891,239 @@ const Connect = () => {
                                             )
                                         }
                                         {
-                                            (ingestionType === 'db' || ingestionType === 'api') && (
-                                                <>
-                                                    <div className="space-y-2">
-                                                        <label
-                                                            htmlFor="databaseUri"
-                                                            className="block text-sm font-medium text-[var(--color-text-primary)]"
-                                                        >
-                                                            {ingestionType === 'db' ? 'Database URI' : 'API Endpoint'}
+                                            ingestionType === 'db' && (
+                                                <div className="space-y-2">
+                                                    <label
+                                                        htmlFor="databaseUri"
+                                                        className="block text-sm font-medium text-[var(--color-text-primary)]"
+                                                    >
+                                                        Database URI
+                                                    </label>
+                                                    <InputText
+                                                        id="databaseUri"
+                                                        value={databaseUri}
+                                                        onChange={(e) => setDatabaseUri(e.target.value)}
+                                                        placeholder="Enter your Database URI here"
+                                                        className="w-full"
+                                                        disabled={loading}
+                                                        invalid={errors.db ? true : false}
+                                                    />
+                                                    {errors.db && (
+                                                        <Text className="text-red-500 text-sm">{errors.db}</Text>
+                                                    )}
+                                                    <Text className="text-gray-500 text-sm">
+                                                        URI Format: <Text className="font-mono">postgres://username:password@host:port/database</Text><br />
+                                                        <Text className="text-xs">Port is optional.</Text>
+                                                    </Text>
+                                                </div>
+                                            )
+                                        }
+                                        {
+                                            ingestionType === 'api' && (
+                                                <div className="space-y-4">
+                                                    {/* ── Source toggle ── */}
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-3">
+                                                            API Source
                                                         </label>
-                                                        {
-                                                            ingestionType === 'db' ? (
-                                                                <>
-                                                                    <InputText
-                                                                        id="databaseUri"
-                                                                        value={databaseUri}
-                                                                        onChange={(e) => setDatabaseUri(e.target.value)}
-                                                                        placeholder="Enter your Database URI here"
-                                                                        className="w-full"
-                                                                        disabled={loading}
-                                                                        invalid={errors.db ? true : false}
-                                                                    />
-                                                                    {errors.db && (<>
-                                                                        <Text className="text-red-500 text-sm">
-                                                                            {errors.db}
-                                                                        </Text>
-                                                                    </>)}
-                                                                    <Text className="text-gray-500 text-sm">
-                                                                        URI Format: <Text className="font-mono">postgres://username:password@host:port/database</Text><br />
-                                                                        <Text className="text-xs">Port is optional.</Text>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setApiMode('external')}
+                                                                className={`flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-colors ${
+                                                                    apiMode === 'external'
+                                                                        ? 'border-[var(--color-g2)] bg-green-50'
+                                                                        : 'border-gray-200 hover:border-gray-300'
+                                                                }`}
+                                                            >
+                                                                <i className="pi pi-globe text-xl mt-0.5 text-[var(--color-g2)]"></i>
+                                                                <div>
+                                                                    <Text className="font-semibold text-sm m-0 text-[var(--color-text-primary)]">
+                                                                        External API
                                                                     </Text>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <InputText
-                                                                        id="apiEndpoint"
-                                                                        value={apiEndpoint}
-                                                                        onChange={(e) => setApiEndpoint(e.target.value)}
-                                                                        placeholder="Enter your API Endpoint here"
-                                                                        className="w-full"
-                                                                        disabled={loading}
-                                                                        invalid={errors.api ? true : false}
-                                                                    />
-                                                                    {errors.api && (<>
-                                                                        <Text className="text-red-500 text-sm">
-                                                                            {errors.api}
-                                                                        </Text>
-                                                                    </>)}
-                                                                    <Text className="text-gray-500 text-sm">
-                                                                        API Format: <Text className="font-mono">https://api.example.com:port/path</Text><br />
-                                                                        <Text className="text-xs">Port and path are optional. "http" or "https" are required.</Text>
+                                                                    <Text className="text-xs text-gray-500 m-0 mt-1">
+                                                                        Provide your own REST API endpoint. Pulse will poll it continuously.
                                                                     </Text>
-                                                                </>
-                                                            )
-                                                        }
+                                                                </div>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setApiMode('pulse')}
+                                                                className={`flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-colors ${
+                                                                    apiMode === 'pulse'
+                                                                        ? 'border-[var(--color-g2)] bg-green-50'
+                                                                        : 'border-gray-200 hover:border-gray-300'
+                                                                }`}
+                                                            >
+                                                                <i className="pi pi-database text-xl mt-0.5 text-[var(--color-g2)]"></i>
+                                                                <div>
+                                                                    <Text className="font-semibold text-sm m-0 text-[var(--color-text-primary)]">
+                                                                        Pulse Stream
+                                                                    </Text>
+                                                                    <Text className="text-xs text-gray-500 m-0 mt-1">
+                                                                        Upload files here. Pulse serves them through its internal streaming endpoint.
+                                                                    </Text>
+                                                                </div>
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                </>
+
+                                                    {/* ── External API: URL input ── */}
+                                                    {apiMode === 'external' && (
+                                                        <div className="space-y-2">
+                                                            <label
+                                                                htmlFor="apiEndpoint"
+                                                                className="block text-sm font-medium text-[var(--color-text-primary)]"
+                                                            >
+                                                                API Endpoint
+                                                            </label>
+                                                            <InputText
+                                                                id="apiEndpoint"
+                                                                value={apiEndpoint}
+                                                                onChange={(e) => setApiEndpoint(e.target.value)}
+                                                                placeholder="Enter your API Endpoint here"
+                                                                className="w-full"
+                                                                disabled={loading}
+                                                                invalid={errors.api ? true : false}
+                                                            />
+                                                            {errors.api && (
+                                                                <Text className="text-red-500 text-sm">{errors.api}</Text>
+                                                            )}
+                                                            <Text className="text-gray-500 text-sm">
+                                                                Format: <Text className="font-mono">https://api.example.com:port/path</Text><br />
+                                                                <Text className="text-xs">
+                                                                    Port and path are optional. "http" or "https" are required.
+                                                                    The endpoint must return:{' '}
+                                                                    <Text className="font-mono">{"{ \"tables\": [{ \"table_name\": \"orders\", \"data\": [...] }] }"}</Text>
+                                                                </Text>
+                                                            </Text>
+                                                        </div>
+                                                    )}
+
+                                                    {/* ── Pulse Stream: file upload + read-only URL ── */}
+                                                    {apiMode === 'pulse' && (
+                                                        <div className="space-y-4">
+                                                            {/* File upload area */}
+                                                            <div className="space-y-3">
+                                                                <label className="block text-sm font-medium text-[var(--color-text-primary)]">
+                                                                    Upload Files
+                                                                </label>
+                                                                <input
+                                                                    ref={fileInputRef}
+                                                                    type="file"
+                                                                    multiple
+                                                                    accept=".csv,.xlsx,.xls,.parquet,.json"
+                                                                    onChange={handleFileInputChange}
+                                                                    className="hidden"
+                                                                />
+                                                                <div
+                                                                    onClick={handleClickUploadArea}
+                                                                    onDragOver={handleDragOver}
+                                                                    onDragLeave={handleDragLeave}
+                                                                    onDrop={handleDrop}
+                                                                    className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
+                                                                        isDragging
+                                                                            ? 'border-[var(--color-g2)] bg-blue-50'
+                                                                            : 'border-gray-300 hover:border-[var(--color-g2)]'
+                                                                    }`}
+                                                                >
+                                                                    <div className="flex flex-col items-center gap-3">
+                                                                        <i className="pi pi-cloud-upload text-4xl text-gray-400"></i>
+                                                                        <Text className="text-gray-500 m-0">
+                                                                            Click to Browse or Drag and Drop Files Here
+                                                                        </Text>
+                                                                        <Text className="text-xs text-gray-400 m-0">
+                                                                            Supported formats: CSV, XLSX, XLS, Parquet, JSON &nbsp;·&nbsp; Max 5 GB per file
+                                                                        </Text>
+                                                                    </div>
+                                                                </div>
+                                                                {uploadedFiles.length > 0 && (
+                                                                    <div className="flex flex-wrap gap-6 py-4">
+                                                                        {uploadedFiles.map((file) => {
+                                                                            const progress = uploadProgress[file.fileId];
+                                                                            const isUploading = progress !== undefined && progress < 100;
+                                                                            return (
+                                                                                <div
+                                                                                    key={file.fileId}
+                                                                                    className="flex flex-col items-center gap-2 relative group w-32"
+                                                                                >
+                                                                                    {!isUploading && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => handleFileRemove(file)}
+                                                                                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                                                                            title="Remove file"
+                                                                                        >
+                                                                                            <i className="pi pi-times text-xs"></i>
+                                                                                        </button>
+                                                                                    )}
+                                                                                    <div className="relative">
+                                                                                        <i className={`pi pi-file text-3xl ${isUploading ? 'text-gray-400' : 'text-[var(--color-g2)]'}`}></i>
+                                                                                        {isUploading && (
+                                                                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                                                                <i className="pi pi-spin pi-spinner text-[var(--color-g2)]"></i>
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <Text className="text-sm text-gray-700 m-0 text-center max-w-[120px] truncate">
+                                                                                        {file.name}
+                                                                                    </Text>
+                                                                                    <Text className="text-xs text-gray-500 m-0">
+                                                                                        {(file.size / 1024).toFixed(2)} KB
+                                                                                    </Text>
+                                                                                    {isUploading && (
+                                                                                        <div className="w-full">
+                                                                                            <ProgressBar
+                                                                                                value={progress}
+                                                                                                style={{ height: '6px' }}
+                                                                                                showValue={false}
+                                                                                            />
+                                                                                            <Text className="text-xs text-[var(--color-g2)] m-0 text-center mt-1">
+                                                                                                {progress}%
+                                                                                            </Text>
+                                                                                        </div>
+                                                                                    )}
+                                                                                    {progress === 100 && (
+                                                                                        <div className="absolute top-0 right-0 bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                                                                                            <i className="pi pi-check text-xs"></i>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Auto-filled stream URL (editable) */}
+                                                            <div className="space-y-2">
+                                                                <label
+                                                                    htmlFor="pulseStreamUrl"
+                                                                    className="block text-sm font-medium text-[var(--color-text-primary)]"
+                                                                >
+                                                                    Stream Endpoint
+                                                                    <span className="ml-2 text-xs font-normal text-gray-400">(auto-filled)</span>
+                                                                </label>
+                                                                <InputText
+                                                                    id="pulseStreamUrl"
+                                                                    value={apiEndpoint}
+                                                                    onChange={(e) => setApiEndpoint(e.target.value)}
+                                                                    className="w-full font-mono text-sm"
+                                                                    disabled={loading}
+                                                                    invalid={errors.api ? true : false}
+                                                                />
+                                                                <Text className="text-xs text-gray-400 m-0">
+                                                                    This URL is used by the streaming pipeline (running inside Docker) to fetch your uploaded files.
+                                                                    Edit it only if your internal API address differs.
+                                                                </Text>
+                                                            </div>
+
+                                                            {errors.api && (
+                                                                <Text className="text-red-500 text-sm">{errors.api}</Text>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             )
                                         }
                                         <div className="flex justify-end pt-4">
