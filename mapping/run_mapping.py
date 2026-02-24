@@ -417,10 +417,26 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10,
         spark_process.start()
         
         print("Both processes started. Press Ctrl+C to stop.\n")
-        
+
         try:
-            api_process.join()
-            spark_process.join()
+            if poll_duration > 0:
+                # Run the API ingestion for a bounded window (e.g. initial schema
+                # discovery during onboarding), then stop both processes cleanly.
+                print(f"Bounded run: will stop API ingestion after {poll_duration}s.")
+                api_process.join(timeout=poll_duration)
+                if api_process.is_alive():
+                    api_process.terminate()
+                    api_process.join()
+                # Give Spark a little time to drain remaining Kafka messages.
+                spark_process.join(timeout=30)
+                if spark_process.is_alive():
+                    spark_process.terminate()
+                    spark_process.join()
+                print(f"✅ API MODE COMPLETED ({poll_duration}s window)\n")
+            else:
+                # Run indefinitely (production streaming via Airflow DAG).
+                api_process.join()
+                spark_process.join()
         except KeyboardInterrupt:
             print("\n\nStopping processes...")
             api_process.terminate()

@@ -67,13 +67,18 @@ DEFAULT_DB_TABLES = os.getenv(
 ).split(",")
 
 # ---------------------------------------------------------------------------
-# Frontend / API endpoint for api-mode ingestion
+# API-mode ingestion settings
 # ---------------------------------------------------------------------------
-# The Pulse backend API that exposes e-commerce data for ingestion.
-# Override with your actual endpoint once the frontend ingestion route is ready.
-FRONTEND_API_URL  = os.getenv("FRONTEND_API_URL", "http://10.5.0.9:8000/api/ingest/stream")
+# The user's external API URL is business-specific and is stored per onboarding
+# record.  It is passed in dag_run.conf["api_url"] when triggering api_streaming.
+# There is no meaningful system-wide default — the env var is provided only as
+# an emergency override (e.g. for manual testing); leave it empty in production.
+FRONTEND_API_URL  = os.getenv("FRONTEND_API_URL", "")
 API_POLL_INTERVAL = int(os.getenv("API_POLL_INTERVAL", "30"))   # seconds per poll cycle
-API_POLL_DURATION = int(os.getenv("API_POLL_DURATION", "300"))  # seconds to run before exit
+# How long (seconds) the initial-mapping subprocess runs to collect schema data.
+# After this window the subprocess exits cleanly and the api_streaming DAG takes
+# over for production continuous polling.
+API_INITIAL_POLL_DURATION = int(os.getenv("API_INITIAL_POLL_DURATION", "120"))
 
 # ---------------------------------------------------------------------------
 # Airflow task defaults (applied to every DAG unless overridden)

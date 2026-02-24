@@ -42,6 +42,7 @@ CREATE TABLE onboarding (
     business_id VARCHAR(50) NULL,
     current_step VARCHAR(100) NOT NULL DEFAULT 'business' CHECK (current_step IN ('business', 'data-type', 'connect', 'mapping', 'mapping-in-progress')),
     ingestion_type VARCHAR(50) NULL CHECK (ingestion_type IN ('batch', 'db', 'api')),
+    api_url TEXT NULL,                   -- User-provided external API endpoint (api mode only)
     is_completed BOOLEAN DEFAULT FALSE,
     mapping_status VARCHAR(50) NULL CHECK (mapping_status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
     mapping_error TEXT NULL,

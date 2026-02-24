@@ -9,7 +9,7 @@ Architecture
 python container:
 
   Process 1 – API Ingestion Service
-    Polls the configured frontend API endpoint every ``api_poll_interval``
+    Polls the USER-PROVIDED external API endpoint every ``api_poll_interval``
     seconds, validates the response, and publishes records to Kafka
     (ecom.* topics).
 
@@ -24,29 +24,27 @@ is handled by the SEPARATE ``streaming_downstream`` DAG which runs on a
 
 When does this DAG run?
 -----------------------
-ONCE — triggered when the user submits an API endpoint URL during
-onboarding (the frontend or API backend calls the Airflow REST API):
+ONCE — triggered automatically from the onboarding confirm-mapping step
+after the user confirms their column mappings. The API backend calls the
+Airflow REST API:
 
   POST /api/v1/dags/api_streaming/dagRuns
        conf: {
-         "bucket":        "pulse-bucket-1",
-         "api_url":       "http://10.5.0.9:8000/api/ingest/stream",
-         "poll_interval": 10
+         "bucket":        "<business_id>",
+         "api_url":       "https://api.example.com/ecommerce/data",
+         "poll_interval": 30
        }
 
-Frontend API endpoint setup
-----------------------------
-The Pulse backend (api container, 10.5.0.9:8000) must expose a route that
-returns e-commerce records in the canonical format expected by
-``api_ingest_service.py``.  Until that route is ready, this DAG can be
-paused — the db and batch pipelines continue to work independently.
+The ``api_url`` MUST be the user's own external REST endpoint that returns
+e-commerce records in the canonical format expected by
+``api_ingest_service.py``.
 
-Suggested endpoint: GET /api/ingest/stream?since=<iso>&limit=500
-Response format: { "table": "orders", "records": [{...}, ...] }
+Required response format from the user's API:
+  { "tables": [{ "table_name": "orders", "data": [{...}, ...] }] }
 
 About "mapping runs only once"
 -------------------------------
-The API ingestion service polls continuously (e.g., every 10 seconds) and
+The API ingestion service polls continuously (e.g., every 30 seconds) and
 the Spark consumer processes each batch.  The column-mapping algorithm runs
 on every batch, but the mapping CONFIGURATION (which source columns map to
 which canonical schema columns) is fixed after the user completes the
@@ -61,12 +59,12 @@ Crash handling & auto-restart
   - retries=9999 means effectively infinite restarts
   - Spark checkpoint persists in MinIO so no data is lost
 
-Override parameters (dag_run.conf)
------------------------------------
+Required dag_run.conf parameters
+----------------------------------
   {
-    "bucket":        "pulse-bucket-1",
-    "api_url":       "http://10.5.0.9:8000/api/ingest/stream",
-    "poll_interval": 10
+    "bucket":        "<business_id>",   # MinIO bucket / business ID
+    "api_url":       "<user_api_url>",  # User's external API endpoint (REQUIRED)
+    "poll_interval": 30                 # Seconds between polls (optional, default 30)
   }
 """
 
@@ -88,12 +86,11 @@ from config.pipeline_config import (
     API_POLL_INTERVAL,
     DEFAULT_BUCKET,
     DEFAULT_TASK_ARGS,
-    FRONTEND_API_URL,
     PYTHON_CONTAINER,
 )
 
-BUCKET        = Variable.get("default_bucket",   default_var=DEFAULT_BUCKET)
-API_URL       = Variable.get("frontend_api_url", default_var=FRONTEND_API_URL)
+BUCKET        = Variable.get("default_bucket",    default_var=DEFAULT_BUCKET)
+# api_url has NO system-wide default — it must come from dag_run.conf per run.
 POLL_INTERVAL = int(Variable.get("api_poll_interval", default_var=str(API_POLL_INTERVAL)))
 
 _batch_defaults = dict(
@@ -127,15 +124,22 @@ def _docker_exec(script_path: str, extra_args: str = "") -> str:
 # ---------------------------------------------------------------------------
 def verify_api_health(**context):
     """
-    Check that the frontend API endpoint is reachable before starting
+    Check that the user-provided API endpoint is reachable before starting
     the continuous polling process.  Raises on failure so Airflow retries.
     """
-    conf      = context["dag_run"].conf or {}
-    api_url   = conf.get("api_url", API_URL)
+    conf    = context["dag_run"].conf or {}
+    api_url = conf.get("api_url", "").strip()
+
+    if not api_url:
+        raise RuntimeError(
+            "dag_run.conf must include 'api_url' — the user's external API endpoint. "
+            "Example: POST dagRuns with conf={\"bucket\": \"<id>\", "
+            "\"api_url\": \"https://api.example.com/data\", \"poll_interval\": 30}"
+        )
 
     # Try a lightweight /health endpoint first; fall back to the main URL.
     for url in [
-        api_url.rsplit("/", 1)[0] + "/health",   # e.g. http://host:8000/health
+        api_url.rsplit("/", 1)[0] + "/health",   # e.g. https://host/health
         api_url,
     ]:
         try:
@@ -150,9 +154,8 @@ def verify_api_health(**context):
             continue
 
     raise RuntimeError(
-        f"Could not reach the frontend API at {api_url}.\n"
-        "Ensure the api container is running and FRONTEND_API_URL / "
-        "the 'frontend_api_url' Airflow Variable are set correctly."
+        f"Could not reach the user API at {api_url}. "
+        "Ensure the endpoint is running and accessible from within the Docker network."
     )
 
 
@@ -173,7 +176,7 @@ with DAG(
     default_args=_batch_defaults,
     params={
         "bucket":        BUCKET,
-        "api_url":       API_URL,
+        "api_url":       "",          # REQUIRED — provided per run via dag_run.conf
         "poll_interval": POLL_INTERVAL,
     },
     render_template_as_native_obj=True,
