@@ -352,7 +352,7 @@ export default function MarketingChannels() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const { kpis, revenueBarData, roasBarData, roiBarData, ctrBarData, cvrBarData, effBarData,
             budgetVsSpendData, impVsClicksData, revDoughnutData, ordersDoughnutData, channelTable } = derived;
 

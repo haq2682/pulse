@@ -323,6 +323,7 @@ export default function EngagementConversion() {
         );
     }
 
+    if (!derived) return null;
     const {
         kpis, abandVsConvGrouped, abandVsConvDoughnut,
         dropoffReasonsBar, dropoffBucketsBar, riskByReasonBar,

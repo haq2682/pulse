@@ -339,7 +339,7 @@ export default function SupplierPerformance() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         totalSuppliers, preferredCount, avgPerfScore, bestRow,
         perfBarData, relBarData, effBarData, healthBarData,

@@ -314,7 +314,7 @@ export default function InventorySupplier() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         totalSuppliers, preferredCount, bestSupplierRow, avgStockoutRate,
         perfBarData, relBarData, revDoughnut, stockoutBarData,

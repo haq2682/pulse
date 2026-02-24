@@ -315,7 +315,7 @@ export default function FunnelCheckout() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const { kpis, dropoffReasonsBarData, recoveryRateBarData, riskByReasonBarData,
             dropoffBucketsBarData, deviceDropoffDoughnutData, dropoffByDeviceBarData,
             deviceConvBarData, deviceConvDoughnutData, abandonBarData,

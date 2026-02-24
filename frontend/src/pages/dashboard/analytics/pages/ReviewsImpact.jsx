@@ -375,7 +375,7 @@ export default function ReviewsImpact() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         kpis, tierRevGrouped, avgRevTierData, avgUnitsTierData, revShareDoughnut,
         topImpactGrouped, lowRatedLineData, improvingBarData, decliningBarData,

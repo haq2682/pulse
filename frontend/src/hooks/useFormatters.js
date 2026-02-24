@@ -37,7 +37,8 @@ export const useFormatters = () => {
          * @param {number} decimals - Number of decimal places
          * @returns {string} Formatted percentage string
          */
-        pct: (v, decimals = 2) => `${((v ?? 0)).toFixed(decimals)}%`,
+        pct: (v, decimals = 2) => `${(v ?? 0).toFixed(decimals)}%`,
+        probToPct: (v, decimals = 2) => `${((v ?? 0) * 100).toFixed(decimals)}%`,
 
         /**
          * Format a value as percentage (raw value, e.g., 50 for 50%)
@@ -46,6 +47,8 @@ export const useFormatters = () => {
          * @returns {string} Formatted percentage string
          */
         pctRaw: (v, decimals = 1) => `${(v ?? 0).toFixed(decimals)}%`,
+        pct100: (v) => `${(+(v ?? 0)).toFixed(2)}%`,
+        probToPct100: (v) => `${((+(v ?? 0)) * 100).toFixed(2)}%`,
 
         /**
          * Format a decimal number

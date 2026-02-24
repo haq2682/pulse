@@ -315,7 +315,7 @@ export default function PaymentMethods() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         kpis, successBarData, paymentDoughnutData, aovBarData, revenueBarData, revDoughnutData,
         ordersBarData, countryBarData, successByCountryData,

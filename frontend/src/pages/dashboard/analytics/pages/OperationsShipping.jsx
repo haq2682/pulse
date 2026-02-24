@@ -302,7 +302,7 @@ export default function OperationsShipping() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         kpis, avgShipPctBarData, shipCostBarData, shipCostDoughnutData, shipVsSubtotalGrouped,
         stateShipPctBarData, stateShipCostBarData, cityShipPctBarData,

@@ -327,7 +327,7 @@ export default function ReviewsOverview() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         kpis, tierDoughnut, catRatingBarData, catReviewsBarData, catReviewsDoughnut,
         topRatedBarData, bottomRatedBarData, tierVelGrouped,

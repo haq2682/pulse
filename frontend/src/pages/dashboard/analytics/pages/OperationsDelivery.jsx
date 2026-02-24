@@ -314,7 +314,7 @@ export default function OperationsDelivery() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         kpis, delCountryBarData, delDoughnutData, ontimeCountryBarData, ontimeVsLateData,
         delStateBarData, ontimeStateBarData, topCitiesOntimeData,

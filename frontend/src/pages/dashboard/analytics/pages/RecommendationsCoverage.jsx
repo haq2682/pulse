@@ -297,7 +297,7 @@ export default function RecommendationsCoverage() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         kpis, coverageDoughnut, topAffinityBarData, recoDistData, scoreDistData,
         withRecoSorted, nameMap,

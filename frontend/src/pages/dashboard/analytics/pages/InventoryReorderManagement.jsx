@@ -287,7 +287,7 @@ export default function InventoryReorderManagement() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         criticalUrgent, stockoutRiskCount, totalStockouts, avgReplenishScore,
         tierDoughnutData, urgencyScoreBarData, replenishBarData,

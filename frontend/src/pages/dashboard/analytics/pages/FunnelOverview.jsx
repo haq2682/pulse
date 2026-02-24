@@ -317,7 +317,7 @@ export default function FunnelOverview() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const { kpis, funnelStepsData, convByDeviceData, convByRefData,
             funnelByDeviceData, funnelByRefData, avgValByDeviceData, hvDoughnutData,
             hvBarData, abandonBarData, byDevice, byReferrer } = derived;

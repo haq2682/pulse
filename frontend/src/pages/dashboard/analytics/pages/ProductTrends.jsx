@@ -422,7 +422,7 @@ export default function ProductTrends() {
             </div>
         );
     }
-
+    if (!derived) return null;
     const {
         totalUnits, totalOrders, peakRow,
         catUnitsLineData, catOrdersBarData,
