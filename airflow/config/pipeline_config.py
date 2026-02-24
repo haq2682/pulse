@@ -131,6 +131,14 @@ MODEL_FEATURE_MAP = {
             "total_orders", "total_revenue", "avg_order_value",
         ],
     },
+    "review_sentiment": {
+        # agg_reviews schema: review_id, product_id, customer_id, review_date,
+        # rating (int), review_title, review_desc, review_sentiment.
+        # Training uses TF-IDF text features; drift detection monitors the
+        # rating distribution (a rating shift signals changed review quality).
+        "table": "agg_reviews",
+        "features": ["rating"],
+    },
     "stock_status": {
         "table": "agg_inventory_health",
         "features": [
@@ -139,11 +147,16 @@ MODEL_FEATURE_MAP = {
         ],
     },
     # ── General regression ──────────────────────────────────────────────────
-    "aov": {
+    "aov_v2": {
+        # Multi-table model (customers + orders + order_items + products).
+        # Drift detection uses customer-level features available directly from
+        # agg_customers without additional joins.
         "table": "agg_customers",
         "features": [
-            "total_orders", "total_revenue", "avg_order_value",
-            "total_items_purchased",
+            "total_orders", "customer_tenure_days", "total_items_purchased",
+            "avg_items_per_order", "session_conversion_rate",
+            "cart_abandonment_rate", "recency_score",
+            "frequency_score", "monetary_score",
         ],
     },
     "clv": {
@@ -284,11 +297,11 @@ MODEL_FEATURE_MAP = {
 # ---------------------------------------------------------------------------
 GENERAL_MODELS = [
     "cart_abandonment", "customer_churn", "customer_segments",
-    "payment_success", "stock_status",                        # classification
-    "aov", "clv", "restock_quantity", "safety_stock",
-    "session_conversion", "stockout_probability",              # regression
+    "payment_success", "review_sentiment", "stock_status",    # classification (6)
+    "aov_v2", "clv", "restock_quantity", "safety_stock",
+    "session_conversion", "stockout_probability",              # regression (6)
     "customer_segment", "geo_cluster", "session_behavior",
-    "supplier_performance",                                    # clustering
+    "supplier_performance",                                    # clustering (4)
 ]
 
 SPECIFIC_MODELS = [
