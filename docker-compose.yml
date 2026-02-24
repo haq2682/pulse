@@ -331,23 +331,8 @@ services:
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
-      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLt0jJgrg=}
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
       - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-pulse_secret_key_change_me}
-      - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
-      - AIRFLOW__CORE__PLUGINS_FOLDER=/opt/airflow/plugins
-      - AIRFLOW__LOGGING__BASE_LOG_FOLDER=/opt/airflow/logs
-      # Pipeline env vars forwarded to tasks
-      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
-      - KAFKA_BOOTSTRAP=${KAFKA_BOOTSTRAP}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DATABASE_NAME=${POSTGRES_DATABASE_NAME}
-      - POSTGRES_SERVER=${POSTGRES_SERVER}
-      - REDIS_HOST=${REDIS_HOST:-10.5.0.11}
-      - DEBEZIUM_URL=http://10.5.0.10:8083
-      - PIPELINE_PYTHON_CONTAINER=python
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/plugins:/opt/airflow/plugins
@@ -357,14 +342,10 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     command: >
       bash -c "
-        airflow db init &&
-        airflow users create
-          --username ${AIRFLOW_ADMIN_USER:-admin}
-          --password ${AIRFLOW_ADMIN_PASSWORD:-admin}
-          --firstname Pulse
-          --lastname Admin
-          --role Admin
-          --email admin@pulse.local
+        airflow db migrate &&
+        airflow db upgrade &&
+        airflow connections create-default-connections &&
+        airflow users create --username ${AIRFLOW_ADMIN_USER:-admin} --password ${AIRFLOW_ADMIN_PASSWORD:-admin} --firstname Pulse --lastname Admin --role Admin --email admin@pulse.local
       "
     networks:
       spark-network:
@@ -383,6 +364,9 @@ services:
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
+      - AIRFLOW__WEBSERVER__RATE_LIMIT_STORAGE_URL=redis://10.5.0.11:6379/0
+      - AIRFLOW__WEBSERVER__RATE_LIMIT_ENABLED=True
+      - AIRFLOW__WEBSERVER__RATE_LIMIT_DEFAULT=200 per day;50 per hour
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLt0jJgrg=}
       - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-pulse_secret_key_change_me}
       - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
