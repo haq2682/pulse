@@ -147,7 +147,6 @@ def run_ks_tests_for_model(
         "error":             str | None,
     }
     """
-    from airflow.utils.drift_detection import _get_minio_client  # allow re-import in container
     client = minio_client or _get_minio_client()
 
     report: dict[str, Any] = {

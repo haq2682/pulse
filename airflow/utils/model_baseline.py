@@ -88,7 +88,7 @@ def _read_parquet_from_minio(client, bucket: str, prefix: str) -> "pd.DataFrame 
         except Exception as exc:
             log.warning("Could not read %s: %s", obj.object_name, exc)
 
-    return None if not frames else __import__("pandas").concat(frames, ignore_index=True)
+    return None if not frames else pd.concat(frames, ignore_index=True)
 
 
 # ---------------------------------------------------------------------------

@@ -27,7 +27,6 @@ import os
 import sys
 
 from airflow.sensors.base import BaseSensorOperator
-from airflow.utils.decorators import apply_defaults
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from config.pipeline_config import (
@@ -64,7 +63,6 @@ class MinIONewFileSensor(BaseSensorOperator):
 
     template_fields = ("bucket", "prefix")
 
-    @apply_defaults
     def __init__(
         self,
         bucket: str,
@@ -121,7 +119,6 @@ class MinIOPrefixEmptySensor(BaseSensorOperator):
 
     template_fields = ("bucket", "prefix")
 
-    @apply_defaults
     def __init__(
         self,
         bucket: str,
