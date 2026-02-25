@@ -16,9 +16,6 @@ services:
       - VITE_MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
       - VITE_KAFKA_BOOTSTRAP=${KAFKA_BOOTSTRAP_EXTERNAL}
       - VITE_API_URL=${VITE_API_URL}
-      - CHOKIDAR_USEPOLLING=true
-      - FAST_REFRESH=false
-      - WATCHPACK_POLLING=true
     ports:
       - "5173:80"
     networks:
@@ -323,8 +320,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DATABASE_NAME}
       POSTGRES_SERVER: ${POSTGRES_SERVER}
       KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
-      SINGLE_USER_CREDENTIALS_USERNAME: ${NIFI_ADMIN_USER:-admin}
-      SINGLE_USER_CREDENTIALS_PASSWORD: ${NIFI_ADMIN_PASSWORD:-adminadminadmin}
+      SINGLE_USER_CREDENTIALS_USERNAME: ${NIFI_ADMIN_USER:?NIFI_ADMIN_USER must be set}
+      SINGLE_USER_CREDENTIALS_PASSWORD: ${NIFI_ADMIN_PASSWORD:?NIFI_ADMIN_PASSWORD must be set}
     volumes:
       - nifi_data:/opt/nifi/nifi-current/data
       - ./nifi/custom_processors:/opt/nifi/nifi-current/custom_processors # optional for custom scripts

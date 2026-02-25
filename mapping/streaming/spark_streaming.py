@@ -364,7 +364,7 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
     #  1. enable_downstream is True (set by --enable-downstream flag)
     #  2. Data was written to the final "mapped" folder (not "mapped-temp")
     #  3. Not in trigger-once mode (batch_id > 0 or continuous streaming)
-    if enable_downstream and target_folder == "mapped":
+    if enable_downstream and target_folder == "mapped" and batch_id > 0:
         try:
             from streaming.downstream_runner import trigger_downstream
             trigger_downstream(OUTPUT_BUCKET, batch_id)

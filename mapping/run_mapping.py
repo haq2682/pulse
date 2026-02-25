@@ -331,7 +331,20 @@ def run_db_mode(config: dict):
                 # tries to read from Kafka.  Without this wait, availableNow may
                 # process 0 messages and exit before the snapshot produces events.
                 import time as _time
-                snapshot_wait = int(os.getenv("DEBEZIUM_SNAPSHOT_WAIT", "30"))
+                default_snapshot_wait = 90
+                env_wait = os.getenv("DEBEZIUM_SNAPSHOT_WAIT")
+                if env_wait is not None:
+                    try:
+                        snapshot_wait = max(0, int(env_wait))
+                    except ValueError:
+                        print(
+                            f"   Invalid DEBEZIUM_SNAPSHOT_WAIT='{env_wait}', "
+                            f"falling back to default {default_snapshot_wait}s.",
+                            flush=True,
+                        )
+                        snapshot_wait = default_snapshot_wait
+                else:
+                    snapshot_wait = default_snapshot_wait
                 print(f"   Waiting {snapshot_wait}s for Debezium initial snapshot...", flush=True)
                 _time.sleep(snapshot_wait)
 

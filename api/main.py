@@ -99,8 +99,9 @@ def health():
         db.execute(text("SELECT 1"))
         checks["database"] = "healthy"
         db.close()
-    except Exception:
+    except Exception as e:
         checks["database"] = "unhealthy"
+        logger.warning("Database health check failed: %s", e, exc_info=True)
         healthy = False
 
     # Check Redis
@@ -113,8 +114,9 @@ def health():
         )
         r.ping()
         checks["redis"] = "healthy"
-    except Exception:
+    except Exception as e:
         checks["redis"] = "unhealthy"
+        logger.warning("Redis health check failed: %s", e, exc_info=True)
         healthy = False
 
     # Check MinIO
@@ -130,8 +132,9 @@ def health():
         )
         mc.list_buckets()
         checks["minio"] = "healthy"
-    except Exception:
+    except Exception as e:
         checks["minio"] = "unhealthy"
+        logger.warning("MinIO health check failed: %s", e, exc_info=True)
         healthy = False
 
     status_code = 200 if healthy else 503

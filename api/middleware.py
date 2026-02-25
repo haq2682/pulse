@@ -27,8 +27,11 @@ try:
     if not _settings.is_production:
         public_paths.extend(["/docs", "/redoc"])
 except Exception:
-    # Fallback: allow docs if config unavailable
-    public_paths.extend(["/docs", "/redoc"])
+    # Fallback: hide docs if config unavailable (fail secure)
+    logger.error(
+        "Failed to load settings; API documentation routes (/docs, /redoc) will remain protected.",
+        exc_info=True,
+    )
 
 async def auth_middleware(request: Request, call_next):
     """
