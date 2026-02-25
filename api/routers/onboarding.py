@@ -90,6 +90,53 @@ async def _trigger_api_streaming_dag(business_id: str, api_url: str) -> None:
     await run_in_threadpool(_do_request)
 
 
+async def _trigger_db_streaming_dag(business_id: str, db_uri: str, db_tables: str) -> None:
+    """
+    Trigger the db_streaming Airflow DAG via the Airflow REST API.
+
+    Called from confirm-mapping for DB-mode businesses so that Debezium CDC
+    streaming runs continuously under Airflow supervision (with auto-restart).
+    The initial bounded subprocess started during start-mapping (--trigger-once)
+    has already exited, so there is no duplication.
+    """
+    import urllib.request
+    import urllib.error
+    import json as _json
+
+    airflow_base = os.getenv("AIRFLOW_BASE_URL", "http://airflow-webserver:8080")
+    airflow_user = os.getenv("AIRFLOW_USERNAME", "admin")
+    airflow_password = os.getenv("AIRFLOW_PASSWORD", "admin")
+
+    url = f"{airflow_base}/api/v1/dags/db_streaming/dagRuns"
+    payload = _json.dumps({
+        "conf": {
+            "bucket":    business_id,
+            "db_uri":    db_uri,
+            "db_tables": db_tables,
+        }
+    }).encode()
+
+    credentials = f"{airflow_user}:{airflow_password}"
+    import base64
+    encoded = base64.b64encode(credentials.encode()).decode()
+
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "Content-Type":  "application/json",
+            "Authorization": f"Basic {encoded}",
+        },
+        method="POST",
+    )
+
+    def _do_request():
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.read()
+
+    await run_in_threadpool(_do_request)
+
+
 async def terminate_mapping_process(process_id: int):
     """
     Helper function to gracefully terminate a mapping process.
@@ -567,6 +614,10 @@ async def start_mapping(request: Request, db=Depends(get_db)):
             cmd.extend(["--db-uri", db_uri])
             if db_tables:
                 cmd.extend(["--db-tables", ",".join(db_tables)])
+            # Bound the initial mapping run so it exits after the first
+            # micro-batch.  The db_streaming Airflow DAG takes over
+            # continuous CDC streaming once the user confirms mappings.
+            cmd.append("--trigger-once")
         elif mode == "api":
             cmd.extend(["--api-url", api_url])
             # Bound the initial mapping run so it exits after collecting enough
@@ -575,8 +626,8 @@ async def start_mapping(request: Request, db=Depends(get_db)):
             initial_poll_duration = int(os.getenv("API_INITIAL_POLL_DURATION", "120"))
             cmd.extend(["--poll-duration", str(initial_poll_duration)])
 
-        # Store the api_url in the onboarding record so confirm-mapping can
-        # retrieve it later to trigger the api_streaming Airflow DAG.
+        # Store connection details in the onboarding record so confirm-mapping
+        # can retrieve them later to trigger the corresponding Airflow DAG.
         if mode == "api" and api_url:
             db.execute(
                 text("""
@@ -585,6 +636,17 @@ async def start_mapping(request: Request, db=Depends(get_db)):
                     WHERE user_id = :user_id AND is_completed = false
                 """),
                 {"api_url": api_url, "user_id": user_id}
+            )
+            db.commit()
+        elif mode == "db" and db_uri:
+            db_tables_str = ",".join(db_tables) if db_tables else ""
+            db.execute(
+                text("""
+                    UPDATE onboarding
+                    SET db_uri = :db_uri, db_tables = :db_tables
+                    WHERE user_id = :user_id AND is_completed = false
+                """),
+                {"db_uri": db_uri, "db_tables": db_tables_str, "user_id": user_id}
             )
             db.commit()
         
@@ -1506,7 +1568,7 @@ async def confirm_mapping(request: Request, db=Depends(get_db)):
         # Get the onboarding record
         onboarding = db.execute(
             text("""
-                SELECT business_id, mapping_status, current_step, ingestion_type, api_url
+                SELECT business_id, mapping_status, current_step, ingestion_type, api_url, db_uri, db_tables
                 FROM onboarding
                 WHERE user_id = :user_id AND is_completed = false
             """),
@@ -1517,7 +1579,7 @@ async def confirm_mapping(request: Request, db=Depends(get_db)):
         if not onboarding_record:
             raise HTTPException(status_code=404, detail="Onboarding record not found")
 
-        business_id, mapping_status, current_step, ingestion_type, stored_api_url = onboarding_record
+        business_id, mapping_status, current_step, ingestion_type, stored_api_url, stored_db_uri, stored_db_tables = onboarding_record
         
         # Verify mapping is completed
         if mapping_status != "completed":
@@ -1575,6 +1637,22 @@ async def confirm_mapping(request: Request, db=Depends(get_db)):
             except Exception as dag_error:
                 # Non-fatal: log and continue — the user's onboarding is complete.
                 print(f"Warning: Failed to trigger api_streaming DAG: {dag_error}")
+                import traceback
+                traceback.print_exc()
+
+        # For DB mode: trigger the db_streaming Airflow DAG so Debezium CDC
+        # streams continuously under Airflow supervision (with auto-restart).
+        if ingestion_type == "db" and stored_db_uri:
+            try:
+                await _trigger_db_streaming_dag(
+                    business_id=business_id,
+                    db_uri=stored_db_uri,
+                    db_tables=stored_db_tables or "",
+                )
+                print(f"db_streaming DAG triggered for business {business_id}")
+            except Exception as dag_error:
+                # Non-fatal: log and continue — the user's onboarding is complete.
+                print(f"Warning: Failed to trigger db_streaming DAG: {dag_error}")
                 import traceback
                 traceback.print_exc()
         

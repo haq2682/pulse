@@ -324,7 +324,51 @@ def run_db_mode(config: dict):
         
         try:
             trigger_once = config.get("trigger_once", False)
+
+            if trigger_once:
+                # When running in trigger-once mode (initial onboarding mapping),
+                # give Debezium time to start its initial snapshot before Spark
+                # tries to read from Kafka.  Without this wait, availableNow may
+                # process 0 messages and exit before the snapshot produces events.
+                import time as _time
+                snapshot_wait = int(os.getenv("DEBEZIUM_SNAPSHOT_WAIT", "30"))
+                print(f"   Waiting {snapshot_wait}s for Debezium initial snapshot...", flush=True)
+                _time.sleep(snapshot_wait)
+
             run_streaming(trigger_once=trigger_once)
+
+            # After trigger-once streaming finishes, update mapping status to
+            # 'completed' if the streaming callback didn't already do it (e.g.
+            # because no data was available from the snapshot yet).
+            if trigger_once:
+                try:
+                    import psycopg2
+                    db_host = os.getenv("POSTGRES_SERVER", "postgresql")
+                    db_name_pg = os.getenv("POSTGRES_DATABASE_NAME", "pulse")
+                    db_user = os.getenv("POSTGRES_USER", "postgres")
+                    db_password = os.getenv("POSTGRES_PASSWORD", "postgres")
+                    with psycopg2.connect(host=db_host, database=db_name_pg,
+                                          user=db_user, password=db_password) as conn:
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                "SELECT mapping_status FROM onboarding WHERE business_id = %s",
+                                (bucket_name,)
+                            )
+                            row = cur.fetchone()
+                            if row and row[0] == "running":
+                                from datetime import datetime, timezone
+                                cur.execute("""
+                                    UPDATE onboarding
+                                    SET mapping_status = 'completed',
+                                        mapping_completed_at = %s,
+                                        mapping_error = NULL,
+                                        current_step = 'mapping'
+                                    WHERE business_id = %s
+                                """, (datetime.now(timezone.utc), bucket_name))
+                                conn.commit()
+                                print("   Mapping status set to 'completed' (trigger-once fallback)")
+                except Exception as status_err:
+                    print(f"⚠️  Could not update mapping status after trigger-once: {status_err}")
         except Exception as e:
             error_msg = f"DB mode error: Streaming failed: {str(e)}"
             print(f"❌ {error_msg}")
