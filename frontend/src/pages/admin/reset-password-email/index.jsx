@@ -5,8 +5,10 @@ import Text from '@/components/global/Typography/Text';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import SecondaryButton from '@/components/global/Button/SecondaryButton';
 import RegistrationBackground from '@/assets/registration-background.png'; // Admin BG
+import usePageTitle from '@/hooks/usePageTitle';
 
 const AdminResetPasswordEmail = () => {
+    usePageTitle('Admin Reset Password');
     const navigate = useNavigate();
 
     const handleTryDifferentEmail = () => {

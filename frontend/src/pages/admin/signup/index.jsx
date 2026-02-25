@@ -5,8 +5,10 @@ import { PrimaryButton } from '@/components/global/Button';
 import { Heading, Text, CustomLink } from '@/components/global/Typography';
 import RegistrationBackground from '@/assets/registration-background.png';
 import { useAdminAuth } from '@/context/AdminAuthContext';
+import usePageTitle from '@/hooks/usePageTitle';
 
 const AdminSignup = () => {
+    usePageTitle('Admin Sign Up');
     const { register, actionLoading, error } = useAdminAuth();
     
     // Local state for form and validation

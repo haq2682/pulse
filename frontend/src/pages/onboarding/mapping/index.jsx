@@ -10,6 +10,7 @@ import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import { SecondaryButton } from '@/components/global/Button';
 import axiosInstance from '@/services/api/axiosInstance';
 import { useAuth } from '@/context/AuthContext';
+import usePageTitle from '@/hooks/usePageTitle';
 
 // Utility functions for formatting names
 const formatColumnName = (columnName) => {
@@ -35,6 +36,7 @@ const formatColumnWithTable = (column, table) => {
 };
 
 const Mapping = () => {
+    usePageTitle('Onboarding - Map Data');
     const navigate = useNavigate();
     const location = useLocation();
     const pathname = location.pathname;
@@ -279,7 +281,6 @@ const Mapping = () => {
                 });
                 
                 if (applyResponse.status === 200) {
-                    console.log('Manual mappings applied successfully');
                     
                     // Confirm mapping and navigate to dashboard
                     const response = await axiosInstance.post('/onboarding/confirm-mapping', {
@@ -399,7 +400,6 @@ const Mapping = () => {
                 
                 // Show message but don't navigate away - user stays on mapping page
                 setError('Manual mapping was cancelled. You can adjust your mappings and try again.');
-                console.log('Mapping cancelled successfully');
             }
         } catch (e) {
             setCancellingMapping(false);

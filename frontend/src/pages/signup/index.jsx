@@ -7,8 +7,10 @@ import { Heading, Text, CustomLink } from '@/components/global/Typography';
 import RegistrationBackground from '@/assets/registration-background.png';
 // 1. Import Auth Hook
 import { useAuth } from '@/context/AuthContext';
+import usePageTitle from '@/hooks/usePageTitle';
 
 const Signup = () => {
+    usePageTitle('Sign Up');
     // 2. Destructure Auth functions
     const { register, loginWithGoogle, loading, error } = useAuth();
     

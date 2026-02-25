@@ -13,6 +13,8 @@
     "@tailwindcss/vite": "^4.1.17",
     "axios": "^1.13.2",
     "chart.js": "^4.5.1",
+    "jspdf": "^4.2.0",
+    "jspdf-autotable": "^5.0.7",
     "primeicons": "^7.0.0",
     "primereact": "^10.9.7",
     "primereact-sass-theme": "^0.0.1-security",

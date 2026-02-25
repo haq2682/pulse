@@ -33,13 +33,13 @@ export const PipelineProgressProvider = ({ children }) => {
         // Prevent duplicate connections for the same business
         if (isConnectingRef.current || 
             (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && currentBusinessIdRef.current === businessId)) {
-            console.log(`WebSocket already connected or connecting for business ${businessId}`);
+            import.meta.env.DEV && console.log(`WebSocket already connected or connecting for business ${businessId}`);
             return;
         }
         
         // Close existing connection if switching to a different business
         if (wsRef.current && currentBusinessIdRef.current !== businessId) {
-            console.log(`Closing existing connection for business ${currentBusinessIdRef.current}`);
+            import.meta.env.DEV && console.log(`Closing existing connection for business ${currentBusinessIdRef.current}`);
             wsRef.current.close();
             wsRef.current = null;
         }
@@ -50,13 +50,13 @@ export const PipelineProgressProvider = ({ children }) => {
         
         try {
             const wsUrl = getWebSocketUrl(businessId);
-            console.log(`Connecting to WebSocket: ${wsUrl}`);
+            import.meta.env.DEV && console.log(`Connecting to WebSocket: ${wsUrl}`);
             
             const ws = new WebSocket(wsUrl);
             wsRef.current = ws;
             
             ws.onopen = () => {
-                console.log('WebSocket connected');
+                import.meta.env.DEV && console.log('WebSocket connected');
                 setIsConnected(true);
                 setError(null);
                 reconnectAttemptsRef.current = 0;
@@ -81,7 +81,7 @@ export const PipelineProgressProvider = ({ children }) => {
                     }
                     
                     const data = JSON.parse(event.data);
-                    console.log('Pipeline update received:', data);
+                    import.meta.env.DEV && console.log('Pipeline update received:', data);
                     setPipelineStatus(data);
                 } catch (err) {
                     console.error('Error parsing WebSocket message:', err);
@@ -95,7 +95,7 @@ export const PipelineProgressProvider = ({ children }) => {
             };
             
             ws.onclose = () => {
-                console.log('WebSocket disconnected');
+                import.meta.env.DEV && console.log('WebSocket disconnected');
                 setIsConnected(false);
                 wsRef.current = null;
                 isConnectingRef.current = false;
@@ -111,7 +111,7 @@ export const PipelineProgressProvider = ({ children }) => {
                     reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS &&
                     currentBusinessIdRef.current === businessId) {
                     reconnectAttemptsRef.current++;
-                    console.log(`Reconnecting... (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`);
+                    import.meta.env.DEV && console.log(`Reconnecting... (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`);
                     
                     reconnectTimeoutRef.current = setTimeout(() => {
                         connectWebSocket(businessId);

@@ -323,7 +323,67 @@ def run_db_mode(config: dict):
             os.environ["MANUAL_MAPPINGS"] = json.dumps(manual_mappings)
         
         try:
-            run_streaming()
+            trigger_once = config.get("trigger_once", False)
+
+            if trigger_once:
+                # When running in trigger-once mode (initial onboarding mapping),
+                # give Debezium time to start its initial snapshot before Spark
+                # tries to read from Kafka.  Without this wait, availableNow may
+                # process 0 messages and exit before the snapshot produces events.
+                import time as _time
+                default_snapshot_wait = 90
+                env_wait = os.getenv("DEBEZIUM_SNAPSHOT_WAIT")
+                if env_wait is not None:
+                    try:
+                        snapshot_wait = max(0, int(env_wait))
+                    except ValueError:
+                        print(
+                            f"   Invalid DEBEZIUM_SNAPSHOT_WAIT='{env_wait}', "
+                            f"falling back to default {default_snapshot_wait}s.",
+                            flush=True,
+                        )
+                        snapshot_wait = default_snapshot_wait
+                else:
+                    snapshot_wait = default_snapshot_wait
+                print(f"   Waiting {snapshot_wait}s for Debezium initial snapshot...", flush=True)
+                _time.sleep(snapshot_wait)
+
+            enable_downstream = config.get("enable_downstream", False)
+            run_streaming(trigger_once=trigger_once,
+                          enable_downstream=enable_downstream)
+
+            # After trigger-once streaming finishes, update mapping status to
+            # 'completed' if the streaming callback didn't already do it (e.g.
+            # because no data was available from the snapshot yet).
+            if trigger_once:
+                try:
+                    import psycopg2
+                    db_host = os.getenv("POSTGRES_SERVER", "postgresql")
+                    db_name_pg = os.getenv("POSTGRES_DATABASE_NAME", "pulse")
+                    db_user = os.getenv("POSTGRES_USER", "postgres")
+                    db_password = os.getenv("POSTGRES_PASSWORD", "postgres")
+                    with psycopg2.connect(host=db_host, database=db_name_pg,
+                                          user=db_user, password=db_password) as conn:
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                "SELECT mapping_status FROM onboarding WHERE business_id = %s",
+                                (bucket_name,)
+                            )
+                            row = cur.fetchone()
+                            if row and row[0] == "running":
+                                from datetime import datetime, timezone
+                                cur.execute("""
+                                    UPDATE onboarding
+                                    SET mapping_status = 'completed',
+                                        mapping_completed_at = %s,
+                                        mapping_error = NULL,
+                                        current_step = 'mapping'
+                                    WHERE business_id = %s
+                                """, (datetime.now(timezone.utc), bucket_name))
+                                conn.commit()
+                                print("   Mapping status set to 'completed' (trigger-once fallback)")
+                except Exception as status_err:
+                    print(f"⚠️  Could not update mapping status after trigger-once: {status_err}")
         except Exception as e:
             error_msg = f"DB mode error: Streaming failed: {str(e)}"
             print(f"❌ {error_msg}")
@@ -337,7 +397,10 @@ def run_db_mode(config: dict):
         sys.exit(1)
 
 
-def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_bootstrap: Optional[str] = None):
+def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10,
+                 kafka_bootstrap: Optional[str] = None,
+                 poll_duration: int = 0, trigger_once: bool = False,
+                 enable_downstream: bool = False):
     """
     API mode: Ingest from API endpoint -> Kafka -> Spark Streaming -> mapped folder.
     
@@ -389,9 +452,9 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_
             run_api_ingestion(
                 api_url=api_url,
                 poll_interval=poll_interval,
-                kafka_bootstrap=kafka_bootstrap
+                kafka_bootstrap=kafka_bootstrap,
             )
-        
+
         # Function to run Spark streaming in a separate process
         def run_spark_consumer():
             print("Starting Spark streaming consumer...")
@@ -400,7 +463,8 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_
             os.environ["BUSINESS_ID"] = bucket_name  # For saving mapping results
             if manual_mappings:
                 os.environ["MANUAL_MAPPINGS"] = json.dumps(manual_mappings)
-            run_streaming()
+            run_streaming(trigger_once=trigger_once,
+                          enable_downstream=enable_downstream)
         
         # Run both processes
         print("Starting parallel processes:")
@@ -414,10 +478,26 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10, kafka_
         spark_process.start()
         
         print("Both processes started. Press Ctrl+C to stop.\n")
-        
+
         try:
-            api_process.join()
-            spark_process.join()
+            if poll_duration > 0:
+                # Run the API ingestion for a bounded window (e.g. initial schema
+                # discovery during onboarding), then stop both processes cleanly.
+                print(f"Bounded run: will stop API ingestion after {poll_duration}s.")
+                api_process.join(timeout=poll_duration)
+                if api_process.is_alive():
+                    api_process.terminate()
+                    api_process.join()
+                # Give Spark a little time to drain remaining Kafka messages.
+                spark_process.join(timeout=30)
+                if spark_process.is_alive():
+                    spark_process.terminate()
+                    spark_process.join()
+                print(f"✅ API MODE COMPLETED ({poll_duration}s window)\n")
+            else:
+                # Run indefinitely (production streaming via Airflow DAG).
+                api_process.join()
+                spark_process.join()
         except KeyboardInterrupt:
             print("\n\nStopping processes...")
             api_process.terminate()
@@ -449,12 +529,22 @@ def main():
     parser.add_argument('--db-tables', type=str, help='Comma-separated list of database tables (for db mode)')
     parser.add_argument('--api-url', type=str, help='API endpoint URL (for api mode)')
     parser.add_argument('--api-poll-interval', type=int, help='API polling interval in seconds (for api mode)')
+    parser.add_argument('--trigger-once', action='store_true',
+                        help='Process all available Kafka messages then exit (db/api mode, Airflow-friendly)')
+    parser.add_argument('--poll-duration', type=int, default=0,
+                        help='For api mode: run ingestion for N seconds then stop (0=run forever)')
+    parser.add_argument('--enable-downstream', action='store_true',
+                        help='Run downstream pipeline (clean/transform/analyze/ML) inline '
+                             'after each micro-batch for near-real-time latency (db/api mode)')
     
     args = parser.parse_args()
     
     # Use command-line args if provided, otherwise use CONFIG
     mode = args.mode if args.mode else CONFIG["mode"]
     bucket_name = args.business_id if args.business_id else CONFIG["bucket_name"]
+    trigger_once = args.trigger_once
+    poll_duration = args.poll_duration
+    enable_downstream = args.enable_downstream
     
     # Wrap execution in try-except to catch any uncaught errors
     try:
@@ -488,7 +578,9 @@ def main():
             run_db_mode({
                 "db_uri": db_uri,
                 "db_tables": db_tables,
-                "bucket_name": bucket_name
+                "bucket_name": bucket_name,
+                "trigger_once": trigger_once,
+                "enable_downstream": enable_downstream,
             })
 
         elif mode == "api":
@@ -500,7 +592,9 @@ def main():
             print(f"  Poll interval: {poll_interval}s", flush=True)
             print(f"{'='*60}\n", flush=True)
             
-            run_api_mode(api_url, bucket_name, poll_interval, kafka_bootstrap)
+            run_api_mode(api_url, bucket_name, poll_interval, kafka_bootstrap,
+                         poll_duration=poll_duration, trigger_once=trigger_once,
+                         enable_downstream=enable_downstream)
 
         else:
             error_msg = f"Invalid mode '{mode}'. Valid modes: batch, db, api"

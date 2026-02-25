@@ -13,6 +13,7 @@ import { ProgressSpinner } from 'primereact/progressspinner';
 import { Dialog } from 'primereact/dialog';
 import { Message } from 'primereact/message';
 import { SecondaryButton } from '@/components/global/Button';
+import usePageTitle from '@/hooks/usePageTitle';
 
 const CHUNK_SIZE = 5 * 1024 * 1024;
 const MAPPING_STATUS_POLL_INTERVAL = 3000; // 3 seconds
@@ -20,6 +21,7 @@ const MAPPING_STATUS_POLL_INTERVAL = 3000; // 3 seconds
 const NIFI_UPLOAD_URL = 'http://localhost:8082/upload';
 
 const Connect = () => {
+    usePageTitle('Onboarding - Connect');
     const navigate = useNavigate();
     const location = useLocation();
     const pathname = location.pathname;
@@ -458,7 +460,7 @@ const Connect = () => {
                 setLoading(false);
                 return;
             }
-            
+
             // Start the mapping pipeline for api mode
             await startMapping();
             return;
@@ -477,7 +479,6 @@ const Connect = () => {
             }
         }
         catch (e) {
-            console.log(e);
             setErrors((prev) => ({ ...prev, form: e.message || 'Failed to fetch ingestion type' }) );
         }
         finally {
@@ -631,8 +632,6 @@ const Connect = () => {
                 // Update UI
                 setMappingLoading(false);
                 setCancellingMapping(false);
-                
-                console.log('Mapping cancelled successfully');
             }
         } catch (e) {
             setCancellingMapping(false);

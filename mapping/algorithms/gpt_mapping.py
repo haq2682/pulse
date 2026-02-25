@@ -1,15 +1,43 @@
 import json
 import time
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
+import os
+from google import genai
+from google.genai import types
+from google.genai.errors import APIError
 from pyspark.sql.functions import lit
 from dotenv import load_dotenv, find_dotenv
 from utils.helpers import make_json_safe
-import os
 
 load_dotenv(find_dotenv())
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# Single client instance reused across all calls
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+# Build config once — safety settings disable all filters for data engineering tasks
+_GENERATE_CONFIG = types.GenerateContentConfig(
+    temperature=0.0,
+    top_p=0.95,
+    top_k=40,
+    max_output_tokens=2048,
+    safety_settings=[
+        types.SafetySetting(
+            category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+            threshold=types.HarmBlockThreshold.BLOCK_NONE,
+        ),
+        types.SafetySetting(
+            category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+            threshold=types.HarmBlockThreshold.BLOCK_NONE,
+        ),
+        types.SafetySetting(
+            category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+            threshold=types.HarmBlockThreshold.BLOCK_NONE,
+        ),
+        types.SafetySetting(
+            category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+            threshold=types.HarmBlockThreshold.BLOCK_NONE,
+        ),
+    ],
+)
 
 
 def simplify_sample_data(pdf, max_rows=3, max_str_length=100):
@@ -19,7 +47,6 @@ def simplify_sample_data(pdf, max_rows=3, max_str_length=100):
     """
     sample_dict = pdf.head(max_rows).to_dict(orient="list")
 
-    # Truncate long strings and sanitize data
     for key, values in sample_dict.items():
         sample_dict[key] = [
             (
@@ -33,52 +60,52 @@ def simplify_sample_data(pdf, max_rows=3, max_str_length=100):
     return sample_dict
 
 
-def call_gemini_with_retry(prompt, max_retries=3, initial_delay=1):
-    """Call Gemini API with exponential backoff retry logic and safety settings"""
-    model = genai.GenerativeModel("gemini-2.5-flash")
+def _is_response_blocked(response) -> bool:
+    """
+    Return True if the response was blocked by safety filters or has no usable content.
+    In the new SDK, accessing response.text on a blocked response raises ValueError,
+    so we inspect candidates directly instead.
+    """
+    if not response.candidates:
+        return True
+    candidate = response.candidates[0]
+    # finish_reason == "STOP" (or enum value 1) means a clean completion
+    finish_reason = candidate.finish_reason
+    # Accept both the string name and the enum integer value
+    if hasattr(finish_reason, "name"):
+        return finish_reason.name not in ("STOP", "MAX_TOKENS")
+    return str(finish_reason) not in ("STOP", "MAX_TOKENS", "1", "2")
 
-    # Configure safety settings to be more permissive for data engineering tasks
-    safety_settings = {
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-    }
+
+def call_gemini_with_retry(prompt, max_retries=3, initial_delay=1):
+    """Call Gemini API with exponential backoff retry logic and safety settings."""
 
     for attempt in range(max_retries):
         try:
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.GenerationConfig(
-                    temperature=0.0,
-                    top_p=0.95,
-                    top_k=40,
-                    max_output_tokens=2048,
-                ),
-                safety_settings=safety_settings,
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=_GENERATE_CONFIG,
             )
 
             # Check if response was blocked by safety filters
-            if not response.parts:
-                print(f"⚠ Response blocked by safety filters")
+            if _is_response_blocked(response):
+                print("⚠ Response blocked by safety filters")
 
-                # Log detailed feedback
                 if response.prompt_feedback:
-                    print(f"Prompt feedback: {response.prompt_feedback}")
+                    print(f"  Prompt feedback: {response.prompt_feedback}")
 
-                if hasattr(response, "candidates") and response.candidates:
+                if response.candidates:
                     candidate = response.candidates[0]
-                    print(f"Finish reason: {candidate.finish_reason}")
-
-                    if hasattr(candidate, "safety_ratings"):
-                        print("Safety ratings:")
+                    print(f"  Finish reason: {candidate.finish_reason}")
+                    if candidate.safety_ratings:
+                        print("  Safety ratings:")
                         for rating in candidate.safety_ratings:
-                            print(f"  - {rating.category}: {rating.probability}")
+                            print(f"    - {rating.category}: {rating.probability}")
 
-                # If blocked and not the last attempt, continue to retry
                 if attempt < max_retries - 1:
-                    delay = initial_delay * (2**attempt)
-                    print(f"Retrying with simplified prompt after {delay}s...")
+                    delay = initial_delay * (2 ** attempt)
+                    print(f"  Retrying after {delay}s...")
                     time.sleep(delay)
                     continue
                 else:
@@ -87,13 +114,31 @@ def call_gemini_with_retry(prompt, max_retries=3, initial_delay=1):
                         "Try simplifying your data or using fallback mapping."
                     )
 
-            return response.text
+            # Safely extract text — raises ValueError if no text part exists
+            try:
+                return response.text
+            except ValueError as text_err:
+                raise ValueError(
+                    f"Response returned no text content: {text_err}"
+                ) from text_err
+
+        except APIError as e:
+            # API-level errors (auth, quota, network, etc.)
+            if attempt == max_retries - 1:
+                raise
+            delay = initial_delay * (2 ** attempt)
+            print(f"  Retry {attempt + 1}/{max_retries} after {delay}s — APIError: {e}")
+            time.sleep(delay)
+
+        except ValueError:
+            # Re-raise ValueErrors (blocked content, no text) immediately — retrying won't help
+            raise
 
         except Exception as e:
             if attempt == max_retries - 1:
-                raise e
-            delay = initial_delay * (2**attempt)
-            print(f"Retry {attempt + 1}/{max_retries} after {delay}s due to: {e}")
+                raise
+            delay = initial_delay * (2 ** attempt)
+            print(f"  Retry {attempt + 1}/{max_retries} after {delay}s due to: {e}")
             time.sleep(delay)
 
 
@@ -109,7 +154,8 @@ def fuzzy_column_mapping(missing_cols, extra_cols):
     remaining_extra = extra_cols.copy()
 
     print(
-        f"  Starting fuzzy matching for {len(missing_cols)} missing cols and {len(extra_cols)} extra cols"
+        f"  Starting fuzzy matching for {len(missing_cols)} missing cols "
+        f"and {len(extra_cols)} extra cols"
     )
 
     for missing_col in missing_cols:
@@ -117,7 +163,6 @@ def fuzzy_column_mapping(missing_cols, extra_cols):
         best_score = 0.6  # Minimum similarity threshold
 
         for extra_col in extra_cols:
-            # Calculate similarity between column names
             score = SequenceMatcher(
                 None,
                 missing_col.lower().replace("_", "").replace("-", ""),
@@ -147,6 +192,13 @@ def fuzzy_column_mapping(missing_cols, extra_cols):
     }
 
 
+def _apply_fallback_fuzzy(df, missing_cols, extra_cols):
+    """Helper to run fuzzy matching, filtering extra_cols to only existing DataFrame columns."""
+    current_df_cols = df.columns
+    available_extra_cols = [col for col in extra_cols if col in current_df_cols]
+    return fuzzy_column_mapping(missing_cols, available_extra_cols)
+
+
 def gpt_schema_mapping(df, missing_cols, extra_cols, mapped_cols):
     """
     Map columns using Google Gemini Flash language model with retry logic.
@@ -170,7 +222,6 @@ def gpt_schema_mapping(df, missing_cols, extra_cols, mapped_cols):
 
     pdf = df.limit(5).toPandas()
 
-    # Simplify sample data to avoid safety filter triggers
     simplified_sample = simplify_sample_data(pdf, max_rows=3, max_str_length=100)
 
     schema_info = {
@@ -183,7 +234,6 @@ def gpt_schema_mapping(df, missing_cols, extra_cols, mapped_cols):
 
     schema_info = make_json_safe(schema_info)
 
-    # Simplified prompt to reduce safety filter triggers
     prompt = f"""
 Task: Map source DataFrame columns to target schema columns.
 
@@ -212,7 +262,6 @@ Instructions:
 }}
 """
 
-    # Store the new mappings from this iteration
     new_mappings = {}
     updated_missing_cols = missing_cols.copy()
     updated_extra_cols = extra_cols.copy()
@@ -224,10 +273,9 @@ Instructions:
             result_text[:300] + ("..." if len(result_text) > 300 else ""),
         )
 
-        # Clean up response - extract JSON from markdown or text
         result_text = result_text.strip()
 
-        # Remove markdown code blocks
+        # Strip markdown code fences if present
         if "```json" in result_text:
             result_text = result_text.split("```json")[1].split("```")[0].strip()
         elif "```" in result_text:
@@ -235,20 +283,15 @@ Instructions:
             if len(parts) >= 3:
                 result_text = parts[1].strip()
 
-        # Extract JSON object if surrounded by text
+        # Extract the JSON object boundaries
         start_idx = result_text.find("{")
         end_idx = result_text.rfind("}")
         if start_idx != -1 and end_idx != -1:
-            result_text = result_text[start_idx : end_idx + 1]
+            result_text = result_text[start_idx: end_idx + 1]
 
         model_mapping = json.loads(result_text)
 
-        # Validate response structure
-        required_keys = {
-            "mapped_cols",
-            "remaining_missing_cols",
-            "remaining_extra_cols",
-        }
+        required_keys = {"mapped_cols", "remaining_missing_cols", "remaining_extra_cols"}
         if not all(key in model_mapping for key in required_keys):
             raise ValueError(f"Response missing required keys: {required_keys}")
 
@@ -263,15 +306,9 @@ Instructions:
     except json.JSONDecodeError as e:
         print(f"✗ JSON parsing error: {e}")
         if "result_text" in locals():
-            print(f"Raw response: {result_text[:500]}")
+            print(f"  Raw response: {result_text[:500]}")
         print("⚠ Falling back to fuzzy column matching...")
-
-        # Get current DataFrame columns to match against
-        current_df_cols = df.columns
-        # Filter extra_cols to only include columns that actually exist in the DataFrame
-        available_extra_cols = [col for col in extra_cols if col in current_df_cols]
-
-        model_mapping = fuzzy_column_mapping(missing_cols, available_extra_cols)
+        model_mapping = _apply_fallback_fuzzy(df, missing_cols, extra_cols)
         new_mappings = model_mapping["mapped_cols"]
         updated_missing_cols = model_mapping["remaining_missing_cols"]
         updated_extra_cols = model_mapping["remaining_extra_cols"]
@@ -279,26 +316,17 @@ Instructions:
     except Exception as e:
         print(f"✗ Gemini API error: {e}")
         print("⚠ Falling back to fuzzy column matching...")
-
-        # Get current DataFrame columns to match against
-        current_df_cols = df.columns
-        # Filter extra_cols to only include columns that actually exist in the DataFrame
-        available_extra_cols = [col for col in extra_cols if col in current_df_cols]
-
-        model_mapping = fuzzy_column_mapping(missing_cols, available_extra_cols)
+        model_mapping = _apply_fallback_fuzzy(df, missing_cols, extra_cols)
         new_mappings = model_mapping["mapped_cols"]
         updated_missing_cols = model_mapping["remaining_missing_cols"]
         updated_extra_cols = model_mapping["remaining_extra_cols"]
 
-    # CRITICAL: Apply ALL mappings from mapped_cols (not just new_mappings)
-    # This ensures that columns that were supposed to be renamed in previous steps
-    # but weren't (due to errors) are renamed now
-
+    # Apply all column transformations
     print(f"\n🔧 Applying column transformations:")
     print(f"  New mappings from this iteration: {new_mappings}")
     print(f"  Existing mappings to apply: {mapped_cols}")
 
-    # First, apply all existing mappings that haven't been applied yet
+    # First apply any previously mapped columns that haven't been renamed yet
     for target_col, source_col in mapped_cols.items():
         if source_col in df.columns and target_col not in df.columns:
             df = df.withColumnRenamed(source_col, target_col)
@@ -306,9 +334,7 @@ Instructions:
         elif source_col not in df.columns and target_col in df.columns:
             print(f"  ℹ Already renamed: '{source_col}' -> '{target_col}'")
         elif source_col not in df.columns and target_col not in df.columns:
-            print(
-                f"  ⚠ Warning: Neither '{source_col}' nor '{target_col}' found in DataFrame"
-            )
+            print(f"  ⚠ Warning: Neither '{source_col}' nor '{target_col}' found in DataFrame")
 
     # Then apply new mappings from this iteration
     for target_col, source_col in new_mappings.items():
@@ -316,16 +342,13 @@ Instructions:
             df = df.withColumnRenamed(source_col, target_col)
             print(f"  ✓ Renamed (new): '{source_col}' -> '{target_col}'")
         elif target_col in df.columns:
-            print(
-                f"  ℹ Column '{target_col}' already exists, skipping rename from '{source_col}'"
-            )
+            print(f"  ℹ Column '{target_col}' already exists, skipping rename from '{source_col}'")
         else:
             print(f"  ⚠ Warning: Column '{source_col}' not found in DataFrame")
 
-    # Update the mapped_cols dictionary with new mappings
     mapped_cols.update(new_mappings)
 
-    # Drop unmapped extra columns (only those that still exist in the DataFrame)
+    # Drop unmapped extra columns that still exist in the DataFrame
     cols_to_drop = [col for col in updated_extra_cols if col in df.columns]
     if cols_to_drop:
         df = df.drop(*cols_to_drop)

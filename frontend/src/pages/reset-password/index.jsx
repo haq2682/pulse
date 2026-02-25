@@ -7,8 +7,10 @@ import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import HeroBackground from '@/assets/hero-background.png';
 // 1. Import Auth Hook
 import { useAuth } from '@/context/AuthContext';
+import usePageTitle from '@/hooks/usePageTitle';
 
 const ResetPassword = () => {
+    usePageTitle('Reset Password');
     const { resetPassword } = useAuth();
     const navigate = useNavigate();
     

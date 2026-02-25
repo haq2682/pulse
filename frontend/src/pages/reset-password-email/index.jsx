@@ -6,8 +6,10 @@ import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import SecondaryButton from '@/components/global/Button/SecondaryButton';
 import GradientCircle from '@/components/global/Shapes/GradientCircle';
 import HeroBackground from '@/assets/hero-background.png';
+import usePageTitle from '@/hooks/usePageTitle';
 
 const ResetPasswordEmail = () => {
+    usePageTitle('Reset Password');
     const navigate = useNavigate();
 
     const handleTryDifferentEmail = () => {

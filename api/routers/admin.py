@@ -21,7 +21,7 @@ ADMIN_COOKIE_NAME = "admin_session_id"
 # 3. Define Cookie Settings (Matches auth.py)
 COOKIE_SETTINGS = {
     "httponly": True,
-    "secure": False,  # Set to True in production (HTTPS)
+    "secure": settings.is_production,
     "samesite": "lax",
     "max_age": settings.session_expire_minutes * 60 
 }

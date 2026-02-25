@@ -8,8 +8,10 @@ import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import { useAuth } from '@/context/AuthContext';
 import axiosInstance from '@/services/api/axiosInstance';
 import { Message } from 'primereact/message';
+import usePageTitle from '@/hooks/usePageTitle';
 
 const DataType = () => {
+    usePageTitle('Onboarding - Data Type');
     const navigate = useNavigate();
     const [selectedDataSource, setSelectedDataSource] = useState('files');
     const [loading, setLoading] = useState(false);

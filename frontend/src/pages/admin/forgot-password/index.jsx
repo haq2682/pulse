@@ -7,8 +7,10 @@ import CustomLink from '@/components/global/Typography/CustomLink';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import RegistrationBackground from '@/assets/registration-background.png'; // Using Admin BG
 import adminApi from '@/services/api/adminApi'; // Direct API call
+import usePageTitle from '@/hooks/usePageTitle';
 
 const AdminForgotPassword = () => {
+    usePageTitle('Admin Forgot Password');
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState({ error: '', success: '' });

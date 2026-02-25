@@ -1,0 +1,688 @@
+============================================================
+📋 MACHINE LEARNING INFERENCE — OUTPUT DIRECTORIES & SCHEMAS
+============================================================
+MinIO bucket: {businessId}  — each business has its own bucket named after
+its UUID (the businessId).  All ML inference output is written into that
+business's bucket, NOT into a shared "pulse-bucket-1" bucket.
+Base prefix: s3a://{businessId}/machine-learning/
+
+Organised by:
+  1. GENERAL  — Classification  (6 files)
+  2. GENERAL  — Clustering      (4 files)
+  3. GENERAL  — Regression      (7 files)
+  4. SPECIFIC — Classification  (2 files)
+  5. SPECIFIC — Clustering      (2 files)
+  6. SPECIFIC — Regression      (6 files)
+============================================================
+
+NOTE ON DISCREPANCIES WITH ML_MODELS_DOCUMENTATION.md
+------------------------------------------------------
+The schemas documented below are derived from the actual inference source
+code (infer_*.py files) and take precedence over the design schemas in
+ML_MODELS_DOCUMENTATION.md in the following cases:
+
+1. Cart Abandonment (1.1):
+   Actual output does NOT include key_risk_factors or recommended_actions
+   columns described in the documentation schema.
+
+2. Safety Stock (3.5):
+   The actual inference uses an adjustment-factor approach; output schema
+   contains theoretical_safety_stock, adjustment_factor, demand_pattern,
+   adjustment_reasoning, model_type — NOT the variability-based columns
+   (demand_variability, lead_time_variability, holding_cost_impact,
+   confidence_interval_lower/upper) described in the documentation.
+
+3. Customer Segmentation Clustering (2.1):
+   The semantic label column is customer_label (not cluster_label as in docs).
+
+4. Supplier Clustering (2.4):
+   Additional columns in actual output: business_persona, confidence_score,
+   validation_flag, action_urgency — not present in documentation schema.
+
+5. Fulfillment Risk (4.1) and Seasonal Trends (6.6):
+   These are "specific" inferences not covered in the main documentation
+   classification/regression sections; schemas here are ground-truth.
+------------------------------------------------------
+
+============================================================
+1. GENERAL — CLASSIFICATION
+============================================================
+
+------------------------------------------------------------
+1.1  infer_cart_abandonment.py
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/classification/predictions/cart_abandonment_predictions
+
+Schema:
+  prediction_id              String      — UUID per prediction row
+  cart_id                    String      — Cart identifier
+  customer_id                String      — Customer identifier
+  prediction_date            Timestamp   — Prediction generation timestamp
+  predicted_status           String      — Predicted cart status (e.g. "Abandoned", "Converted")
+  abandonment_probability    Double      — Probability of cart abandonment (0.0 – 1.0)
+  abandonment_risk_score     Double      — Risk score (probability × 100)
+  confidence_score           Double      — Max class probability (0.0 – 1.0)
+  model_version              String      — Model name + version tag
+
+
+------------------------------------------------------------
+1.2  infer_customer_churn.py
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/classification/predictions/customer_churn_predictions
+
+Schema:
+  prediction_id              String      — UUID per prediction row
+  customer_id                String      — Customer identifier
+  prediction_date            Timestamp   — Prediction generation timestamp
+  predicted_churn_risk       String      — Churn risk class label (e.g. "High Risk", "Low Risk")
+  churn_probability          Double      — Probability of the predicted churn class (0.0 – 1.0)
+  confidence_score           Double      — Max class probability (0.0 – 1.0)
+  contributing_factors       String      — JSON string listing top contributing features
+  model_version              String      — Model name + version tag
+
+
+------------------------------------------------------------
+1.3  infer_customer_segments.py
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/classification/predictions/customer_segment_predictions
+
+Schema:
+  prediction_id              String      — UUID per prediction row
+  customer_id                String      — Customer identifier
+  prediction_date            Timestamp   — Prediction generation timestamp
+  predicted_segment          String      — Predicted customer segment label
+  segment_probability        Double      — Probability of the predicted segment (0.0 – 1.0)
+  rfm_score                  Double      — Composite RFM score (recency + frequency + monetary)
+  confidence_score           Double      — Max class probability (0.0 – 1.0)
+  model_version              String      — Model name + version tag
+
+
+------------------------------------------------------------
+1.4  infer_payment_success.py
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/classification/predictions/payment_success_predictions
+
+Schema:
+  prediction_id              String      — UUID per prediction row
+  payment_id                 String      — Payment identifier
+  order_id                   String      — Associated order identifier
+  prediction_date            Timestamp   — Prediction generation timestamp
+  predicted_status           String      — Predicted payment status (e.g. "Completed", "Failed")
+  success_probability        Double      — Probability of payment success (0.0 – 1.0)
+  risk_factors               String      — JSON string of top risk factors
+  confidence_score           Double      — Max class probability (0.0 – 1.0)
+  model_version              String      — Model name + version tag
+
+
+------------------------------------------------------------
+1.5  infer_review_sentiment.py
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/classification/predictions/review_sentiment_predictions
+
+Schema:
+  prediction_id              String      — UUID per prediction row
+  review_id                  String      — Review identifier
+  product_id                 String      — Associated product identifier
+  prediction_date            Timestamp   — Prediction generation timestamp
+  predicted_sentiment        String      — Predicted sentiment label (Positive / Neutral / Negative)
+  sentiment_score            Double      — Numeric sentiment score (-1.0 = Negative, 0.0 = Neutral, 1.0 = Positive)
+  confidence_score           Double      — Max class probability (0.0 – 1.0)
+  key_phrases                String      — Extracted key phrases from the review text
+  model_version              String      — Model name + version tag
+
+
+------------------------------------------------------------
+1.6  infer_stock_status.py
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/classification/predictions/stock_status_predictions
+
+Schema:
+  prediction_id              String      — UUID per prediction row
+  product_id                 String      — Product identifier
+  prediction_date            Timestamp   — Prediction generation timestamp
+  predicted_status           String      — Predicted stock status (e.g. "In Stock", "Low Stock", "Out of Stock")
+  days_until_stockout        Double      — Estimated days until stockout based on current stock and daily sales
+  reorder_recommendation     Boolean     — Whether reorder is recommended
+  confidence_score           Double      — Max class probability (0.0 – 1.0)
+  model_version              String      — Model name + version tag
+
+
+============================================================
+2. GENERAL — CLUSTERING
+============================================================
+
+------------------------------------------------------------
+2.1  infer_customer_segment.py  (Customer Segmentation)
+------------------------------------------------------------
+Output Directory (Spark partitioned directory):
+  s3a://{businessId}/machine-learning/clustering/predictions/customer_segmentation.parquet/
+  NOTE: Spark .write.parquet() always creates a directory even when the path ends in .parquet.
+        Actual files: customer_segmentation.parquet/part-00000-*.snappy.parquet
+
+Schema:
+  clustering_id              String      — Composite ID: customer_id + "_current"
+  customer_id                String      — Customer identifier
+  cluster_date               Timestamp   — Clustering execution timestamp
+  cluster_id                 Integer     — Assigned cluster number
+  customer_label             String      — Semantic customer label (e.g. "High Value Champions", "At Risk", "New Customers")
+  cluster_centroid_distance  Double      — Distance from assigned cluster centroid (0.0 placeholder)
+  recency_score              Double      — RFM recency score
+  frequency_score            Double      — RFM frequency score
+  monetary_score             Double      — RFM monetary score
+  model_version              String      — Algorithm + k value (e.g. "kmeans_k5")
+
+
+------------------------------------------------------------
+2.2  infer_geo_cluster.py  (Geographic Sales Clustering)
+------------------------------------------------------------
+Output Directory (Spark partitioned directory):
+  s3a://{businessId}/machine-learning/clustering/predictions/geographic_clustering.parquet/
+  NOTE: Spark .write.parquet() always creates a directory even when the path ends in .parquet.
+        Actual files: geographic_clustering.parquet/part-00000-*.snappy.parquet
+
+Schema:
+  clustering_id              String      — Composite ID: country + "_" + state_province + "_" + city + "_current"
+  country                    String      — Country name
+  state_province             String      — State or province name
+  city                       String      — City name
+  cluster_date               Timestamp   — Clustering execution timestamp
+  cluster_id                 Integer     — Assigned cluster number
+  market_segment             String      — Market segment label (e.g. "High Value Market", "Growth Market", "Developing Market")
+  cluster_centroid_distance  Double      — Distance from assigned cluster centroid (0.0 placeholder)
+  segment_characteristics    String      — JSON with avg_revenue, avg_customers, avg_efficiency for the cluster
+  expansion_opportunity_score Double     — Score (0.3 – 0.8) indicating expansion potential
+  model_version              String      — Algorithm + k value (e.g. "kmeans_k4")
+
+
+------------------------------------------------------------
+2.3  infer_session_behavior.py  (Session Behavior Clustering)
+------------------------------------------------------------
+Output Directory (Spark partitioned directory):
+  s3a://{businessId}/machine-learning/clustering/predictions/session_behavior_clustering.parquet/
+  NOTE: Spark .write.parquet() always creates a directory even when the path ends in .parquet.
+        Actual files: session_behavior_clustering.parquet/part-00000-*.snappy.parquet
+
+Schema:
+  clustering_id              String      — Composite ID: session_id + "_current"
+  session_id                 String      — Session identifier
+  cluster_date               Timestamp   — Clustering execution timestamp
+  cluster_id                 Integer     — Assigned cluster number
+  behavior_type              String      — Behavior persona label (e.g. "Quick Buyers", "Cart Abandoners", "Researchers")
+  cluster_centroid_distance  Double      — Euclidean distance from cluster centroid
+  confidence_score           Double      — Assignment confidence: 1 − (distance / max_distance)
+  validation_flag            String      — Assignment quality flag ("Confident", "Monitor", "Review Pattern")
+  behavior_characteristics   String      — JSON with session metrics and cluster-level stats
+  engagement_recommendations String      — JSON array of persona-specific engagement action recommendations
+  model_version              String      — "enhanced_kmeans"
+
+
+------------------------------------------------------------
+2.4  infer_supplier_performance.py  (Supplier Performance Clustering)
+------------------------------------------------------------
+Output Directory (Spark partitioned directory):
+  s3a://{businessId}/machine-learning/clustering/predictions/supplier_clustering.parquet/
+  NOTE: Spark .write.parquet() always creates a directory even when the path ends in .parquet.
+        Actual files: supplier_clustering.parquet/part-00000-*.snappy.parquet
+
+Schema:
+  clustering_id              String      — Composite ID: supplier_id + "_current"
+  supplier_id                String      — Supplier identifier
+  cluster_date               Timestamp   — Clustering execution timestamp
+  cluster_id                 Integer     — Assigned cluster number
+  business_persona           String      — Business persona label (e.g. "Strategic Partners", "Risk Suppliers", "Reliable Performers")
+  performance_tier           String      — Tier label ("Premium", "Standard", "At Risk")
+  confidence_score           Double      — Assignment confidence: 1 − (distance / max_distance)
+  validation_flag            String      — Risk classification ("Confident Assignment", "Medium Risk - Monitor Closely", "High Risk - Manual Review Required")
+  action_urgency             String      — Urgency level ("Immediate", "Urgent", "High", "Monitor", "Routine")
+  performance_metrics        String      — JSON with current supplier KPIs vs. cluster averages
+  improvement_recommendations String     — JSON array of persona-specific action recommendations
+  model_version              String      — "enhanced_kmeans"
+
+
+============================================================
+3. GENERAL — REGRESSION
+============================================================
+
+------------------------------------------------------------
+3.1  infer_aov.py  (Average Order Value Prediction — v1)
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/regression/predictions/aov_prediction/
+
+Schema:
+  prediction_id              String      — UUID per prediction row
+  customer_id                String      — Customer identifier
+  prediction_date            Timestamp   — Prediction generation timestamp
+  predicted_next_aov         Double      — Predicted next average order value ($)
+  confidence_interval_lower  Double      — Lower bound: predicted_next_aov × 0.85
+  confidence_interval_upper  Double      — Upper bound: predicted_next_aov × 1.15
+  factors_influencing_aov    String      — JSON with last_order_value, average_3_orders, spending_trend, trend_percentage
+  confidence_score           Double      — Fixed at 0.88
+  model_version              String      — Model algorithm name (e.g. "linear_regression")
+
+Note: infer_aov_v2.py (below) is the improved version and writes to the same directory.
+
+
+------------------------------------------------------------
+3.2  infer_aov_v2.py  (Average Order Value Prediction — v2 Fixed)
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/regression/predictions/aov_prediction/
+
+Schema:
+  prediction_id              String      — UUID per prediction row
+  customer_id                String      — Customer identifier
+  prediction_date            Timestamp   — Prediction generation timestamp
+  predicted_next_aov         Double      — Predicted next average order value ($)
+  confidence_interval_lower  Double      — Lower bound: predicted_next_aov × 0.85
+  confidence_interval_upper  Double      — Upper bound: predicted_next_aov × 1.15
+  factors_influencing_aov    String      — JSON with last_order_value, prev_order_value, average_3_orders, spending_trend, trend_percentage
+  confidence_score           Double      — Data-adaptive: 0.92 (3 lags) / 0.85 (2 lags) / 0.75 (1 lag)
+  model_version              String      — Model algorithm name (e.g. "random_forest")
+
+Note: Fixes weighted discount_sensitivity and applies scaling only for linear_regression.
+
+
+------------------------------------------------------------
+3.3  infer_clv.py  (Customer Lifetime Value Prediction)
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/regression/predictions/clv_predictions/
+
+Schema:
+  prediction_id              String      — UUID per prediction row
+  customer_id                String      — Customer identifier
+  prediction_date            Timestamp   — Prediction generation timestamp
+  predicted_clv              Double      — Predicted customer lifetime value ($)
+  prediction_horizon_days    Integer     — Forecast horizon in days (default 365)
+  confidence_interval_lower  Double      — Lower bound: predicted_clv × 0.80
+  confidence_interval_upper  Double      — Upper bound: predicted_clv × 1.20
+  confidence_score           Double      — Fixed at 0.85
+  model_version              String      — Model algorithm name (e.g. "random_forest")
+
+
+------------------------------------------------------------
+3.4  infer_restock_quantity.py  (Inventory Restock Quantity Prediction)
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/regression/predictions/restock_quantity/
+
+Schema:
+  prediction_id                 String   — UUID per prediction row
+  product_id                    String   — Product identifier
+  prediction_date               Timestamp — Prediction generation timestamp
+  recommended_restock_quantity  Integer  — Recommended units to restock (rounded)
+  expected_demand_next_30_days  Double   — Forecasted demand over the next 30 days
+  optimal_order_point           Integer  — Reorder point (lead-time demand + safety stock)
+  safety_stock_level            Integer  — Calculated safety stock units
+  estimated_cost                Double   — Estimated cost: restock_quantity × unit_cost ($)
+  confidence_score              Double   — Data-adaptive based on demand volatility (0.5 – 0.95)
+  model_version                 String   — Model algorithm name (e.g. "random_forest")
+
+
+------------------------------------------------------------
+3.5  infer_safety_stock.py  (Safety Stock Adjustment Factor Prediction)
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/regression/predictions/safety_stock_adjusted/
+
+Schema:
+  prediction_id                 String   — UUID per prediction row
+  product_id                    String   — Product identifier
+  prediction_date               Timestamp — Prediction generation timestamp
+  theoretical_safety_stock      Integer  — Formula-based safety stock (z × σ_demand × √lead_time)
+  adjustment_factor             Double   — ML-predicted adjustment factor (clipped to 0.5 – 2.0)
+  required_safety_stock_units   Integer  — Final safety stock: theoretical × adjustment_factor
+  minimum_stock_level           Integer  — Recommended minimum stock level (= reorder_point)
+  reorder_point                 Integer  — Reorder point: lead_time_demand + required_safety_stock_units
+  service_level_target          Double   — Target service level (0.90, 0.95, or 0.99)
+  demand_pattern                String   — Demand pattern classification ("Stable", "Variable", "Erratic")
+  expected_stockout_probability Double   — Expected stockout probability at the given service level
+  confidence_score              Double   — 0.95 (Stable) / 0.80 (Variable) / 0.65 (Erratic)
+  adjustment_reasoning          String   — Human-readable explanation for the adjustment factor
+  model_version                 String   — Model algorithm name (e.g. "random_forest")
+  model_type                    String   — "adjustment_factor"
+
+
+------------------------------------------------------------
+3.6  infer_session_conversion.py  (Session Conversion Value Prediction)
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/regression/predictions/session_conversion_value/
+
+Schema:
+  prediction_id                String   — UUID per prediction row
+  session_id                   String   — Session identifier
+  customer_id                  String   — Customer identifier
+  prediction_date              Timestamp — Prediction generation timestamp
+  predicted_conversion_value   Double   — Predicted order value if session converts ($, non-negative)
+  conversion_probability       Double   — Estimated conversion probability (0.0 – 0.95)
+  recommended_interventions    String   — JSON array of recommended engagement interventions
+  confidence_score             Double   — 0.70 (new customer) / 0.90 (repeat with history) / 0.75 (other)
+  model_version                String   — Model algorithm name (e.g. "random_forest")
+
+
+------------------------------------------------------------
+3.7  infer_stockout_probability.py  (Stockout Probability Prediction)
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/regression/predictions/stockout_probability/
+
+Schema:
+  prediction_id                 String   — UUID per prediction row
+  product_id                    String   — Product identifier
+  prediction_date               Timestamp — Prediction generation timestamp
+  stockout_probability          Double   — Predicted probability of stockout (0.0 – 1.0)
+  days_until_stockout           Double   — Predicted days until stock runs out
+  expected_stockout_date        Date     — Calculated expected stockout date (current_date + days_until_stockout)
+  stockout_risk_level           String   — Risk classification ("Critical", "High", "Medium", "Low")
+  current_days_of_supply        Double   — Current available stock / average daily demand
+  safety_stock_breach           Boolean  — Whether current stock is below minimum stock level
+  reorder_recommended           Boolean  — Whether reorder is recommended
+  recommended_reorder_quantity  Integer  — Recommended reorder units (if reorder_recommended = true)
+  urgency_score                 Double   — Composite urgency score (0 – 100)
+  confidence_score              Double   — 0.90 (supply ≤ 30 days) / 0.75 (≤ 90 days) / 0.60 (> 90 days)
+  model_version                 String   — "random_forest"
+
+
+============================================================
+4. SPECIFIC — CLASSIFICATION
+============================================================
+
+------------------------------------------------------------
+4.1  infer_fulfillment_risk.py  (Order Fulfillment Risk Classification)
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/classification/predictions/fulfillment_risk_predictions
+
+Schema:
+  prediction_id                      String    — UUID per prediction row
+  order_id                           String    — Order identifier
+  customer_id                        String    — Customer identifier
+  prediction_timestamp               Timestamp — Prediction generation timestamp
+  predicted_risk_class               Integer   — Risk class index (0 = Low, 1 = Medium, 2 = High, 3 = Critical)
+  predicted_risk_label               String    — Human-readable risk label ("Low Risk", "Medium Risk", "High Risk", "Critical Risk")
+  prob_low_risk                      Double    — Probability of Low Risk class (-1.0 if model has no probability output)
+  prob_medium_risk                   Double    — Probability of Medium Risk class
+  prob_high_risk                     Double    — Probability of High Risk class
+  prob_critical_risk                 Double    — Probability of Critical Risk class
+  delay_probability                  Double    — Sum of prob_medium + prob_high + prob_critical
+  failure_probability                Double    — Probability of critical failure (prob_critical_risk)
+  partial_fulfillment_probability    Double    — Weighted partial fulfillment score
+  predicted_ship_date                String    — Expected ship date (ISO date string)
+  predicted_delivery_date            String    — Expected delivery date (ISO date string)
+  expected_delay_days                Integer   — Expected delay days by risk class (0 / 3 / 7 / 15)
+  delivery_window_confidence         Double    — Max class probability as delivery window confidence
+  primary_risk_factor                String    — Primary cause of risk ("Supplier Reliability", "Stock Availability", etc.)
+  secondary_risk_factor              String    — Secondary contributing risk factor
+  risk_factor_breakdown              String    — JSON placeholder "{}" for detailed breakdown
+  recommended_action                 String    — Recommended action for the given risk level
+  alternative_supplier_available     Boolean   — Whether primary supplier reliability > 0.8
+  expedited_shipping_recommended     Boolean   — True if predicted_risk_class >= 2
+  customer_communication_recommended Boolean   — True if predicted_risk_class >= 1
+  potential_delay_cost               Double    — Estimated delay cost ($)
+  expedited_shipping_cost            Double    — Estimated expedited shipping cost ($)
+  customer_compensation_estimate     Double    — Estimated customer compensation ($)
+  prediction_confidence              Double    — Max class probability (same as delivery_window_confidence)
+  feature_importance                 String    — JSON placeholder "{}" for feature importance
+  model_version                      String    — Model name + version (e.g. "GBT_v2.0")
+  created_at                         Timestamp — Record creation timestamp
+  execution_batch_id                 String    — Batch execution identifier (batch_YYYYMMDD_HHMMSS)
+
+
+------------------------------------------------------------
+4.2  infer_product_bundling.py  (Product Bundling Classification)
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/classification/predictions/product_bundling_predictions
+
+Schema:
+  prediction_id              String    — UUID per prediction row
+  product_id_a               String    — First product in the pair
+  product_id_b               String    — Second product in the pair
+  prediction_date            Timestamp — Prediction generation timestamp
+  is_complementary           Boolean   — Whether the product pair is complementary (recommended for bundling)
+  bundle_category            String    — Bundle type ("Accessory Bundle", "Essential Bundle", "Complete Set", "Value Pack")
+  affinity_score             Double    — Affinity score (from DB if available, else model probability)
+  support                    Double    — Proportion of orders containing both products
+  confidence                 Double    — Confidence of association rule (A → B)
+  lift                       Double    — Lift of the association rule (confidence / P(B))
+  expected_bundle_revenue    Double    — Sum of product_a_price + product_b_price ($)
+  recommended_bundle_discount Double   — Recommended discount amount based on lift ($)
+  confidence_score           Double    — Max class probability (0.0 – 1.0)
+  model_version              String    — Model name + version tag
+
+
+============================================================
+5. SPECIFIC — CLUSTERING
+============================================================
+
+------------------------------------------------------------
+5.1  infer_product_affinity.py  (Product Affinity Clustering)
+------------------------------------------------------------
+Output Directory (Spark partitioned directory):
+  s3a://{businessId}/machine-learning/clustering/predictions/product_affinity_clustering.parquet/
+  NOTE: Spark .write.parquet() always creates a directory even when the path ends in .parquet.
+        Actual files: product_affinity_clustering.parquet/part-00000-*.snappy.parquet
+
+Schema:
+  clustering_id              String    — Composite ID: product_id + "_current"
+  product_id                 String    — Product identifier
+  cluster_date               Timestamp — Clustering execution timestamp
+  cluster_id                 Integer   — Assigned cluster number
+  cluster_label              String    — Semantic cluster label (e.g. "Premium High-Rated", "High Volume Sellers", "Budget-Friendly")
+  cluster_centroid_distance  Double    — Distance from cluster centroid (0.0 placeholder)
+  recommended_products       String    — JSON array of products in the same cluster (for cross-sell)
+  cross_sell_opportunities   String    — JSON array of cross-sell product recommendations (same as recommended_products)
+  model_version              String    — Algorithm + k value (e.g. "kmeans_k5")
+
+
+------------------------------------------------------------
+5.2  infer_product_lifecycle.py  (Product Lifecycle Clustering)
+------------------------------------------------------------
+Output Directory (Spark partitioned directory):
+  s3a://{businessId}/machine-learning/clustering/predictions/product_lifecycle_clustering.parquet/
+  NOTE: Spark .write.parquet() always creates a directory even when the path ends in .parquet.
+        Actual files: product_lifecycle_clustering.parquet/part-00000-*.snappy.parquet
+
+Schema:
+  clustering_id              String    — Composite ID: product_id + "_v1"
+  product_id                 String    — Product identifier
+  cluster_date               Timestamp — Clustering execution timestamp
+  cluster_id                 Integer   — Assigned cluster number
+  lifecycle_stage            String    — Lifecycle stage label ("Introduction", "Growth", "Maturity", "Decline")
+  cluster_centroid_distance  Double    — Euclidean distance from cluster centroid
+  stage_characteristics      String    — JSON with age_days, sales_velocity, revenue_velocity, turnover, confidence_score
+  strategic_recommendations  String    — JSON with primary and secondary strategic recommendations
+  model_version              String    — "v1"
+
+
+============================================================
+6. SPECIFIC — REGRESSION
+============================================================
+
+------------------------------------------------------------
+6.1  infer_campaign_roi.py  (Campaign ROI Prediction)
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/regression/predictions/campaign_roi/
+
+Schema:
+  prediction_id              String    — UUID per prediction row
+  campaign_id                String    — Marketing campaign identifier
+  prediction_date            Timestamp — Prediction generation timestamp
+  predicted_roi              Double    — Predicted ROI (%): (predicted_revenue − spent) / spent × 100
+  predicted_revenue          Double    — Predicted campaign revenue ($)
+  predicted_conversions      Integer   — Predicted number of conversions
+  predicted_ctr              Double    — Predicted click-through rate
+  confidence_interval_lower  Double    — ROI lower bound (based on revenue × 0.80)
+  confidence_interval_upper  Double    — ROI upper bound (based on revenue × 1.20)
+  revenue_ci_lower           Double    — Revenue lower bound: predicted_revenue × 0.80 ($)
+  revenue_ci_upper           Double    — Revenue upper bound: predicted_revenue × 1.20 ($)
+  optimization_recommendations String  — JSON array of campaign optimization recommendations
+  confidence_score           Double    — 0.95 (>50 conversions) / 0.85 (>10) / 0.70 (otherwise)
+  model_version              String    — "random_forest_revenue_v2"
+
+
+------------------------------------------------------------
+6.2  infer_delivery_time.py  (Delivery Time Prediction)
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/regression/predictions/delivery_time/
+
+Schema:
+  prediction_id              String    — UUID per prediction row
+  order_id                   String    — Order identifier
+  prediction_date            Timestamp — Prediction generation timestamp
+  predicted_delivery_days    Double    — Predicted delivery time in days (min 1.0)
+  predicted_delivery_date    Date      — Expected delivery date (order_placed_at + predicted_delivery_days)
+  confidence_interval_lower  Double    — Lower bound: predicted_delivery_days × 0.80 (min 1.0)
+  confidence_interval_upper  Double    — Upper bound: predicted_delivery_days × 1.20
+  factors_affecting_delivery String    — JSON array of factors impacting delivery time
+  confidence_score           Double    — 0.95 (≤5 days) / 0.85 (≤10 days) / 0.75 (>10 days)
+  model_version              String    — "random_forest"
+
+
+------------------------------------------------------------
+6.3  infer_demand_forecast.py  (Product Demand Forecasting)
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/regression/predictions/demand_forecast/
+
+Schema:
+  prediction_id              String    — UUID per prediction row
+  product_id                 String    — Product identifier
+  forecast_date              Date      — Target forecast date (prediction_date + forecast_horizon_days)
+  prediction_date            Timestamp — Prediction generation timestamp
+  predicted_demand_units     Double    — Predicted demand in units for the forecast period
+  confidence_interval_lower  Double    — Lower bound: predicted_demand_units × 0.85
+  confidence_interval_upper  Double    — Upper bound: predicted_demand_units × 1.15
+  forecast_horizon_days      Integer   — Forecast horizon in days
+  seasonality_factor         Double    — Current month's seasonal demand factor
+  trend_factor               Double    — Derived trend factor: 1 + growth_rate_1m
+  confidence_score           Double    — Fixed at 0.90
+  model_version              String    — Model algorithm name (e.g. "gbt")
+
+
+------------------------------------------------------------
+6.4  infer_price_optimization.py  (Product Price Optimization)
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/regression/predictions/price_optimization/
+
+Schema:
+  prediction_id              String    — UUID per prediction row
+  product_id                 String    — Product identifier
+  prediction_date            Timestamp — Prediction generation timestamp
+  current_price              Double    — Current product selling price ($)
+  optimal_price              Double    — ML-recommended optimal price (≥ cost × 1.10, rounded to 2 dp)
+  expected_revenue_at_optimal Double   — Projected revenue at optimal price: optimal_price × expected_units ($)
+  expected_units_at_optimal  Integer   — Expected units sold at optimal price (elasticity-adjusted)
+  price_elasticity           Double    — Computed price elasticity of demand
+  competitor_price_range     String    — JSON with min, max, avg competitor/historical price estimates
+  confidence_score           Double    — 0.90 (|elasticity| > 1.0) / 0.80 (> 0.5) / 0.70 (otherwise)
+  model_version              String    — "random_forest"
+
+
+------------------------------------------------------------
+6.5  infer_revenue_forecast.py  (Revenue Forecasting)
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/regression/predictions/revenue_forecast/
+
+Schema:
+  prediction_id              String    — UUID per prediction row
+  forecast_date              Date      — Target forecast date
+  prediction_date            Timestamp — Prediction generation timestamp
+  predicted_revenue          Double    — Predicted total revenue for the forecast period ($)
+  predicted_orders           Integer   — Estimated order count: predicted_revenue / avg_order_value
+  confidence_interval_lower  Double    — Lower bound: predicted_revenue × 0.90 ($)
+  confidence_interval_upper  Double    — Upper bound: predicted_revenue × 1.10 ($)
+  forecast_horizon_days      Integer   — Forecast horizon in days (default 30)
+  seasonality_factor         Double    — Fixed at 1.0 (not seasonally adjusted in this model)
+  trend_factor               Double    — Derived trend factor: 1 + revenue_growth_1m
+  confidence_score           Double    — Fixed at 0.92
+  model_version              String    — Model algorithm name (e.g. "linear_regression")
+
+
+------------------------------------------------------------
+6.6  infer_seasonal_trends.py  (Seasonal Trends Forecasting)
+------------------------------------------------------------
+Output Directory:
+  s3a://{businessId}/machine-learning/regression/predictions/seasonal_trends/
+
+Schema:
+  prediction_id              String    — UUID per prediction row
+  forecast_date              Date      — Target forecast date (first day of forecast month)
+  forecast_month             Integer   — Numeric forecast month (1–12)
+  prediction_date            Timestamp — Prediction generation timestamp
+  predicted_seasonal_index   Double    — Predicted seasonal index (clipped to 0.3 – 3.0)
+                                         > 1.0 = above-average month; < 1.0 = below-average month
+  season_classification      String    — Season strength label ("peak_season", "above_average", "average", "below_average", "low_season")
+  estimated_revenue          Double    — Estimated revenue for the period: seasonal_index × rolling_12m_avg ($)
+  confidence_interval_lower  Double    — Lower bound: predicted_seasonal_index × 0.90
+  confidence_interval_upper  Double    — Upper bound: predicted_seasonal_index × 1.10
+  forecast_horizon_days      Integer   — Forecast horizon in days (default 30)
+  trend_factor               Double    — Derived trend factor: 1 + revenue_growth_rate
+  confidence_score           Double    — Fixed at 0.90
+  model_version              String    — Model algorithm name (e.g. "random_forest")
+
+
+============================================================
+SUMMARY — OUTPUT PATH QUICK REFERENCE
+============================================================
+{BUCKET} = {businessId}   (each business's own MinIO bucket)
+
+GENERAL CLASSIFICATION
+  cart_abandonment_predictions       → s3a://{BUCKET}/machine-learning/classification/predictions/cart_abandonment_predictions
+  customer_churn_predictions         → s3a://{BUCKET}/machine-learning/classification/predictions/customer_churn_predictions
+  customer_segment_predictions       → s3a://{BUCKET}/machine-learning/classification/predictions/customer_segment_predictions
+  payment_success_predictions        → s3a://{BUCKET}/machine-learning/classification/predictions/payment_success_predictions
+  review_sentiment_predictions       → s3a://{BUCKET}/machine-learning/classification/predictions/review_sentiment_predictions
+  stock_status_predictions           → s3a://{BUCKET}/machine-learning/classification/predictions/stock_status_predictions
+
+GENERAL CLUSTERING  (Spark writes .parquet as directory, not single file)
+  customer_segmentation.parquet/      → s3a://{BUCKET}/machine-learning/clustering/predictions/customer_segmentation.parquet/
+  geographic_clustering.parquet/      → s3a://{BUCKET}/machine-learning/clustering/predictions/geographic_clustering.parquet/
+  session_behavior_clustering.parquet/ → s3a://{BUCKET}/machine-learning/clustering/predictions/session_behavior_clustering.parquet/
+  supplier_clustering.parquet/        → s3a://{BUCKET}/machine-learning/clustering/predictions/supplier_clustering.parquet/
+
+GENERAL REGRESSION
+  aov_prediction/                    → s3a://{BUCKET}/machine-learning/regression/predictions/aov_prediction/
+  clv_predictions/                   → s3a://{BUCKET}/machine-learning/regression/predictions/clv_predictions/
+  restock_quantity/                  → s3a://{BUCKET}/machine-learning/regression/predictions/restock_quantity/
+  safety_stock_adjusted/             → s3a://{BUCKET}/machine-learning/regression/predictions/safety_stock_adjusted/
+  session_conversion_value/          → s3a://{BUCKET}/machine-learning/regression/predictions/session_conversion_value/
+  stockout_probability/              → s3a://{BUCKET}/machine-learning/regression/predictions/stockout_probability/
+
+SPECIFIC CLASSIFICATION
+  fulfillment_risk_predictions       → s3a://{BUCKET}/machine-learning/classification/predictions/fulfillment_risk_predictions
+  product_bundling_predictions       → s3a://{BUCKET}/machine-learning/classification/predictions/product_bundling_predictions
+
+SPECIFIC CLUSTERING  (Spark writes .parquet as directory, not single file)
+  product_affinity_clustering.parquet/ → s3a://{BUCKET}/machine-learning/clustering/predictions/product_affinity_clustering.parquet/
+  product_lifecycle_clustering.parquet/ → s3a://{BUCKET}/machine-learning/clustering/predictions/product_lifecycle_clustering.parquet/
+
+SPECIFIC REGRESSION
+  campaign_roi/                      → s3a://{BUCKET}/machine-learning/regression/predictions/campaign_roi/
+  delivery_time/                     → s3a://{BUCKET}/machine-learning/regression/predictions/delivery_time/
+  demand_forecast/                   → s3a://{BUCKET}/machine-learning/regression/predictions/demand_forecast/
+  price_optimization/                → s3a://{BUCKET}/machine-learning/regression/predictions/price_optimization/
+  revenue_forecast/                  → s3a://{BUCKET}/machine-learning/regression/predictions/revenue_forecast/
+  seasonal_trends/                   → s3a://{BUCKET}/machine-learning/regression/predictions/seasonal_trends/
+
+============================================================
+Total inference files documented: 27
+  General  Classification: 6
+  General  Clustering:     4
+  General  Regression:     7  (includes infer_aov.py v1 + infer_aov_v2.py v2, same output dir)
+  Specific Classification: 2
+  Specific Clustering:     2
+  Specific Regression:     6
+============================================================

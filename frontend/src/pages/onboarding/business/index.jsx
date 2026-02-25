@@ -6,8 +6,14 @@ import Heading from '@/components/global/Typography/Heading';
 import Text from '@/components/global/Typography/Text';
 import PrimaryButton from '@/components/global/Button/PrimaryButton';
 import { useNavigate } from 'react-router';
+import { AutoComplete } from 'primereact/autocomplete';
+import axiosInstance from '@/services/api/axiosInstance';
+import { useAuth } from '@/context/AuthContext';
+import { useLocation } from 'react-router-dom';
+import usePageTitle from '@/hooks/usePageTitle';
 
 const AddBusiness = () => {
+    usePageTitle('Onboarding - Business Info');
     const navigate = useNavigate();
     const [businessName, setBusinessName] = useState('');
     const [currency, setCurrency] = useState(null);
