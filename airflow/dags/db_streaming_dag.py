@@ -232,7 +232,8 @@ with DAG(
                 "--mode db "
                 "--business-id {{ params.bucket }} "
                 "--db-uri {{ params.db_uri }} "
-                "--db-tables {{ params.db_tables }}"
+                "--db-tables {{ params.db_tables }} "
+                "--enable-downstream"
                 # No --trigger-once: this must run indefinitely
             ),
         ),

@@ -335,7 +335,9 @@ def run_db_mode(config: dict):
                 print(f"   Waiting {snapshot_wait}s for Debezium initial snapshot...", flush=True)
                 _time.sleep(snapshot_wait)
 
-            run_streaming(trigger_once=trigger_once)
+            enable_downstream = config.get("enable_downstream", False)
+            run_streaming(trigger_once=trigger_once,
+                          enable_downstream=enable_downstream)
 
             # After trigger-once streaming finishes, update mapping status to
             # 'completed' if the streaming callback didn't already do it (e.g.
@@ -384,7 +386,8 @@ def run_db_mode(config: dict):
 
 def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10,
                  kafka_bootstrap: Optional[str] = None,
-                 poll_duration: int = 0, trigger_once: bool = False):
+                 poll_duration: int = 0, trigger_once: bool = False,
+                 enable_downstream: bool = False):
     """
     API mode: Ingest from API endpoint -> Kafka -> Spark Streaming -> mapped folder.
     
@@ -447,7 +450,8 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10,
             os.environ["BUSINESS_ID"] = bucket_name  # For saving mapping results
             if manual_mappings:
                 os.environ["MANUAL_MAPPINGS"] = json.dumps(manual_mappings)
-            run_streaming(trigger_once=trigger_once)
+            run_streaming(trigger_once=trigger_once,
+                          enable_downstream=enable_downstream)
         
         # Run both processes
         print("Starting parallel processes:")
@@ -516,6 +520,9 @@ def main():
                         help='Process all available Kafka messages then exit (db/api mode, Airflow-friendly)')
     parser.add_argument('--poll-duration', type=int, default=0,
                         help='For api mode: run ingestion for N seconds then stop (0=run forever)')
+    parser.add_argument('--enable-downstream', action='store_true',
+                        help='Run downstream pipeline (clean/transform/analyze/ML) inline '
+                             'after each micro-batch for near-real-time latency (db/api mode)')
     
     args = parser.parse_args()
     
@@ -524,6 +531,7 @@ def main():
     bucket_name = args.business_id if args.business_id else CONFIG["bucket_name"]
     trigger_once = args.trigger_once
     poll_duration = args.poll_duration
+    enable_downstream = args.enable_downstream
     
     # Wrap execution in try-except to catch any uncaught errors
     try:
@@ -559,6 +567,7 @@ def main():
                 "db_tables": db_tables,
                 "bucket_name": bucket_name,
                 "trigger_once": trigger_once,
+                "enable_downstream": enable_downstream,
             })
 
         elif mode == "api":
@@ -571,7 +580,8 @@ def main():
             print(f"{'='*60}\n", flush=True)
             
             run_api_mode(api_url, bucket_name, poll_interval, kafka_bootstrap,
-                         poll_duration=poll_duration, trigger_once=trigger_once)
+                         poll_duration=poll_duration, trigger_once=trigger_once,
+                         enable_downstream=enable_downstream)
 
         else:
             error_msg = f"Invalid mode '{mode}'. Valid modes: batch, db, api"

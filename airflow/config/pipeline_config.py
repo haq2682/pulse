@@ -81,6 +81,16 @@ API_POLL_INTERVAL = int(os.getenv("API_POLL_INTERVAL", "30"))   # seconds per po
 API_INITIAL_POLL_DURATION = int(os.getenv("API_INITIAL_POLL_DURATION", "120"))
 
 # ---------------------------------------------------------------------------
+# Inline downstream processing (streaming modes)
+# ---------------------------------------------------------------------------
+# When --enable-downstream is passed to run_mapping.py, the downstream
+# pipeline (clean → transform → analyze → ML inference) runs inline
+# in a background thread immediately after each Spark micro-batch.
+# This reduces end-to-end latency from ~10 min (Airflow cron) to ~10 s – 2 min.
+# The streaming_downstream DAG remains as a fallback at a reduced interval.
+STREAMING_DOWNSTREAM_TIMEOUT = int(os.getenv("STREAMING_DOWNSTREAM_TIMEOUT", "900"))  # 15 min per step
+
+# ---------------------------------------------------------------------------
 # Airflow task defaults (applied to every DAG unless overridden)
 # ---------------------------------------------------------------------------
 DEFAULT_TASK_ARGS = {

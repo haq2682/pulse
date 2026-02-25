@@ -205,7 +205,8 @@ with DAG(
                 "--mode api "
                 "--business-id {{ params.bucket }} "
                 "--api-url {{ params.api_url }} "
-                "--api-poll-interval {{ params.poll_interval }}"
+                "--api-poll-interval {{ params.poll_interval }} "
+                "--enable-downstream"
                 # No --trigger-once: must run indefinitely
                 # No --poll-duration: must poll forever
             ),

@@ -4,42 +4,21 @@ Airflow DAG: Streaming Downstream Pipeline
 Processes data that has been mapped and written to MinIO  mapped/  by
 the continuous db_streaming or api_streaming DAGs.
 
-This is the "batch over streaming" pattern
-------------------------------------------
-The upstream streaming jobs (Debezium CDC or API polling) continuously
-produce normalised Parquet files in MinIO  mapped/.  Instead of running
-separate streaming versions of cleaning/transformation/analysis/inference,
-we run the same BATCH scripts on a short schedule with incremental mode:
+Reduced-interval fallback
+--------------------------
+The primary downstream processing now runs INLINE within the streaming
+job itself (via ``--enable-downstream``), executing the downstream
+pipeline (clean → transform → analyze → ML inference) in a background
+thread immediately after each Spark micro-batch.  This achieves ~10 s –
+2 min end-to-end latency.
 
-  • cleaning.py --incremental  processes only files it hasn't seen yet
-    (tracks state in Redis via incremental_cleaner.py)
-  • transformation.py, analysis.py, infer_all.py  process whatever is
-    in cleaned/, transformed/, etc.
+This DAG remains as a FALLBACK / catch-up mechanism that runs every
+2 minutes (configurable).  It ensures no data is left unprocessed if
+the inline downstream was temporarily unable to run (e.g. resource
+contention, script error, or the streaming job restarting).
 
-Advantages
-----------
-  • Re-uses the exact same, well-tested batch scripts
-  • Incremental cleaning ensures no duplicate processing
-  • Simple crash handling via Airflow retries (no complex streaming state)
-  • Acceptable latency: ~10 min from Kafka event to ML inference result
-
-Schedule
---------
-Default: every 10 minutes.  Adjust via the Airflow Variable
-``streaming_downstream_interval`` (cron syntax) or the docker-compose env.
-
-max_active_runs=1 prevents overlapping runs — if the previous run is still
-processing, the next scheduled run is queued and starts immediately after.
-
-General vs Specific ML models
-------------------------------
-General models are pre-trained globally and only need inference here.
-Specific models must be trained on THIS business's data before inference:
-
-  • ensure_specific_models_trained  checks MinIO for specific model drift
-    baselines under  models/drift_baselines/<model>/baseline.json  in the
-    bucket.  On the very first cycle where data is available it runs
-    specific/train.py; all subsequent cycles skip it in seconds.
+Because cleaning uses ``--incremental``, duplicate processing is
+avoided — files already cleaned by the inline downstream are skipped.
 
 Flow (sequential)
 -----------------
@@ -50,19 +29,11 @@ Flow (sequential)
     → ml_infer
     → trigger_drift_check   (fires ml_retrain asynchronously if drift found)
 
-ML training after the first run is handled exclusively by ml_retrain_dag.py
-(weekly KS-test driven or force_retrain=true).
-
 Relation to db_streaming / api_streaming
 -----------------------------------------
   db_streaming DAG   ─┐
-  api_streaming DAG  ─┤──→  MinIO mapped/  ──→  THIS DAG  ──→  MinIO cleaned/
-                      │                                     transformed/
-                                                            analytics/
-                                                            ml-predictions/
-
-Both source DAGs feed the same mapped/ prefix; this DAG processes all of
-them regardless of which source produced the data.
+  api_streaming DAG  ─┤──→  MinIO mapped/  ──→  [inline downstream]  ──→  dashboard
+                      │                     ──→  [THIS DAG fallback]  ──→  dashboard
 """
 
 from __future__ import annotations
@@ -89,7 +60,7 @@ from config.pipeline_config import (
 )
 
 BUCKET   = Variable.get("default_bucket",              default_var=DEFAULT_BUCKET)
-SCHEDULE = Variable.get("streaming_downstream_interval", default_var="*/10 * * * *")
+SCHEDULE = Variable.get("streaming_downstream_interval", default_var="*/2 * * * *")
 
 _task_defaults = dict(
     owner=DEFAULT_TASK_ARGS["owner"],
@@ -196,9 +167,9 @@ def ensure_specific_models_trained(**context):
 with DAG(
     dag_id="streaming_downstream",
     description=(
-        "Incremental batch processing over streaming output: "
+        "Fallback downstream processing for streaming: "
         "clean (incremental) → transform → analyze → ml_infer. "
-        "Runs every 10 min by default."
+        "Primary processing is inline; this DAG catches up every 2 min."
     ),
     schedule_interval=SCHEDULE,
     start_date=datetime(2024, 1, 1),
