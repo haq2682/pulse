@@ -20,14 +20,16 @@ services:
       - FAST_REFRESH=false
       - WATCHPACK_POLLING=true
     ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - "5173:80"
     networks:
       spark-network:
         ipv4_address: 10.5.0.8
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
   
   api:
     build:
@@ -70,6 +72,11 @@ services:
       spark-network:
         ipv4_address: 10.5.0.9
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
   python:
     build:
       context: .
@@ -98,6 +105,11 @@ services:
       spark-network:
         ipv4_address: 10.5.0.2
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   postgresql:
     build:
@@ -118,6 +130,11 @@ services:
       spark-network:
         ipv4_address: 10.5.0.5
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
 
   minio:
     build:
@@ -212,6 +229,11 @@ services:
       spark-network:
         ipv4_address: 10.5.0.7
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
 
   debezium:
     build:
@@ -301,8 +323,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DATABASE_NAME}
       POSTGRES_SERVER: ${POSTGRES_SERVER}
       KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
-      SINGLE_USER_CREDENTIALS_USERNAME: admin
-      SINGLE_USER_CREDENTIALS_PASSWORD: adminadminadmin
+      SINGLE_USER_CREDENTIALS_USERNAME: ${NIFI_ADMIN_USER:-admin}
+      SINGLE_USER_CREDENTIALS_PASSWORD: ${NIFI_ADMIN_PASSWORD:-adminadminadmin}
     volumes:
       - nifi_data:/opt/nifi/nifi-current/data
       - ./nifi/custom_processors:/opt/nifi/nifi-current/custom_processors # optional for custom scripts

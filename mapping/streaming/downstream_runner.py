@@ -27,11 +27,14 @@ The ``streaming_downstream`` Airflow DAG remains as a reduced-interval
 fallback (every 2 minutes) to catch any data missed by inline processing.
 """
 
+import logging
 import os
 import subprocess
 import threading
 import time
 from typing import Optional
+
+logger = logging.getLogger("pulse.downstream")
 
 # ---------------------------------------------------------------------------
 # Module-level state: a single lock and a running flag prevent concurrent
@@ -73,10 +76,7 @@ def _run_downstream_sync(bucket: str, batch_id: int) -> None:
     Runs inside a background thread — never call directly from foreachBatch.
     """
     overall_start = time.time()
-    print(f"\n{'─'*60}")
-    print(f"🔄 DOWNSTREAM PIPELINE — triggered by batch {batch_id}")
-    print(f"   Bucket: {bucket}")
-    print(f"{'─'*60}")
+    logger.info("DOWNSTREAM PIPELINE — triggered by batch %d, bucket=%s", batch_id, bucket)
 
     for step in _DOWNSTREAM_STEPS:
         step_name = step["name"]
@@ -85,7 +85,7 @@ def _run_downstream_sync(bucket: str, batch_id: int) -> None:
         cmd = ["python", f"/app/{script}"] + args_str.split()
 
         step_start = time.time()
-        print(f"\n  ▶ {step_name}: {' '.join(cmd)}")
+        logger.info("  ▶ %s: %s", step_name, " ".join(cmd))
 
         try:
             result = subprocess.run(
@@ -99,25 +99,24 @@ def _run_downstream_sync(bucket: str, batch_id: int) -> None:
             elapsed = time.time() - step_start
 
             if result.returncode == 0:
-                print(f"  ✅ {step_name} completed in {elapsed:.1f}s")
+                logger.info("  ✅ %s completed in %.1fs", step_name, elapsed)
             else:
                 # Log the error but continue to the next step — partial
                 # downstream results are better than none.
                 stderr_tail = (result.stderr or "")[-500:]
-                print(f"  ⚠️  {step_name} exited with code {result.returncode} "
-                      f"({elapsed:.1f}s)")
-                if stderr_tail:
-                    print(f"     stderr: {stderr_tail}")
+                logger.warning(
+                    "  %s exited with code %d (%.1fs)%s",
+                    step_name, result.returncode, elapsed,
+                    f"\n     stderr: {stderr_tail}" if stderr_tail else "",
+                )
 
         except subprocess.TimeoutExpired:
-            print(f"  ⚠️  {step_name} timed out after 900s — skipping")
+            logger.error("  %s timed out after 900s — skipping", step_name)
         except Exception as exc:
-            print(f"  ⚠️  {step_name} failed: {exc}")
+            logger.error("  %s failed: %s", step_name, exc, exc_info=True)
 
     total = time.time() - overall_start
-    print(f"\n{'─'*60}")
-    print(f"✅ DOWNSTREAM PIPELINE completed in {total:.1f}s (batch {batch_id})")
-    print(f"{'─'*60}\n")
+    logger.info("DOWNSTREAM PIPELINE completed in %.1fs (batch %d)", total, batch_id)
 
 
 def trigger_downstream(bucket: str, batch_id: int) -> bool:
@@ -133,13 +132,13 @@ def trigger_downstream(bucket: str, batch_id: int) -> bool:
     global _downstream_thread
 
     if not _downstream_lock.acquire(blocking=False):
-        print(f"   ⏭️  Downstream already running — skipping for batch {batch_id}")
+        logger.debug("Downstream already running — skipping for batch %d", batch_id)
         return False
 
     # If there's an old thread reference, check if it's still alive
     if _downstream_thread is not None and _downstream_thread.is_alive():
         _downstream_lock.release()
-        print(f"   ⏭️  Downstream thread still alive — skipping for batch {batch_id}")
+        logger.debug("Downstream thread still alive — skipping for batch %d", batch_id)
         return False
 
     def _wrapped():
@@ -154,5 +153,5 @@ def trigger_downstream(bucket: str, batch_id: int) -> bool:
         daemon=True,
     )
     _downstream_thread.start()
-    print(f"   🚀 Downstream pipeline started in background (batch {batch_id})")
+    logger.info("Downstream pipeline started in background (batch %d)", batch_id)
     return True

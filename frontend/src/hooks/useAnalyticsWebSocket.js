@@ -32,14 +32,14 @@ export const useAnalyticsWebSocket = (businessId) => {
     // Connect to WebSocket
     const connect = useCallback(() => {
         if (!businessId) {
-            console.log('No business ID provided, skipping analytics WebSocket connection');
+            import.meta.env.DEV && console.log('No business ID provided, skipping analytics WebSocket connection');
             return;
         }
         
         // Prevent duplicate connections
         if (isConnectingRef.current || 
             (wsRef.current && wsRef.current.readyState === WebSocket.OPEN)) {
-            console.log(`Analytics WebSocket already connected or connecting for business ${businessId}`);
+            import.meta.env.DEV && console.log(`Analytics WebSocket already connected or connecting for business ${businessId}`);
             return;
         }
         
@@ -48,13 +48,13 @@ export const useAnalyticsWebSocket = (businessId) => {
         
         try {
             const wsUrl = getWebSocketUrl(businessId);
-            console.log(`Connecting to Analytics WebSocket: ${wsUrl}`);
+            import.meta.env.DEV && console.log(`Connecting to Analytics WebSocket: ${wsUrl}`);
             
             const ws = new WebSocket(wsUrl);
             wsRef.current = ws;
             
             ws.onopen = () => {
-                console.log('Analytics WebSocket connected');
+                import.meta.env.DEV && console.log('Analytics WebSocket connected');
                 setIsConnected(true);
                 setError(null);
                 reconnectAttemptsRef.current = 0;
@@ -79,11 +79,11 @@ export const useAnalyticsWebSocket = (businessId) => {
                     }
                     
                     const data = JSON.parse(event.data);
-                    console.log('Analytics update received:', data);
+                    import.meta.env.DEV && console.log('Analytics update received:', data);
                     
                     // Handle different event types
                     if (data.event === 'connected') {
-                        console.log('Analytics WebSocket connection confirmed');
+                        import.meta.env.DEV && console.log('Analytics WebSocket connection confirmed');
                         return;
                     }
                     
@@ -109,7 +109,7 @@ export const useAnalyticsWebSocket = (businessId) => {
             };
             
             ws.onclose = () => {
-                console.log('Analytics WebSocket disconnected');
+                import.meta.env.DEV && console.log('Analytics WebSocket disconnected');
                 setIsConnected(false);
                 wsRef.current = null;
                 isConnectingRef.current = false;
@@ -123,7 +123,7 @@ export const useAnalyticsWebSocket = (businessId) => {
                 // Attempt to reconnect
                 if (shouldReconnectRef.current && reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
                     reconnectAttemptsRef.current++;
-                    console.log(`Reconnecting analytics WebSocket... (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`);
+                    import.meta.env.DEV && console.log(`Reconnecting analytics WebSocket... (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`);
                     
                     reconnectTimeoutRef.current = setTimeout(() => {
                         connect();
@@ -182,7 +182,7 @@ export const useAnalyticsWebSocket = (businessId) => {
             });
             
             if (response.ok) {
-                console.log('Manual refresh triggered');
+                import.meta.env.DEV && console.log('Manual refresh triggered');
             }
         } catch (err) {
             console.error('Error triggering manual refresh:', err);

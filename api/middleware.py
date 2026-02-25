@@ -6,8 +6,6 @@ logger = logging.getLogger(__name__)
 
 # Define paths that should be excluded from authentication
 public_paths = [
-    "/docs",
-    "/redoc",
     "/openapi.json",
     "/health",
     "/favicon.ico",
@@ -18,10 +16,19 @@ public_paths = [
     "/auth/google",
     "/auth/google/callback",
     "/",
-    "/health",
     # Ingest stream is polled by api_ingest_service.py without browser auth
     "/ingest",
 ]
+
+# Only expose docs/redoc in non-production environments
+try:
+    from config import get_settings
+    _settings = get_settings()
+    if not _settings.is_production:
+        public_paths.extend(["/docs", "/redoc"])
+except Exception:
+    # Fallback: allow docs if config unavailable
+    public_paths.extend(["/docs", "/redoc"])
 
 async def auth_middleware(request: Request, call_next):
     """

@@ -444,7 +444,6 @@ const Dashboard = () => {
             });
             
             if (response.data.status === 200) {
-                console.log('Business deleted successfully');
                 setShowDeleteDialog(false);
                 // Redirect to analytics page without business ID
                 navigate('/analytics/');
@@ -944,7 +943,7 @@ const Dashboard = () => {
 
                                     {/* Menu Items */}
                                     <button 
-                                        onClick={() => console.log('Profile')}
+                                        onClick={() => {}}
                                         className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
                                     >
                                         <i className="pi pi-user text-gray-500"></i>

@@ -472,7 +472,6 @@ const Connect = () => {
             }
         }
         catch (e) {
-            console.log(e);
             setErrors((prev) => ({ ...prev, form: e.message || 'Failed to fetch ingestion type' }) );
         }
         finally {
@@ -626,8 +625,6 @@ const Connect = () => {
                 // Update UI
                 setMappingLoading(false);
                 setCancellingMapping(false);
-                
-                console.log('Mapping cancelled successfully');
             }
         } catch (e) {
             setCancellingMapping(false);
