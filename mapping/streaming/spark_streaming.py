@@ -192,8 +192,8 @@ def extract_table_dataframes(batch_df: DataFrame) -> tuple:
     return all_dataframes, operations
 
 
-def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_client, manual_mappings=None, business_id=None):
-    """Process each micro-batch with CDC operation support"""
+def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_client, manual_mappings=None, business_id=None, enable_downstream=False):
+    """Process each micro-batch with CDC operation support and optional inline downstream."""
     print(f"\n{'='*60}")
     print(f"Processing batch {batch_id}")
     print(f"{'='*60}")
@@ -359,13 +359,38 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
     print(f"✅ Batch {batch_id} completed: {len(results)} tables processed")
     print(f"   Data saved to {OUTPUT_BUCKET}/{target_folder}/")
 
+    # ── Trigger inline downstream pipeline (clean → transform → analyze → ML) ──
+    # Only runs when:
+    #  1. enable_downstream is True (set by --enable-downstream flag)
+    #  2. Data was written to the final "mapped" folder (not "mapped-temp")
+    #  3. Not in trigger-once mode (batch_id > 0 or continuous streaming)
+    if enable_downstream and target_folder == "mapped" and batch_id > 0:
+        try:
+            from streaming.downstream_runner import trigger_downstream
+            trigger_downstream(OUTPUT_BUCKET, batch_id)
+        except Exception as downstream_err:
+            # Never let downstream errors crash the mapping stream
+            print(f"   ⚠️  Could not trigger downstream: {downstream_err}")
 
-def run_streaming():
-    """Main streaming pipeline"""
+
+def run_streaming(trigger_once: bool = False, enable_downstream: bool = False):
+    """Main streaming pipeline.
+
+    Args:
+        trigger_once: When True, uses Spark's availableNow trigger so the job
+                      processes all pending Kafka messages and then exits cleanly.
+                      Use this for Airflow-managed micro-batch execution.
+        enable_downstream: When True, runs the downstream pipeline
+                           (clean → transform → analyze → ML inference)
+                           inline after each micro-batch, reducing end-to-end
+                           latency from ~10 min to ~10 s – 2 min.
+    """
     print("Starting Spark Streaming Pipeline")
     print(f"Kafka: {KAFKA_BOOTSTRAP}")
     print(f"Checkpoint: {CHECKPOINT_LOCATION}")
-    print(f"Output bucket: {OUTPUT_BUCKET}\n")
+    print(f"Output bucket: {OUTPUT_BUCKET}")
+    print(f"Trigger-once mode: {trigger_once}")
+    print(f"Inline downstream: {enable_downstream}\n")
     
     # Retrieve manual mappings from environment variable
     manual_mappings = None
@@ -408,16 +433,22 @@ def run_streaming():
     json_stream = read_kafka_stream(spark)
     
     # Process with foreachBatch
-    query = (
+    writer = (
         json_stream.writeStream
-        .foreachBatch(lambda df, id: process_microbatch(df, id, columns_info, minio_client, manual_mappings, business_id))
+        .foreachBatch(lambda df, bid: process_microbatch(df, bid, columns_info, minio_client, manual_mappings, business_id, enable_downstream))
         .outputMode("append")
         .option("checkpointLocation", CHECKPOINT_LOCATION)
-        .start()
     )
-    
-    print("Streaming query started. Press Ctrl+C to stop.\n")
-    
+
+    if trigger_once:
+        # availableNow: process all pending Kafka messages then stop (Airflow-friendly)
+        writer = writer.trigger(availableNow=True)
+        print("Streaming query started in trigger-once mode (availableNow).\n")
+    else:
+        print("Streaming query started. Press Ctrl+C to stop.\n")
+
+    query = writer.start()
+
     try:
         query.awaitTermination()
     except KeyboardInterrupt:

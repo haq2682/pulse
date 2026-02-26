@@ -281,7 +281,6 @@ const Mapping = () => {
                 });
                 
                 if (applyResponse.status === 200) {
-                    console.log('Manual mappings applied successfully');
                     
                     // Confirm mapping and navigate to dashboard
                     const response = await axiosInstance.post('/onboarding/confirm-mapping', {
@@ -401,7 +400,6 @@ const Mapping = () => {
                 
                 // Show message but don't navigate away - user stays on mapping page
                 setError('Manual mapping was cancelled. You can adjust your mappings and try again.');
-                console.log('Mapping cancelled successfully');
             }
         } catch (e) {
             setCancellingMapping(false);

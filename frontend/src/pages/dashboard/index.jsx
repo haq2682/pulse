@@ -286,7 +286,7 @@ const INSIGHT_CATALOG = [
 const Dashboard = () => {
     usePageTitle('Dashboard');
     const { logout, user } = useAuth();
-    const { startPipeline } = usePipelineProgress();
+    const { startPipeline, pipelineStatus: contextPipelineStatus, pipelineEverCompleted: contextPipelineEverCompleted } = usePipelineProgress();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [selectedBusiness, setSelectedBusiness] = useState(null);
     const navigate = useNavigate();
@@ -302,8 +302,15 @@ const Dashboard = () => {
     const profileRef = useRef(null);
     // NEW: Pipeline status for streaming modes
     const [pipelineStatus, setPipelineStatus] = useState('idle');
+    // NEW: Tracks whether the first pipeline has completed for this business (db/api modes)
+    const [pipelineCompletedBefore, setPipelineCompletedBefore] = useState(false);
+    const pipelineCompletedBeforeRef = useRef(false);
+    // NEW: Error banner state for subsequent streaming-batch failures
+    const [streamingError, setStreamingError] = useState(false);
     // NEW: Toast ref for notifications
     const toastRef = useRef(null);
+    // NEW: Ref for auto-reset timeouts so they can be cleared on unmount/business switch
+    const statusTimeoutRef = useRef(null);
 
     // Search Insight state
     const [searchQuery, setSearchQuery] = useState('');
@@ -399,9 +406,67 @@ const Dashboard = () => {
                     setBusinessIngestionType(business.ingestion_type);
                 }
                 setSelectedBusiness(businessId);
+                // Reset completion flag on business switch; it will be restored
+                // asynchronously once fetchPipelineStatus returns the DB value.
+                pipelineCompletedBeforeRef.current = false;
+                setPipelineCompletedBefore(false);
+                setStreamingError(false);
+                setPipelineStatus('idle');
             }
         }
     }, [businessId, businesses]);
+
+    // Sync the DB-backed "ever completed" flag from context into local state.
+    // This is updated by fetchPipelineStatus (called by InlinePipelineProgress on
+    // business change) so it reflects the persisted value across devices.
+    useEffect(() => {
+        pipelineCompletedBeforeRef.current = contextPipelineEverCompleted;
+        setPipelineCompletedBefore(contextPipelineEverCompleted);
+    }, [contextPipelineEverCompleted]);
+
+    // Sync the context pipeline status (WebSocket) → local pipelineStatus so that
+    // the IngestionStatusIndicator circular arrow reflects streaming pipeline activity
+    // without blocking the analytics dashboard with the Knob overlay.
+    useEffect(() => {
+        const isStreamingMode = businessIngestionType === 'db' || businessIngestionType === 'api';
+        if (!isStreamingMode) return;
+
+        const status = contextPipelineStatus?.status;
+        if (status === 'running') {
+            setPipelineStatus('running');
+        } else if (status === 'completed') {
+            // Update immediately so the Knob is suppressed for any subsequent microbatch
+            // within the same session.  contextPipelineEverCompleted (set by fetchPipelineStatus
+            // on each business load) is the authoritative cross-device source of truth; this
+            // local update ensures zero-latency for same-session transitions.
+            pipelineCompletedBeforeRef.current = true;
+            setPipelineCompletedBefore(true);
+            setStreamingError(false);
+            setPipelineStatus('success');
+            if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
+            statusTimeoutRef.current = setTimeout(() => setPipelineStatus('idle'), 3000);
+        } else if (status === 'failed') {
+            setPipelineStatus('failed');
+            // Only show the error banner when analytics are already displayed (subsequent batch)
+            if (pipelineCompletedBeforeRef.current) {
+                setStreamingError(true);
+                // Do NOT auto-reset; user must manually retry via the arrow button
+            } else {
+                // First batch: InlinePipelineProgress shows the full Knob error UI.
+                // Auto-reset the header indicator so it doesn't stay red indefinitely.
+                if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
+                statusTimeoutRef.current = setTimeout(() => setPipelineStatus('idle'), 5000);
+            }
+        }
+    }, [contextPipelineStatus?.status, businessIngestionType]);
+
+    // Clear any pending auto-reset timer on unmount to avoid state updates on
+    // an unmounted component.
+    useEffect(() => {
+        return () => {
+            if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
+        };
+    }, []);
     
     // Handle starting analysis
     const handleStartAnalysis = async () => {
@@ -444,7 +509,6 @@ const Dashboard = () => {
             });
             
             if (response.data.status === 200) {
-                console.log('Business deleted successfully');
                 setShowDeleteDialog(false);
                 // Redirect to analytics page without business ID
                 navigate('/analytics/');
@@ -461,6 +525,7 @@ const Dashboard = () => {
 
     // Function to trigger streaming pipeline
     const triggerStreamingPipeline = async () => {
+        setStreamingError(false);
         setPipelineStatus('running');
         
         try {
@@ -483,14 +548,17 @@ const Dashboard = () => {
             }
         } catch (error) {
             setPipelineStatus('failed');
-            toastRef.current?.show({
-                severity: 'error',
-                summary: 'Error',
-                detail: 'Failed to trigger streaming pipeline',
-                life: 5000
-            });
-            // Return to idle after 5 seconds
-            setTimeout(() => setPipelineStatus('idle'), 5000);
+            // Show banner if analytics were already visible, otherwise just show toast
+            if (pipelineCompletedBeforeRef.current) {
+                setStreamingError(true);
+            } else {
+                toastRef.current?.show({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: 'Failed to trigger streaming pipeline',
+                    life: 5000
+                });
+            }
         }
     };
 
@@ -944,7 +1012,7 @@ const Dashboard = () => {
 
                                     {/* Menu Items */}
                                     <button 
-                                        onClick={() => console.log('Profile')}
+                                        onClick={() => {}}
                                         className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
                                     >
                                         <i className="pi pi-user text-gray-500"></i>
@@ -1019,7 +1087,25 @@ const Dashboard = () => {
                             <InlinePipelineProgress
                                 businessId={businessId}
                                 onStartAnalysis={handleStartAnalysis}
+                                ingestionType={businessIngestionType}
+                                pipelineCompletedBefore={pipelineCompletedBefore || contextPipelineEverCompleted}
                             />
+                            {/* Error banner for streaming-mode subsequent-batch failures */}
+                            {streamingError && (
+                                <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-300 rounded-lg flex items-center gap-3">
+                                    <i className="pi pi-exclamation-circle text-red-500 text-lg flex-shrink-0" />
+                                    <span className="text-red-700 text-sm font-medium">
+                                        An error occurred while trying to fetch and process data.
+                                    </span>
+                                    <button
+                                        onClick={() => setStreamingError(false)}
+                                        className="ml-auto text-red-400 hover:text-red-600 transition-colors"
+                                        aria-label="Dismiss error"
+                                    >
+                                        <i className="pi pi-times text-sm" />
+                                    </button>
+                                </div>
+                            )}
                             {/* Render appropriate analytics content based on route */}
                             {renderAnalyticsContent()}
                         </CurrencyProvider>

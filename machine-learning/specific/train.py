@@ -1,3 +1,4 @@
+import argparse
 import sys
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from specific.training.regression.train_seasonal_trends import main as seasonal_
 from specific.training.clustering.train_product_affinity import main as product_affinity
 from specific.training.clustering.train_product_lifecycle import main as product_lifecycle
 
+
 def main(BUCKET_NAME):
     fulfillment_risk(BUCKET_NAME)
     product_bundling(BUCKET_NAME)
@@ -31,6 +33,9 @@ def main(BUCKET_NAME):
     product_affinity(BUCKET_NAME)
     product_lifecycle(BUCKET_NAME)
 
+
 if __name__ == "__main__":
-    BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME)
+    parser = argparse.ArgumentParser(description="Train all specific ML models for a business bucket")
+    parser.add_argument("--bucket-name", type=str, required=True, help="Business MinIO bucket name")
+    args = parser.parse_args()
+    main(args.bucket_name)

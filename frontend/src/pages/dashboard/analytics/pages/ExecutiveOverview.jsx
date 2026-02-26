@@ -157,7 +157,6 @@ const ExecutiveOverview = () => {
                 }
 
                 const json = await res.json();
-                console.log('[ExecutiveOverview] Fetched data:', json);
                 if (json.mode) setDataMode(json.mode);
                 setRawCategories(json.categories ?? {});
             } catch (err) {

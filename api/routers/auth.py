@@ -25,7 +25,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 COOKIE_NAME = "session_id"
 COOKIE_SETTINGS = {
     "httponly": True,
-    "secure": False,  # Set True in production
+    "secure": settings.is_production,
     "samesite": "lax",
     "max_age": settings.session_expire_minutes * 60
 }

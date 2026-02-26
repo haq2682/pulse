@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     # Frontend
     frontend_url: str = "http://localhost:5173"
     
+    # Environment: "development" or "production"
+    environment: str = "development"
+    
+    @property
+    def is_production(self) -> bool:
+        return self.environment.lower() == "production"
+    
     @property
     def database_url(self) -> str:
         return f"postgresql://{self.postgres_user}:{self.postgres_password}@{self.postgres_server}/{self.postgres_database_name}"

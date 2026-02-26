@@ -536,7 +536,7 @@ The Debezium container is already defined in `docker-compose.yml`:
 
 ```yaml
 debezium:
-  image: debezium/connect:2.5
+  image: debezium/connect:3.4
   container_name: debezium
   depends_on:
     - kafka
@@ -572,20 +572,20 @@ docker-compose up -d debezium
 
 ### Installing Additional Connector Plugins
 
-The default `debezium/connect:2.5` image ships with connectors for **PostgreSQL, MySQL, MongoDB, SQL Server, Oracle, Db2**. For other databases, you need to add plugins.
+The default `debezium/connect:3.4` image ships with connectors for **PostgreSQL, MySQL, MongoDB, SQL Server, Oracle, Db2**. For other databases, you need to add plugins.
 
 To add connectors for Vitess, Spanner, Informix, MariaDB, or Cassandra, create a custom Dockerfile:
 
 ```dockerfile
-FROM debezium/connect:2.5
+FROM debezium/connect:3.4
 
 # Example: add Vitess connector
 RUN cd /kafka/connect && \
-    curl -L https://repo1.maven.org/maven2/io/debezium/debezium-connector-vitess/2.5.0.Final/debezium-connector-vitess-2.5.0.Final-plugin.tar.gz | tar xz
+    curl -L https://repo1.maven.org/maven2/io/debezium/debezium-connector-vitess/3.4.0.Final/debezium-connector-vitess-3.4.0.Final-plugin.tar.gz | tar xz
 
 # Example: add Spanner connector
 RUN cd /kafka/connect && \
-    curl -L https://repo1.maven.org/maven2/io/debezium/debezium-connector-spanner/2.5.0.Final/debezium-connector-spanner-2.5.0.Final-plugin.tar.gz | tar xz
+    curl -L https://repo1.maven.org/maven2/io/debezium/debezium-connector-spanner/3.4.0.Final/debezium-connector-spanner-3.4.0.Final-plugin.tar.gz | tar xz
 ```
 
 Then update `docker-compose.yml` to build from it:

@@ -16,18 +16,17 @@ services:
       - VITE_MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
       - VITE_KAFKA_BOOTSTRAP=${KAFKA_BOOTSTRAP_EXTERNAL}
       - VITE_API_URL=${VITE_API_URL}
-      - CHOKIDAR_USEPOLLING=true
-      - FAST_REFRESH=false
-      - WATCHPACK_POLLING=true
     ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - "5173:80"
     networks:
       spark-network:
         ipv4_address: 10.5.0.8
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
   
   api:
     build:
@@ -70,6 +69,11 @@ services:
       spark-network:
         ipv4_address: 10.5.0.9
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
   python:
     build:
       context: .
@@ -98,6 +102,11 @@ services:
       spark-network:
         ipv4_address: 10.5.0.2
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   postgresql:
     build:
@@ -110,6 +119,9 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DATABASE_NAME}
+      - DEBEZIUM_PASSWORD=${DEBEZIUM_PASSWORD}
+      # Enable logical replication so Debezium can read the WAL from this database
+      - POSTGRESQL_WAL_LEVEL=logical
     ports:
       - "5432:5432"
     volumes:
@@ -118,6 +130,11 @@ services:
       spark-network:
         ipv4_address: 10.5.0.5
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
 
   minio:
     build:
@@ -212,6 +229,11 @@ services:
       spark-network:
         ipv4_address: 10.5.0.7
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
 
   debezium:
     build:
@@ -247,6 +269,63 @@ services:
       spark-network:
         ipv4_address: 10.5.0.10
     restart: always
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Cassandra — source database for Cassandra CDC mode
+  # CDC is enabled in the image (see .docker/cassandra/Dockerfile).
+  # After starting, enable CDC per table:
+  #   docker exec -it cassandra cqlsh
+  #   ALTER TABLE your_keyspace.orders WITH cdc = true;
+  # ─────────────────────────────────────────────────────────────────────────
+  cassandra:
+    build:
+      context: .
+      dockerfile: .docker/cassandra/Dockerfile
+    container_name: cassandra
+    environment:
+      CASSANDRA_CLUSTER_NAME: pulse-cluster
+      CASSANDRA_DC: dc1
+      CASSANDRA_RACK: rack1
+      HEAP_NEWSIZE: 128M
+      MAX_HEAP_SIZE: 512M
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+      - cassandra_commitlog:/var/lib/cassandra/commitlog
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.55
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Debezium Server — Cassandra CDC connector (separate from the Kafka Connect
+  # debezium service; the Cassandra connector reads commit log files directly
+  # from the shared cassandra_commitlog volume)
+  # ─────────────────────────────────────────────────────────────────────────
+  debezium-cassandra:
+    image: quay.io/debezium/server:3.4
+    container_name: debezium-cassandra
+    depends_on:
+      - cassandra
+      - kafka
+    volumes:
+      - cassandra_commitlog:/cassandra/commitlog
+      - ./conf/debezium-cassandra.properties:/debezium/conf/application.properties
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.56
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:7-alpine
@@ -301,8 +380,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DATABASE_NAME}
       POSTGRES_SERVER: ${POSTGRES_SERVER}
       KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
-      SINGLE_USER_CREDENTIALS_USERNAME: admin
-      SINGLE_USER_CREDENTIALS_PASSWORD: adminadminadmin
+      SINGLE_USER_CREDENTIALS_USERNAME: ${NIFI_ADMIN_USER:?NIFI_ADMIN_USER must be set}
+      SINGLE_USER_CREDENTIALS_PASSWORD: ${NIFI_ADMIN_PASSWORD:?NIFI_ADMIN_PASSWORD must be set}
     volumes:
       - nifi_data:/opt/nifi/nifi-current/data
       - ./nifi/custom_processors:/opt/nifi/nifi-current/custom_processors # optional for custom scripts
@@ -310,6 +389,133 @@ services:
     networks:
       spark-network:
         ipv4_address: 10.5.0.12
+    restart: always
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Apache Airflow  (webserver + scheduler, LocalExecutor)
+  # UI:  http://localhost:8090   admin / admin  (change via AIRFLOW_ADMIN_*)
+  # ─────────────────────────────────────────────────────────────────────────
+
+  # One-shot init container: create the metadata DB and the admin user.
+  # It exits after completing; docker restart policy is "on-failure" so it
+  # won't loop if it succeeds.
+  airflow-init:
+    image: apache/airflow:2.8.0-python3.10
+    container_name: airflow-init
+    depends_on:
+      - postgresql
+      - redis
+    env_file:
+      - .env
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-pulse_secret_key_change_me}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/utils:/opt/airflow/utils
+      - ./airflow/config:/opt/airflow/config
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: >
+      bash -c "
+        airflow db migrate &&
+        airflow db upgrade &&
+        airflow connections create-default-connections &&
+        airflow users create --username ${AIRFLOW_ADMIN_USER:-admin} --password ${AIRFLOW_ADMIN_PASSWORD:-admin} --firstname Pulse --lastname Admin --role Admin --email admin@pulse.local
+      "
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.16
+    restart: on-failure
+
+  airflow-webserver:
+    image: apache/airflow:2.8.0-python3.10
+    container_name: airflow-webserver
+    depends_on:
+      - airflow-init
+      - postgresql
+      - redis
+    env_file:
+      - .env
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
+      - AIRFLOW__WEBSERVER__RATE_LIMIT_STORAGE_URL=redis://10.5.0.11:6379/0
+      - AIRFLOW__WEBSERVER__RATE_LIMIT_ENABLED=True
+      - AIRFLOW__WEBSERVER__RATE_LIMIT_DEFAULT=200 per day;50 per hour
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLt0jJgrg=}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-pulse_secret_key_change_me}
+      - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
+      - AIRFLOW__CORE__PLUGINS_FOLDER=/opt/airflow/plugins
+      - AIRFLOW__LOGGING__BASE_LOG_FOLDER=/opt/airflow/logs
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - KAFKA_BOOTSTRAP=${KAFKA_BOOTSTRAP}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE_NAME=${POSTGRES_DATABASE_NAME}
+      - POSTGRES_SERVER=${POSTGRES_SERVER}
+      - REDIS_HOST=${REDIS_HOST:-10.5.0.11}
+      - DEBEZIUM_URL=http://10.5.0.10:8083
+      - PIPELINE_PYTHON_CONTAINER=python
+      - PYTHONPATH=/opt/airflow/utils:/opt/airflow/config
+    ports:
+      - "8090:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/utils:/opt/airflow/utils
+      - ./airflow/config:/opt/airflow/config
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: webserver
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.17
+    restart: always
+
+  airflow-scheduler:
+    image: apache/airflow:2.8.0-python3.10
+    container_name: airflow-scheduler
+    depends_on:
+      - airflow-webserver
+    env_file:
+      - .env
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLt0jJgrg=}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-pulse_secret_key_change_me}
+      - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
+      - AIRFLOW__CORE__PLUGINS_FOLDER=/opt/airflow/plugins
+      - AIRFLOW__LOGGING__BASE_LOG_FOLDER=/opt/airflow/logs
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - KAFKA_BOOTSTRAP=${KAFKA_BOOTSTRAP}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE_NAME=${POSTGRES_DATABASE_NAME}
+      - POSTGRES_SERVER=${POSTGRES_SERVER}
+      - REDIS_HOST=${REDIS_HOST:-10.5.0.11}
+      - DEBEZIUM_URL=http://10.5.0.10:8083
+      - PIPELINE_PYTHON_CONTAINER=python
+      - PYTHONPATH=/opt/airflow/utils:/opt/airflow/config
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/utils:/opt/airflow/utils
+      - ./airflow/config:/opt/airflow/config
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: scheduler
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.18
     restart: always
 
   nginx:
@@ -357,3 +563,6 @@ volumes:
   app:
   redis_data:
   nifi_data:
+  airflow_logs:
+  cassandra_data:
+  cassandra_commitlog:

@@ -356,7 +356,7 @@ def _vitess_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
         "table.include.list": _build_table_include_list(
             "vitess", tables, parsed["database"]
         ),
-        "vitess.tablet.type": "MASTER",
+        "vitess.tablet.type": "PRIMARY",
         "snapshot.mode": "initial",
     }
     config.update(_common_converter_config())

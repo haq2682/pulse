@@ -6,6 +6,7 @@ const PipelineProgressContext = createContext(null);
 export const PipelineProgressProvider = ({ children }) => {
     const { user } = useAuth();
     const [pipelineStatus, setPipelineStatus] = useState(null);
+    const [pipelineEverCompleted, setPipelineEverCompleted] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState(null);
     
@@ -33,13 +34,13 @@ export const PipelineProgressProvider = ({ children }) => {
         // Prevent duplicate connections for the same business
         if (isConnectingRef.current || 
             (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && currentBusinessIdRef.current === businessId)) {
-            console.log(`WebSocket already connected or connecting for business ${businessId}`);
+            import.meta.env.DEV && console.log(`WebSocket already connected or connecting for business ${businessId}`);
             return;
         }
         
         // Close existing connection if switching to a different business
         if (wsRef.current && currentBusinessIdRef.current !== businessId) {
-            console.log(`Closing existing connection for business ${currentBusinessIdRef.current}`);
+            import.meta.env.DEV && console.log(`Closing existing connection for business ${currentBusinessIdRef.current}`);
             wsRef.current.close();
             wsRef.current = null;
         }
@@ -50,13 +51,13 @@ export const PipelineProgressProvider = ({ children }) => {
         
         try {
             const wsUrl = getWebSocketUrl(businessId);
-            console.log(`Connecting to WebSocket: ${wsUrl}`);
+            import.meta.env.DEV && console.log(`Connecting to WebSocket: ${wsUrl}`);
             
             const ws = new WebSocket(wsUrl);
             wsRef.current = ws;
             
             ws.onopen = () => {
-                console.log('WebSocket connected');
+                import.meta.env.DEV && console.log('WebSocket connected');
                 setIsConnected(true);
                 setError(null);
                 reconnectAttemptsRef.current = 0;
@@ -81,7 +82,7 @@ export const PipelineProgressProvider = ({ children }) => {
                     }
                     
                     const data = JSON.parse(event.data);
-                    console.log('Pipeline update received:', data);
+                    import.meta.env.DEV && console.log('Pipeline update received:', data);
                     setPipelineStatus(data);
                 } catch (err) {
                     console.error('Error parsing WebSocket message:', err);
@@ -95,7 +96,7 @@ export const PipelineProgressProvider = ({ children }) => {
             };
             
             ws.onclose = () => {
-                console.log('WebSocket disconnected');
+                import.meta.env.DEV && console.log('WebSocket disconnected');
                 setIsConnected(false);
                 wsRef.current = null;
                 isConnectingRef.current = false;
@@ -111,7 +112,7 @@ export const PipelineProgressProvider = ({ children }) => {
                     reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS &&
                     currentBusinessIdRef.current === businessId) {
                     reconnectAttemptsRef.current++;
-                    console.log(`Reconnecting... (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`);
+                    import.meta.env.DEV && console.log(`Reconnecting... (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`);
                     
                     reconnectTimeoutRef.current = setTimeout(() => {
                         connectWebSocket(businessId);
@@ -153,6 +154,9 @@ export const PipelineProgressProvider = ({ children }) => {
     // Fetch current pipeline status from REST API
     const fetchPipelineStatus = useCallback(async (businessId) => {
         if (!businessId) return;
+        // Reset "ever completed" immediately so switching businesses never leaks
+        // a previous business's true value into the new business's first render.
+        setPipelineEverCompleted(false);
         setPipelineStatus('loading');
         try {
             const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -160,14 +164,25 @@ export const PipelineProgressProvider = ({ children }) => {
             
             if (response.ok) {
                 const result = await response.json();
+                // Persist the cross-device "ever completed" flag from the DB
+                setPipelineEverCompleted(
+                    typeof result.pipeline_ever_completed === 'boolean'
+                        ? result.pipeline_ever_completed
+                        : false
+                );
                 if (result.data) {
                     setPipelineStatus(result.data);
                 } else if (result.pipeline_status === 'not_started') {
                     setPipelineStatus(null);
                 }
+            } else {
+                // Non-2xx: treat as unknown — conservatively keep false
+                setPipelineEverCompleted(false);
+                setPipelineStatus(null);
             }
         } catch (err) {
             console.error('Error fetching pipeline status:', err);
+            setPipelineEverCompleted(false);
             setPipelineStatus(null);
         }
     }, []);
@@ -280,6 +295,7 @@ export const PipelineProgressProvider = ({ children }) => {
     
     const value = {
         pipelineStatus,
+        pipelineEverCompleted,
         isConnected,
         error,
         connectWebSocket,

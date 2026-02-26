@@ -187,7 +187,6 @@ const Landing = () => {
                         <NavLink to="/login">
                             <SecondaryButton
                                 label="Log In"
-                                onClick={() => console.log('Log In clicked')}
                                 className="! bg-white"
                             />
                         </NavLink>
@@ -228,7 +227,6 @@ const Landing = () => {
                                 <NavLink to="/signup">
                                     <SecondaryButton
                                         label="Get Started"
-                                        onClick={() => console.log('Get Started clicked')}
                                         className=""
                                     />
                                 </NavLink>
@@ -549,7 +547,6 @@ const Landing = () => {
                                 <NavLink to="/signup">
                                     <SecondaryButton
                                         label="Get Started"
-                                        onClick={() => console.log('Get Started clicked')}
                                     />
                                 </NavLink>
                             </div>

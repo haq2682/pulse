@@ -2,12 +2,15 @@
 Pipeline API router for managing data processing pipeline execution.
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from database import get_db
 from sqlalchemy import text
 from services.pipeline_service import PipelineService
-from services.streaming_pipeline_service import StreamingPipelineService
 from services.websocket_manager import WebSocketManager
+
+logger = logging.getLogger("pulse.pipeline")
 
 
 router = APIRouter(
@@ -22,76 +25,63 @@ websocket_manager = WebSocketManager()
 @router.post("/start")
 async def start_pipeline(request: Request, db=Depends(get_db)):
     """
-    Start the data processing pipeline for a business.
-    
+    Start the batch downstream pipeline for a business.
+
+    Triggered by the frontend after the user confirms column mapping.
+    For db/api ingestion modes the streaming supervisor DAGs (db_streaming /
+    api_streaming) run continuously in Airflow; this endpoint only handles
+    the batch post-mapping stages (clean → transform → analyze → ml_infer).
+
     Request body:
         - userId: User ID
         - businessId: Business ID (used as bucket name)
-        - mode: Pipeline mode - "batch" (default), "streaming" 
-        - ingestionMode: Data ingestion mode - "batch", "db" (CDC), or "api" (for streaming)
     """
     try:
         body = await request.json()
         user_id = body.get("userId")
         business_id = body.get("businessId")
-        pipeline_mode = body.get("mode", "batch")  # batch or streaming
-        ingestion_mode = body.get("ingestionMode", "batch")  # batch, db, or api
-        
+
         if not user_id or not business_id:
             raise HTTPException(status_code=400, detail="userId and businessId are required")
-        
+
         # Verify business belongs to user
         result = db.execute(
             text("SELECT business_id FROM businesses WHERE business_id = :business_id AND user_id = :user_id"),
             {"business_id": business_id, "user_id": user_id}
         ).fetchone()
-        
+
         if not result:
             raise HTTPException(status_code=404, detail="Business not found or access denied")
-        
+
         # Check if pipeline is already running
         existing = db.execute(
             text("""
-                SELECT pipeline_id, status FROM pipeline_status 
+                SELECT pipeline_id, status FROM pipeline_status
                 WHERE business_id = :business_id AND status = 'running'
                 ORDER BY started_at DESC LIMIT 1
             """),
             {"business_id": business_id}
         ).fetchone()
-        
+
         if existing:
             raise HTTPException(
-                status_code=409, 
+                status_code=409,
                 detail="Pipeline is already running for this business"
             )
-        
-        # Start appropriate pipeline based on mode
-        if pipeline_mode == "streaming":
-            # Start streaming pipeline
-            streaming_service = StreamingPipelineService(db, websocket_manager)
-            pipeline_id = await streaming_service.start_streaming_pipeline(
-                business_id, user_id, mode=ingestion_mode
-            )
-            message = f"Streaming pipeline started successfully (mode: {ingestion_mode})"
-        else:
-            # Start traditional batch pipeline
-            pipeline_service = PipelineService(db, websocket_manager)
-            pipeline_id = await pipeline_service.start_pipeline(business_id, user_id)
-            message = "Batch pipeline started successfully"
-        
+
+        pipeline_service = PipelineService(db, websocket_manager)
+        pipeline_id = await pipeline_service.start_pipeline(business_id, user_id)
+
         return {
             "status": 200,
-            "message": message,
+            "message": "Batch pipeline started successfully",
             "pipeline_id": pipeline_id,
-            "pipeline_mode": pipeline_mode
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error starting pipeline: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Error starting pipeline: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -106,22 +96,25 @@ async def get_pipeline_status(business_id: str, db=Depends(get_db)):
     try:
         pipeline_service = PipelineService(db, websocket_manager)
         status_info = pipeline_service.get_pipeline_status_info(business_id)
-        
+        ever_completed = pipeline_service.has_pipeline_ever_completed(business_id)
+
         if not status_info:
             return {
                 "status": 200,
                 "pipeline_status": "not_started",
+                "pipeline_ever_completed": ever_completed,
                 "message": "No pipeline execution found for this business"
             }
-        
+
         return {
             "status": 200,
             "pipeline_status": status_info["status"],
+            "pipeline_ever_completed": ever_completed,
             "data": status_info
         }
         
     except Exception as e:
-        print(f"Error getting pipeline status: {e}")
+        logger.error("Error getting pipeline status: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -181,9 +174,7 @@ async def cancel_pipeline(request: Request, db=Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error cancelling pipeline: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Error cancelling pipeline: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -246,9 +237,7 @@ async def retry_pipeline(request: Request, db=Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error retrying pipeline: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Error retrying pipeline: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -275,5 +264,5 @@ async def websocket_endpoint(websocket: WebSocket, business_id: str):
     except WebSocketDisconnect:
         websocket_manager.disconnect(websocket, business_id)
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        logger.error("WebSocket error: %s", e, exc_info=True)
         websocket_manager.disconnect(websocket, business_id)

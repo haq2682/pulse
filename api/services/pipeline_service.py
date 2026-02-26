@@ -14,10 +14,13 @@ import asyncio
 import subprocess
 import uuid
 import json
+import logging
 import signal
 from datetime import datetime
 from typing import Optional, Dict, Any
 from sqlalchemy import text
+
+logger = logging.getLogger("pulse.pipeline")
 
 
 class PipelineService:
@@ -78,7 +81,7 @@ class PipelineService:
             # Fallback: assume we're in the project root
             self.project_root = os.path.dirname(current_file)
         
-        print(f"PipelineService initialized with project_root: {self.project_root}")
+        logger.info("PipelineService initialized with project_root: %s", self.project_root)
     
     async def start_pipeline(self, business_id: str, user_id: str, start_from_phase: Optional[str] = None) -> str:
         """
@@ -133,25 +136,23 @@ class PipelineService:
         """
         from database import get_db_connection
         
-        print(f"Creating new database connection for pipeline {pipeline_id}")
+        logger.info("Creating new database connection for pipeline %s", pipeline_id)
         # Create a new connection for this background task
         db_connection = get_db_connection()
-        print(f"Database connection created: {db_connection}")
+        logger.debug("Database connection created: %s", db_connection)
         
         try:
             # Execute the pipeline with the new connection
             await self._execute_pipeline(pipeline_id, business_id, user_id, start_from_phase, db_connection)
         except Exception as e:
-            print(f"Error in pipeline execution: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error("Error in pipeline execution: %s", e, exc_info=True)
         finally:
             # Always close the connection when done
             try:
                 db_connection.close()
-                print(f"Pipeline {pipeline_id} database connection closed successfully")
+                logger.info("Pipeline %s database connection closed successfully", pipeline_id)
             except Exception as e:
-                print(f"Error closing database connection: {e}")
+                logger.error("Error closing database connection: %s", e, exc_info=True)
     
     async def _execute_pipeline(self, pipeline_id: str, business_id: str, user_id: str, start_from_phase: Optional[str] = None, db_connection=None):
         """
@@ -177,7 +178,7 @@ class PipelineService:
                         for j in range(i):
                             cumulative_progress += self.PIPELINE_PHASES[j]["weight"]
                         break
-                print(f"Resuming pipeline from phase: {start_from_phase} (index {start_index})")
+                logger.info("Resuming pipeline from phase: %s (index %d)", start_from_phase, start_index)
             
             for i in range(start_index, len(self.PIPELINE_PHASES)):
                 phase = self.PIPELINE_PHASES[i]
@@ -186,7 +187,7 @@ class PipelineService:
                 # Check if pipeline was cancelled
                 status = self._get_pipeline_status(pipeline_id, db_connection=db_connection)
                 if status == "cancelled":
-                    print(f"Pipeline {pipeline_id} was cancelled before {phase_name} phase")
+                    logger.info("Pipeline %s was cancelled before %s phase", pipeline_id, phase_name)
                     return
                 
                 # Update status for this phase
@@ -199,9 +200,7 @@ class PipelineService:
                 )
                 
                 # Execute phase
-                print(f"\n{'='*60}")
-                print(f"Starting {phase_name} phase for business {business_id}")
-                print(f"{'='*60}")
+                logger.info("Starting %s phase for business %s", phase_name, business_id)
                 
                 success, process_id = await self._execute_phase(
                     phase, business_id, pipeline_id
@@ -247,14 +246,10 @@ class PipelineService:
                 db_connection=db_connection
             )
             
-            print(f"\n{'='*60}")
-            print(f"Pipeline {pipeline_id} completed successfully!")
-            print(f"{'='*60}")
+            logger.info("Pipeline %s completed successfully!", pipeline_id)
             
         except Exception as e:
-            print(f"Pipeline execution error: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error("Pipeline execution error: %s", e, exc_info=True)
             
             # Store error information
             await self._update_progress(
@@ -285,7 +280,7 @@ class PipelineService:
         
         # Check if script exists
         if not os.path.exists(script_path):
-            print(f"ERROR: Script not found: {script_path}")
+            logger.error("Script not found: %s", script_path)
             return False, None
         
         # Build command
@@ -295,7 +290,7 @@ class PipelineService:
             "--bucket-name", business_id
         ]
         
-        print(f"Executing: {' '.join(cmd)}")
+        logger.info("Executing: %s", ' '.join(cmd))
         
         try:
             # Set environment variable to track this as a pipeline process
@@ -328,16 +323,14 @@ class PipelineService:
             await asyncio.gather(stdout_task, stderr_task)
             
             if return_code == 0:
-                print(f"✅ {phase['name']} phase completed successfully")
+                logger.info("%s phase completed successfully", phase['name'])
                 return True, process.pid
             else:
-                print(f"❌ {phase['name']} phase failed with return code {return_code}")
+                logger.error("%s phase failed with return code %d", phase['name'], return_code)
                 return False, process.pid
                 
         except Exception as e:
-            print(f"Error executing {phase['name']} phase: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error("Error executing %s phase: %s", phase['name'], e, exc_info=True)
             return False, None
     
     async def _stream_output(self, stream, prefix: str, pipeline_id: str):
@@ -357,10 +350,10 @@ class PipelineService:
                 
                 decoded_line = line.decode('utf-8').rstrip()
                 if decoded_line:
-                    print(f"{prefix}{decoded_line}")
+                    logger.info("%s%s", prefix, decoded_line)
                     
         except Exception as e:
-            print(f"Error streaming output: {e}")
+            logger.error("Error streaming output: %s", e, exc_info=True)
     
     async def _update_progress(
         self,
@@ -395,9 +388,9 @@ class PipelineService:
         
         # Log which connection is being used
         if db_connection is not None:
-            print(f"_update_progress using provided db_connection for pipeline {pipeline_id}")
+            logger.debug("_update_progress using provided db_connection for pipeline %s", pipeline_id)
         else:
-            print(f"_update_progress WARNING: using self.db (request-scoped) for pipeline {pipeline_id}")
+            logger.warning("_update_progress using self.db (request-scoped) for pipeline %s", pipeline_id)
         
         try:
             # Prepare update data
@@ -434,9 +427,7 @@ class PipelineService:
             })
             
         except Exception as e:
-            print(f"Error updating progress: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error("Error updating progress: %s", e, exc_info=True)
     
     async def _broadcast_progress(self, business_id: str, data: Dict[str, Any]):
         """
@@ -453,7 +444,7 @@ class PipelineService:
                     business_id=business_id
                 )
             except Exception as e:
-                print(f"Error broadcasting progress: {e}")
+                logger.error("Error broadcasting progress: %s", e, exc_info=True)
     
     def _get_pipeline_status(self, pipeline_id: str, db_connection=None) -> Optional[str]:
         """
@@ -477,7 +468,7 @@ class PipelineService:
             
             return result[0] if result else None
         except Exception as e:
-            print(f"Error getting pipeline status: {e}")
+            logger.error("Error getting pipeline status: %s", e, exc_info=True)
             return None
     
     async def cancel_pipeline(self, pipeline_id: str, business_id: str) -> bool:
@@ -528,7 +519,7 @@ class PipelineService:
             if process_ids_json:
                 try:
                     process_ids = json.loads(process_ids_json)
-                    print(f"Attempting to terminate processes: {process_ids}")
+                    logger.info("Attempting to terminate processes: %s", process_ids)
                     
                     for phase_name, pid in process_ids.items():
                         try:
@@ -540,11 +531,11 @@ class PipelineService:
                             # This ensures Spark sessions and any subprocesses are also terminated
                             try:
                                 os.killpg(os.getpgid(pid), signal.SIGTERM)
-                                print(f"Sent SIGTERM to process group of {phase_name} (PID: {pid})")
+                                logger.info("Sent SIGTERM to process group of %s (PID: %d)", phase_name, pid)
                             except:
                                 # Fallback to killing just the process if process group fails
                                 os.kill(pid, signal.SIGTERM)
-                                print(f"Sent SIGTERM to {phase_name} process (PID: {pid})")
+                                logger.info("Sent SIGTERM to %s process (PID: %d)", phase_name, pid)
                             
                             # Give processes 2 seconds to terminate gracefully
                             await asyncio.sleep(2)
@@ -554,22 +545,22 @@ class PipelineService:
                                 os.kill(pid, 0)  # Check if still exists
                                 try:
                                     os.killpg(os.getpgid(pid), signal.SIGKILL)
-                                    print(f"Force killed process group of {phase_name} (PID: {pid})")
+                                    logger.warning("Force killed process group of %s (PID: %d)", phase_name, pid)
                                 except:
                                     os.kill(pid, signal.SIGKILL)
-                                    print(f"Force killed {phase_name} process (PID: {pid})")
+                                    logger.warning("Force killed %s process (PID: %d)", phase_name, pid)
                             except ProcessLookupError:
                                 # Process terminated gracefully
-                                print(f"Process {pid} ({phase_name}) terminated successfully")
+                                logger.info("Process %d (%s) terminated successfully", pid, phase_name)
                                 
                         except ProcessLookupError:
                             # Process already terminated or doesn't exist
-                            print(f"Process {pid} ({phase_name}) already terminated or does not exist")
+                            logger.info("Process %d (%s) already terminated or does not exist", pid, phase_name)
                         except PermissionError:
                             # Don't have permission to terminate this process
-                            print(f"Permission denied to terminate process {pid} ({phase_name})")
+                            logger.warning("Permission denied to terminate process %d (%s)", pid, phase_name)
                         except Exception as e:
-                            print(f"Error terminating process {pid} ({phase_name}): {e}")
+                            logger.error("Error terminating process %d (%s): %s", pid, phase_name, e, exc_info=True)
                     
                     # Additionally, try to kill any remaining Spark processes for this pipeline
                     # This ensures we catch any Spark sessions that may have detached
@@ -583,17 +574,17 @@ class PipelineService:
                             capture_output=True,
                             timeout=5
                         )
-                        print(f"Killed any remaining Spark processes for business {business_id}")
+                        logger.info("Killed any remaining Spark processes for business %s", business_id)
                     except Exception as e:
-                        print(f"Note: Could not kill remaining Spark processes: {e}")
+                        logger.warning("Could not kill remaining Spark processes: %s", e)
                             
                 except Exception as e:
-                    print(f"Error parsing or terminating processes: {e}")
+                    logger.error("Error parsing or terminating processes: %s", e, exc_info=True)
             
             return True
             
         except Exception as e:
-            print(f"Error cancelling pipeline: {e}")
+            logger.error("Error cancelling pipeline: %s", e, exc_info=True)
             return False
     
     async def cleanup_pipeline_data(self, business_id: str):
@@ -633,15 +624,40 @@ class PipelineService:
                                 Bucket=business_id,
                                 Delete={"Objects": objects}
                             )
-                            print(f"Deleted {len(objects)} objects from {business_id}/{folder}/")
+                            logger.info("Deleted %d objects from %s/%s/", len(objects), business_id, folder)
             
-            print(f"✅ Cleaned up pipeline data for business {business_id}")
+            logger.info("Cleaned up pipeline data for business %s", business_id)
             
         except Exception as e:
-            print(f"Error cleaning up pipeline data: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error("Error cleaning up pipeline data: %s", e, exc_info=True)
     
+    def has_pipeline_ever_completed(self, business_id: str) -> bool:
+        """
+        Return True if at least one pipeline has ever completed successfully for this business.
+        Used by the frontend to decide whether to suppress the full-screen Knob for
+        subsequent streaming microbatches (analytics are already displayed).
+
+        Args:
+            business_id: Business ID
+
+        Returns:
+            True if a completed pipeline exists, False otherwise
+        """
+        try:
+            result = self.db.execute(
+                text("""
+                    SELECT EXISTS(
+                        SELECT 1 FROM pipeline_status
+                        WHERE business_id = :business_id AND status = 'completed'
+                    )
+                """),
+                {"business_id": business_id}
+            ).scalar()
+            return bool(result)
+        except Exception as e:
+            logger.error("Error checking pipeline_ever_completed for business %s: %s", business_id, e, exc_info=True)
+            return False
+
     def get_pipeline_status_info(self, business_id: str) -> Optional[Dict[str, Any]]:
         """
         Get current pipeline status for a business.
@@ -680,7 +696,7 @@ class PipelineService:
             return None
             
         except Exception as e:
-            print(f"Error getting pipeline status info: {e}")
+            logger.error("Error getting pipeline status info: %s", e, exc_info=True)
             return None
     
     async def delete_business_bucket(self, business_id: str):
@@ -714,14 +730,12 @@ class PipelineService:
                             Bucket=business_id,
                             Delete={"Objects": objects}
                         )
-                        print(f"Deleted {len(objects)} objects from bucket {business_id}")
+                        logger.info("Deleted %d objects from bucket %s", len(objects), business_id)
             
             # Delete the bucket itself
             s3_client.delete_bucket(Bucket=business_id)
-            print(f"✅ Deleted bucket: {business_id}")
+            logger.info("Deleted bucket: %s", business_id)
             
         except Exception as e:
-            print(f"Error deleting business bucket: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error("Error deleting business bucket: %s", e, exc_info=True)
             raise
