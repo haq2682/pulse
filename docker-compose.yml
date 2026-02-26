@@ -119,6 +119,9 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DATABASE_NAME}
+      - DEBEZIUM_PASSWORD=${DEBEZIUM_PASSWORD}
+      # Enable logical replication so Debezium can read the WAL from this database
+      - POSTGRESQL_WAL_LEVEL=logical
     ports:
       - "5432:5432"
     volumes:
