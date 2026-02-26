@@ -745,8 +745,8 @@ cassandra://debezium_user:your_strong_password@10.5.0.55:9042/keyspace_name
 ### Pulse system administrator (one-time)
 
 - [ ] Clone the repository and copy `.env.example` to `.env`, then fill in all values.
-- [ ] For Oracle: verify `./jars/ojdbc8.jar` is present (it is already included in the repo). The `debezium` service mounts it automatically — no extra steps needed.
-- [ ] For Google Spanner: verify `./jars/gcp-credentials.json` is present (it is already included in the repo). The `debezium` service mounts it automatically — no extra steps needed.
+- [ ] For Oracle: download `ojdbc8.jar` from Oracle and place it at `./jars/ojdbc8.jar` on the host running Docker. Ensure `./jars/ojdbc8.jar` is listed in `.gitignore` and is **not** committed to version control. The `debezium` service mounts it automatically — no extra steps needed inside the container.
+- [ ] For Google Spanner: create or obtain a service account JSON key with the required permissions and save it as `./jars/gcp-credentials.json` on the host running Docker. Ensure this file is listed in `.gitignore` and is **not** committed to version control. The `debezium` service mounts it automatically — no extra steps needed inside the container.
 - [ ] For Cassandra: edit `conf/debezium-cassandra.properties` and replace `CHANGE_ME` with your keyspace name and `debezium_user` password.
 - [ ] Run `docker-compose up -d` to start all services.
 - [ ] Verify Debezium is healthy: `curl http://localhost:8083/`

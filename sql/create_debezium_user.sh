@@ -18,7 +18,8 @@ DEBEZIUM_PWD="${DEBEZIUM_PASSWORD:-debezium_changeme}"
 DB_USER="${POSTGRES_USER:-postgres}"
 DB_NAME="${POSTGRES_DB:-postgres}"
 
-psql -v ON_ERROR_STOP=1 --username "$DB_USER" --dbname "$DB_NAME" <<-EOSQL
+psql -v ON_ERROR_STOP=1 --username "$DB_USER" --dbname "$DB_NAME" \
+    -v debezium_pwd="$DEBEZIUM_PWD" <<-EOSQL
     DO \$\$
     BEGIN
         IF NOT EXISTS (
@@ -27,7 +28,7 @@ psql -v ON_ERROR_STOP=1 --username "$DB_USER" --dbname "$DB_NAME" <<-EOSQL
             CREATE USER debezium_user WITH
                 REPLICATION
                 LOGIN
-                PASSWORD '$DEBEZIUM_PWD';
+                PASSWORD :'debezium_pwd';
         END IF;
     END
     \$\$;

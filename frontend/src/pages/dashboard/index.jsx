@@ -309,6 +309,8 @@ const Dashboard = () => {
     const [streamingError, setStreamingError] = useState(false);
     // NEW: Toast ref for notifications
     const toastRef = useRef(null);
+    // NEW: Ref for auto-reset timeouts so they can be cleared on unmount/business switch
+    const statusTimeoutRef = useRef(null);
 
     // Search Insight state
     const [searchQuery, setSearchQuery] = useState('');
@@ -441,7 +443,8 @@ const Dashboard = () => {
             setPipelineCompletedBefore(true);
             setStreamingError(false);
             setPipelineStatus('success');
-            setTimeout(() => setPipelineStatus('idle'), 3000);
+            if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
+            statusTimeoutRef.current = setTimeout(() => setPipelineStatus('idle'), 3000);
         } else if (status === 'failed') {
             setPipelineStatus('failed');
             // Only show the error banner when analytics are already displayed (subsequent batch)
@@ -451,10 +454,19 @@ const Dashboard = () => {
             } else {
                 // First batch: InlinePipelineProgress shows the full Knob error UI.
                 // Auto-reset the header indicator so it doesn't stay red indefinitely.
-                setTimeout(() => setPipelineStatus('idle'), 5000);
+                if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
+                statusTimeoutRef.current = setTimeout(() => setPipelineStatus('idle'), 5000);
             }
         }
     }, [contextPipelineStatus?.status, businessIngestionType]);
+
+    // Clear any pending auto-reset timer on unmount to avoid state updates on
+    // an unmounted component.
+    useEffect(() => {
+        return () => {
+            if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
+        };
+    }, []);
     
     // Handle starting analysis
     const handleStartAnalysis = async () => {
