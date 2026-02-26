@@ -642,6 +642,33 @@ class PipelineService:
             import traceback
             traceback.print_exc()
     
+    def has_pipeline_ever_completed(self, business_id: str) -> bool:
+        """
+        Return True if at least one pipeline has ever completed successfully for this business.
+        Used by the frontend to decide whether to suppress the full-screen Knob for
+        subsequent streaming microbatches (analytics are already displayed).
+
+        Args:
+            business_id: Business ID
+
+        Returns:
+            True if a completed pipeline exists, False otherwise
+        """
+        try:
+            result = self.db.execute(
+                text("""
+                    SELECT EXISTS(
+                        SELECT 1 FROM pipeline_status
+                        WHERE business_id = :business_id AND status = 'completed'
+                    )
+                """),
+                {"business_id": business_id}
+            ).scalar()
+            return bool(result)
+        except Exception as e:
+            print(f"Error checking pipeline_ever_completed: {e}")
+            return False
+
     def get_pipeline_status_info(self, business_id: str) -> Optional[Dict[str, Any]]:
         """
         Get current pipeline status for a business.

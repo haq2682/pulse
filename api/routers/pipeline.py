@@ -94,17 +94,20 @@ async def get_pipeline_status(business_id: str, db=Depends(get_db)):
     try:
         pipeline_service = PipelineService(db, websocket_manager)
         status_info = pipeline_service.get_pipeline_status_info(business_id)
-        
+        ever_completed = pipeline_service.has_pipeline_ever_completed(business_id)
+
         if not status_info:
             return {
                 "status": 200,
                 "pipeline_status": "not_started",
+                "pipeline_ever_completed": ever_completed,
                 "message": "No pipeline execution found for this business"
             }
-        
+
         return {
             "status": 200,
             "pipeline_status": status_info["status"],
+            "pipeline_ever_completed": ever_completed,
             "data": status_info
         }
         

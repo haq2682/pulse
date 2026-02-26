@@ -6,6 +6,7 @@ const PipelineProgressContext = createContext(null);
 export const PipelineProgressProvider = ({ children }) => {
     const { user } = useAuth();
     const [pipelineStatus, setPipelineStatus] = useState(null);
+    const [pipelineEverCompleted, setPipelineEverCompleted] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState(null);
     
@@ -160,6 +161,10 @@ export const PipelineProgressProvider = ({ children }) => {
             
             if (response.ok) {
                 const result = await response.json();
+                // Persist the cross-device "ever completed" flag from the DB
+                if (typeof result.pipeline_ever_completed === 'boolean') {
+                    setPipelineEverCompleted(result.pipeline_ever_completed);
+                }
                 if (result.data) {
                     setPipelineStatus(result.data);
                 } else if (result.pipeline_status === 'not_started') {
@@ -280,6 +285,7 @@ export const PipelineProgressProvider = ({ children }) => {
     
     const value = {
         pipelineStatus,
+        pipelineEverCompleted,
         isConnected,
         error,
         connectWebSocket,

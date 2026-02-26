@@ -286,7 +286,7 @@ const INSIGHT_CATALOG = [
 const Dashboard = () => {
     usePageTitle('Dashboard');
     const { logout, user } = useAuth();
-    const { startPipeline, pipelineStatus: contextPipelineStatus } = usePipelineProgress();
+    const { startPipeline, pipelineStatus: contextPipelineStatus, pipelineEverCompleted: contextPipelineEverCompleted } = usePipelineProgress();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [selectedBusiness, setSelectedBusiness] = useState(null);
     const navigate = useNavigate();
@@ -395,9 +395,6 @@ const Dashboard = () => {
         getBusinesses();
     }, []);
 
-    // Helper: per-business localStorage key for the "pipeline completed before" flag
-    const completedStorageKey = (id) => `pulse_pipeline_completed_${id}`;
-
     useEffect(() => {
         if (businessId && businesses.length > 0) {
             // Only set if different
@@ -407,17 +404,23 @@ const Dashboard = () => {
                     setBusinessIngestionType(business.ingestion_type);
                 }
                 setSelectedBusiness(businessId);
-                // Restore per-business completion flag from localStorage so that switching
-                // away and back (or a page reload) does not wrongly show the Knob for a
-                // subsequent microbatch on a business whose first pipeline already ran.
-                const storedCompleted = localStorage.getItem(completedStorageKey(businessId)) === 'true';
-                pipelineCompletedBeforeRef.current = storedCompleted;
-                setPipelineCompletedBefore(storedCompleted);
+                // Reset completion flag on business switch; it will be restored
+                // asynchronously once fetchPipelineStatus returns the DB value.
+                pipelineCompletedBeforeRef.current = false;
+                setPipelineCompletedBefore(false);
                 setStreamingError(false);
                 setPipelineStatus('idle');
             }
         }
     }, [businessId, businesses]);
+
+    // Sync the DB-backed "ever completed" flag from context into local state.
+    // This is updated by fetchPipelineStatus (called by InlinePipelineProgress on
+    // business change) so it reflects the persisted value across devices.
+    useEffect(() => {
+        pipelineCompletedBeforeRef.current = contextPipelineEverCompleted;
+        setPipelineCompletedBefore(contextPipelineEverCompleted);
+    }, [contextPipelineEverCompleted]);
 
     // Sync the context pipeline status (WebSocket) → local pipelineStatus so that
     // the IngestionStatusIndicator circular arrow reflects streaming pipeline activity
@@ -430,12 +433,12 @@ const Dashboard = () => {
         if (status === 'running') {
             setPipelineStatus('running');
         } else if (status === 'completed') {
+            // Update immediately so the Knob is suppressed for any subsequent microbatch
+            // within the same session.  contextPipelineEverCompleted (set by fetchPipelineStatus
+            // on each business load) is the authoritative cross-device source of truth; this
+            // local update ensures zero-latency for same-session transitions.
             pipelineCompletedBeforeRef.current = true;
             setPipelineCompletedBefore(true);
-            // Persist so that business switches and page reloads preserve this knowledge
-            if (businessId) {
-                localStorage.setItem(completedStorageKey(businessId), 'true');
-            }
             setStreamingError(false);
             setPipelineStatus('success');
             setTimeout(() => setPipelineStatus('idle'), 3000);
@@ -495,8 +498,6 @@ const Dashboard = () => {
             
             if (response.data.status === 200) {
                 setShowDeleteDialog(false);
-                // Remove the persisted completion flag for this business
-                localStorage.removeItem(completedStorageKey(selectedBusiness));
                 // Redirect to analytics page without business ID
                 navigate('/analytics/');
                 // Refresh business list
