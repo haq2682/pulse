@@ -95,7 +95,7 @@ These steps are done **once** when deploying Pulse. If you are using the provide
 docker-compose up -d
 ```
 
-This starts Debezium, Kafka, Zookeeper, PostgreSQL, Spark, MinIO, Redis, and Airflow.
+This starts Debezium, Kafka, Zookeeper, PostgreSQL, Spark, MinIO, Redis, Airflow, and Cassandra (with its dedicated Debezium Server).
 
 ### Verify Debezium is running
 
@@ -120,13 +120,13 @@ The Debezium container is built from `.docker/debezium/Dockerfile` (extends `qua
 - **Downloaded during image build** — MariaDB, Vitess, Spanner, Informix, and the Debezium Scripting extension
 - **Cassandra** — cannot run inside Kafka Connect; requires a separate `quay.io/debezium/server:3.4` container (see section 11 below)
 
-After running `docker-compose up -d`, all connector plugins above are ready. The three databases that require **additional manual steps on the Pulse system** are:
+After running `docker-compose up -d`, all connector plugins above are ready. The databases that require **additional manual steps on the Pulse system** are:
 
-| Database | What you must do before `docker-compose up` |
-|----------|---------------------------------------------|
-| Oracle | Place `ojdbc8.jar` at `./jars/ojdbc8.jar` (see section 6) |
-| Google Spanner | Place GCP credentials JSON at `./jars/gcp-credentials.json` (see section 9) |
-| Cassandra | Add a `debezium-cassandra` service to `docker-compose.yml` (see section 11) |
+| Database | What you must do |
+|----------|-----------------|
+| Oracle | Place `ojdbc8.jar` at `./jars/ojdbc8.jar` **before** `docker-compose up` (see section 6) |
+| Google Spanner | Place GCP credentials JSON at `./jars/gcp-credentials.json` **before** `docker-compose up` (see section 9) |
+| Cassandra | Edit `conf/debezium-cassandra.properties` (set keyspace and password), then enable CDC per table with CQL after containers start (see section 11) |
 
 ---
 
@@ -146,7 +146,7 @@ The table below summarises, from the **Pulse system side**, which databases are 
 | Informix | ✅ **Yes — fully automatic** | None |
 | Oracle | ⚠️ **No — requires manual file** | Download `ojdbc8.jar` from Oracle and place at `./jars/ojdbc8.jar` |
 | Google Spanner | ⚠️ **No — requires manual file** | Place GCP service account JSON at `./jars/gcp-credentials.json` |
-| Cassandra | ⚠️ **No — requires separate container** | Add `debezium-cassandra` service using `quay.io/debezium/server:3.4` to `docker-compose.yml` |
+| Cassandra | ✅ **Yes — included in docker-compose** | Edit `conf/debezium-cassandra.properties` (keyspace and password), then enable CDC per table (see section 11) |
 
 > **Note:** "Connector ready" means the plugin is installed and Kafka Connect can load it. You still need to configure the remote database itself (WAL level, binlog, etc.) as described in the sections below.
 
@@ -661,9 +661,13 @@ informix://debezium_user:your_strong_password@your-host:9088/your_database
 
 **Minimum version:** Cassandra 4.0+
 
-> ⚠️ **Pulse system — separate container required:** The Cassandra connector **cannot be installed inside Kafka Connect** at all. The Cassandra Debezium connector reads CommitLog files directly from the Cassandra node's disk. It must run as a **separate `quay.io/debezium/server:3.4` container** sharing a volume with Cassandra. See the "Pulse system" steps at the end of this section. This is different from all other supported databases, which all run inside the `debezium` Kafka Connect container.
+> ℹ️ **Pulse system — already included in docker-compose:** The Cassandra connector **cannot run inside Kafka Connect**. Instead, a separate `debezium-cassandra` service using `quay.io/debezium/server:3.4` is included in `docker-compose.yml`. It shares the `cassandra_commitlog` volume with the `cassandra` service and reads commit log files directly. The `cassandra` service itself is also included, built from `.docker/cassandra/Dockerfile` which enables CDC in `cassandra.yaml` automatically. This is different from all other supported databases, which run inside the `debezium` Kafka Connect container.
 
 #### Step 1 — Enable CDC in `cassandra.yaml`
+
+CDC is already enabled in the `cassandra` container via the Dockerfile (`.docker/cassandra/Dockerfile`). No manual `cassandra.yaml` editing is required when using the provided Docker setup.
+
+If you are using an **external** Cassandra instance, add the following to its `cassandra.yaml` and restart:
 
 ```yaml
 cdc_enabled: true
@@ -679,9 +683,17 @@ sudo systemctl restart cassandra
 
 #### Step 2 — Enable CDC per table
 
+After the containers start, connect to Cassandra and run:
+
 ```cql
 ALTER TABLE keyspace_name.orders   WITH cdc = true;
 ALTER TABLE keyspace_name.payments WITH cdc = true;
+```
+
+Using the bundled container:
+
+```bash
+docker exec -it cassandra cqlsh
 ```
 
 #### Step 3 — Create `debezium_user`
@@ -691,42 +703,21 @@ CREATE ROLE debezium_user WITH PASSWORD = 'your_strong_password' AND LOGIN = tru
 GRANT SELECT ON KEYSPACE keyspace_name TO debezium_user;
 ```
 
-#### Pulse system — add a Debezium Server container
+#### Pulse system — configure `conf/debezium-cassandra.properties`
 
-Add the following to `docker-compose.yml` and create `conf/debezium-cassandra.properties`:
-
-```yaml
-debezium-cassandra:
-  image: quay.io/debezium/server:3.4
-  container_name: debezium-cassandra
-  volumes:
-    - cassandra_commitlog:/cassandra/commitlog
-    - ./conf/debezium-cassandra.properties:/debezium/conf/application.properties
-  networks:
-    spark-network:
-      ipv4_address: 10.5.0.56
-  restart: always
-```
-
-`conf/debezium-cassandra.properties`:
+The `cassandra` and `debezium-cassandra` services are **already included** in `docker-compose.yml`. Before running `docker-compose up -d`, update `conf/debezium-cassandra.properties` with your keyspace name and password:
 
 ```properties
-debezium.source.connector.class=io.debezium.connector.cassandra.CassandraConnector
-debezium.source.cassandra.hosts=<cassandra-host>
-debezium.source.cassandra.port=9042
-debezium.source.cassandra.user=debezium_user
+debezium.source.cassandra.keyspace=your_keyspace
 debezium.source.cassandra.password=your_strong_password
-debezium.source.cassandra.keyspace=keyspace_name
-debezium.source.commitlog.dir=/cassandra/commitlog
-debezium.source.topic.prefix=ecom
-debezium.sink.type=kafka
-debezium.sink.kafka.producer.bootstrap.servers=10.5.0.7:9092
 ```
+
+The full properties file is at `conf/debezium-cassandra.properties`. The `cassandra.hosts` is pre-set to `10.5.0.55` (the cassandra container's IP on the spark-network).
 
 #### URI to enter in Pulse
 
 ```
-cassandra://debezium_user:your_strong_password@your-host:9042/keyspace_name
+cassandra://debezium_user:your_strong_password@10.5.0.55:9042/keyspace_name
 ```
 
 ---
@@ -754,11 +745,13 @@ cassandra://debezium_user:your_strong_password@your-host:9042/keyspace_name
 ### Pulse system administrator (one-time)
 
 - [ ] Clone the repository and copy `.env.example` to `.env`, then fill in all values.
-- [ ] For Oracle: download `ojdbc8.jar` from Oracle and place it at `./jars/ojdbc8.jar`.
-- [ ] For Google Spanner: place the GCP service account JSON key at `./jars/gcp-credentials.json`.
+- [ ] For Oracle: verify `./jars/ojdbc8.jar` is present (it is already included in the repo). The `debezium` service mounts it automatically — no extra steps needed.
+- [ ] For Google Spanner: verify `./jars/gcp-credentials.json` is present (it is already included in the repo). The `debezium` service mounts it automatically — no extra steps needed.
+- [ ] For Cassandra: edit `conf/debezium-cassandra.properties` and replace `CHANGE_ME` with your keyspace name and `debezium_user` password.
 - [ ] Run `docker-compose up -d` to start all services.
 - [ ] Verify Debezium is healthy: `curl http://localhost:8083/`
 - [ ] Verify Kafka is healthy: `docker logs kafka | tail -20`
+- [ ] For Cassandra: after containers are up, connect with `docker exec -it cassandra cqlsh` and enable CDC per table (see section 11).
 
 ---
 
@@ -776,7 +769,7 @@ cassandra://debezium_user:your_strong_password@your-host:9042/keyspace_name
 | Snapshot is very slow | Large tables during initial load | Wait; the snapshot is a one-time full read before CDC starts |
 | Oracle connector fails immediately | `ojdbc8.jar` is missing | Download from Oracle and place at `./jars/ojdbc8.jar`, then restart the `debezium` container |
 | Spanner connector authentication error | GCP credentials file not mounted | Place service account JSON at `./jars/gcp-credentials.json` and restart the `debezium` container |
-| Cassandra — no events received | Debezium Server container not running | Add the `debezium-cassandra` service to `docker-compose.yml` (see section 11) |
+| Cassandra — no events received | `debezium-cassandra` container not running, or CDC not enabled on tables | Run `docker logs debezium-cassandra --tail 50`; enable CDC per table with `ALTER TABLE ... WITH cdc = true` (see section 11) |
 
 For Debezium logs:
 

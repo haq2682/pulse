@@ -108,11 +108,10 @@ RUN mkdir -p /kafka/connect/debezium-scripting && \
 #   1. Download ojdbc8.jar from:
 #      https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html
 #
-#   2. Place it at ./oracle-jdbc/ojdbc8.jar next to your docker-compose.yml
-#
-#   3. Add to the debezium service in docker-compose.yml:
-#      volumes:
-#        - ./oracle-jdbc/ojdbc8.jar:/kafka/connect/debezium-connector-oracle/ojdbc8.jar
+#   2. Place it at ./jars/ojdbc8.jar (next to docker-compose.yml).
+#      The file is already mounted by the debezium service in docker-compose.yml:
+#        volumes:
+#          - ./jars/ojdbc8.jar:/kafka/connect/debezium-connector-oracle/ojdbc8.jar
 #
 # The Oracle connector will fail to start without this file.
 # =============================================================================
