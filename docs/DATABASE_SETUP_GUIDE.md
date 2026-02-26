@@ -43,13 +43,13 @@ Debezium connects to your database using the `debezium_user` credentials you ent
 
 ## Connector Plugin Status — What the Pulse Dockerfile Already Installs
 
-The Debezium container is built from `.docker/debezium/Dockerfile`. It extends `quay.io/debezium/connect:2.5` and adds the community connectors that are not in the base image. The table below shows the connector status for each database and any **extra Pulse-side action** required beyond just having the plugin installed.
+The Debezium container is built from `.docker/debezium/Dockerfile`. It extends `quay.io/debezium/connect:3.4` and adds the community connectors that are not in the base image. The table below shows the connector status for each database and any **extra Pulse-side action** required beyond just having the plugin installed.
 
 | Database | Connector plugin | How it gets installed | Extra Pulse-side requirement |
 |----------|-----------------|----------------------|------------------------------|
 | PostgreSQL | `debezium-connector-postgres` | Pre-installed in base image | None |
 | MySQL | `debezium-connector-mysql` | Pre-installed in base image | None |
-| MariaDB | ⚠️ **Uses MySQL connector** | Pre-installed in base image | None — uses `io.debezium.connector.mysql.MySqlConnector` (see section 3) |
+| MariaDB | `debezium-connector-mariadb` | Downloaded in Dockerfile (Maven Central) | None — standalone connector added in 3.4 |
 | MongoDB | `debezium-connector-mongodb` | Pre-installed in base image | None |
 | SQL Server | `debezium-connector-sqlserver` | Pre-installed in base image | None |
 | Oracle | `debezium-connector-oracle` | Pre-installed in base image (JARs only) | ⚠️ **`ojdbc8.jar` must be manually supplied** — Oracle's JDBC driver cannot be redistributed. Download it from Oracle and place at `./jars/ojdbc8.jar`. |
@@ -101,7 +101,7 @@ This starts Debezium, Kafka, Zookeeper, PostgreSQL, Spark, MinIO, Redis, and Air
 
 ```bash
 curl http://localhost:8083/
-# Expected: {"version":"3.6.0","commit":"..."}
+# Expected: {"version":"3.4.0.Final","commit":"..."}
 ```
 
 ### Internal PostgreSQL — already configured
@@ -114,12 +114,11 @@ This happens automatically on first container start via the initialization scrip
 
 ### Connector plugins — what the Dockerfile installs
 
-The Debezium container is built from `.docker/debezium/Dockerfile` (extends `quay.io/debezium/connect:2.5`):
+The Debezium container is built from `.docker/debezium/Dockerfile` (extends `quay.io/debezium/connect:3.4`):
 
 - **Pre-installed in base image** — PostgreSQL, MySQL, MongoDB, SQL Server, Oracle (JARs), Db2
-- **Downloaded during image build** — Vitess, Spanner, Informix, and the Debezium Scripting extension
-- **MariaDB** — uses the pre-installed MySQL connector (`io.debezium.connector.mysql.MySqlConnector`); no extra installation needed in Debezium 2.5
-- **Cassandra** — cannot run inside Kafka Connect; requires a separate `quay.io/debezium/server:2.5` container (see section 11 below)
+- **Downloaded during image build** — MariaDB, Vitess, Spanner, Informix, and the Debezium Scripting extension
+- **Cassandra** — cannot run inside Kafka Connect; requires a separate `quay.io/debezium/server:3.4` container (see section 11 below)
 
 After running `docker-compose up -d`, all connector plugins above are ready. The three databases that require **additional manual steps on the Pulse system** are:
 
@@ -128,6 +127,52 @@ After running `docker-compose up -d`, all connector plugins above are ready. The
 | Oracle | Place `ojdbc8.jar` at `./jars/ojdbc8.jar` (see section 6) |
 | Google Spanner | Place GCP credentials JSON at `./jars/gcp-credentials.json` (see section 9) |
 | Cassandra | Add a `debezium-cassandra` service to `docker-compose.yml` (see section 11) |
+
+---
+
+## Auto-Configured vs Manual-Configuration Databases
+
+The table below summarises, from the **Pulse system side**, which databases are fully ready after `docker-compose up -d` and which require additional manual steps.
+
+| Database | Connector ready after `docker-compose up`? | Manual action required on Pulse side |
+|----------|--------------------------------------------|---------------------------------------|
+| PostgreSQL | ✅ **Yes — fully automatic** | None |
+| MySQL | ✅ **Yes — fully automatic** | None |
+| MariaDB | ✅ **Yes — fully automatic** | None |
+| MongoDB | ✅ **Yes — fully automatic** | None |
+| SQL Server | ✅ **Yes — fully automatic** | None |
+| IBM Db2 | ✅ **Yes — fully automatic** | None |
+| Vitess | ✅ **Yes — fully automatic** | None |
+| Informix | ✅ **Yes — fully automatic** | None |
+| Oracle | ⚠️ **No — requires manual file** | Download `ojdbc8.jar` from Oracle and place at `./jars/ojdbc8.jar` |
+| Google Spanner | ⚠️ **No — requires manual file** | Place GCP service account JSON at `./jars/gcp-credentials.json` |
+| Cassandra | ⚠️ **No — requires separate container** | Add `debezium-cassandra` service using `quay.io/debezium/server:3.4` to `docker-compose.yml` |
+
+> **Note:** "Connector ready" means the plugin is installed and Kafka Connect can load it. You still need to configure the remote database itself (WAL level, binlog, etc.) as described in the sections below.
+
+---
+
+## Upgrade Notes — Debezium 2.x → 3.4
+
+If you are upgrading an existing Pulse deployment from Debezium 2.5 to 3.4, be aware of the following:
+
+### What changes automatically
+- All community connectors (MariaDB, Vitess, Spanner, Informix) are updated to 3.4.0.Final when the image is rebuilt.
+- MariaDB now uses its own dedicated connector (`debezium-connector-mariadb`) instead of the MySQL connector. Existing connectors deployed with `io.debezium.connector.mariadb.MariaDbConnector` continue to work. If you had any old connectors deployed with `io.debezium.connector.mysql.MySqlConnector` for MariaDB, delete and redeploy them.
+- The scripting extension is now placed in its own `/kafka/connect/debezium-scripting/` plugin directory (instead of inside the Oracle connector directory). No action needed if you have not customised scripting transforms.
+
+### Breaking change — Vitess tablet type
+The `vitess.tablet.type` connector property value changed from `MASTER` to `PRIMARY` in Debezium 3.x. This is already updated in `debezium_connector_manager.py`. If you have any manually deployed Vitess connectors, update their configuration before or after the upgrade.
+
+### Risk areas
+| Area | Risk | Action |
+|------|------|--------|
+| Existing connector offsets | Low — 3.x can continue reading offsets written by 2.x | None; test after upgrade |
+| Schema history topics | Low — backward-compatible format | None; monitor for errors |
+| Vitess connectors | Medium — `MASTER` value rejected in 3.x | Delete and redeploy Vitess connectors with `PRIMARY` |
+| MariaDB connectors using MySQL class | Medium — old class still works but new class is preferred | Redeploy with `io.debezium.connector.mariadb.MariaDbConnector` |
+| Kafka version | Low — Confluent 7.7.0 (Kafka 3.7.x) is compatible with Debezium 3.4 | None |
+| Java version | Debezium 3.x base image uses Java 21 (up from 11 in 2.x) | No action; handled by the container image |
 
 ---
 
@@ -233,7 +278,7 @@ mysql://debezium_user:your_strong_password@your-host:3306/your_database
 
 **Minimum version:** MariaDB 10.5+
 
-> ⚠️ **Pulse system note:** In Debezium 2.5, there is no standalone `debezium-connector-mariadb` plugin available on Maven Central. MariaDB support is bundled inside the MySQL connector as a preview feature. Pulse uses `io.debezium.connector.mysql.MySqlConnector` for MariaDB connections — no extra plugin installation is needed. A standalone MariaDB connector was only added in Debezium 2.7+.
+> ℹ️ **Pulse system note:** Debezium 3.4 ships with a dedicated `debezium-connector-mariadb` plugin (available since Debezium 2.7). The Dockerfile installs it automatically. Pulse uses `io.debezium.connector.mariadb.MariaDbConnector` for MariaDB connections, which correctly handles MariaDB-specific GTID format and protocol differences from MySQL.
 
 #### Step 1 — Edit `my.cnf`
 
@@ -616,7 +661,7 @@ informix://debezium_user:your_strong_password@your-host:9088/your_database
 
 **Minimum version:** Cassandra 4.0+
 
-> ⚠️ **Pulse system — separate container required:** The Cassandra connector **cannot be installed inside Kafka Connect** at all. The Cassandra Debezium connector reads CommitLog files directly from the Cassandra node's disk. It must run as a **separate `quay.io/debezium/server:2.5` container** sharing a volume with Cassandra. See the "Pulse system" steps at the end of this section. This is different from all other supported databases, which all run inside the `debezium` Kafka Connect container.
+> ⚠️ **Pulse system — separate container required:** The Cassandra connector **cannot be installed inside Kafka Connect** at all. The Cassandra Debezium connector reads CommitLog files directly from the Cassandra node's disk. It must run as a **separate `quay.io/debezium/server:3.4` container** sharing a volume with Cassandra. See the "Pulse system" steps at the end of this section. This is different from all other supported databases, which all run inside the `debezium` Kafka Connect container.
 
 #### Step 1 — Enable CDC in `cassandra.yaml`
 
@@ -652,7 +697,7 @@ Add the following to `docker-compose.yml` and create `conf/debezium-cassandra.pr
 
 ```yaml
 debezium-cassandra:
-  image: quay.io/debezium/server:2.5
+  image: quay.io/debezium/server:3.4
   container_name: debezium-cassandra
   volumes:
     - cassandra_commitlog:/cassandra/commitlog
