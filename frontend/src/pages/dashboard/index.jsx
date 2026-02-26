@@ -302,6 +302,11 @@ const Dashboard = () => {
     const profileRef = useRef(null);
     // NEW: Pipeline status for streaming modes
     const [pipelineStatus, setPipelineStatus] = useState('idle');
+    // NEW: Tracks whether the first pipeline has completed for this business (db/api modes)
+    const [pipelineCompletedBefore, setPipelineCompletedBefore] = useState(false);
+    const pipelineCompletedBeforeRef = useRef(false);
+    // NEW: Error banner state for subsequent streaming-batch failures
+    const [streamingError, setStreamingError] = useState(false);
     // NEW: Toast ref for notifications
     const toastRef = useRef(null);
 
@@ -399,6 +404,11 @@ const Dashboard = () => {
                     setBusinessIngestionType(business.ingestion_type);
                 }
                 setSelectedBusiness(businessId);
+                // Reset streaming state when switching businesses
+                pipelineCompletedBeforeRef.current = false;
+                setPipelineCompletedBefore(false);
+                setStreamingError(false);
+                setPipelineStatus('idle');
             }
         }
     }, [businessId, businesses]);
@@ -414,11 +424,22 @@ const Dashboard = () => {
         if (status === 'running') {
             setPipelineStatus('running');
         } else if (status === 'completed') {
+            pipelineCompletedBeforeRef.current = true;
+            setPipelineCompletedBefore(true);
+            setStreamingError(false);
             setPipelineStatus('success');
             setTimeout(() => setPipelineStatus('idle'), 3000);
         } else if (status === 'failed') {
             setPipelineStatus('failed');
-            setTimeout(() => setPipelineStatus('idle'), 5000);
+            // Only show the error banner when analytics are already displayed (subsequent batch)
+            if (pipelineCompletedBeforeRef.current) {
+                setStreamingError(true);
+                // Do NOT auto-reset; user must manually retry via the arrow button
+            } else {
+                // First batch: InlinePipelineProgress shows the full Knob error UI.
+                // Auto-reset the header indicator so it doesn't stay red indefinitely.
+                setTimeout(() => setPipelineStatus('idle'), 5000);
+            }
         }
     }, [contextPipelineStatus?.status, businessIngestionType]);
     
@@ -479,6 +500,7 @@ const Dashboard = () => {
 
     // Function to trigger streaming pipeline
     const triggerStreamingPipeline = async () => {
+        setStreamingError(false);
         setPipelineStatus('running');
         
         try {
@@ -501,14 +523,17 @@ const Dashboard = () => {
             }
         } catch (error) {
             setPipelineStatus('failed');
-            toastRef.current?.show({
-                severity: 'error',
-                summary: 'Error',
-                detail: 'Failed to trigger streaming pipeline',
-                life: 5000
-            });
-            // Return to idle after 5 seconds
-            setTimeout(() => setPipelineStatus('idle'), 5000);
+            // Show banner if analytics were already visible, otherwise just show toast
+            if (pipelineCompletedBeforeRef.current) {
+                setStreamingError(true);
+            } else {
+                toastRef.current?.show({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: 'Failed to trigger streaming pipeline',
+                    life: 5000
+                });
+            }
         }
     };
 
@@ -1038,7 +1063,24 @@ const Dashboard = () => {
                                 businessId={businessId}
                                 onStartAnalysis={handleStartAnalysis}
                                 ingestionType={businessIngestionType}
+                                pipelineCompletedBefore={pipelineCompletedBefore}
                             />
+                            {/* Error banner for streaming-mode subsequent-batch failures */}
+                            {streamingError && (
+                                <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-300 rounded-lg flex items-center gap-3">
+                                    <i className="pi pi-exclamation-circle text-red-500 text-lg flex-shrink-0" />
+                                    <span className="text-red-700 text-sm font-medium">
+                                        An error occurred while trying to fetch and process data.
+                                    </span>
+                                    <button
+                                        onClick={() => setStreamingError(false)}
+                                        className="ml-auto text-red-400 hover:text-red-600 transition-colors"
+                                        aria-label="Dismiss error"
+                                    >
+                                        <i className="pi pi-times text-sm" />
+                                    </button>
+                                </div>
+                            )}
                             {/* Render appropriate analytics content based on route */}
                             {renderAnalyticsContent()}
                         </CurrencyProvider>
