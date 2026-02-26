@@ -1076,7 +1076,7 @@ const Dashboard = () => {
                                 businessId={businessId}
                                 onStartAnalysis={handleStartAnalysis}
                                 ingestionType={businessIngestionType}
-                                pipelineCompletedBefore={pipelineCompletedBefore}
+                                pipelineCompletedBefore={pipelineCompletedBefore || contextPipelineEverCompleted}
                             />
                             {/* Error banner for streaming-mode subsequent-batch failures */}
                             {streamingError && (
