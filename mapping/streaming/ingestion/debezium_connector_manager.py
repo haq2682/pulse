@@ -1,9 +1,9 @@
 """
 Debezium Connector Manager: Deploy and manage CDC connectors via Kafka Connect REST API.
 
-Supports all Debezium source connectors:
-- PostgreSQL, MySQL, MariaDB, MongoDB, SQL Server, Oracle, Db2,
-  Vitess, Spanner, Informix, Cassandra
+Supports Debezium source connectors for databases commonly used in e-commerce:
+- PostgreSQL, MySQL, MariaDB, MongoDB, SQL Server (transactional)
+- Cassandra, Vitess, Oracle (big data / large-scale e-commerce)
 
 The user provides a database URI. This module auto-detects the database type,
 builds the correct Debezium connector configuration, and deploys it to
@@ -40,10 +40,7 @@ URI_SCHEME_MAP = {
     "mssql": "sqlserver",
     "sqlserver": "sqlserver",
     "oracle": "oracle",
-    "db2": "db2",
     "vitess": "vitess",
-    "spanner": "spanner",
-    "informix": "informix",
     "cassandra": "cassandra",
 }
 
@@ -55,9 +52,7 @@ DEFAULT_PORTS = {
     "mongodb": 27017,
     "sqlserver": 1433,
     "oracle": 1521,
-    "db2": 50000,
     "vitess": 15991,
-    "informix": 9088,
     "cassandra": 9042,
 }
 
@@ -69,15 +64,12 @@ CONNECTOR_CLASSES = {
     "mongodb": "io.debezium.connector.mongodb.MongoDbConnector",
     "sqlserver": "io.debezium.connector.sqlserver.SqlServerConnector",
     "oracle": "io.debezium.connector.oracle.OracleConnector",
-    "db2": "io.debezium.connector.db2.Db2Connector",
     "vitess": "io.debezium.connector.vitess.VitessConnector",
-    "spanner": "io.debezium.connector.spanner.SpannerConnector",
-    "informix": "io.debezium.connector.informix.InformixConnector",
     "cassandra": "io.debezium.connector.cassandra.CassandraConnector",
 }
 
 # Databases that need schema.history.internal Kafka topics for DDL tracking
-NEEDS_SCHEMA_HISTORY = {"mysql", "mariadb", "sqlserver", "oracle", "db2", "informix"}
+NEEDS_SCHEMA_HISTORY = {"mysql", "mariadb", "sqlserver", "oracle"}
 
 
 def parse_db_uri(uri: str) -> Dict[str, Any]:
@@ -91,10 +83,7 @@ def parse_db_uri(uri: str) -> Dict[str, Any]:
         mongodb://user:pass@host:27017/dbname
         mssql://user:pass@host:1433/dbname
         oracle://user:pass@host:1521/service_name
-        db2://user:pass@host:50000/dbname
         vitess://user:pass@host:15991/keyspace
-        spanner://project_id/instance_id/database_id
-        informix://user:pass@host:9088/dbname
         cassandra://user:pass@host:9042/keyspace
 
     Returns:
@@ -110,33 +99,6 @@ def parse_db_uri(uri: str) -> Dict[str, Any]:
             f"Unsupported database URI scheme: '{scheme}'. "
             f"Supported types: {', '.join(supported)}"
         )
-
-    # Spanner uses a special URI format: spanner://project/instance/database
-    if db_type == "spanner":
-        path_parts = parsed.path.strip("/").split("/")
-        project_id = parsed.hostname or (path_parts[0] if len(path_parts) > 0 else "")
-        instance_id = path_parts[1] if len(path_parts) > 1 else (path_parts[0] if parsed.hostname else "")
-        database_id = path_parts[2] if len(path_parts) > 2 else (path_parts[1] if parsed.hostname else "")
-
-        # Handle spanner://project/instance/database format
-        if parsed.hostname:
-            project_id = parsed.hostname
-            path_parts = parsed.path.strip("/").split("/")
-            instance_id = path_parts[0] if len(path_parts) > 0 else ""
-            database_id = path_parts[1] if len(path_parts) > 1 else ""
-
-        return {
-            "db_type": "spanner",
-            "host": None,
-            "port": None,
-            "user": None,
-            "password": None,
-            "database": database_id,
-            "spanner_project_id": project_id,
-            "spanner_instance_id": instance_id,
-            "spanner_database_id": database_id,
-            "raw_uri": uri,
-        }
 
     default_port = DEFAULT_PORTS.get(db_type)
 
@@ -184,9 +146,7 @@ def _build_table_include_list(
         mariadb:    dbname.table
         sqlserver:  dbo.table
         oracle:     SCHEMA.TABLE
-        db2:        SCHEMA.TABLE
         vitess:     keyspace.table
-        informix:   informix.table
     """
     prefix_map = {
         "postgres": schema,
@@ -194,9 +154,7 @@ def _build_table_include_list(
         "mariadb": db_name,
         "sqlserver": "dbo",
         "oracle": schema.upper(),
-        "db2": schema.upper(),
         "vitess": db_name,
-        "informix": f"{db_name}.{schema}",
     }
     prefix = prefix_map.get(db_type, db_name)
     return ",".join(f"{prefix}.{t}" for t in tables)
@@ -324,28 +282,10 @@ def _oracle_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
     return config
 
 
-def _db2_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
-    config = {
-        "connector.class": CONNECTOR_CLASSES["db2"],
-        "database.hostname": parsed["host"],
-        "database.port": str(parsed["port"]),
-        "database.user": parsed["user"],
-        "database.password": parsed["password"],
-        "database.dbname": parsed["database"],
-        "topic.prefix": topic_prefix,
-        "table.include.list": _build_table_include_list(
-            "db2", tables, parsed["database"], schema=parsed["user"]
-        ),
-        "snapshot.mode": "initial",
-    }
-    config.update(_common_converter_config())
-    config.update(_schema_history_config(parsed["database"]))
-    return config
-
-
 def _vitess_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
     """
     Vitess connects to VTGate via gRPC. No schema history needed.
+    Used by large e-commerce platforms (e.g. Shopify) for horizontal MySQL scaling.
     """
     config = {
         "connector.class": CONNECTOR_CLASSES["vitess"],
@@ -363,50 +303,12 @@ def _vitess_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
     return config
 
 
-def _spanner_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
-    """
-    Spanner uses GCP credentials, not host/user/password.
-    URI format: spanner://project_id/instance_id/database_id
-    The user must set GOOGLE_APPLICATION_CREDENTIALS env var or provide
-    gcp.spanner.credentials.path / gcp.spanner.credentials.json.
-    """
-    config = {
-        "connector.class": CONNECTOR_CLASSES["spanner"],
-        "gcp.spanner.project.id": parsed.get("spanner_project_id", ""),
-        "gcp.spanner.instance.id": parsed.get("spanner_instance_id", ""),
-        "gcp.spanner.database.id": parsed.get("spanner_database_id", ""),
-        "gcp.spanner.change.stream": "pulse_change_stream",
-        "topic.prefix": topic_prefix,
-    }
-    config.update(_common_converter_config())
-    return config
-
-
-def _informix_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
-    config = {
-        "connector.class": CONNECTOR_CLASSES["informix"],
-        "database.hostname": parsed["host"],
-        "database.port": str(parsed["port"]),
-        "database.user": parsed["user"],
-        "database.password": parsed["password"],
-        "database.dbname": parsed["database"],
-        "topic.prefix": topic_prefix,
-        "table.include.list": _build_table_include_list(
-            "informix", tables, parsed["database"]
-        ),
-        "snapshot.mode": "initial",
-    }
-    config.update(_common_converter_config())
-    config.update(_schema_history_config(parsed["database"]))
-    return config
-
-
 def _cassandra_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
     """
-    Cassandra CDC connector. Note: the Cassandra connector runs as a
-    standalone agent (NOT inside Kafka Connect) in production. This config
-    is for the Kafka Connect-compatible wrapper / Debezium Server mode.
-    CDC must be enabled per-table in Cassandra (ALTER TABLE ... WITH cdc = true).
+    Cassandra CDC connector for high-volume e-commerce event data.
+    Note: the Cassandra connector runs as a standalone agent (NOT inside Kafka
+    Connect) in production. CDC must be enabled per-table in Cassandra
+    (ALTER TABLE ... WITH cdc = true).
     """
     config = {
         "connector.class": CONNECTOR_CLASSES["cassandra"],
@@ -431,10 +333,7 @@ _CONFIG_BUILDERS = {
     "mongodb": _mongodb_config,
     "sqlserver": _sqlserver_config,
     "oracle": _oracle_config,
-    "db2": _db2_config,
     "vitess": _vitess_config,
-    "spanner": _spanner_config,
-    "informix": _informix_config,
     "cassandra": _cassandra_config,
 }
 

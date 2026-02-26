@@ -3,8 +3,8 @@ Database connector with auto-detection from URI.
 Functional approach - simple functions for all DB types.
 
 IMPORTANT: Database connections require proper user permissions.
-See mapping/README.md for database administrator prerequisites
-including user creation, role assignments, and replication setup.
+See mapping/CDC_SETUP_GUIDE.md for database administrator prerequisites
+including debezium_user creation, role assignments, and replication setup.
 """
 
 from urllib.parse import urlparse
@@ -16,11 +16,8 @@ def detect_db_type(uri: str) -> str:
     """
     Detect database type from URI scheme.
     
-    Supported databases: PostgreSQL, MySQL, MongoDB, SQL Server, Oracle, IBM Db2, Vitess.
-    Note: Cassandra and Spanner use configuration-based connections, not URIs.
-    
-    Vitess: Can use either 'mysql://' or 'vitess://' scheme (both use MySQL protocol).
-    See mapping/README.md for detailed setup instructions.
+    Supported databases: PostgreSQL, MySQL, MariaDB, MongoDB, SQL Server,
+    Oracle, Vitess (large-scale / big data e-commerce).
     """
     scheme = urlparse(uri).scheme.lower()
     
@@ -30,11 +27,11 @@ def detect_db_type(uri: str) -> str:
         'mongodb': 'mongo',
         'mongodb+srv': 'mongo',
         'mysql': 'mysql',
+        'mariadb': 'mariadb',
         'mssql': 'mssql',
         'sqlserver': 'mssql',
         'oracle': 'oracle',
-        'db2': 'db2',
-        'vitess': 'vitess'  # Vitess uses MySQL protocol but can be specified explicitly
+        'vitess': 'vitess',
     }
     
     db_type = db_map.get(scheme)
@@ -42,7 +39,7 @@ def detect_db_type(uri: str) -> str:
         raise ValueError(
             f"Unsupported database type: {scheme}. "
             f"Supported types: {', '.join(set(db_map.values()))}. "
-            f"See mapping/README.md for setup instructions."
+            f"See mapping/CDC_SETUP_GUIDE.md for setup instructions."
         )
     
     return db_type
@@ -56,6 +53,20 @@ def connect_postgres(uri: str) -> Any:
 
 def connect_mysql(uri: str) -> Any:
     """Connect to MySQL."""
+    import mysql.connector
+    from mysql.connector import connect
+    parsed = urlparse(uri)
+    return connect(
+        host=parsed.hostname,
+        port=parsed.port or 3306,
+        user=parsed.username,
+        password=parsed.password,
+        database=parsed.path.lstrip('/')
+    )
+
+
+def connect_mariadb(uri: str) -> Any:
+    """Connect to MariaDB (uses MySQL protocol)."""
     import mysql.connector
     from mysql.connector import connect
     parsed = urlparse(uri)
@@ -120,39 +131,11 @@ def connect_oracle(uri: str) -> Any:
             )
 
 
-def connect_db2(uri: str) -> Any:
-    """
-    Connect to IBM Db2.
-    Requires ibm_db or ibm_db_dbi package.
-    URI format: db2://user:pass@host:port/database
-    """
-    try:
-        import ibm_db
-        parsed = urlparse(uri)
-        conn_str = (
-            f"DATABASE={parsed.path.lstrip('/')};"
-            f"HOSTNAME={parsed.hostname};"
-            f"PORT={parsed.port or 50000};"
-            f"PROTOCOL=TCPIP;"
-            f"UID={parsed.username};"
-            f"PWD={parsed.password};"
-        )
-        return ibm_db.connect(conn_str, "", "")
-    except ImportError:
-        raise ImportError(
-            "IBM Db2 database support requires 'ibm_db' package. "
-            "Install with: pip install ibm_db"
-        )
-
-
 def connect_vitess(uri: str) -> Any:
     """
     Connect to Vitess (uses MySQL protocol).
-    Vitess is MySQL-compatible, so we use MySQL connector.
-    URI format: mysql://user:pass@vtgate-host:port/keyspace
-              or vitess://user:pass@vtgate-host:port/keyspace
-    
-    Both schemes are supported; Vitess uses MySQL protocol internally.
+    Used by large e-commerce platforms (e.g. Shopify) for horizontal MySQL scaling.
+    URI format: vitess://user:pass@vtgate-host:port/keyspace
     """
     return connect_mysql(uri)
 
@@ -162,22 +145,22 @@ def get_connection(uri: str) -> Tuple[Any, str]:
     Auto-detect DB type and return connection.
     Returns: (connection, db_type)
     
-    Supported databases: PostgreSQL, MySQL, MongoDB, SQL Server, 
-    Oracle, IBM Db2, Vitess.
+    Supported databases: PostgreSQL, MySQL, MariaDB, MongoDB, SQL Server,
+    Oracle, Vitess (large-scale / big data e-commerce).
     
-    Note: Cassandra and Spanner require configuration-based setup
-    rather than URI connections. See mapping/README.md for details.
+    Note: Cassandra requires configuration-based setup rather than a URI
+    connection. See mapping/CDC_SETUP_GUIDE.md for details.
     """
     db_type = detect_db_type(uri)
     
     connectors = {
         'postgres': connect_postgres,
         'mysql': connect_mysql,
+        'mariadb': connect_mariadb,
         'mongo': connect_mongo,
         'mssql': connect_mssql,
         'oracle': connect_oracle,
-        'db2': connect_db2,
-        'vitess': connect_vitess
+        'vitess': connect_vitess,
     }
     
     conn = connectors[db_type](uri)
@@ -189,7 +172,7 @@ def discover_tables(conn: Any, db_type: str) -> List[str]:
     Auto-discover all tables/collections in database.
     Returns list of table/collection names.
     
-    Supported for: PostgreSQL, MySQL, MongoDB, SQL Server, Oracle, Db2, Vitess.
+    Supported for: PostgreSQL, MySQL, MariaDB, MongoDB, SQL Server, Oracle, Vitess.
     """
     if db_type == 'mongo':
         db = conn.get_default_database()
@@ -205,7 +188,7 @@ def discover_tables(conn: Any, db_type: str) -> List[str]:
         cursor.close()
         return tables
     
-    elif db_type == 'mysql':
+    elif db_type in ('mysql', 'mariadb', 'vitess'):
         cursor = conn.cursor()
         cursor.execute("SHOW TABLES")
         tables = [row[0] for row in cursor.fetchall()]
@@ -232,40 +215,13 @@ def discover_tables(conn: Any, db_type: str) -> List[str]:
         cursor.close()
         return tables
     
-    elif db_type == 'db2':
-        try:
-            import ibm_db_dbi
-            # Convert ibm_db connection to DBI connection for cursor operations
-            cursor = ibm_db_dbi.Connection(conn).cursor()
-            cursor.execute("""
-                SELECT TABNAME FROM SYSCAT.TABLES 
-                WHERE TABSCHEMA = CURRENT SCHEMA AND TYPE = 'T'
-                ORDER BY TABNAME
-            """)
-            tables = [row[0] for row in cursor.fetchall()]
-            cursor.close()
-            return tables
-        except ImportError:
-            raise ImportError(
-                "IBM Db2 table discovery requires 'ibm_db_dbi' package. "
-                "Install with: pip install ibm_db"
-            )
-    
-    elif db_type == 'vitess':
-        # Vitess uses MySQL protocol
-        cursor = conn.cursor()
-        cursor.execute("SHOW TABLES")
-        tables = [row[0] for row in cursor.fetchall()]
-        cursor.close()
-        return tables
-    
     return []
 
 
 def fetch_new_records(conn: Any, db_type: str, table: str, last_timestamp: str = None) -> List[Dict]:
     """
     Fetch new records from database.
-    Works for SQL databases (PostgreSQL, MySQL, SQL Server, Oracle, Db2, Vitess).
+    Works for SQL databases (PostgreSQL, MySQL, MariaDB, SQL Server).
     MongoDB needs different logic.
     """
     if db_type == 'mongo':

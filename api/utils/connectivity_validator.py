@@ -2,17 +2,9 @@
 Connectivity validation utilities for database and API endpoints.
 Used to test connections before starting mapping pipelines.
 
-Supports all Debezium-compatible databases:
-- PostgreSQL
-- MySQL/MariaDB
-- MongoDB
-- SQL Server
-- Oracle
-- DB2
-- Cassandra
-- Vitess
-- Spanner
-- Informix
+Supports databases commonly used in e-commerce:
+- PostgreSQL, MySQL, MariaDB, MongoDB, SQL Server (transactional)
+- Oracle, Vitess, Cassandra (large-scale / big data e-commerce)
 """
 
 import socket
@@ -45,8 +37,7 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
     """
     Test database connectivity and return status with error message.
     
-    Supports all Debezium-compatible databases with appropriate connection testing.
-    For databases without direct Python drivers, returns guidance message.
+    Supports databases commonly used in e-commerce with appropriate connection testing.
     
     Args:
         db_uri: Database connection URI
@@ -213,11 +204,9 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                 else:
                     return False, f"SQL Server connection error: {error_msg}"
         
-        # Oracle
+        # Oracle — used by large enterprise retailers
         elif db_type == 'oracle':
             port = port or 1521
-            # Oracle requires cx_Oracle or oracledb library
-            # We'll provide a helpful message since it requires specific setup
             try:
                 import cx_Oracle
                 if not database:
@@ -236,38 +225,16 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                     else:
                         return False, f"Oracle connection error: {error_obj}"
             except ImportError:
-                # cx_Oracle not installed, provide helpful message
                 return True, f"Oracle database at {hostname}:{port} will be validated by Debezium connector. Install cx_Oracle library for pre-validation."
         
-        # DB2
-        elif db_type == 'db2':
-            port = port or 50000
-            # DB2 requires ibm_db library
-            try:
-                import ibm_db
-                if not database:
-                    return False, "Invalid DB2 URI: database name not found"
-                try:
-                    conn_str = f"DATABASE={database};HOSTNAME={hostname};PORT={port};PROTOCOL=TCPIP;UID={username};PWD={password};"
-                    conn = ibm_db.connect(conn_str, "", "")
-                    ibm_db.close(conn)
-                    return True, f"Successfully connected to DB2 database at {hostname}:{port}"
-                except Exception as e:
-                    error_msg = str(e)
-                    if "authorization" in error_msg.lower() or "authentication" in error_msg.lower():
-                        return False, f"Authentication failed for DB2 at {hostname}:{port}. Check username and password."
-                    elif "communication" in error_msg.lower() or "connection refused" in error_msg.lower():
-                        return False, f"Cannot connect to DB2 at {hostname}:{port}. Server may be down or unreachable."
-                    else:
-                        return False, f"DB2 connection error: {error_msg}"
-            except ImportError:
-                # ibm_db not installed, provide helpful message
-                return True, f"DB2 database at {hostname}:{port} will be validated by Debezium connector. Install ibm_db library for pre-validation."
+        # Vitess — used by large e-commerce platforms (e.g. Shopify) for horizontal MySQL scaling
+        elif db_type == 'vitess':
+            port = port or 15991
+            return True, f"Vitess database at {hostname}:{port} will be validated by Debezium connector during deployment."
         
-        # Cassandra
+        # Cassandra — used by large e-commerce sites for high-volume event / big data streams
         elif db_type == 'cassandra':
             port = port or 9042
-            # Cassandra requires cassandra-driver library
             try:
                 from cassandra.cluster import Cluster
                 from cassandra.auth import PlainTextAuthProvider
@@ -277,7 +244,7 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                         cluster = Cluster([hostname], port=port, auth_provider=auth_provider, connect_timeout=timeout)
                     else:
                         cluster = Cluster([hostname], port=port, connect_timeout=timeout)
-                    cluster.connect()  # Test connection
+                    cluster.connect()
                     cluster.shutdown()
                     return True, f"Successfully connected to Cassandra database at {hostname}:{port}"
                 except Exception as e:
@@ -289,27 +256,11 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                     else:
                         return False, f"Cassandra connection error: {error_msg}"
             except ImportError:
-                # cassandra-driver not installed, provide helpful message
                 return True, f"Cassandra database at {hostname}:{port} will be validated by Debezium connector. Install cassandra-driver library for pre-validation."
-        
-        # Vitess (MySQL-compatible)
-        elif db_type == 'vitess':
-            port = port or 15991
-            return True, f"Vitess database at {hostname}:{port} will be validated by Debezium connector during deployment."
-        
-        # Google Cloud Spanner
-        elif db_type == 'spanner':
-            return True, f"Google Cloud Spanner database will be validated by Debezium connector during deployment. Ensure GCP credentials are configured."
-        
-        # Informix
-        elif db_type == 'informix':
-            port = port or 9088
-            # Informix requires specific ODBC setup
-            return True, f"Informix database at {hostname}:{port} will be validated by Debezium connector. Ensure Informix ODBC driver is installed."
         
         else:
             # Unknown database type
-            return False, f"Unsupported database type '{db_type}'. Supported types: postgresql, mysql, mariadb, mongodb, sqlserver, oracle, db2, cassandra, vitess, spanner, informix"
+            return False, f"Unsupported database type '{db_type}'. Supported types: postgresql, mysql, mariadb, mongodb, sqlserver, oracle, vitess, cassandra"
             
     except Exception as e:
         return False, f"Error validating database connection: {str(e)}"

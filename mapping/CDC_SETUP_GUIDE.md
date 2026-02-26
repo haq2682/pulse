@@ -26,19 +26,16 @@ Debezium reads the database's native change stream (not polling queries) and pro
 
 ## Supported Databases
 
-| Database | URI Scheme | Default Port | CDC Mechanism |
-|---|---|---|---|
-| PostgreSQL | `postgresql://` | 5432 | Logical replication (WAL) |
-| MySQL | `mysql://` | 3306 | Binary log (binlog) |
-| MariaDB | `mariadb://` | 3306 | Binary log (binlog) |
-| MongoDB | `mongodb://` | 27017 | Change streams (oplog) |
-| SQL Server | `mssql://` | 1433 | SQL Server CDC |
-| Oracle | `oracle://` | 1521 | LogMiner / XStream |
-| IBM Db2 | `db2://` | 50000 | SQL Replication |
-| Vitess | `vitess://` | 15991 | VStream gRPC |
-| Google Spanner | `spanner://` | N/A | Change streams |
-| Informix | `informix://` | 9088 | Change Data Capture API |
-| Cassandra | `cassandra://` | 9042 | Commit log CDC |
+| Database | URI Scheme | Default Port | CDC Mechanism | Use Case |
+|---|---|---|---|---|
+| PostgreSQL | `postgresql://` | 5432 | Logical replication (WAL) | Transactional e-commerce |
+| MySQL | `mysql://` | 3306 | Binary log (binlog) | Transactional e-commerce |
+| MariaDB | `mariadb://` | 3306 | Binary log (binlog) | Transactional e-commerce |
+| MongoDB | `mongodb://` | 27017 | Change streams (oplog) | Flexible / document store |
+| SQL Server | `mssql://` | 1433 | SQL Server CDC | Enterprise e-commerce |
+| Oracle | `oracle://` | 1521 | LogMiner / XStream | Large enterprise retailers |
+| Vitess | `vitess://` | 15991 | VStream gRPC | Horizontal MySQL scaling (e.g. Shopify) |
+| Cassandra | `cassandra://` | 9042 | Commit log CDC | High-volume big data / event streams |
 
 ---
 
@@ -49,20 +46,18 @@ The user must configure their source database before providing the connection UR
 ## URI Format
 
 ```
-scheme://username:password@host:port/database
+scheme://debezium_user:password@host:port/database
 ```
 
 Examples:
 ```
 postgresql://debezium_user:secret@10.0.0.50:5432/ecommerce
 mysql://debezium_user:secret@db.example.com:3306/shop
-mongodb://debezium_user:secret@mongo-rs1:27017/orders?replicaSet=rs0
+mariadb://debezium_user:secret@db.example.com:3306/shop
+mongodb://debezium_user:secret@mongo-rs1:27017/orders?replicaSet=rs0&authSource=admin
 mssql://debezium_user:secret@sqlserver.local:1433/sales
 oracle://debezium_user:secret@oracle-host:1521/ORCL
-db2://debezium_user:secret@db2-host:50000/ECOMDB
-vitess://vtgate-host:15991/commerce
-spanner://my-gcp-project/my-instance/my-database
-informix://debezium_user:secret@informix-host:9088/stores
+vitess://debezium_user:secret@vtgate-host:15991/commerce
 cassandra://debezium_user:secret@cassandra-host:9042/ecommerce
 ```
 
@@ -352,126 +347,43 @@ oracle://debezium_user:your_password@host:1521/service_name
 
 ---
 
-## 7. IBM Db2
+## 7. Vitess
 
-### 7.1 Enable CDC (ASN Capture)
-
-Tables must be placed in capture mode by a DBA. This requires Db2's SQL Replication feature.
-
-```sql
--- Enable capture for a table
-CALL ASNCDC.ADDTABLE('SCHEMA_NAME', 'TABLE_NAME');
-
--- Start capture agent
-CALL ASNCDC.REINIT();
-```
-
-### 7.2 Create Debezium User
-
-```sql
-CREATE USER debezium_user IDENTIFIED BY your_password;
-GRANT CONNECT ON DATABASE TO debezium_user;
-GRANT SELECT ON TABLE schema_name.orders TO debezium_user;
-GRANT SELECT ON TABLE schema_name.payments TO debezium_user;
--- Grant on ASN tables
-GRANT SELECT ON ASNCDC.IBMSNAP_REGISTER TO debezium_user;
-GRANT SELECT ON ASNCDC.IBMSNAP_SIGNAL TO debezium_user;
-```
-
-### URI
-
-```
-db2://debezium_user:your_password@host:50000/dbname
-```
-
----
-
-## 8. Vitess
-
-### 8.1 Requirements
+### 7.1 Requirements
 
 - VTGate must be accessible via gRPC (default port 15991).
 - VStream must be enabled on the Vitess cluster.
-- No special user creation is needed beyond normal Vitess authentication.
+- Vitess uses MySQL protocol under the hood.
 
-### 8.2 Verify VStream
+### 7.2 Configure Binlog on Each MySQL Shard
 
-```bash
-# Check VStream is accessible
-vtctlclient VDiff -- --tablet_types MASTER keyspace.workflow
+```conf
+[mysqld]
+server-id         = 1
+log_bin           = mysql-bin
+binlog_format     = ROW
+binlog_row_image  = FULL
+```
+
+### 7.3 Create Debezium User
+
+```sql
+CREATE USER 'debezium_user'@'%' IDENTIFIED BY 'your_password';
+GRANT SELECT, RELOAD, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'debezium_user'@'%';
+FLUSH PRIVILEGES;
 ```
 
 ### URI
 
 ```
-vitess://vtgate-host:15991/keyspace
+vitess://debezium_user:your_password@vtgate-host:15991/keyspace
 ```
 
 ---
 
-## 9. Google Cloud Spanner
+## 8. Cassandra
 
-### 9.1 Create a Change Stream
-
-```sql
-CREATE CHANGE STREAM pulse_change_stream
-  FOR orders, payments, inventory
-  OPTIONS (
-    retention_period = '7d',
-    value_capture_type = 'NEW_AND_OLD_VALUES'
-  );
-```
-
-### 9.2 Service Account Credentials
-
-Create a GCP service account with the following roles:
-- `roles/spanner.databaseReader`
-- `roles/spanner.viewer`
-
-Download the JSON key file and either:
-- Set `GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json` environment variable, OR
-- Mount the key file into the Debezium container
-
-### URI
-
-```
-spanner://project-id/instance-id/database-id
-```
-
----
-
-## 10. Informix
-
-### 10.1 Enable CDC
-
-```sql
--- Enable CDC on the database
-EXECUTE FUNCTION task('cdc add database', 'your_database');
-
--- Enable CDC on each table
-EXECUTE FUNCTION task('cdc add table', 'your_database:informix.orders');
-EXECUTE FUNCTION task('cdc add table', 'your_database:informix.payments');
-```
-
-### 10.2 Create Debezium User
-
-```sql
-CREATE USER debezium_user WITH PASSWORD 'your_password';
-GRANT SELECT ON orders TO debezium_user;
-GRANT SELECT ON payments TO debezium_user;
-```
-
-### URI
-
-```
-informix://debezium_user:your_password@host:9088/dbname
-```
-
----
-
-## 11. Cassandra
-
-### 11.1 Enable CDC in `cassandra.yaml`
+### 8.1 Enable CDC in `cassandra.yaml`
 
 ```yaml
 cdc_enabled: true
@@ -484,7 +396,7 @@ Restart Cassandra:
 sudo systemctl restart cassandra
 ```
 
-### 11.2 Enable CDC Per Table
+### 8.2 Enable CDC Per Table
 
 ```sql
 ALTER TABLE keyspace_name.orders WITH cdc = true;
@@ -492,14 +404,14 @@ ALTER TABLE keyspace_name.payments WITH cdc = true;
 ALTER TABLE keyspace_name.inventory WITH cdc = true;
 ```
 
-### 11.3 Create Debezium User
+### 8.3 Create Debezium User
 
 ```sql
 CREATE ROLE debezium_user WITH PASSWORD = 'your_password' AND LOGIN = true;
 GRANT SELECT ON KEYSPACE keyspace_name TO debezium_user;
 ```
 
-### 11.4 Important Note
+### 8.4 Important Note
 
 The Cassandra Debezium connector runs as a **standalone JVM agent** deployed on each Cassandra node (not inside Kafka Connect). For Kafka Connect-based deployment, use Debezium Server as a bridge. See the Debezium documentation for Cassandra-specific deployment.
 
@@ -572,20 +484,24 @@ docker-compose up -d debezium
 
 ### Installing Additional Connector Plugins
 
-The default `debezium/connect:2.5` image ships with connectors for **PostgreSQL, MySQL, MongoDB, SQL Server, Oracle, Db2**. For other databases, you need to add plugins.
+The default `debezium/connect:2.5` image ships with connectors for **PostgreSQL, MySQL, MongoDB, SQL Server, Oracle**. For Vitess, MariaDB, and Cassandra you need to add plugins.
 
-To add connectors for Vitess, Spanner, Informix, MariaDB, or Cassandra, create a custom Dockerfile:
+To add those connectors, create a custom Dockerfile:
 
 ```dockerfile
 FROM debezium/connect:2.5
 
-# Example: add Vitess connector
+# Add Vitess connector (used by large e-commerce platforms for horizontal MySQL scaling)
 RUN cd /kafka/connect && \
     curl -L https://repo1.maven.org/maven2/io/debezium/debezium-connector-vitess/2.5.0.Final/debezium-connector-vitess-2.5.0.Final-plugin.tar.gz | tar xz
 
-# Example: add Spanner connector
+# Add MariaDB connector
 RUN cd /kafka/connect && \
-    curl -L https://repo1.maven.org/maven2/io/debezium/debezium-connector-spanner/2.5.0.Final/debezium-connector-spanner-2.5.0.Final-plugin.tar.gz | tar xz
+    curl -L https://repo1.maven.org/maven2/io/debezium/debezium-connector-mariadb/2.5.0.Final/debezium-connector-mariadb-2.5.0.Final-plugin.tar.gz | tar xz
+
+# Add Cassandra connector (runs as standalone agent; included here for Debezium Server mode)
+RUN cd /kafka/connect && \
+    curl -L https://repo1.maven.org/maven2/io/debezium/debezium-connector-cassandra-4/2.5.0.Final/debezium-connector-cassandra-4-2.5.0.Final-plugin.tar.gz | tar xz
 ```
 
 Then update `docker-compose.yml` to build from it:

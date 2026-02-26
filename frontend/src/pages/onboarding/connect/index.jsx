@@ -403,7 +403,7 @@ const Connect = () => {
         setErrors({db: '', api: '', form: ''});
 
         const apiRegex = /^(https?:\/\/)([a-zA-Z0-9.-]+)(:\d+)?(\/.*)?$/;
-        const dbRegex = /^([a-zA-Z0-9]+):\/\/([^:@\s]+):([^:@\s]+)@([a-zA-Z0-9.-]+)(:\d+)?\/([a-zA-Z0-9_-]+)$/;
+        const dbRegex = /^([a-zA-Z0-9+]+):\/\/([^:@\s]+):([^:@\s]+)@([a-zA-Z0-9.-]+)(:\d+)?\/([a-zA-Z0-9_-]+)(\?.*)?$/;
 
         if (ingestionType === 'batch') {
             if (uploadedFiles.length === 0) {
@@ -879,8 +879,11 @@ const Connect = () => {
                                                                         </Text>
                                                                     </>)}
                                                                     <Text className="text-gray-500 text-sm">
-                                                                        URI Format: <Text className="font-mono">postgres://username:password@host:port/database</Text><br />
-                                                                        <Text className="text-xs">Port is optional.</Text>
+                                                                        URI Format: <Text className="font-mono">scheme://debezium_user:password@host:port/database</Text><br />
+                                                                        <Text className="text-xs">
+                                                                            Supported databases: PostgreSQL (<Text className="font-mono">postgresql://</Text>), MySQL (<Text className="font-mono">mysql://</Text>), MariaDB (<Text className="font-mono">mariadb://</Text>), MongoDB (<Text className="font-mono">mongodb://</Text>), SQL Server (<Text className="font-mono">mssql://</Text>), Oracle (<Text className="font-mono">oracle://</Text>), Vitess (<Text className="font-mono">vitess://</Text>), Cassandra (<Text className="font-mono">cassandra://</Text>).<br />
+                                                                            Your database administrator must create <Text className="font-mono">debezium_user</Text> with CDC permissions before connecting. See <Text className="font-mono">sql/debezium_user_setup.sql</Text> for setup scripts.
+                                                                        </Text>
                                                                     </Text>
                                                                 </>
                                                             ) : (

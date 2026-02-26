@@ -40,7 +40,8 @@ CONFIG = {
     # Uses Debezium CDC for true real-time ingestion from database transaction log.
     # The database type is auto-detected from the URI scheme.
     # Supported: postgresql, mysql, mariadb, mongodb, mssql/sqlserver,
-    #            oracle, db2, vitess, spanner, informix, cassandra
+    #            oracle, vitess, cassandra
+    # (Db2, Spanner, and Informix are not supported — not common for e-commerce)
     # See mapping/CDC_SETUP_GUIDE.md for database setup instructions.
     "db_uri": "postgresql://debezium_user:debezium_pass@localhost:5432/ecommerce",
     "db_tables": ["orders", "payments", "inventory", "shopping_cart", "cart_items"],
