@@ -41,6 +41,26 @@ Debezium connects to your database using the `debezium_user` credentials you ent
 
 ---
 
+## Connector Plugin Status — What the Pulse Dockerfile Already Installs
+
+The Debezium container is built from `.docker/debezium/Dockerfile`. It extends `quay.io/debezium/connect:2.5` and adds the community connectors that are not in the base image. The table below shows the connector status for each database and any **extra Pulse-side action** required beyond just having the plugin installed.
+
+| Database | Connector plugin | How it gets installed | Extra Pulse-side requirement |
+|----------|-----------------|----------------------|------------------------------|
+| PostgreSQL | `debezium-connector-postgres` | Pre-installed in base image | None |
+| MySQL | `debezium-connector-mysql` | Pre-installed in base image | None |
+| MariaDB | ⚠️ **Uses MySQL connector** | Pre-installed in base image | None — uses `io.debezium.connector.mysql.MySqlConnector` (see section 3) |
+| MongoDB | `debezium-connector-mongodb` | Pre-installed in base image | None |
+| SQL Server | `debezium-connector-sqlserver` | Pre-installed in base image | None |
+| Oracle | `debezium-connector-oracle` | Pre-installed in base image (JARs only) | ⚠️ **`ojdbc8.jar` must be manually supplied** — Oracle's JDBC driver cannot be redistributed. Download it from Oracle and place at `./jars/ojdbc8.jar`. |
+| IBM Db2 | `debezium-connector-db2` | Pre-installed in base image | None |
+| Vitess | `debezium-connector-vitess` | Downloaded in Dockerfile (Maven Central) | None |
+| Google Spanner | `debezium-connector-spanner` | Downloaded in Dockerfile (Maven Central) | ⚠️ **GCP credentials JSON file must be supplied** — place at `./jars/gcp-credentials.json` before starting the stack. |
+| Informix | `debezium-connector-informix` | Downloaded in Dockerfile (Maven Central) | None |
+| Cassandra | ⚠️ **Cannot use Kafka Connect** | Not installable in Kafka Connect | ⚠️ **Separate Debezium Server container required** (see section 11) |
+
+---
+
 ## URI Format
 
 ```
@@ -92,13 +112,22 @@ The Pulse internal PostgreSQL is pre-configured with:
 
 This happens automatically on first container start via the initialization scripts in `sql/`.
 
-### Install extra connector plugins (if needed)
+### Connector plugins — what the Dockerfile installs
 
-The Debezium container (`debezium/connect:2.5`) ships with connectors for PostgreSQL, MySQL, MongoDB, SQL Server, Oracle, and Db2.
+The Debezium container is built from `.docker/debezium/Dockerfile` (extends `quay.io/debezium/connect:2.5`):
 
-For **Vitess**, **Spanner**, and **Informix**, the plugins are added automatically by the custom Dockerfile at `.docker/debezium/Dockerfile`.
+- **Pre-installed in base image** — PostgreSQL, MySQL, MongoDB, SQL Server, Oracle (JARs), Db2
+- **Downloaded during image build** — Vitess, Spanner, Informix, and the Debezium Scripting extension
+- **MariaDB** — uses the pre-installed MySQL connector (`io.debezium.connector.mysql.MySqlConnector`); no extra installation needed in Debezium 2.5
+- **Cassandra** — cannot run inside Kafka Connect; requires a separate `quay.io/debezium/server:2.5` container (see section 11 below)
 
-For **Cassandra**, a separate Debezium Server container is required (see the Cassandra section below).
+After running `docker-compose up -d`, all connector plugins above are ready. The three databases that require **additional manual steps on the Pulse system** are:
+
+| Database | What you must do before `docker-compose up` |
+|----------|---------------------------------------------|
+| Oracle | Place `ojdbc8.jar` at `./jars/ojdbc8.jar` (see section 6) |
+| Google Spanner | Place GCP credentials JSON at `./jars/gcp-credentials.json` (see section 9) |
+| Cassandra | Add a `debezium-cassandra` service to `docker-compose.yml` (see section 11) |
 
 ---
 
@@ -203,6 +232,8 @@ mysql://debezium_user:your_strong_password@your-host:3306/your_database
 ### 3. MariaDB
 
 **Minimum version:** MariaDB 10.5+
+
+> ⚠️ **Pulse system note:** In Debezium 2.5, there is no standalone `debezium-connector-mariadb` plugin available on Maven Central. MariaDB support is bundled inside the MySQL connector as a preview feature. Pulse uses `io.debezium.connector.mysql.MySqlConnector` for MariaDB connections — no extra plugin installation is needed. A standalone MariaDB connector was only added in Debezium 2.7+.
 
 #### Step 1 — Edit `my.cnf`
 
@@ -359,6 +390,17 @@ mssql://debezium_user:your_strong_password@your-host:1433/your_database
 
 **Minimum version:** Oracle 11g R2+
 
+> ⚠️ **Pulse system — extra file required:** The Oracle Debezium connector JARs are pre-installed in the base image, but the Oracle JDBC driver (`ojdbc8.jar`) **cannot be redistributed** due to Oracle's license. You must supply it manually:
+> 1. Download `ojdbc8.jar` from [Oracle JDBC Downloads](https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html).
+> 2. Place it at `./jars/ojdbc8.jar` (next to `docker-compose.yml`).
+>
+> The `debezium` service mounts it automatically via the volume in `docker-compose.yml`:
+> ```yaml
+> volumes:
+>   - ./jars/ojdbc8.jar:/kafka/connect/debezium-connector-oracle/ojdbc8.jar
+> ```
+> **The Oracle connector will fail to start without this file.**
+
 #### Step 1 — Enable archive log mode
 
 Connect as `SYSDBA`:
@@ -491,6 +533,15 @@ vitess://vtgate-host:15991/keyspace_name
 
 **Requirement:** A GCP service account with `roles/spanner.databaseReader` and `roles/spanner.viewer`.
 
+> ⚠️ **Pulse system — extra file required:** The Spanner connector plugin is downloaded and installed automatically during the Docker image build. However, it requires a **GCP service account credentials JSON file at runtime**. Place the key file at `./jars/gcp-credentials.json` (next to `docker-compose.yml`) before running `docker-compose up`. The `debezium` service mounts it automatically:
+> ```yaml
+> volumes:
+>   - ./jars/gcp-credentials.json:/etc/gcp/credentials.json
+> environment:
+>   - GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials.json
+> ```
+> **The Spanner connector will fail to authenticate without this file.**
+
 #### Step 1 — Create a change stream on the database
 
 Using the Google Cloud Console or `gcloud`:
@@ -565,7 +616,7 @@ informix://debezium_user:your_strong_password@your-host:9088/your_database
 
 **Minimum version:** Cassandra 4.0+
 
-> **Important:** The Cassandra Debezium connector runs as a separate **Debezium Server** container, not inside the Kafka Connect container. See the Pulse system notes below.
+> ⚠️ **Pulse system — separate container required:** The Cassandra connector **cannot be installed inside Kafka Connect** at all. The Cassandra Debezium connector reads CommitLog files directly from the Cassandra node's disk. It must run as a **separate `quay.io/debezium/server:2.5` container** sharing a volume with Cassandra. See the "Pulse system" steps at the end of this section. This is different from all other supported databases, which all run inside the `debezium` Kafka Connect container.
 
 #### Step 1 — Enable CDC in `cassandra.yaml`
 
@@ -678,6 +729,9 @@ cassandra://debezium_user:your_strong_password@your-host:9042/keyspace_name
 | `wal_level must be logical` | PostgreSQL `wal_level` not set | Edit `postgresql.conf` and restart |
 | `REPLICATION permission denied` | User missing REPLICATION role | Re-run the `CREATE USER … WITH REPLICATION` statement |
 | Snapshot is very slow | Large tables during initial load | Wait; the snapshot is a one-time full read before CDC starts |
+| Oracle connector fails immediately | `ojdbc8.jar` is missing | Download from Oracle and place at `./jars/ojdbc8.jar`, then restart the `debezium` container |
+| Spanner connector authentication error | GCP credentials file not mounted | Place service account JSON at `./jars/gcp-credentials.json` and restart the `debezium` container |
+| Cassandra — no events received | Debezium Server container not running | Add the `debezium-cassandra` service to `docker-compose.yml` (see section 11) |
 
 For Debezium logs:
 
