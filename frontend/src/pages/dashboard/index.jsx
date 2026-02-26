@@ -286,7 +286,7 @@ const INSIGHT_CATALOG = [
 const Dashboard = () => {
     usePageTitle('Dashboard');
     const { logout, user } = useAuth();
-    const { startPipeline } = usePipelineProgress();
+    const { startPipeline, pipelineStatus: contextPipelineStatus } = usePipelineProgress();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [selectedBusiness, setSelectedBusiness] = useState(null);
     const navigate = useNavigate();
@@ -402,6 +402,25 @@ const Dashboard = () => {
             }
         }
     }, [businessId, businesses]);
+
+    // Sync the context pipeline status (WebSocket) → local pipelineStatus so that
+    // the IngestionStatusIndicator circular arrow reflects streaming pipeline activity
+    // without blocking the analytics dashboard with the Knob overlay.
+    useEffect(() => {
+        const isStreamingMode = businessIngestionType === 'db' || businessIngestionType === 'api';
+        if (!isStreamingMode) return;
+
+        const status = contextPipelineStatus?.status;
+        if (status === 'running') {
+            setPipelineStatus('running');
+        } else if (status === 'completed') {
+            setPipelineStatus('success');
+            setTimeout(() => setPipelineStatus('idle'), 3000);
+        } else if (status === 'failed') {
+            setPipelineStatus('failed');
+            setTimeout(() => setPipelineStatus('idle'), 5000);
+        }
+    }, [contextPipelineStatus?.status, businessIngestionType]);
     
     // Handle starting analysis
     const handleStartAnalysis = async () => {
@@ -1018,6 +1037,7 @@ const Dashboard = () => {
                             <InlinePipelineProgress
                                 businessId={businessId}
                                 onStartAnalysis={handleStartAnalysis}
+                                ingestionType={businessIngestionType}
                             />
                             {/* Render appropriate analytics content based on route */}
                             {renderAnalyticsContent()}

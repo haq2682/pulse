@@ -5,7 +5,7 @@ import { PrimaryButton } from '@/components/global/Button';
 import Text from '@/components/global/Typography/Text';
 import Heading from '@/components/global/Typography/Heading';
 
-const InlinePipelineProgress = ({ businessId, onStartAnalysis }) => {
+const InlinePipelineProgress = ({ businessId, onStartAnalysis, ingestionType }) => {
     const {
         pipelineStatus,
         isConnected,
@@ -52,6 +52,11 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis }) => {
     // const isCompleted = pipelineStatus?.status === 'completed';
     const isFailed = pipelineStatus?.status === 'failed';
     const hasNoPipeline = !pipelineStatus || pipelineStatus.status === 'cancelled';
+
+    // In streaming modes (db/api), the analytics remain visible while the pipeline
+    // processes a new microbatch.  Only the header circular arrow should rotate — the
+    // Knob/progress overlay must not block the dashboard.
+    const isStreamingMode = ingestionType === 'db' || ingestionType === 'api';
     
     // Get status color
     const getStatusColor = () => {
@@ -178,6 +183,9 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis }) => {
     
     // Show pipeline in progress
     if (isRunning) {
+        // For streaming modes the analytics stay visible; only the header arrow rotates.
+        if (isStreamingMode) return null;
+
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
                 <div className="text-center max-w-2xl">
