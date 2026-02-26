@@ -1,10 +1,10 @@
 # =============================================================================
 # Dockerfile.debezium
 # =============================================================================
-# Extends the official Debezium 2.5 Kafka Connect image with ALL connectors
+# Extends the official Debezium 3.4 Kafka Connect image with ALL connectors
 # needed by the mapping pipeline's true CDC db mode.
 #
-# ── Pre-installed in quay.io/debezium/connect:2.5 (nothing to do) ───────────
+# ── Pre-installed in quay.io/debezium/connect:3.4 (nothing to do) ───────────
 #   ✅ PostgreSQL   (debezium-connector-postgres)
 #   ✅ MySQL        (debezium-connector-mysql)
 #   ✅ MongoDB      (debezium-connector-mongodb)
@@ -13,46 +13,37 @@
 #   ✅ Db2          (debezium-connector-db2)
 #
 # ── Added by this Dockerfile ─────────────────────────────────────────────────
+#   ✅ MariaDB      — standalone connector available since 2.7, fully mature in 3.x
 #   ✅ Vitess       — community connector, not in base image
 #   ✅ Spanner      — community connector, not in base image
-#   ✅ Informix     — new community connector in 2.5, not in base image
+#   ✅ Informix     — community connector, not in base image
 #   ✅ Scripting    — event filtering/routing extension
-#
-# ── MariaDB situation ────────────────────────────────────────────────────────
-#   ⚠️  The standalone debezium-connector-mariadb artifact did NOT exist
-#       until version 2.7.0. It is NOT available on Maven Central for 2.5.x.
-#       In 2.5, MariaDB works via the pre-installed MySQL connector using:
-#         connector.class = io.debezium.connector.mysql.MySqlConnector
-#       No extra installation needed — see SECTION 1 note below.
 #
 # ── Cannot be added here ─────────────────────────────────────────────────────
 #   ⚠️  Cassandra  — requires Debezium Server (separate container), see bottom
 # =============================================================================
 
-FROM quay.io/debezium/connect:2.5
+FROM quay.io/debezium/connect:3.4
 
-ENV DEBEZIUM_VERSION=2.5.4.Final
+ENV DEBEZIUM_VERSION=3.4.0.Final
 
 USER root
 
 # =============================================================================
-# SECTION 1 — MariaDB (no installation required in 2.5)
+# SECTION 1 — MariaDB Connector
 # -----------------------------------------------------------------------------
-# In Debezium 2.5, MariaDB support is bundled inside the MySQL connector as
-# a preview feature. The MySQL connector is already in the base image.
+# In Debezium 3.4, MariaDB has its own dedicated connector (available since
+# 2.7+). This replaces the old workaround of using the MySQL connector for
+# MariaDB. The standalone connector correctly handles MariaDB-specific
+# features, GTID format, and protocol differences.
 #
 # Use this in your connector config for MariaDB:
-#   "connector.class": "io.debezium.connector.mysql.MySqlConnector"
+#   "connector.class": "io.debezium.connector.mariadb.MariaDbConnector"
 #   "database.hostname": "<your-mariadb-host>"
-#
-# If you later upgrade to Debezium 2.7+, switch the base image to:
-#   FROM quay.io/debezium/connect:2.7
-#   ENV DEBEZIUM_VERSION=2.7.4.Final
-# And uncomment:
-#   RUN curl -fSL \
-#       https://repo1.maven.org/maven2/io/debezium/debezium-connector-mariadb/${DEBEZIUM_VERSION}/debezium-connector-mariadb-${DEBEZIUM_VERSION}-plugin.tar.gz \
-#       | tar -xzv -C /kafka/connect/
 # =============================================================================
+RUN curl -fSL \
+    https://repo1.maven.org/maven2/io/debezium/debezium-connector-mariadb/${DEBEZIUM_VERSION}/debezium-connector-mariadb-${DEBEZIUM_VERSION}-plugin.tar.gz \
+    | tar -xzv -C /kafka/connect/
 
 # =============================================================================
 # SECTION 2 — Vitess Connector
@@ -95,16 +86,18 @@ RUN curl -fSL \
 # SECTION 5 — Debezium Scripting Extension
 # -----------------------------------------------------------------------------
 # Enables Groovy/JS-based filtering and routing transforms in connector config.
-# Placed inside the oracle connector dir which is already on the plugin path.
+# In Debezium 3.x, placed in its own plugin directory so it is available to
+# all connectors on the plugin path.
 # Example use:
 #   transforms=filter
 #   transforms.filter.type=io.debezium.transforms.Filter
 #   transforms.filter.language=jsr223.groovy
 #   transforms.filter.condition=value.op == 'u'
 # =============================================================================
-RUN curl -fSL \
+RUN mkdir -p /kafka/connect/debezium-scripting && \
+    curl -fSL \
     https://repo1.maven.org/maven2/io/debezium/debezium-scripting/${DEBEZIUM_VERSION}/debezium-scripting-${DEBEZIUM_VERSION}.tar.gz \
-    | tar -xzv -C /kafka/connect/debezium-connector-oracle/
+    | tar -xzv -C /kafka/connect/debezium-scripting/
 
 # =============================================================================
 # SECTION 6 — Oracle JDBC Driver (cannot be bundled — license restricted)
@@ -115,11 +108,10 @@ RUN curl -fSL \
 #   1. Download ojdbc8.jar from:
 #      https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html
 #
-#   2. Place it at ./oracle-jdbc/ojdbc8.jar next to your docker-compose.yml
-#
-#   3. Add to the debezium service in docker-compose.yml:
-#      volumes:
-#        - ./oracle-jdbc/ojdbc8.jar:/kafka/connect/debezium-connector-oracle/ojdbc8.jar
+#   2. Place it at ./jars/ojdbc8.jar (next to docker-compose.yml).
+#      The file is already mounted by the debezium service in docker-compose.yml:
+#        volumes:
+#          - ./jars/ojdbc8.jar:/kafka/connect/debezium-connector-oracle/ojdbc8.jar
 #
 # The Oracle connector will fail to start without this file.
 # =============================================================================
@@ -130,7 +122,7 @@ USER 1001
 # CASSANDRA — Requires a separate Debezium Server container
 # =============================================================================
 # The Cassandra connector reads CommitLog files directly from disk.
-# It must run as quay.io/debezium/server:2.5 sharing a volume with Cassandra.
+# It must run as quay.io/debezium/server:3.4 sharing a volume with Cassandra.
 #
 # Add to docker-compose.yml:
 #
@@ -140,7 +132,7 @@ USER 1001
 #       - cassandra_commitlog:/var/lib/cassandra/commitlog
 #
 #   debezium-cassandra:
-#     image: quay.io/debezium/server:2.5
+#     image: quay.io/debezium/server:3.4
 #     container_name: debezium-cassandra
 #     volumes:
 #       - cassandra_commitlog:/cassandra/commitlog

@@ -47,6 +47,10 @@ frontend/coverage
 # ignore dump files
 *.dump
 
+# proprietary JDBC drivers and cloud credentials — supply locally, never commit
+jars/ojdbc8.jar
+jars/gcp-credentials.json
+
 # production
 frontend/build
 

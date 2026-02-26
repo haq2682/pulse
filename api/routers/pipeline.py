@@ -2,11 +2,15 @@
 Pipeline API router for managing data processing pipeline execution.
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from database import get_db
 from sqlalchemy import text
 from services.pipeline_service import PipelineService
 from services.websocket_manager import WebSocketManager
+
+logger = logging.getLogger("pulse.pipeline")
 
 
 router = APIRouter(
@@ -77,9 +81,7 @@ async def start_pipeline(request: Request, db=Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error starting pipeline: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Error starting pipeline: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -94,22 +96,25 @@ async def get_pipeline_status(business_id: str, db=Depends(get_db)):
     try:
         pipeline_service = PipelineService(db, websocket_manager)
         status_info = pipeline_service.get_pipeline_status_info(business_id)
-        
+        ever_completed = pipeline_service.has_pipeline_ever_completed(business_id)
+
         if not status_info:
             return {
                 "status": 200,
                 "pipeline_status": "not_started",
+                "pipeline_ever_completed": ever_completed,
                 "message": "No pipeline execution found for this business"
             }
-        
+
         return {
             "status": 200,
             "pipeline_status": status_info["status"],
+            "pipeline_ever_completed": ever_completed,
             "data": status_info
         }
         
     except Exception as e:
-        print(f"Error getting pipeline status: {e}")
+        logger.error("Error getting pipeline status: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -169,9 +174,7 @@ async def cancel_pipeline(request: Request, db=Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error cancelling pipeline: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Error cancelling pipeline: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -234,9 +237,7 @@ async def retry_pipeline(request: Request, db=Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error retrying pipeline: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Error retrying pipeline: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -263,5 +264,5 @@ async def websocket_endpoint(websocket: WebSocket, business_id: str):
     except WebSocketDisconnect:
         websocket_manager.disconnect(websocket, business_id)
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        logger.error("WebSocket error: %s", e, exc_info=True)
         websocket_manager.disconnect(websocket, business_id)

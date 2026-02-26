@@ -6,6 +6,7 @@ const PipelineProgressContext = createContext(null);
 export const PipelineProgressProvider = ({ children }) => {
     const { user } = useAuth();
     const [pipelineStatus, setPipelineStatus] = useState(null);
+    const [pipelineEverCompleted, setPipelineEverCompleted] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState(null);
     
@@ -153,6 +154,9 @@ export const PipelineProgressProvider = ({ children }) => {
     // Fetch current pipeline status from REST API
     const fetchPipelineStatus = useCallback(async (businessId) => {
         if (!businessId) return;
+        // Reset "ever completed" immediately so switching businesses never leaks
+        // a previous business's true value into the new business's first render.
+        setPipelineEverCompleted(false);
         setPipelineStatus('loading');
         try {
             const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -160,14 +164,25 @@ export const PipelineProgressProvider = ({ children }) => {
             
             if (response.ok) {
                 const result = await response.json();
+                // Persist the cross-device "ever completed" flag from the DB
+                setPipelineEverCompleted(
+                    typeof result.pipeline_ever_completed === 'boolean'
+                        ? result.pipeline_ever_completed
+                        : false
+                );
                 if (result.data) {
                     setPipelineStatus(result.data);
                 } else if (result.pipeline_status === 'not_started') {
                     setPipelineStatus(null);
                 }
+            } else {
+                // Non-2xx: treat as unknown — conservatively keep false
+                setPipelineEverCompleted(false);
+                setPipelineStatus(null);
             }
         } catch (err) {
             console.error('Error fetching pipeline status:', err);
+            setPipelineEverCompleted(false);
             setPipelineStatus(null);
         }
     }, []);
@@ -280,6 +295,7 @@ export const PipelineProgressProvider = ({ children }) => {
     
     const value = {
         pipelineStatus,
+        pipelineEverCompleted,
         isConnected,
         error,
         connectWebSocket,

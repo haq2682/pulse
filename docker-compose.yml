@@ -119,6 +119,9 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DATABASE_NAME}
+      - DEBEZIUM_PASSWORD=${DEBEZIUM_PASSWORD}
+      # Enable logical replication so Debezium can read the WAL from this database
+      - POSTGRESQL_WAL_LEVEL=logical
     ports:
       - "5432:5432"
     volumes:
@@ -266,6 +269,63 @@ services:
       spark-network:
         ipv4_address: 10.5.0.10
     restart: always
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Cassandra — source database for Cassandra CDC mode
+  # CDC is enabled in the image (see .docker/cassandra/Dockerfile).
+  # After starting, enable CDC per table:
+  #   docker exec -it cassandra cqlsh
+  #   ALTER TABLE your_keyspace.orders WITH cdc = true;
+  # ─────────────────────────────────────────────────────────────────────────
+  cassandra:
+    build:
+      context: .
+      dockerfile: .docker/cassandra/Dockerfile
+    container_name: cassandra
+    environment:
+      CASSANDRA_CLUSTER_NAME: pulse-cluster
+      CASSANDRA_DC: dc1
+      CASSANDRA_RACK: rack1
+      HEAP_NEWSIZE: 128M
+      MAX_HEAP_SIZE: 512M
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+      - cassandra_commitlog:/var/lib/cassandra/commitlog
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.55
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Debezium Server — Cassandra CDC connector (separate from the Kafka Connect
+  # debezium service; the Cassandra connector reads commit log files directly
+  # from the shared cassandra_commitlog volume)
+  # ─────────────────────────────────────────────────────────────────────────
+  debezium-cassandra:
+    image: quay.io/debezium/server:3.4
+    container_name: debezium-cassandra
+    depends_on:
+      - cassandra
+      - kafka
+    volumes:
+      - cassandra_commitlog:/cassandra/commitlog
+      - ./conf/debezium-cassandra.properties:/debezium/conf/application.properties
+    networks:
+      spark-network:
+        ipv4_address: 10.5.0.56
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:7-alpine
@@ -504,3 +564,5 @@ volumes:
   redis_data:
   nifi_data:
   airflow_logs:
+  cassandra_data:
+  cassandra_commitlog:
