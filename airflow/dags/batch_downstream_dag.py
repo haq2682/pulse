@@ -86,7 +86,7 @@ _task_defaults = dict(
 
 
 def _docker_exec(script_path: str, extra_args: str = "") -> str:
-    return f"docker exec {PYTHON_CONTAINER} python /app/{script_path} {extra_args}"
+    return f"docker exec {PYTHON_CONTAINER} python3 /app/{script_path} {extra_args}"
 
 
 with DAG(

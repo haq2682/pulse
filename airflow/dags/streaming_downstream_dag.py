@@ -120,7 +120,7 @@ def _ensure_specific_models_for_bucket(bucket: str) -> None:
     result = subprocess.run(
         [
             "docker", "exec", PYTHON_CONTAINER,
-            "python", "/app/machine-learning/specific/train.py",
+            "python3", "/app/machine-learning/specific/train.py",
             "--bucket-name", bucket,
         ],
         capture_output=True,
