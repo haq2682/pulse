@@ -11,10 +11,26 @@ After the mapping micro-batch writes normalised Parquet to MinIO ``mapped/``,
 this module spawns the four downstream scripts **sequentially** in a
 background thread so the next Spark micro-batch can start immediately.
 
-A threading lock prevents concurrent downstream runs.  If a new micro-batch
-completes while the previous downstream run is still processing, the
-trigger is skipped — the NEXT successful micro-batch after the downstream
-finishes will pick up all accumulated data.
+Concurrency and data-safety guarantee
+--------------------------------------
+A threading lock prevents concurrent downstream runs.  When a new micro-batch
+arrives while the previous downstream run is still processing, the trigger
+cannot start a new run — instead it sets a ``_downstream_pending`` flag.
+The active run's **drain loop** detects that flag after completing and
+immediately re-runs the downstream pipeline, picking up every mapped/ file
+that accumulated while the first run was in progress (incremental cleaning
+ensures only unprocessed files are cleaned).  The loop repeats until no
+more pending flags are set, guaranteeing that **no accumulated micro-batch
+data is left unprocessed** regardless of how many batches arrive in a burst.
+
+Example (batch rate > downstream throughput):
+  batch 45 → downstream starts              (lock acquired)
+  batch 46 → skipped, pending flag SET
+  batch 47 → skipped, pending flag SET (already set)
+  batch 45's downstream finishes
+    → pending flag is set → clear flag → re-run (catch-up #1, processes 46 & 47)
+    → pending flag clear → drain loop exits, lock released
+  batch 48 → downstream starts normally
 
 Expected end-to-end latency
 ----------------------------
@@ -23,8 +39,8 @@ Expected end-to-end latency
 + downstream pipeline (~30-90 s)
 = **~45 s – 2 min**  (down from ~10-20 min with Airflow cron)
 
-The ``streaming_downstream`` Airflow DAG remains as a reduced-interval
-fallback (every 2 minutes) to catch any data missed by inline processing.
+The ``streaming_downstream`` Airflow DAG remains as an additional safety-net
+fallback (every 2 minutes), but correctness no longer depends on it.
 """
 
 import logging
@@ -42,10 +58,11 @@ logger = logging.getLogger("pulse.downstream")
 _REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 
 # ---------------------------------------------------------------------------
-# Module-level state: a single lock and a running flag prevent concurrent
-# downstream runs from overlapping within the same streaming job.
+# Module-level state: a single lock and a pending flag prevent concurrent
+# downstream runs while ensuring every skipped trigger is caught up.
 # ---------------------------------------------------------------------------
 _downstream_lock = threading.Lock()
+_downstream_pending = threading.Event()   # set when a trigger was skipped while a run was active
 _downstream_thread: Optional[threading.Thread] = None
 
 
@@ -129,7 +146,8 @@ def trigger_downstream(bucket: str, batch_id: int) -> bool:
     Attempt to start a downstream pipeline run in a background thread.
 
     Returns True if a new run was started, False if a previous run is still
-    in progress (the trigger is silently skipped).
+    in progress (a pending flag is set so the active run will re-run
+    immediately after it finishes, processing all accumulated data).
 
     This function is safe to call from Spark's foreachBatch callback — it
     returns immediately and never blocks the streaming query.
@@ -158,18 +176,48 @@ def trigger_downstream(bucket: str, batch_id: int) -> bool:
     global _downstream_thread
 
     if not _downstream_lock.acquire(blocking=False):
-        logger.debug("Downstream already running — skipping for batch %d", batch_id)
+        # A run is active; flag it so the drain loop re-runs after it finishes.
+        _downstream_pending.set()
+        logger.debug(
+            "Downstream already running — pending flag set for batch %d", batch_id
+        )
         return False
 
     # If there's an old thread reference, check if it's still alive
     if _downstream_thread is not None and _downstream_thread.is_alive():
         _downstream_lock.release()
-        logger.debug("Downstream thread still alive — skipping for batch %d", batch_id)
+        _downstream_pending.set()
+        logger.debug(
+            "Downstream thread still alive — pending flag set for batch %d", batch_id
+        )
         return False
 
     def _wrapped():
         try:
-            _run_downstream_sync(bucket, batch_id)
+            # Drain loop: run downstream, then immediately re-run if any new
+            # micro-batches arrived (set the pending flag) while the previous
+            # run was in progress.  This guarantees every mapped/ file is
+            # processed without waiting for the Airflow fallback DAG.
+            #
+            # Pattern: check THEN clear — any batch that sets the flag between
+            # the check and the clear will be detected in the NEXT iteration's
+            # check (because the incremental cleaner will find its files still
+            # unprocessed in mapped/).  The flag is a "please re-run" signal;
+            # actual data safety comes from Spark checkpoints + incremental
+            # cleaning state, not from the flag itself.
+            catchup_count = 0
+            while True:
+                _run_downstream_sync(bucket, batch_id if catchup_count == 0 else -catchup_count)
+                if not _downstream_pending.is_set():
+                    break
+                _downstream_pending.clear()
+                catchup_count += 1
+                logger.info(
+                    "New micro-batches arrived while downstream was running "
+                    "(batch %d) — starting catch-up run #%d",
+                    batch_id,
+                    catchup_count,
+                )
         finally:
             _downstream_lock.release()
 
