@@ -105,7 +105,7 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis, ingestionType, pi
             
             if (!result.success) {
                 console.error('Failed to cancel pipeline:', result.error);
-                setErrorMessage('Failed to cancel pipeline: ' + result.error);
+                setErrorMessage('Failed to cancel the pipeline. Please try again.');
             }
         } catch (err) {
             console.error('Error cancelling pipeline:', err);
@@ -124,7 +124,7 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis, ingestionType, pi
             
             if (!result.success) {
                 console.error('Failed to retry pipeline:', result.error);
-                setErrorMessage('Failed to retry pipeline: ' + result.error);
+                setErrorMessage('Failed to retry the pipeline. Please try again.');
             }
         } catch (err) {
             console.error('Error retrying pipeline:', err);
@@ -328,7 +328,7 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis, ingestionType, pi
                     {pipelineStatus.error_message && (
                         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                             <Text className="text-red-600 text-sm m-0">
-                                {pipelineStatus.error_message}
+                                An error occurred while processing your data. Please retry.
                             </Text>
                         </div>
                     )}

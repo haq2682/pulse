@@ -283,7 +283,7 @@ class PipelineService:
                 status="failed",
                 current_step="Pipeline Error",
                 progress=cumulative_progress,
-                error_message=str(e),
+                error_message="An unexpected error occurred while processing your data. Please retry.",
                 failed_phase=phase_name if 'phase_name' in locals() else None,
                 db_connection=db_connection
             )

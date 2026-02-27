@@ -175,7 +175,7 @@ async def cancel_pipeline(request: Request, db=Depends(get_db)):
         raise
     except Exception as e:
         logger.error("Error cancelling pipeline: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to cancel pipeline")
 
 
 @router.post("/retry")
@@ -238,7 +238,81 @@ async def retry_pipeline(request: Request, db=Depends(get_db)):
         raise
     except Exception as e:
         logger.error("Error retrying pipeline: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to retry pipeline")
+
+
+@router.post("/trigger-streaming")
+async def trigger_streaming_pipeline(request: Request, db=Depends(get_db)):
+    """
+    Manually trigger a downstream pipeline run for a db/api-mode streaming business.
+
+    Called from the dashboard's streaming-indicator refresh button so the user can
+    force-process any data that has accumulated in mapped/ since the last run.
+
+    Request body:
+        - businessId: Business ID
+        - userId: Authenticated user ID (used to verify ownership)
+    """
+    try:
+        body = await request.json()
+        business_id = body.get("businessId")
+        user_id = body.get("userId")
+
+        if not business_id or not user_id:
+            raise HTTPException(status_code=400, detail="businessId and userId are required")
+
+        # Verify business belongs to user and is in a streaming ingestion mode
+        result = db.execute(
+            text("""
+                SELECT b.business_id, o.ingestion_type
+                FROM businesses b
+                JOIN onboarding o ON b.business_id = o.business_id
+                WHERE b.business_id = :business_id AND b.user_id = :user_id
+                LIMIT 1
+            """),
+            {"business_id": business_id, "user_id": user_id},
+        ).fetchone()
+
+        if not result:
+            raise HTTPException(status_code=404, detail="Business not found or access denied")
+
+        ingestion_type = result[1]
+        if ingestion_type not in ("db", "api"):
+            raise HTTPException(
+                status_code=400,
+                detail="Streaming pipeline trigger is only available for db and api ingestion modes",
+            )
+
+        # Reject if a pipeline run is already active
+        existing = db.execute(
+            text("""
+                SELECT pipeline_id FROM pipeline_status
+                WHERE business_id = :business_id AND status = 'running'
+                ORDER BY started_at DESC LIMIT 1
+            """),
+            {"business_id": business_id},
+        ).fetchone()
+
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail="A pipeline is already running for this business",
+            )
+
+        pipeline_service = PipelineService(db, websocket_manager)
+        pipeline_id = await pipeline_service.start_pipeline(business_id, user_id)
+
+        return {
+            "success": True,
+            "message": "Streaming pipeline triggered successfully",
+            "pipeline_id": pipeline_id,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error triggering streaming pipeline: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to trigger streaming pipeline")
 
 
 @router.websocket("/ws/{business_id}")

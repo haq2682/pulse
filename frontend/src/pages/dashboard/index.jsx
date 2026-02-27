@@ -530,7 +530,8 @@ const Dashboard = () => {
         
         try {
             const response = await axiosInstance.post('/pipeline/trigger-streaming', {
-                businessId: businessId
+                businessId: businessId,
+                userId: user?.user_id,
             });
             
             if (response.data.success) {
