@@ -124,7 +124,7 @@ def drop_null_keys(dataframes):
         "cart_items": "cart_item_id",
         "inventory": "inventory_id",
         "reviews": "review_id",
-        "wishlists": "wishlist_id",
+        "wishlist": "wishlist_id",
         "addresses": "address_id",
         "customer_sessions": "session_id",
     }

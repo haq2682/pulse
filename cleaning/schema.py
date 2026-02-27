@@ -65,7 +65,7 @@ def cast_dataframes(dataframes):
     if "categories" in dataframes:
         dataframes["categories"] = dataframes["categories"].select(
             col("category_id").cast(StringType()),
-            col("category").cast(StringType()),
+            col("category_name").cast(StringType()),
             col("sub_category").cast(StringType())
         )
         print("Cast categories DataFrame")
@@ -102,7 +102,8 @@ def cast_dataframes(dataframes):
             col("reserved_quantity").cast(IntegerType()),
             col("minimum_stock_level").cast(IntegerType()),
             col("last_restocked_date").cast(DateType()),
-            col("storage_cost").cast(FloatType())
+            col("storage_cost").cast(FloatType()),
+            col("stock_status").cast(StringType())
         )
         print("Cast inventory DataFrame")
 

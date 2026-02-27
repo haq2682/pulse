@@ -23,7 +23,7 @@ from general.training.clustering.train_geo_cluster import main as geo_cluster
 from general.training.clustering.train_session_behavior import main as session_behavior
 from general.training.clustering.train_supplier_performance import main as supplier_performance
 
-def main():
+def main(bucket_name=None):
     # cart_abandonment()
     # customer_churn()
     # customer_segments()

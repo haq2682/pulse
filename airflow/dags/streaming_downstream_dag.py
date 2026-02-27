@@ -274,7 +274,7 @@ def run_downstream_for_all_buckets(**context):
         print(f"{'='*60}")
         for step_name, script, args_tpl in _steps:
             args = args_tpl.format(b=bucket).split()
-            cmd = ["docker", "exec", PYTHON_CONTAINER, "python", f"/app/{script}"] + args
+            cmd = ["docker", "exec", PYTHON_CONTAINER, "python3", f"/app/{script}"] + args
             print(f"  ▶ {step_name}: {' '.join(cmd)}")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=_STEP_TIMEOUT_SECONDS, check=False)
             if result.returncode == 0:

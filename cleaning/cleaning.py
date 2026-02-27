@@ -45,7 +45,7 @@ from cleaning_utils import (
     get_file_paths_from_minio
 )
 from incremental_cleaner import IncrementalCleaner
-from pyspark.sql.functions import regexp_extract, col
+from pyspark.sql.functions import regexp_extract, col, when
 
 
 def main(bucket_name=None, incremental=True, force_full=False):
@@ -263,6 +263,8 @@ if __name__ == "__main__":
     parser.add_argument('--bucket-name', type=str, help='MinIO bucket name (business_id)')
     parser.add_argument('--full', action='store_true', 
                        help='Run full cleaning (process all files, not just new ones)')
+    parser.add_argument('--incremental', action='store_true',
+                       help='Run incremental cleaning (process only new files)')
     parser.add_argument('--force-full', action='store_true',
                        help='Reset state and reprocess all files')
     args = parser.parse_args()

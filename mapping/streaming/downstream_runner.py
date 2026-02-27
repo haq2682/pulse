@@ -116,7 +116,7 @@ def _run_downstream_sync(bucket: str, batch_id: int) -> None:
         step_name = step["name"]
         script = step["script"]
         args_str = step["args_template"].format(bucket=bucket)
-        cmd = ["python", f"/app/{script}"] + args_str.split()
+        cmd = ["python3", f"/app/{script}"] + args_str.split()
 
         step_start = time.time()
         logger.info("  ▶ %s: %s", step_name, " ".join(cmd))
