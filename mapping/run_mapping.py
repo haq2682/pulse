@@ -143,7 +143,7 @@ def run_batch_mode(bucket_name: str):
         # Try to retrieve manual mappings from Redis
         manual_mappings = None
         try:
-            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=int(os.getenv("REDIS_PORT", "6379")), decode_responses=True)
             manual_mappings_str = redis_client.get(f"manual_mappings:{bucket_name}")
             if manual_mappings_str:
                 manual_mappings = json.loads(manual_mappings_str)
@@ -180,21 +180,21 @@ def run_batch_mode(bucket_name: str):
             extra_cols = result.get("extra_cols", [])
             
             # Add table name to each column for frontend display
-            for col in missing_cols:
+            for missing_col in missing_cols:
                 mapping_results["missing_cols"].append({
-                    "column": col,
+                    "column": missing_col,
                     "table": table_name
                 })
             
-            for col in extra_cols:
+            for extra_col in extra_cols:
                 mapping_results["extra_cols"].append({
-                    "column": col,
+                    "column": extra_col,
                     "table": table_name
                 })
         
         # Save mapping results to Redis for the API to retrieve
         try:
-            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=int(os.getenv("REDIS_PORT", "6379")), decode_responses=True)
             redis_client.setex(
                 f"mapping_results:{bucket_name}",
                 86400,  # 24 hours
@@ -524,11 +524,12 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10,
                             api_process.join()
                         break
                     _time.sleep(5)
-                # Propagate non-zero exit code so Airflow retries
-                exit_code = api_process.exitcode or spark_process.exitcode or 0
-                if exit_code != 0:
-                    print(f"❌ API MODE exited with code {exit_code}")
-                    sys.exit(exit_code)
+                # Both processes are now stopped.  Always exit non-zero so that
+                # Airflow marks this task as FAILED and schedules a restart.
+                # (The streaming job must run 24/7; a clean exit is still a bug.)
+                exit_code = max(api_process.exitcode or 0, spark_process.exitcode or 0)
+                print(f"❌ API MODE exited (exit code {exit_code}) — Airflow will restart")
+                sys.exit(exit_code if exit_code != 0 else 1)
         except KeyboardInterrupt:
             print("\n\nStopping processes...")
             api_process.terminate()

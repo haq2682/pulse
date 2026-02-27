@@ -23,6 +23,7 @@ Usage:
 import time
 import json
 import hashlib
+import os
 import requests
 from urllib.parse import urlparse, parse_qs
 from typing import List, Dict, Any, Optional
@@ -455,13 +456,17 @@ _CONFIG_BUILDERS = {
 class DebeziumConnectorManager:
     """Manages Debezium CDC connectors via Kafka Connect REST API."""
 
-    def __init__(self, connect_url: str = "http://10.5.0.10:8083"):
+    def __init__(self, connect_url: str = None):
         """
         Initialize connector manager.
 
         Args:
-            connect_url: Kafka Connect REST API URL (default: Debezium container IP)
+            connect_url: Kafka Connect REST API URL. Defaults to the
+                         DEBEZIUM_URL environment variable, falling back to
+                         the hardcoded container IP if the variable is unset.
         """
+        if connect_url is None:
+            connect_url = os.getenv("DEBEZIUM_URL", "http://10.5.0.10:8083")
         self.connect_url = connect_url.rstrip("/")
 
     def wait_for_connect(self, timeout: int = 120, interval: int = 5) -> bool:

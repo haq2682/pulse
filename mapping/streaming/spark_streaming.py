@@ -6,7 +6,7 @@ import findspark
 findspark.init()
 
 from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import col, from_json
+from pyspark.sql.functions import col, from_json, explode, map_keys
 from pyspark.sql.types import StructType, StructField, StringType, MapType
 from minio import Minio
 from dotenv import load_dotenv, find_dotenv
@@ -83,6 +83,9 @@ def normalize_message_row(row):
     """
     Normalize row to canonical format.
     Handles both canonical and Debezium formats.
+
+    Returns None for Debezium tombstone events (both 'after' and 'before' are
+    None/empty) so that the caller can filter them out before processing.
     """
     if row is None:
         return None
@@ -97,13 +100,20 @@ def normalize_message_row(row):
             import json
             source = json.loads(source)
 
+        payload = row.get("after") or row.get("before")
+        # Tombstone: Debezium sends a null-value follow-up message after a
+        # delete.  Both 'after' and 'before' will be None/empty.  Skip these
+        # so we do not write empty Parquet files or crash on 0-column DFs.
+        if not payload:
+            return None
+
         return {
             "source_type": "db",
             "vendor": "debezium",
             "table": source.get("table"),
             "schema_version": "v1",
             "operation": op_map.get(row.get("op"), "c"),
-            "payload": row.get("after") or row.get("before") or {}
+            "payload": payload
         }
     else:
         # Already canonical format
@@ -155,7 +165,7 @@ def extract_table_dataframes(batch_df: DataFrame) -> tuple:
         return {}, {}
 
     # Normalize messages to canonical format
-    normalized_rdd = batch_df.rdd.map(lambda row: normalize_message_row(row.asDict()))
+    normalized_rdd = batch_df.rdd.map(lambda row: normalize_message_row(row.asDict())).filter(lambda r: r is not None)
 
     # Convert to DataFrame
     normalized_schema = StructType([
@@ -169,7 +179,11 @@ def extract_table_dataframes(batch_df: DataFrame) -> tuple:
 
     normalized_df = batch_df.sparkSession.createDataFrame(normalized_rdd, normalized_schema)
 
-    table_names = [row["table"] for row in normalized_df.select("table").distinct().collect()]
+    table_names = [
+        row["table"]
+        for row in normalized_df.select("table").distinct().collect()
+        if row["table"] is not None
+    ]
     all_dataframes = {}
     operations = {}
 
@@ -183,6 +197,18 @@ def extract_table_dataframes(batch_df: DataFrame) -> tuple:
             continue
 
         payload_keys = list(sample[0]["payload"].keys())
+
+        # Union keys from all rows in the table using Spark's map_keys so that
+        # schema variation (e.g. partial Debezium updates) doesn't cause columns
+        # present in later rows to be silently dropped.  This collects only the
+        # distinct key strings — not the full rows — to the driver.
+        all_keys = [
+            row[0]
+            for row in table_df.select(explode(map_keys(col("payload"))).alias("k"))
+            .select("k").distinct().collect()
+        ]
+        if all_keys:
+            payload_keys = all_keys
         operation = sample[0]["operation"] if sample[0]["operation"] else "c"
 
         # Extract payload columns
@@ -496,6 +522,19 @@ def run_streaming(trigger_once: bool = False, enable_downstream: bool = False, o
         query.stop()
         spark.stop()
         print("\nStreaming stopped")
+    except Exception as stream_err:
+        # Catch StreamingQueryException (and any other unexpected error) so
+        # the process exits with a non-zero code, allowing Airflow to restart.
+        print(f"\n❌ Streaming query terminated with error: {stream_err}")
+        try:
+            query.stop()
+        except Exception:
+            pass
+        try:
+            spark.stop()
+        except Exception:
+            pass
+        raise
 
 
 if __name__ == "__main__":

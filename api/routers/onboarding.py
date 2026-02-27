@@ -18,7 +18,10 @@ from datetime import datetime
 import asyncio
 import time
 
-redis = aioredis.from_url("redis://redis:6379", decode_responses=True)
+redis = aioredis.from_url(
+    f"redis://{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}",
+    decode_responses=True,
+)
 
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://localhost:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")

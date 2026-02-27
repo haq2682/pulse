@@ -1,5 +1,6 @@
 """API Ingestion Service - Polls external API and streams to Kafka"""
 
+import os
 import time
 import json
 import requests
@@ -11,7 +12,7 @@ from rapidfuzz import fuzz, process
 from ..canonical_message import create_message, VALID_TABLES
 from .api_validation import validate_api_data, get_expected_format_example
 
-KAFKA_BOOTSTRAP = "10.5.0.7:9092"
+KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "10.5.0.7:9092")
 POLL_INTERVAL = 10
 API_URL = "http://localhost:5000/api/data"
 

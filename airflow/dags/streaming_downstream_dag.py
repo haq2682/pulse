@@ -45,7 +45,6 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.models import Variable
 from airflow.operators.python import PythonOperator
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from config.pipeline_config import (
@@ -82,27 +81,14 @@ _task_defaults = dict(
 # Task callable: first-run specific model training
 # ---------------------------------------------------------------------------
 
-def ensure_specific_models_trained(**context):
+def _ensure_specific_models_for_bucket(bucket: str) -> None:
     """
-    Guarantee that specific ML models are trained for this business bucket
-    before inference runs.
-
-    Logic:
-      1. Check MinIO for each specific model's drift baseline JSON.
-         (Baseline existence ≡ model has been trained at least once.)
-      2. If ALL baselines exist → skip (fast path, completes in seconds).
-      3. If ANY baseline is missing → run specific/train.py inside the
-         python container, then save fresh baselines for all specific models.
-
-    This runs every 10 minutes with the DAG, but after the first successful
-    training the MinIO check short-circuits in milliseconds.
+    Guarantee that specific ML models are trained for a single bucket.
+    Called once per active bucket by ensure_specific_models_trained.
     """
     import subprocess
     from minio import Minio
     from minio.error import S3Error
-
-    conf   = context["dag_run"].conf or {}
-    bucket = conf.get("bucket", BUCKET)
 
     client = Minio(
         MINIO_ENDPOINT,
@@ -161,6 +147,75 @@ def ensure_specific_models_trained(**context):
         f"Initial specific model training complete. "
         f"Baselines saved for {len(SPECIFIC_MODELS)} models in bucket '{bucket}'."
     )
+
+
+def ensure_specific_models_trained(**context):
+    """
+    Guarantee that specific ML models are trained for EVERY active tenant
+    bucket discovered by get_active_business_ids.
+
+    Logic per bucket:
+      1. Check MinIO for each specific model's drift baseline JSON.
+         (Baseline existence ≡ model has been trained at least once.)
+      2. If ALL baselines exist → skip (fast path, completes in seconds).
+      3. If ANY baseline is missing → run specific/train.py inside the
+         python container, then save fresh baselines for all specific models.
+
+    This runs every 2 minutes with the DAG, but after the first successful
+    training the MinIO check short-circuits in milliseconds.
+    """
+    buckets = (
+        context["ti"].xcom_pull(task_ids="get_active_buckets", key="active_buckets")
+        or [BUCKET]
+    )
+    for bucket in buckets:
+        print(f"\n{'='*60}")
+        print(f"Ensuring specific models for bucket: {bucket}")
+        print(f"{'='*60}")
+        _ensure_specific_models_for_bucket(bucket)
+
+
+def trigger_drift_check_for_all_buckets(**context):
+    """
+    Trigger the ml_retrain DAG for every active tenant bucket so that KS
+    drift detection runs for each one — not only the default bucket.
+    """
+    import urllib.request
+    import urllib.error
+    import json as _json
+    import base64
+
+    buckets = (
+        context["ti"].xcom_pull(task_ids="get_active_buckets", key="active_buckets")
+        or [BUCKET]
+    )
+
+    airflow_base = os.getenv("AIRFLOW_BASE_URL", "http://airflow-webserver:8080")
+    airflow_user = os.getenv("AIRFLOW_USERNAME", "admin")
+    airflow_password = os.getenv("AIRFLOW_PASSWORD", "admin")
+    url = f"{airflow_base}/api/v1/dags/ml_retrain/dagRuns"
+    encoded = base64.b64encode(f"{airflow_user}:{airflow_password}".encode()).decode()
+
+    for bucket in buckets:
+        payload = _json.dumps({
+            "conf": {"bucket": bucket, "source_dag": "streaming_downstream"}
+        }).encode()
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Basic {encoded}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                body = resp.read().decode(errors="replace")
+                print(f"ml_retrain triggered for bucket '{bucket}' (HTTP {resp.status}): {body[:200]}")
+        except Exception as exc:
+            # Non-fatal: log and continue to the next bucket
+            print(f"⚠️  Could not trigger ml_retrain for bucket '{bucket}': {exc}")
 
 
 def get_active_business_ids(**context):
@@ -263,20 +318,18 @@ with DAG(
         execution_timeout=timedelta(hours=2),
     )
 
-    # ── 3. Ensure specific models trained (uses params.bucket for compat) ──
-    # Fast no-op when baselines already exist.
+    # ── 3. Ensure specific models trained for ALL active buckets ──────────
+    # Fast no-op per bucket when baselines already exist.
     ensure_specific = PythonOperator(
         task_id="ensure_specific_models_trained",
         python_callable=ensure_specific_models_trained,
         execution_timeout=timedelta(hours=2),
     )
 
-    # ── 4. Trigger KS drift check (async, weekly DAG handles retraining) ──
-    trigger_drift_check = TriggerDagRunOperator(
+    # ── 4. Trigger KS drift check for ALL active buckets (async) ──────────
+    trigger_drift_check = PythonOperator(
         task_id="trigger_drift_check",
-        trigger_dag_id="ml_retrain",
-        conf={"bucket": "{{ params.bucket }}", "source_dag": "streaming_downstream"},
-        wait_for_completion=False,
+        python_callable=trigger_drift_check_for_all_buckets,
     )
 
     # ── Sequential dependencies ────────────────────────────────────────────
