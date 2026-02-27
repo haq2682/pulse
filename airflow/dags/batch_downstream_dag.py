@@ -19,20 +19,25 @@ The batch pipeline is entirely user-driven: the user uploads files, reviews
 the mapping results, optionally fixes missing columns, then kicks off the
 rest of the pipeline.  A schedule would be meaningless here.
 
-ML Training
------------
-Both general and specific models are trained for the business bucket on every
-batch run (ml_train step).  This guarantees that model files always exist in
-the business bucket before inference runs.  Subsequent retraining is also
-handled by ml_retrain (KS-test driven drift detection).
+General vs Specific ML Models
+------------------------------
+General models are pre-trained globally across all businesses and their
+trained model files already live in the shared  pulse-bucket-1  bucket.
+General inference reads those global models and writes per-business results
+to the business bucket — no per-business training is needed or performed.
+
+Specific models are per-business mini-models that must be trained exactly
+once on THIS business's own cleaned data before inference can produce useful
+results.  The  ml_train  step below calls  specific/train.py  to do this.
+All subsequent retraining is driven by the  ml_retrain  DAG (KS-test drift).
 
 Flow (fully sequential — no parallel branches)
 ----------------------------------------------
   clean
     → transform
     → analyze
-    → ml_train        (trains all models — general + specific — for this bucket)
-    → ml_infer
+    → ml_train        (trains specific models for this business bucket)
+    → ml_infer        (general inference uses global models; specific uses trained above)
     → trigger_drift_check   (fires ml_retrain DAG asynchronously)
 
 Crash / retry
@@ -127,14 +132,14 @@ with DAG(
         ),
     )
 
-    # ── 4. Train all ML models for this business bucket ────────────────────
-    # Trains both general and specific models so that model files exist in
-    # the business bucket before inference runs.  Must always run in batch
-    # mode — without it specific model files won't exist and inference crashes.
+    # ── 4. Train specific ML models for this business bucket ──────────────
+    # General models are pre-trained globally (pulse-bucket-1) and require no
+    # per-business training.  Specific models are per-business and must be
+    # trained once on this business's own cleaned data before inference runs.
     ml_train = BashOperator(
         task_id="ml_train",
         bash_command=_docker_exec(
-            "machine-learning/train_all.py",
+            "machine-learning/specific/train.py",
             "--bucket-name {{ params.bucket }}",
         ),
         execution_timeout=timedelta(hours=2),  # training can be slow on large datasets
@@ -142,7 +147,8 @@ with DAG(
 
     # ── 5. ML Inference ────────────────────────────────────────────────────
     # Runs infer_all.py (general + specific models).
-    # All models are guaranteed trained by the previous step.
+    # General models load from pulse-bucket-1 (global); specific models load
+    # from this business bucket (guaranteed trained by the previous step).
     ml_infer = BashOperator(
         task_id="ml_infer",
         bash_command=_docker_exec(

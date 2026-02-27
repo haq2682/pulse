@@ -25,7 +25,7 @@ Flow (sequential)
   clean_incremental
     → transform
     → analyze
-    → ensure_specific_models_trained   (trains specific models on first cycle)
+    → ensure_specific_models_trained   (trains specific models on first cycle; fast no-op thereafter)
     → ml_infer
     → trigger_drift_check   (fires ml_retrain asynchronously if drift found)
 
@@ -310,19 +310,22 @@ with DAG(
         python_callable=get_active_business_ids,
     )
 
-    # ── 2. Run full downstream pipeline for ALL discovered buckets ─────────
-    # Sequential per-bucket processing: clean (incremental) → transform → analyze → ml_infer
-    run_downstream = PythonOperator(
-        task_id="run_downstream_all_buckets",
-        python_callable=run_downstream_for_all_buckets,
-        execution_timeout=timedelta(hours=2),
-    )
-
-    # ── 3. Ensure specific models trained for ALL active buckets ──────────
-    # Fast no-op per bucket when baselines already exist.
+    # ── 2. Ensure specific models trained for ALL active buckets ──────────
+    # Must run BEFORE ml_infer (inside run_downstream) so that specific model
+    # files exist in the business bucket on the very first cycle.
+    # Fast no-op per bucket once baselines exist.
     ensure_specific = PythonOperator(
         task_id="ensure_specific_models_trained",
         python_callable=ensure_specific_models_trained,
+        execution_timeout=timedelta(hours=2),
+    )
+
+    # ── 3. Run full downstream pipeline for ALL discovered buckets ─────────
+    # Sequential per-bucket processing: clean (incremental) → transform → analyze → ml_infer
+    # Specific models are guaranteed trained by the previous step.
+    run_downstream = PythonOperator(
+        task_id="run_downstream_all_buckets",
+        python_callable=run_downstream_for_all_buckets,
         execution_timeout=timedelta(hours=2),
     )
 
@@ -333,4 +336,4 @@ with DAG(
     )
 
     # ── Sequential dependencies ────────────────────────────────────────────
-    fetch_buckets >> run_downstream >> ensure_specific >> trigger_drift_check
+    fetch_buckets >> ensure_specific >> run_downstream >> trigger_drift_check
