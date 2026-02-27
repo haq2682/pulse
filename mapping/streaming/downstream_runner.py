@@ -116,6 +116,8 @@ def _run_downstream_sync(bucket: str, batch_id: int) -> None:
         step_name = step["name"]
         script = step["script"]
         args_str = step["args_template"].format(bucket=bucket)
+        if step["name"] == "ml_inference" and batch_id == 0:
+            args_str += " --first-batch"
         cmd = ["python3", f"/app/{script}"] + args_str.split()
 
         step_start = time.time()
