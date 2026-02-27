@@ -22,12 +22,15 @@ Usage:
 
 import time
 import json
+import hashlib
 import requests
 from urllib.parse import urlparse, parse_qs
 from typing import List, Dict, Any, Optional
 
-# Kafka bootstrap inside the docker network
-KAFKA_BOOTSTRAP_INTERNAL = "10.5.0.7:9092"
+# MySQL/MariaDB server ID derivation constants.
+# The server ID must be in [_MYSQL_SERVER_ID_BASE, _MYSQL_SERVER_ID_BASE + _MYSQL_SERVER_ID_RANGE).
+_MYSQL_SERVER_ID_BASE = 100000
+_MYSQL_SERVER_ID_RANGE = 900000
 
 # URI scheme -> internal db type key
 URI_SCHEME_MAP = {
@@ -205,7 +208,11 @@ def _build_table_include_list(
 # ── Per-database config builders ────────────────────────────────────────────
 
 
-def _postgres_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
+def _postgres_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
+    # Derive a slot name that is unique per connector while being a valid PostgreSQL
+    # identifier (≤63 chars, alphanumeric + underscores only).
+    safe_name = connector_name.replace("-", "_").replace(".", "_")
+    slot_name = f"dz_{safe_name}"[:63]
     config = {
         "connector.class": CONNECTOR_CLASSES["postgres"],
         "database.hostname": parsed["host"],
@@ -218,7 +225,7 @@ def _postgres_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict
             "postgres", tables, parsed["database"]
         ),
         "plugin.name": "pgoutput",
-        "slot.name": "debezium_slot",
+        "slot.name": slot_name,
         "publication.autocreate.mode": "filtered",
         "snapshot.mode": "initial",
     }
@@ -226,14 +233,18 @@ def _postgres_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict
     return config
 
 
-def _mysql_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
+def _mysql_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
+    # MySQL server ID must be unique across the replication topology.
+    # Derive a stable numeric ID from the connector name so that the same
+    # connector always produces the same ID (idempotent restarts).
+    server_id = int(hashlib.md5(connector_name.encode()).hexdigest()[:8], 16) % _MYSQL_SERVER_ID_RANGE + _MYSQL_SERVER_ID_BASE
     config = {
         "connector.class": CONNECTOR_CLASSES["mysql"],
         "database.hostname": parsed["host"],
         "database.port": str(parsed["port"]),
         "database.user": parsed["user"],
         "database.password": parsed["password"],
-        "database.server.id": "184054",
+        "database.server.id": str(server_id),
         "topic.prefix": topic_prefix,
         "table.include.list": _build_table_include_list(
             "mysql", tables, parsed["database"]
@@ -246,14 +257,16 @@ def _mysql_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
     return config
 
 
-def _mariadb_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
+def _mariadb_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
+    # Derive a unique server ID for MariaDB (same approach as MySQL).
+    server_id = int(hashlib.md5(connector_name.encode()).hexdigest()[:8], 16) % _MYSQL_SERVER_ID_RANGE + _MYSQL_SERVER_ID_BASE
     config = {
         "connector.class": CONNECTOR_CLASSES["mariadb"],
         "database.hostname": parsed["host"],
         "database.port": str(parsed["port"]),
         "database.user": parsed["user"],
         "database.password": parsed["password"],
-        "database.server.id": "184055",
+        "database.server.id": str(server_id),
         "topic.prefix": topic_prefix,
         "table.include.list": _build_table_include_list(
             "mariadb", tables, parsed["database"]
@@ -266,7 +279,7 @@ def _mariadb_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
     return config
 
 
-def _mongodb_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
+def _mongodb_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
     """
     MongoDB uses collection.include.list instead of table.include.list.
     The raw URI is passed as mongodb.connection.string.
@@ -284,7 +297,7 @@ def _mongodb_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
     return config
 
 
-def _sqlserver_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
+def _sqlserver_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
     config = {
         "connector.class": CONNECTOR_CLASSES["sqlserver"],
         "database.hostname": parsed["host"],
@@ -303,7 +316,7 @@ def _sqlserver_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dic
     return config
 
 
-def _oracle_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
+def _oracle_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
     config = {
         "connector.class": CONNECTOR_CLASSES["oracle"],
         "database.hostname": parsed["host"],
@@ -324,7 +337,7 @@ def _oracle_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
     return config
 
 
-def _db2_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
+def _db2_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
     config = {
         "connector.class": CONNECTOR_CLASSES["db2"],
         "database.hostname": parsed["host"],
@@ -343,7 +356,7 @@ def _db2_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
     return config
 
 
-def _vitess_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
+def _vitess_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
     """
     Vitess connects to VTGate via gRPC. No schema history needed.
     """
@@ -363,7 +376,7 @@ def _vitess_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
     return config
 
 
-def _spanner_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
+def _spanner_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
     """
     Spanner uses GCP credentials, not host/user/password.
     URI format: spanner://project_id/instance_id/database_id
@@ -382,7 +395,7 @@ def _spanner_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
     return config
 
 
-def _informix_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
+def _informix_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
     config = {
         "connector.class": CONNECTOR_CLASSES["informix"],
         "database.hostname": parsed["host"],
@@ -401,7 +414,7 @@ def _informix_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict
     return config
 
 
-def _cassandra_config(parsed: Dict, tables: List[str], topic_prefix: str) -> Dict:
+def _cassandra_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
     """
     Cassandra CDC connector. Note: the Cassandra connector runs as a
     standalone agent (NOT inside Kafka Connect) in production. This config
@@ -510,7 +523,7 @@ class DebeziumConnectorManager:
         if not builder:
             raise ValueError(f"No Debezium config builder for database type: {db_type}")
 
-        config = builder(parsed, tables, topic_prefix)
+        config = builder(parsed, tables, topic_prefix, connector_name)
 
         print(f"  Detected database type: {db_type}")
         print(f"  Connector class: {config['connector.class']}")

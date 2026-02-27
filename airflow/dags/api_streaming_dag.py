@@ -182,8 +182,7 @@ with DAG(
     schedule_interval=None,      # USER-TRIGGERED — never runs on a schedule
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    max_active_runs=1,
-    tags=["pulse", "api", "streaming"],
+    max_active_runs=None,           # allow one run per tenant simultaneously
     default_args=_batch_defaults,
     params={
         "bucket":        BUCKET,

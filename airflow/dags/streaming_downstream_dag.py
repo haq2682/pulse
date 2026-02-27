@@ -44,7 +44,6 @@ from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.models import Variable
-from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 
@@ -62,6 +61,9 @@ from config.pipeline_config import (
 BUCKET   = Variable.get("default_bucket",              default_var=DEFAULT_BUCKET)
 SCHEDULE = Variable.get("streaming_downstream_interval", default_var="*/2 * * * *")
 
+# Per-step hard timeout for downstream subprocess calls (15 minutes).
+_STEP_TIMEOUT_SECONDS = 900
+
 _task_defaults = dict(
     owner=DEFAULT_TASK_ARGS["owner"],
     depends_on_past=False,
@@ -74,9 +76,6 @@ _task_defaults = dict(
     email_on_retry=DEFAULT_TASK_ARGS["email_on_retry"],
 )
 
-
-def _docker_exec(script_path: str, extra_args: str = "") -> str:
-    return f"docker exec {PYTHON_CONTAINER} python /app/{script_path} {extra_args}"
 
 
 # ---------------------------------------------------------------------------
@@ -164,12 +163,81 @@ def ensure_specific_models_trained(**context):
     )
 
 
+def get_active_business_ids(**context):
+    """
+    Query PostgreSQL for all business_ids that have completed onboarding.
+    Results are pushed to XCom so downstream tasks can iterate over them.
+    Falls back to the single BUCKET variable if the DB query fails.
+    """
+    import psycopg2
+    buckets = []
+    try:
+        conn = psycopg2.connect(
+            host=os.getenv("POSTGRES_SERVER", "postgresql"),
+            database=os.getenv("POSTGRES_DATABASE_NAME", "pulse"),
+            user=os.getenv("POSTGRES_USER", "postgres"),
+            password=os.getenv("POSTGRES_PASSWORD", "postgres"),
+        )
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT DISTINCT business_id FROM onboarding WHERE is_completed = true AND business_id IS NOT NULL"
+            )
+            buckets = [row[0] for row in cur.fetchall()]
+        conn.close()
+    except Exception as exc:
+        print(f"⚠️  Could not query active business IDs from DB: {exc}")
+
+    if not buckets:
+        print(f"No active business IDs found — falling back to default bucket '{BUCKET}'")
+        buckets = [BUCKET]
+
+    print(f"Active business IDs: {buckets}")
+    context["ti"].xcom_push(key="active_buckets", value=buckets)
+    return buckets
+
+
+def run_downstream_for_all_buckets(**context):
+    """
+    Run the full downstream pipeline (clean → transform → analyze → ML) for
+    every active tenant bucket discovered by get_active_business_ids.
+    Processes tenants sequentially to avoid resource exhaustion on a single
+    Python container.
+    """
+    import subprocess
+    buckets = context["ti"].xcom_pull(task_ids="get_active_buckets", key="active_buckets") or [BUCKET]
+
+    _steps = [
+        ("cleaning",       "cleaning/cleaning.py",           "--bucket-name {b} --incremental"),
+        ("transformation", "transformation/transformation.py","--bucket-name {b}"),
+        ("analysis",       "analysis/analysis.py",           "--bucket-name {b}"),
+        ("ml_inference",   "machine-learning/infer_all.py",  "--bucket-name {b}"),
+    ]
+
+    for bucket in buckets:
+        print(f"\n{'='*60}")
+        print(f"Processing downstream for bucket: {bucket}")
+        print(f"{'='*60}")
+        for step_name, script, args_tpl in _steps:
+            args = args_tpl.format(b=bucket).split()
+            cmd = ["docker", "exec", PYTHON_CONTAINER, "python", f"/app/{script}"] + args
+            print(f"  ▶ {step_name}: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=_STEP_TIMEOUT_SECONDS, check=False)
+            if result.returncode == 0:
+                print(f"  ✅ {step_name} completed for {bucket}")
+            else:
+                stderr_tail = (result.stderr or "")[-500:]
+                print(f"  ⚠️  {step_name} failed for {bucket} (exit {result.returncode}){': ' + stderr_tail if stderr_tail else ''}")
+                # Continue with next step rather than aborting — partial
+                # downstream results are better than leaving data unprocessed.
+
+
 with DAG(
     dag_id="streaming_downstream",
     description=(
         "Fallback downstream processing for streaming: "
         "clean (incremental) → transform → analyze → ml_infer. "
-        "Primary processing is inline; this DAG catches up every 2 min."
+        "Primary processing is inline; this DAG catches up every 2 min. "
+        "Processes all active tenant buckets discovered from the onboarding table."
     ),
     schedule_interval=SCHEDULE,
     start_date=datetime(2024, 1, 1),
@@ -181,55 +249,29 @@ with DAG(
     render_template_as_native_obj=True,
 ) as dag:
 
-    # ── 1. Clean (incremental) ─────────────────────────────────────────────
-    # --incremental: cleaning.py checks Redis for which mapped/ files it has
-    # already processed and skips them.  Only new files are cleaned.
-    # If nothing is new, this step completes in seconds.
-    clean_incremental = BashOperator(
-        task_id="clean_incremental",
-        bash_command=_docker_exec(
-            "cleaning/cleaning.py",
-            "--bucket-name {{ params.bucket }} --incremental",
-        ),
+    # ── 1. Discover all active tenant buckets ─────────────────────────────
+    fetch_buckets = PythonOperator(
+        task_id="get_active_buckets",
+        python_callable=get_active_business_ids,
     )
 
-    # ── 2. Transform ───────────────────────────────────────────────────────
-    transform = BashOperator(
-        task_id="transform",
-        bash_command=_docker_exec(
-            "transformation/transformation.py",
-            "--bucket-name {{ params.bucket }}",
-        ),
+    # ── 2. Run full downstream pipeline for ALL discovered buckets ─────────
+    # Sequential per-bucket processing: clean (incremental) → transform → analyze → ml_infer
+    run_downstream = PythonOperator(
+        task_id="run_downstream_all_buckets",
+        python_callable=run_downstream_for_all_buckets,
+        execution_timeout=timedelta(hours=2),
     )
 
-    # ── 3. Analyze ─────────────────────────────────────────────────────────
-    analyze = BashOperator(
-        task_id="analyze",
-        bash_command=_docker_exec(
-            "analysis/analysis.py",
-            "--bucket-name {{ params.bucket }}",
-        ),
-    )
-
-    # ── 4. Ensure specific models are trained for this business ───────────
-    # Fast no-op when baselines already exist; runs specific/train.py only
-    # on the very first streaming cycle where transformed data is available.
+    # ── 3. Ensure specific models trained (uses params.bucket for compat) ──
+    # Fast no-op when baselines already exist.
     ensure_specific = PythonOperator(
         task_id="ensure_specific_models_trained",
         python_callable=ensure_specific_models_trained,
         execution_timeout=timedelta(hours=2),
     )
 
-    # ── 5. ML Inference ────────────────────────────────────────────────────
-    ml_infer = BashOperator(
-        task_id="ml_infer",
-        bash_command=_docker_exec(
-            "machine-learning/infer_all.py",
-            "--bucket-name {{ params.bucket }}",
-        ),
-    )
-
-    # ── 6. Trigger KS drift check (async, weekly DAG handles retraining) ──
+    # ── 4. Trigger KS drift check (async, weekly DAG handles retraining) ──
     trigger_drift_check = TriggerDagRunOperator(
         task_id="trigger_drift_check",
         trigger_dag_id="ml_retrain",
@@ -238,4 +280,4 @@ with DAG(
     )
 
     # ── Sequential dependencies ────────────────────────────────────────────
-    clean_incremental >> transform >> analyze >> ensure_specific >> ml_infer >> trigger_drift_check
+    fetch_buckets >> run_downstream >> ensure_specific >> trigger_drift_check

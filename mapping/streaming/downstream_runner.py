@@ -48,7 +48,7 @@ import os
 import subprocess
 import threading
 import time
-from typing import Optional
+from typing import Dict, Optional
 
 import redis
 
@@ -58,12 +58,24 @@ logger = logging.getLogger("pulse.downstream")
 _REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 
 # ---------------------------------------------------------------------------
-# Module-level state: a single lock and a pending flag prevent concurrent
-# downstream runs while ensuring every skipped trigger is caught up.
+# Per-bucket state: each bucket gets its own lock, pending flag, and thread
+# so that multiple tenants running in the same Python process do not share
+# streaming state and block each other.
 # ---------------------------------------------------------------------------
-_downstream_lock = threading.Lock()
-_downstream_pending = threading.Event()   # set when a trigger was skipped while a run was active
-_downstream_thread: Optional[threading.Thread] = None
+_state_lock: threading.Lock = threading.Lock()          # guards the dicts below
+_downstream_locks: Dict[str, threading.Lock] = {}
+_downstream_pendings: Dict[str, threading.Event] = {}
+_downstream_threads: Dict[str, Optional[threading.Thread]] = {}
+
+
+def _get_bucket_state(bucket: str):
+    """Return (lock, pending_event, thread_ref_dict) for the given bucket, creating if absent."""
+    with _state_lock:
+        if bucket not in _downstream_locks:
+            _downstream_locks[bucket] = threading.Lock()
+            _downstream_pendings[bucket] = threading.Event()
+            _downstream_threads[bucket] = None
+    return _downstream_locks[bucket], _downstream_pendings[bucket]
 
 
 # Scripts to execute, in order.  Paths are relative to /app/ inside the
@@ -173,22 +185,24 @@ def trigger_downstream(bucket: str, batch_id: int) -> bool:
             "Could not check downstream_pipeline_lock in Redis (%s) — proceeding", _redis_err
         )
 
-    global _downstream_thread
+    bucket_lock, bucket_pending = _get_bucket_state(bucket)
 
-    if not _downstream_lock.acquire(blocking=False):
+    if not bucket_lock.acquire(blocking=False):
         # A run is active; flag it so the drain loop re-runs after it finishes.
-        _downstream_pending.set()
+        bucket_pending.set()
         logger.debug(
-            "Downstream already running — pending flag set for batch %d", batch_id
+            "Downstream already running for %s — pending flag set for batch %d", bucket, batch_id
         )
         return False
 
     # If there's an old thread reference, check if it's still alive
-    if _downstream_thread is not None and _downstream_thread.is_alive():
-        _downstream_lock.release()
-        _downstream_pending.set()
+    with _state_lock:
+        existing_thread = _downstream_threads.get(bucket)
+    if existing_thread is not None and existing_thread.is_alive():
+        bucket_lock.release()
+        bucket_pending.set()
         logger.debug(
-            "Downstream thread still alive — pending flag set for batch %d", batch_id
+            "Downstream thread still alive for %s — pending flag set for batch %d", bucket, batch_id
         )
         return False
 
@@ -196,36 +210,28 @@ def trigger_downstream(bucket: str, batch_id: int) -> bool:
         try:
             # Drain loop: run downstream, then immediately re-run if any new
             # micro-batches arrived (set the pending flag) while the previous
-            # run was in progress.  This guarantees every mapped/ file is
-            # processed without waiting for the Airflow fallback DAG.
-            #
-            # Pattern: check THEN clear — any batch that sets the flag between
-            # the check and the clear will be detected in the NEXT iteration's
-            # check (because the incremental cleaner will find its files still
-            # unprocessed in mapped/).  The flag is a "please re-run" signal;
-            # actual data safety comes from Spark checkpoints + incremental
-            # cleaning state, not from the flag itself.
+            # run was in progress.
             catchup_count = 0
             while True:
                 _run_downstream_sync(bucket, batch_id if catchup_count == 0 else -catchup_count)
-                if not _downstream_pending.is_set():
+                if not bucket_pending.is_set():
                     break
-                _downstream_pending.clear()
+                bucket_pending.clear()
                 catchup_count += 1
                 logger.info(
-                    "New micro-batches arrived while downstream was running "
-                    "(batch %d) — starting catch-up run #%d",
-                    batch_id,
-                    catchup_count,
+                    "New micro-batches arrived while downstream was running for %s (batch %d) — starting catch-up run #%d",
+                    bucket, batch_id, catchup_count,
                 )
         finally:
-            _downstream_lock.release()
+            bucket_lock.release()
 
-    _downstream_thread = threading.Thread(
+    new_thread = threading.Thread(
         target=_wrapped,
-        name=f"downstream-batch-{batch_id}",
+        name=f"downstream-{bucket}-batch-{batch_id}",
         daemon=True,
     )
-    _downstream_thread.start()
-    logger.info("Downstream pipeline started in background (batch %d)", batch_id)
+    with _state_lock:
+        _downstream_threads[bucket] = new_thread
+    new_thread.start()
+    logger.info("Downstream pipeline started in background for %s (batch %d)", bucket, batch_id)
     return True

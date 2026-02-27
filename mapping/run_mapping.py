@@ -243,8 +243,8 @@ def run_batch_mode(bucket_name: str):
         spark.stop()
         
     except Exception as e:
-        error_msg = f"Batch mode: Failed during data processing - {str(e)}"
-        print(f"❌ {error_msg}", flush=True)
+        error_msg = "Batch mode: Failed during data processing"
+        print(f"❌ {error_msg}: {str(e)}", flush=True)
         traceback.print_exc()
         
         # Update database with error status so frontend can display it
@@ -281,7 +281,7 @@ def run_db_mode(config: dict):
     # Try to retrieve manual mappings from Redis
     manual_mappings = None
     try:
-        redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+        redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=int(os.getenv("REDIS_PORT", "6379")), decode_responses=True)
         manual_mappings_str = redis_client.get(f"manual_mappings:{bucket_name}")
         if manual_mappings_str:
             manual_mappings = json.loads(manual_mappings_str)
@@ -298,15 +298,19 @@ def run_db_mode(config: dict):
         update_mapping_status(bucket_name, "failed", error_msg)
         sys.exit(1)
 
-    # Auto-detect database type from URI and build connector config
+    # Auto-detect database type from URI and build connector config.
+    # Use a per-tenant connector name so that different tenants' connectors
+    # do not collide and the DAG health-check finds the same name we deploy.
+    connector_name = f"pulse-{bucket_name}-connector"
     try:
         connector_config = manager.create_connector_config(
             db_uri=db_uri,
             tables=tables,
+            connector_name=connector_name,
         )
     except Exception as e:
-        error_msg = f"DB mode error: Failed to create connector config: {str(e)}"
-        print(f"❌ {error_msg}")
+        error_msg = "DB mode error: Failed to create connector configuration"
+        print(f"❌ {error_msg}: {str(e)}")
         traceback.print_exc()
         update_mapping_status(bucket_name, "failed", error_msg)
         sys.exit(1)
@@ -316,9 +320,11 @@ def run_db_mode(config: dict):
         print("\nDebezium connector deployed")
         print("   Starting Spark streaming...\n")
 
-        # Pass bucket name and manual mappings to streaming
-        os.environ["OUTPUT_BUCKET"] = bucket_name
-        os.environ["BUSINESS_ID"] = bucket_name  # For saving mapping results
+        # Pass business ID and manual mappings to the streaming session.
+        # We set BUSINESS_ID here (needed for Redis flags inside spark_streaming).
+        # output_bucket is now passed directly as an argument — no module-level
+        # variable evaluation race.
+        os.environ["BUSINESS_ID"] = bucket_name
         if manual_mappings:
             os.environ["MANUAL_MAPPINGS"] = json.dumps(manual_mappings)
         
@@ -350,7 +356,8 @@ def run_db_mode(config: dict):
 
             enable_downstream = config.get("enable_downstream", False)
             run_streaming(trigger_once=trigger_once,
-                          enable_downstream=enable_downstream)
+                          enable_downstream=enable_downstream,
+                          output_bucket=bucket_name)
 
             # After trigger-once streaming finishes, update mapping status to
             # 'completed' if the streaming callback didn't already do it (e.g.
@@ -366,7 +373,7 @@ def run_db_mode(config: dict):
                                           user=db_user, password=db_password) as conn:
                         with conn.cursor() as cur:
                             cur.execute(
-                                "SELECT mapping_status FROM onboarding WHERE business_id = %s",
+                                "SELECT mapping_status FROM onboarding WHERE business_id = %s AND is_completed = false",
                                 (bucket_name,)
                             )
                             row = cur.fetchone()
@@ -379,14 +386,15 @@ def run_db_mode(config: dict):
                                         mapping_error = NULL,
                                         current_step = 'mapping'
                                     WHERE business_id = %s
+                                    AND is_completed = false
                                 """, (datetime.now(timezone.utc), bucket_name))
                                 conn.commit()
                                 print("   Mapping status set to 'completed' (trigger-once fallback)")
                 except Exception as status_err:
                     print(f"⚠️  Could not update mapping status after trigger-once: {status_err}")
         except Exception as e:
-            error_msg = f"DB mode error: Streaming failed: {str(e)}"
-            print(f"❌ {error_msg}")
+            error_msg = "DB mode error: Streaming failed"
+            print(f"❌ {error_msg}: {str(e)}")
             traceback.print_exc()
             update_mapping_status(bucket_name, "failed", error_msg)
             sys.exit(1)
@@ -424,7 +432,7 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10,
     # Try to retrieve manual mappings from Redis
     manual_mappings = None
     try:
-        redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+        redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=int(os.getenv("REDIS_PORT", "6379")), decode_responses=True)
         manual_mappings_str = redis_client.get(f"manual_mappings:{bucket_name}")
         if manual_mappings_str:
             manual_mappings = json.loads(manual_mappings_str)
@@ -458,13 +466,15 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10,
         # Function to run Spark streaming in a separate process
         def run_spark_consumer():
             print("Starting Spark streaming consumer...")
-            # Update the output bucket in environment
-            os.environ["OUTPUT_BUCKET"] = bucket_name
-            os.environ["BUSINESS_ID"] = bucket_name  # For saving mapping results
+            # Set BUSINESS_ID for Redis flag usage inside spark_streaming.
+            # output_bucket is passed as an explicit argument so the module-level
+            # variable race in spark_streaming.py is avoided entirely.
+            os.environ["BUSINESS_ID"] = bucket_name
             if manual_mappings:
                 os.environ["MANUAL_MAPPINGS"] = json.dumps(manual_mappings)
             run_streaming(trigger_once=trigger_once,
-                          enable_downstream=enable_downstream)
+                          enable_downstream=enable_downstream,
+                          output_bucket=bucket_name)
         
         # Run both processes
         print("Starting parallel processes:")
@@ -495,9 +505,30 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10,
                     spark_process.join()
                 print(f"✅ API MODE COMPLETED ({poll_duration}s window)\n")
             else:
-                # Run indefinitely (production streaming via Airflow DAG).
-                api_process.join()
-                spark_process.join()
+                # Production streaming: monitor both processes concurrently.
+                # If either one exits (crash or normal), terminate the other so
+                # Airflow gets a non-zero exit and can restart the whole task.
+                import time as _time
+                while True:
+                    api_alive = api_process.is_alive()
+                    spark_alive = spark_process.is_alive()
+                    if not api_alive or not spark_alive:
+                        if not api_alive:
+                            print("⚠️  API ingestion process exited — terminating Spark consumer")
+                            if spark_alive:
+                                spark_process.terminate()
+                                spark_process.join()
+                        else:
+                            print("⚠️  Spark consumer process exited — terminating API ingestion")
+                            api_process.terminate()
+                            api_process.join()
+                        break
+                    _time.sleep(5)
+                # Propagate non-zero exit code so Airflow retries
+                exit_code = api_process.exitcode or spark_process.exitcode or 0
+                if exit_code != 0:
+                    print(f"❌ API MODE exited with code {exit_code}")
+                    sys.exit(exit_code)
         except KeyboardInterrupt:
             print("\n\nStopping processes...")
             api_process.terminate()
@@ -507,8 +538,8 @@ def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10,
             print("✅ API MODE STOPPED\n")
             
     except Exception as e:
-        error_msg = f"API mode error: {str(e)}"
-        print(f"❌ {error_msg}")
+        error_msg = "API mode error: An unexpected error occurred"
+        print(f"❌ {error_msg}: {str(e)}")
         traceback.print_exc()
         update_mapping_status(bucket_name, "failed", error_msg)
         sys.exit(1)
@@ -604,8 +635,8 @@ def main():
             
     except Exception as e:
         # Catch any uncaught errors from the main execution
-        error_msg = f"Unexpected error in mapping pipeline: {str(e)}"
-        print(f"\n❌ {error_msg}", flush=True)
+        error_msg = "An unexpected error occurred in the mapping pipeline"
+        print(f"\n❌ {error_msg}: {str(e)}", flush=True)
         traceback.print_exc()
         update_mapping_status(bucket_name, "failed", error_msg)
         sys.exit(1)

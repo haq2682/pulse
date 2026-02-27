@@ -300,7 +300,7 @@ const Mapping = () => {
             }
         } catch (e) {
             console.error('Error saving mappings:', e);
-            setError(e.response?.data?.detail || e.message || 'Failed to process mappings');
+            setError(e.response?.data?.detail || 'Failed to process mappings. Please check your configuration and try again.');
             setMappingLoading(false);
         }
     };

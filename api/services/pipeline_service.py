@@ -157,12 +157,39 @@ class PipelineService:
         except Exception as _redis_err:
             logger.warning("Could not set downstream pipeline lock for %s: %s", business_id, _redis_err)
 
+        # Heartbeat: refresh the lock TTL every 1/3 of the TTL so it does not
+        # expire while a long-running pipeline is still executing.
+        _heartbeat_interval = _DOWNSTREAM_LOCK_TTL_SECONDS // 3
+        _heartbeat_running = True
+
+        async def _refresh_lock():
+            while _heartbeat_running:
+                await asyncio.sleep(_heartbeat_interval)
+                if not _heartbeat_running:
+                    break
+                try:
+                    # Only refresh if the key still belongs to this pipeline run
+                    current_val = await _redis_client.get(_lock_key)
+                    if current_val == pipeline_id:
+                        await _redis_client.expire(_lock_key, _DOWNSTREAM_LOCK_TTL_SECONDS)
+                        logger.debug("Downstream pipeline lock TTL refreshed for %s", business_id)
+                except Exception as _hb_err:
+                    logger.warning("Heartbeat refresh failed for %s: %s", business_id, _hb_err)
+
+        heartbeat_task = asyncio.create_task(_refresh_lock())
+
         try:
             # Execute the pipeline with the new connection
             await self._execute_pipeline(pipeline_id, business_id, user_id, start_from_phase, db_connection)
         except Exception as e:
             logger.error("Error in pipeline execution: %s", e, exc_info=True)
         finally:
+            _heartbeat_running = False
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
             # Always close the connection when done
             try:
                 db_connection.close()

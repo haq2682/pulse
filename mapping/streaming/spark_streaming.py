@@ -24,8 +24,13 @@ from utils.helpers import parse_minio_endpoint
 load_dotenv(find_dotenv())
 
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "10.5.0.7:9092")
-CHECKPOINT_LOCATION = "s3a://pulse-checkpoints/normalize-stream"
-OUTPUT_BUCKET = os.getenv("OUTPUT_BUCKET", "pulse-bucket-stream")
+_REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+
+# TTL for the per-business "first batch done" Redis flag (7 days).
+_FIRST_BATCH_FLAG_TTL_SECONDS = 86400 * 7
+
+# TTL for mapping results stored in Redis (24 hours).
+_MAPPING_RESULTS_TTL_SECONDS = 86400
 
 
 def create_spark_session() -> SparkSession:
@@ -130,7 +135,7 @@ def read_kafka_stream(spark: SparkSession) -> DataFrame:
         .format("kafka")
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP)
         .option("subscribePattern", "ecom\\..*")
-        .option("startingOffsets", "latest")
+        .option("startingOffsets", "earliest")
         .load()
         .selectExpr("CAST(value AS STRING) as json_str")
         .select(from_json(col("json_str"), get_canonical_schema()).alias("data"))
@@ -192,8 +197,10 @@ def extract_table_dataframes(batch_df: DataFrame) -> tuple:
     return all_dataframes, operations
 
 
-def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_client, manual_mappings=None, business_id=None, enable_downstream=False):
+def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_client, manual_mappings=None, business_id=None, enable_downstream=False, trigger_once=False, output_bucket=None):
     """Process each micro-batch with CDC operation support and optional inline downstream."""
+    if output_bucket is None:
+        output_bucket = os.getenv("OUTPUT_BUCKET", "pulse-bucket-stream")
     print(f"\n{'='*60}")
     print(f"Processing batch {batch_id}")
     print(f"{'='*60}")
@@ -214,7 +221,7 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
         try:
             import redis
             import json
-            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=_REDIS_PORT, decode_responses=True)
             redis_mappings_str = redis_client.get(f"manual_mappings:{business_id}")
             if redis_mappings_str:
                 current_manual_mappings = json.loads(redis_mappings_str)
@@ -238,8 +245,25 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
     target_folder = "mapped"  # Default for subsequent batches
     has_missing_columns = False
     
-    # Save mapping results to Redis on first batch (batch_id == 0)
+    # Perform first-batch initialization only once per streaming job lifetime.
+    # We use a Redis flag so that on a Spark restart (where batch_id resets to 0)
+    # we do NOT re-run the DB status update or Redis mapping-results write.
+    is_first_ever_batch = False
     if batch_id == 0 and business_id:
+        try:
+            import redis as _redis_mod
+            import json
+            _init_client = _redis_mod.Redis(host=os.getenv("REDIS_HOST", "redis"), port=_REDIS_PORT, decode_responses=True)
+            # NX = only set if key does NOT exist; returns True only on the very first call
+            is_first_ever_batch = bool(_init_client.set(
+                f"streaming_first_batch_done:{business_id}", "1", nx=True, ex=_FIRST_BATCH_FLAG_TTL_SECONDS
+            ))
+        except Exception as _guard_err:
+            print(f"   ⚠️  Could not check/set first-batch guard: {_guard_err}")
+            is_first_ever_batch = True  # conservative: attempt initialization
+    
+    # Save mapping results to Redis on the very first batch of a new streaming job
+    if is_first_ever_batch and business_id:
         try:
             import redis
             import json
@@ -255,15 +279,15 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
                 extra_cols = result.get("extra_cols", [])
                 
                 # Add table name to each column for frontend display
-                for col in missing_cols:
+                for missing_col in missing_cols:
                     mapping_results["missing_cols"].append({
-                        "column": col,
+                        "column": missing_col,
                         "table": table_name
                     })
                 
-                for col in extra_cols:
+                for extra_col in extra_cols:
                     mapping_results["extra_cols"].append({
-                        "column": col,
+                        "column": extra_col,
                         "table": table_name
                     })
             
@@ -271,10 +295,10 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
             has_missing_columns = len(mapping_results['missing_cols']) > 0
             
             # Save to Redis
-            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=_REDIS_PORT, decode_responses=True)
             redis_client.setex(
                 f"mapping_results:{business_id}",
-                86400,  # 24 hours
+                _MAPPING_RESULTS_TTL_SECONDS,
                 json.dumps(mapping_results)
             )
             
@@ -282,7 +306,7 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
             if has_missing_columns:
                 redis_client.setex(
                     f"streaming_use_temp:{business_id}",
-                    86400,  # 24 hours
+                    _MAPPING_RESULTS_TTL_SECONDS,
                     "true"
                 )
                 target_folder = "mapped-temp"
@@ -322,6 +346,7 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
                                     mapping_error = NULL,
                                     current_step = 'mapping'
                                 WHERE business_id = %s
+                                AND is_completed = false
                             """, ("completed", datetime.now(timezone.utc), business_id))
                             conn.commit()
                     print(f"   Database status updated to 'completed'")
@@ -331,11 +356,11 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
         except Exception as redis_error:
             print(f"⚠️  Warning: Could not save mapping results to Redis: {redis_error}")
     else:
-        # For subsequent batches (batch_id > 0), check Redis flag
+        # For subsequent batches, check Redis flag for temp folder
         if business_id:
             try:
                 import redis
-                redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=6379, decode_responses=True)
+                redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=_REDIS_PORT, decode_responses=True)
                 use_temp = redis_client.get(f"streaming_use_temp:{business_id}")
                 if use_temp == "true":
                     target_folder = "mapped-temp"
@@ -351,29 +376,29 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
         save_dataframes_to_minio(
             {result_key: result_data}, 
             minio_client, 
-            OUTPUT_BUCKET,
+            output_bucket,
             operation=operation,
             folder=target_folder
         )
     
     print(f"✅ Batch {batch_id} completed: {len(results)} tables processed")
-    print(f"   Data saved to {OUTPUT_BUCKET}/{target_folder}/")
+    print(f"   Data saved to {output_bucket}/{target_folder}/")
 
     # ── Trigger inline downstream pipeline (clean → transform → analyze → ML) ──
     # Only runs when:
     #  1. enable_downstream is True (set by --enable-downstream flag)
     #  2. Data was written to the final "mapped" folder (not "mapped-temp")
-    #  3. Not in trigger-once mode (batch_id > 0 or continuous streaming)
-    if enable_downstream and target_folder == "mapped" and batch_id > 0:
+    #  3. Not in trigger-once mode (Airflow handles downstream for trigger-once runs)
+    if enable_downstream and target_folder == "mapped" and not trigger_once:
         try:
             from streaming.downstream_runner import trigger_downstream
-            trigger_downstream(OUTPUT_BUCKET, batch_id)
+            trigger_downstream(output_bucket, batch_id)
         except Exception as downstream_err:
             # Never let downstream errors crash the mapping stream
             print(f"   ⚠️  Could not trigger downstream: {downstream_err}")
 
 
-def run_streaming(trigger_once: bool = False, enable_downstream: bool = False):
+def run_streaming(trigger_once: bool = False, enable_downstream: bool = False, output_bucket: str = None):
     """Main streaming pipeline.
 
     Args:
@@ -384,17 +409,30 @@ def run_streaming(trigger_once: bool = False, enable_downstream: bool = False):
                            (clean → transform → analyze → ML inference)
                            inline after each micro-batch, reducing end-to-end
                            latency from ~10 min to ~10 s – 2 min.
+        output_bucket: MinIO bucket name to write mapped files to.  Defaults to
+                       the OUTPUT_BUCKET environment variable.
     """
-    print("Starting Spark Streaming Pipeline")
-    print(f"Kafka: {KAFKA_BOOTSTRAP}")
-    print(f"Checkpoint: {CHECKPOINT_LOCATION}")
-    print(f"Output bucket: {OUTPUT_BUCKET}")
-    print(f"Trigger-once mode: {trigger_once}")
-    print(f"Inline downstream: {enable_downstream}\n")
-    
+    # Resolve output bucket: prefer explicit argument, then env var, then fallback.
+    if output_bucket is None:
+        output_bucket = os.getenv("OUTPUT_BUCKET", "pulse-bucket-stream")
+
     # Retrieve manual mappings from environment variable
     manual_mappings = None
     business_id = os.getenv("BUSINESS_ID")
+
+    # Per-business checkpoint so that different tenants do not share Kafka
+    # consumer-group state and Spark streaming state.
+    if business_id:
+        checkpoint_location = f"s3a://pulse-checkpoints/normalize-stream-{business_id}"
+    else:
+        checkpoint_location = "s3a://pulse-checkpoints/normalize-stream"
+
+    print("Starting Spark Streaming Pipeline")
+    print(f"Kafka: {KAFKA_BOOTSTRAP}")
+    print(f"Checkpoint: {checkpoint_location}")
+    print(f"Output bucket: {output_bucket}")
+    print(f"Trigger-once mode: {trigger_once}")
+    print(f"Inline downstream: {enable_downstream}\n")
     
     manual_mappings_str = os.getenv("MANUAL_MAPPINGS")
     if manual_mappings_str:
@@ -425,9 +463,9 @@ def run_streaming(trigger_once: bool = False, enable_downstream: bool = False):
     )
     
     # Create bucket if not exists
-    if not minio_client.bucket_exists(OUTPUT_BUCKET):
-        minio_client.make_bucket(OUTPUT_BUCKET)
-        print(f"Created bucket: {OUTPUT_BUCKET}")
+    if not minio_client.bucket_exists(output_bucket):
+        minio_client.make_bucket(output_bucket)
+        print(f"Created bucket: {output_bucket}")
     
     # Read stream
     json_stream = read_kafka_stream(spark)
@@ -435,9 +473,12 @@ def run_streaming(trigger_once: bool = False, enable_downstream: bool = False):
     # Process with foreachBatch
     writer = (
         json_stream.writeStream
-        .foreachBatch(lambda df, bid: process_microbatch(df, bid, columns_info, minio_client, manual_mappings, business_id, enable_downstream))
+        .foreachBatch(lambda df, bid: process_microbatch(
+            df, bid, columns_info, minio_client, manual_mappings,
+            business_id, enable_downstream, trigger_once, output_bucket
+        ))
         .outputMode("append")
-        .option("checkpointLocation", CHECKPOINT_LOCATION)
+        .option("checkpointLocation", checkpoint_location)
     )
 
     if trigger_once:

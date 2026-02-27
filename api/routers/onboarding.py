@@ -895,16 +895,31 @@ async def get_mapping_status(request: Request, userId: str, db=Depends(get_db)):
         if mapping_status == "running" and business_id:
             process_id_str = await redis.get(f"mapping_process:{business_id}")
             if process_id_str:
+                process_dead = False
                 try:
                     process_id = int(process_id_str)
-                    # Check if process is still running
-                    # os.kill with signal 0 doesn't kill the process, just checks if it exists
-                    os.kill(process_id, 0)
-                except (OSError, ValueError, PermissionError):
-                    # Process is not running anymore:
-                    # - OSError: Process doesn't exist or already terminated
-                    # - ValueError: Invalid PID
-                    # - PermissionError: Process exists but owned by different user (not accessible)
+                    # os.kill(pid, 0) checks process existence on THIS host only.
+                    # In a multi-replica deployment the PID may belong to a
+                    # different container, so we only treat the process as dead
+                    # when the OS explicitly says "no such process" (ESRCH).
+                    # EPERM means the process exists but belongs to another user —
+                    # treat it as still alive.  Any other OSError is a "not found".
+                    import errno as _errno
+                    try:
+                        os.kill(process_id, 0)
+                    except PermissionError:
+                        # Process exists (different owner or container) — assume alive
+                        pass
+                    except OSError as _oe:
+                        if _oe.errno == _errno.ESRCH:
+                            # No such process on this host
+                            process_dead = True
+                        # Any other OSError (e.g. EPERM from different namespace):
+                        # assume alive to avoid false negatives in multi-replica setups
+                except ValueError:
+                    process_dead = True  # Invalid PID stored in Redis
+
+                if process_dead:
                     # Check if it completed successfully by looking at the MinIO bucket for mapped files
                     try:
                         # List objects in the mapped folder with timestamp checking
@@ -1490,9 +1505,8 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
             )
             
             if result.returncode != 0:
-                error_msg = f"Manual mapping failed: {result.stderr}"
-                print(error_msg)
-                raise HTTPException(status_code=500, detail=error_msg)
+                print(f"Manual mapping script failed: {result.stderr}")
+                raise HTTPException(status_code=500, detail="Failed to apply manual mappings. Please check your mapping configuration and try again.")
             
             print(f"Manual mapping output: {result.stdout}")
             
@@ -1503,10 +1517,11 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
         except subprocess.TimeoutExpired:
             raise HTTPException(
                 status_code=500, 
-                detail=f"Manual mapping took too long (timeout after {MANUAL_MAPPING_TIMEOUT_SECONDS} seconds)"
+                detail="Manual mapping timed out. Please try again."
             )
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to run manual mapping: {str(e)}")
+            print(f"Error running manual mapping script: {str(e)}")
+            raise HTTPException(status_code=500, detail="Failed to apply manual mappings. Please try again.")
         
         # Get updated mapping results from Redis
         mapping_results_str = await redis.get(f"mapping_results:{business_id}")

@@ -210,7 +210,7 @@ with DAG(
     schedule_interval=None,      # USER-TRIGGERED — never runs on a schedule
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    max_active_runs=1,           # guard against accidental double-starts
+    max_active_runs=None,           # allow one run per tenant simultaneously
     tags=["pulse", "db", "cdc", "streaming"],
     default_args=_batch_defaults,
     params={
