@@ -34,7 +34,12 @@ import threading
 import time
 from typing import Optional
 
+import redis
+
 logger = logging.getLogger("pulse.downstream")
+
+# Redis port used for pipeline lock checks (configurable via REDIS_PORT env var).
+_REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 
 # ---------------------------------------------------------------------------
 # Module-level state: a single lock and a running flag prevent concurrent
@@ -129,6 +134,27 @@ def trigger_downstream(bucket: str, batch_id: int) -> bool:
     This function is safe to call from Spark's foreachBatch callback — it
     returns immediately and never blocks the streaming query.
     """
+    # Check cross-container Redis lock set by pipeline_service during the
+    # initial (post-onboarding) pipeline run.  If that run is still active
+    # we must not start a concurrent downstream execution — the accumulated
+    # new data will be picked up by the next trigger once the lock is gone,
+    # and the streaming_downstream Airflow DAG provides a 2-min fallback.
+    try:
+        _r = redis.Redis(
+            host=os.getenv("REDIS_HOST", "redis"), port=_REDIS_PORT, decode_responses=True
+        )
+        if _r.exists(f"downstream_pipeline_lock:{bucket}"):
+            logger.info(
+                "Initial pipeline lock held for %s — skipping inline downstream for batch %d",
+                bucket,
+                batch_id,
+            )
+            return False
+    except Exception as _redis_err:
+        logger.warning(
+            "Could not check downstream_pipeline_lock in Redis (%s) — proceeding", _redis_err
+        )
+
     global _downstream_thread
 
     if not _downstream_lock.acquire(blocking=False):

@@ -22,6 +22,9 @@ from sqlalchemy import text
 
 logger = logging.getLogger("pulse.pipeline")
 
+# TTL (seconds) for the cross-container downstream pipeline lock stored in Redis.
+# Acts as a safety net if the pipeline process exits without releasing the lock.
+_DOWNSTREAM_LOCK_TTL_SECONDS = 7200  # 2 hours
 
 class PipelineService:
     """Service for managing data processing pipeline execution."""
@@ -135,12 +138,25 @@ class PipelineService:
         This ensures the background task has its own connection that won't be closed by the request handler.
         """
         from database import get_db_connection
-        
+        import aioredis as _aioredis
+
         logger.info("Creating new database connection for pipeline %s", pipeline_id)
         # Create a new connection for this background task
         db_connection = get_db_connection()
         logger.debug("Database connection created: %s", db_connection)
-        
+
+        # Acquire a cross-container Redis lock so the streaming inline downstream
+        # (downstream_runner.trigger_downstream) does not start a concurrent
+        # downstream run while this initial pipeline execution is in progress.
+        _redis_url = f"redis://{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}"
+        _redis_client = _aioredis.from_url(_redis_url, decode_responses=True)
+        _lock_key = f"downstream_pipeline_lock:{business_id}"
+        try:
+            await _redis_client.set(_lock_key, pipeline_id, ex=_DOWNSTREAM_LOCK_TTL_SECONDS)
+            logger.info("Downstream pipeline lock set for %s (pipeline %s)", business_id, pipeline_id)
+        except Exception as _redis_err:
+            logger.warning("Could not set downstream pipeline lock for %s: %s", business_id, _redis_err)
+
         try:
             # Execute the pipeline with the new connection
             await self._execute_pipeline(pipeline_id, business_id, user_id, start_from_phase, db_connection)
@@ -153,6 +169,16 @@ class PipelineService:
                 logger.info("Pipeline %s database connection closed successfully", pipeline_id)
             except Exception as e:
                 logger.error("Error closing database connection: %s", e, exc_info=True)
+            # Release the cross-container downstream lock
+            try:
+                await _redis_client.delete(_lock_key)
+                logger.info("Downstream pipeline lock released for %s", business_id)
+            except Exception as e:
+                logger.warning("Could not release downstream pipeline lock for %s: %s", business_id, e)
+            try:
+                await _redis_client.close()
+            except Exception as e:
+                logger.warning("Could not close Redis client for pipeline %s: %s", pipeline_id, e)
     
     async def _execute_pipeline(self, pipeline_id: str, business_id: str, user_id: str, start_from_phase: Optional[str] = None, db_connection=None):
         """
