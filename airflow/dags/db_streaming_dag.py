@@ -13,9 +13,20 @@ every INSERT/UPDATE/DELETE as a Kafka message (ecom.* topics).
   - Runs the 7-algorithm column-mapping pipeline on every micro-batch
   - Writes normalised Parquet files to MinIO  mapped/
 
-The downstream pipeline (cleaning → transformation → analysis → inference)
-is handled by the SEPARATE ``streaming_downstream`` DAG which runs on a
-10-minute schedule over whatever has accumulated in mapped/.
+Inline downstream pipeline (``--enable-downstream``)
+------------------------------------------------------
+After each micro-batch is written to ``mapped/``, the downstream pipeline
+(cleaning → transformation → analysis → ML inference) is triggered
+**inline** in a background thread so the next micro-batch can start
+immediately.  A pending-flag drain loop in ``downstream_runner.py``
+guarantees that no accumulated micro-batch data is ever left unprocessed:
+if new CDC events arrive while a downstream run is in progress, a flag is
+set and the active run immediately re-runs after finishing (a "catch-up"
+run), picking up all data accumulated in ``mapped/`` since the previous run.
+
+The ``streaming_downstream`` Airflow DAG remains as an additional
+safety-net fallback (every 2 minutes), but correctness no longer depends
+on it.
 
 When does this DAG run?
 -----------------------
