@@ -245,8 +245,8 @@ services:
 
   debezium:
     build:
-      context: .docker/debezium
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: .docker/debezium/Dockerfile
     container_name: debezium
     depends_on:
       - kafka
