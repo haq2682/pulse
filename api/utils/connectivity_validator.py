@@ -176,30 +176,52 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
             # list_collection_names() on the target database instead — this is a
             # real application-level command that requires an authenticated
             # connection.
-            try:
-                client = MongoClient(db_uri, serverSelectionTimeoutMS=timeout * 1000)
-                target_db = database if database else 'admin'
-                client[target_db].list_collection_names()
-                client.close()
-                return True, f"Successfully connected to MongoDB database at {location}"
-            except OperationFailure:
+            #
+            # IMPORTANT: pymongo defaults the authSource to the database name in
+            # the URI path (e.g. /pulse-test → authSource=pulse-test).  Most
+            # MongoDB users (root, debezium_user) are created in the 'admin'
+            # database and therefore require authSource=admin.  When no explicit
+            # authSource is present in the URI we therefore retry with
+            # authSource=admin on the first auth failure before giving up.
+            query_str = urlparse(db_uri).query.lower()
+            has_explicit_authsource = 'authsource' in query_str
+
+            target_db = database if database else 'admin'
+            # Build the list of URIs to attempt: original first, then with
+            # authSource=admin as a fallback (only when no authSource was given
+            # and we know the server is reachable, i.e. non-SRV after TCP check).
+            uris_to_try = [db_uri]
+            if not has_explicit_authsource and db_type == 'mongodb':
+                sep = '&' if query_str else '?'
+                uris_to_try.append(f"{db_uri}{sep}authSource=admin")
+
+            last_failure = None
+            for uri in uris_to_try:
+                try:
+                    client = MongoClient(uri, serverSelectionTimeoutMS=timeout * 1000)
+                    client[target_db].list_collection_names()
+                    client.close()
+                    return True, f"Successfully connected to MongoDB database at {location}"
+                except OperationFailure:
+                    last_failure = 'auth'
+                    continue
+                except ServerSelectionTimeoutError:
+                    # After TCP confirmation (non-SRV), SSTE means an auth/TLS
+                    # issue; for SRV it may be a connectivity problem.
+                    last_failure = 'auth' if db_type == 'mongodb' else 'connect'
+                    continue
+                except MongoConfigurationError as e:
+                    return False, f"MongoDB configuration error: {str(e)}"
+                except Exception as e:
+                    error_msg = str(e)
+                    if "authentication" in error_msg.lower() or "auth" in error_msg.lower():
+                        last_failure = 'auth'
+                        continue
+                    return False, f"MongoDB connection error: {error_msg}"
+
+            if last_failure == 'auth':
                 return False, f"Authentication failed for MongoDB at {location}. Check username and password."
-            except ServerSelectionTimeoutError:
-                # For non-SRV URIs TCP was already confirmed reachable above, so a
-                # ServerSelectionTimeoutError here means pymongo could not establish
-                # an authenticated connection (wrong credentials / authSource / TLS).
-                # For SRV URIs we cannot do a prior TCP check, so fall back to the
-                # "cannot connect" message as the cause is ambiguous.
-                if db_type == 'mongodb':
-                    return False, f"Authentication failed for MongoDB at {location}. Check username and password."
-                return False, f"Cannot connect to MongoDB at {location}. Server may be down or unreachable."
-            except MongoConfigurationError as e:
-                return False, f"MongoDB configuration error: {str(e)}"
-            except Exception as e:
-                error_msg = str(e)
-                if "authentication" in error_msg.lower() or "auth" in error_msg.lower():
-                    return False, f"Authentication failed for MongoDB at {location}. Check username and password."
-                return False, f"MongoDB connection error: {error_msg}"
+            return False, f"Cannot connect to MongoDB at {location}. Server may be down or unreachable."
                     
         # SQL Server
         elif db_type in ['mssql', 'sqlserver']:
