@@ -11,7 +11,7 @@ from general.inference.classification.infer_payment_success import main as payme
 from general.inference.classification.infer_review_sentiment import main as review_sentiment
 from general.inference.classification.infer_stock_status import main as stock_status
 
-# from general.inference.regression.infer_aov_v2 import main as aov
+from general.inference.regression.infer_aov_v2 import main as aov
 from general.inference.regression.infer_clv import main as clv
 from general.inference.regression.infer_restock_quantity import main as restock_quantity
 from general.inference.regression.infer_safety_stock import main as safety_stock
