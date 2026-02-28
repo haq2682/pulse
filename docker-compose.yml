@@ -323,7 +323,7 @@ services:
       - kafka
     volumes:
       - cassandra_data:/var/lib/cassandra:ro
-      - ./conf/debezium-cassandra.properties:/debezium/conf/application.properties
+      - ./conf/debezium-cassandra.properties:/debezium/config/application.properties
     networks:
       spark-network:
         ipv4_address: 10.5.0.56
