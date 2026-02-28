@@ -282,8 +282,8 @@ def run_downstream_for_all_buckets(**context):
             else:
                 stderr_tail = (result.stderr or "")[-500:]
                 print(f"  ⚠️  {step_name} failed for {bucket} (exit {result.returncode}){': ' + stderr_tail if stderr_tail else ''}")
-                # Continue with next step rather than aborting — partial
-                # downstream results are better than leaving data unprocessed.
+                print(f"  ⏭  Skipping remaining steps for {bucket} to avoid processing stale data.")
+                break
 
 
 with DAG(
