@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     postgres_server: str
     
     # Redis (UNCHANGED:  your IP works fine)
-    redis_host: str = "10.5.0.10"  # ← KEEP THIS
+    redis_host: str = "10.5.0.11"  # ← KEEP THIS
     redis_port: int = 6379
     
     # Security

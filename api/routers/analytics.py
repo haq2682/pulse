@@ -14,6 +14,9 @@ import numpy as np
 import json
 import pandas as pd
 from datetime import datetime, date
+import os
+
+
 
 class AnalyticsJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -37,7 +40,10 @@ class AnalyticsJSONEncoder(json.JSONEncoder):
             pass
         return super().default(obj)
 
-redis = aioredis.from_url("redis://redis:6379", decode_responses=True)
+REDIS_HOST = os.getenv("REDIS_HOST", "10.5.0.11")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+
+redis = aioredis.from_url(f"redis://{REDIS_HOST}:{REDIS_PORT}", decode_responses=True)
 
 router = APIRouter(
     prefix="/analytics",

@@ -15,18 +15,11 @@ DB_PASS = os.getenv("POSTGRES_PASSWORD", "postgres")
 DB_CONFIG = {
     "host": DB_HOST,
     "port":  DB_PORT,
-    "port":  DB_PORT,
     "database": DB_NAME,
     "user": DB_USER,
     "password": DB_PASS,
     "driver": "org.postgresql.Driver",
     "url": f"jdbc:postgresql://{DB_HOST}:{DB_PORT}/{DB_NAME}"
-}
-
-MINIO_CONFIG = {
-    "endpoint": os.getenv("MINIO_ENDPOINT"),
-    "access_key": os.getenv("MINIO_ACCESS_KEY"),
-    "secret_key": os.getenv("MINIO_SECRET_KEY"),
 }
 
 MINIO_CONFIG = {

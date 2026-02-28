@@ -19,7 +19,7 @@ import asyncio
 import time
 
 redis = aioredis.from_url(
-    f"redis://{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}",
+    f"redis://{os.getenv('REDIS_HOST', '10.5.0.11')}:{os.getenv('REDIS_PORT', '6379')}",
     decode_responses=True,
 )
 
