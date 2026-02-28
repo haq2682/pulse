@@ -148,7 +148,7 @@ class PipelineService:
         # Acquire a cross-container Redis lock so the streaming inline downstream
         # (downstream_runner.trigger_downstream) does not start a concurrent
         # downstream run while this initial pipeline execution is in progress.
-        _redis_url = f"redis://{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}"
+        _redis_url = f"redis://{os.getenv('REDIS_HOST', '10.5.0.11')}:{os.getenv('REDIS_PORT', '6379')}"
         _redis_client = _aioredis.from_url(_redis_url, decode_responses=True)
         _lock_key = f"downstream_pipeline_lock:{business_id}"
         try:
@@ -585,7 +585,7 @@ class PipelineService:
                             try:
                                 os.killpg(os.getpgid(pid), signal.SIGTERM)
                                 logger.info("Sent SIGTERM to process group of %s (PID: %d)", phase_name, pid)
-                            except:
+                            except Exception:
                                 # Fallback to killing just the process if process group fails
                                 os.kill(pid, signal.SIGTERM)
                                 logger.info("Sent SIGTERM to %s process (PID: %d)", phase_name, pid)
@@ -599,7 +599,7 @@ class PipelineService:
                                 try:
                                     os.killpg(os.getpgid(pid), signal.SIGKILL)
                                     logger.warning("Force killed process group of %s (PID: %d)", phase_name, pid)
-                                except:
+                                except Exception:
                                     os.kill(pid, signal.SIGKILL)
                                     logger.warning("Force killed %s process (PID: %d)", phase_name, pid)
                             except ProcessLookupError:

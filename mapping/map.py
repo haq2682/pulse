@@ -20,6 +20,7 @@ from utils.helpers import (
     parse_minio_endpoint,
 )
 from utils.table_mapper import map_table_name
+import argparse
 import os
 
 import findspark
@@ -192,7 +193,6 @@ minio_client = Minio(
     secure=False,
 )
 
-bucket_name = "pulse-bucket-1"
 
 spark = (
     SparkSession.builder.appName("NormalizeData")
@@ -770,6 +770,12 @@ def save_dataframes_to_minio(results, client, bucket_name, operation=None, prima
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Normalize and map data files from MinIO")
+    parser.add_argument("--bucket-name", type=str, default="pulse-bucket-1",
+                        help="MinIO bucket name (business_id)")
+    args = parser.parse_args()
+    bucket_name = args.bucket_name
+
     all_dataframes = load_all_files_from_minio(minio_client, bucket_name, spark)
 
     # Use hardcoded columns_info from canonical schema

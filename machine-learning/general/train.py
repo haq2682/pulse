@@ -24,24 +24,24 @@ from general.training.clustering.train_session_behavior import main as session_b
 from general.training.clustering.train_supplier_performance import main as supplier_performance
 
 def main(bucket_name=None):
-    # cart_abandonment()
-    # customer_churn()
-    # customer_segments()
-    # payment_success()
-    # review_sentiment()
-    # stock_status()
+    cart_abandonment()
+    customer_churn()
+    customer_segments()
+    payment_success()
+    review_sentiment()
+    stock_status()
 
-    # aov()
-    # clv()
-    # restock_quantity()
+    aov()
+    clv()
+    restock_quantity()
     safety_stock()
-    # session_conversion()
-    # stockout_probability()
+    session_conversion()
+    stockout_probability()
 
-    # customer_segment()
-    # geo_cluster()
-    # session_behavior()
-    # supplier_performance()
+    customer_segment()
+    geo_cluster()
+    session_behavior()
+    supplier_performance()
 
 if __name__ == "__main__":
     main()

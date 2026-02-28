@@ -59,7 +59,10 @@ s3 = boto3.client(
     region_name="us-east-1",
 )
 
-redis = aioredis.from_url("redis://redis:6379", decode_responses=True)
+REDIS_HOST = os.getenv("REDIS_HOST", "10.5.0.11")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+
+redis = aioredis.from_url(f"redis://{REDIS_HOST}:{REDIS_PORT}", decode_responses=True)
 
 # Served-file tracking keys auto-expire after 7 days of inactivity
 _SERVED_KEY_TTL = 86_400 * 7
