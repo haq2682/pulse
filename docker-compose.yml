@@ -420,6 +420,7 @@ services:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
       - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-pulse_secret_key_change_me}
+      - _PIP_ADDITIONAL_REQUIREMENTS=minio scipy pandas numpy psycopg2-binary
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/plugins:/opt/airflow/plugins
@@ -471,6 +472,7 @@ services:
       - DEBEZIUM_URL=http://10.5.0.10:8083
       - PIPELINE_PYTHON_CONTAINER=python
       - PYTHONPATH=/opt/airflow/utils:/opt/airflow/config
+      - _PIP_ADDITIONAL_REQUIREMENTS=minio scipy pandas numpy psycopg2-binary
     ports:
       - "8090:8080"
     volumes:
@@ -513,6 +515,7 @@ services:
       - DEBEZIUM_URL=http://10.5.0.10:8083
       - PIPELINE_PYTHON_CONTAINER=python
       - PYTHONPATH=/opt/airflow/utils:/opt/airflow/config
+      - _PIP_ADDITIONAL_REQUIREMENTS=minio scipy pandas numpy psycopg2-binary
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/plugins:/opt/airflow/plugins
