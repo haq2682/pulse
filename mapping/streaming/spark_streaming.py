@@ -110,7 +110,7 @@ def normalize_message_row(row):
         return {
             "source_type": "db",
             "vendor": "debezium",
-            "table": source.get("table"),
+            "table": source.get("table") or source.get("collection"),
             "schema_version": "v1",
             "operation": op_map.get(row.get("op"), "c"),
             "payload": payload

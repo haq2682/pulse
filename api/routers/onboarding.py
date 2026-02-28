@@ -1,5 +1,6 @@
 import os
 import signal
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, Query, UploadFile, File
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
@@ -44,6 +45,8 @@ router = APIRouter(
     prefix="/onboarding",
     tags=["onboarding"],
 )
+
+logger = logging.getLogger("pulse")
 
 async def _trigger_api_streaming_dag(business_id: str, api_url: str) -> None:
     """
@@ -504,12 +507,20 @@ async def start_mapping(request: Request, db=Depends(get_db)):
         
         # Validate connectivity for db and api modes (run in threadpool to avoid blocking)
         if mode == "db":
-            from utils.connectivity_validator import validate_database_connection
+            from utils.connectivity_validator import validate_database_connection, discover_and_match_db_tables
             success, message = await run_in_threadpool(validate_database_connection, db_uri, 10)
             if not success:
                 raise HTTPException(status_code=400, detail=message)
             print(f"Database connectivity validated: {message}")
-            
+
+            # Auto-discover tables when the caller did not specify any
+            if not db_tables:
+                try:
+                    db_tables = await run_in_threadpool(discover_and_match_db_tables, db_uri, 10)
+                    print(f"Auto-discovered {len(db_tables)} tables matching canonical schema: {db_tables}")
+                except Exception as disc_err:
+                    logger.warning("Table auto-discovery failed (non-fatal): %s", disc_err)
+
         elif mode == "api":
             from utils.connectivity_validator import validate_api_endpoint
             success, message = await run_in_threadpool(validate_api_endpoint, api_url, 10)

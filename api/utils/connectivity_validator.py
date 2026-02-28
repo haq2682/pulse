@@ -18,11 +18,12 @@ Supports all Debezium-compatible databases:
 import socket
 import ipaddress
 from urllib.parse import urlparse
-from typing import Tuple
+from typing import List, Optional, Tuple
 
 # Core dependencies (should always be available)
 import psycopg2
 from pymongo import MongoClient
+from pymongo.errors import ServerSelectionTimeoutError, OperationFailure, ConfigurationError as MongoConfigurationError
 
 # Optional dependencies - import conditionally
 try:
@@ -34,6 +35,28 @@ try:
     import pymssql
 except ImportError:
     pymssql = None  # type: ignore[assignment]
+
+try:
+    import oracledb
+except ImportError:
+    oracledb = None  # type: ignore[assignment]
+
+try:
+    import ibm_db_dbi
+except ImportError:
+    ibm_db_dbi = None  # type: ignore[assignment]
+
+try:
+    from cassandra.cluster import Cluster as CassandraCluster
+    from cassandra.auth import PlainTextAuthProvider as CassandraPlainTextAuthProvider
+except ImportError:
+    CassandraCluster = None  # type: ignore[assignment]
+    CassandraPlainTextAuthProvider = None  # type: ignore[assignment]
+
+try:
+    from google.cloud import spanner as gcp_spanner
+except ImportError:
+    gcp_spanner = None  # type: ignore[assignment]
 
 try:
     import requests
@@ -157,34 +180,85 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
         # MongoDB
         elif db_type in ['mongodb', 'mongodb+srv']:
             port = port or 27017
-            try:
-                # For MongoDB, construct connection string differently
-                if db_type == 'mongodb+srv':
-                    # SRV connection string
-                    if username and password:
-                        mongo_uri = f"mongodb+srv://{username}:{password}@{hostname}/{database if database else ''}"
-                    else:
-                        mongo_uri = f"mongodb+srv://{hostname}/{database if database else ''}"
-                else:
-                    # Standard connection
-                    if username and password:
-                        mongo_uri = f"mongodb://{username}:{password}@{hostname}:{port}/{database if database else ''}"
-                    else:
-                        mongo_uri = f"mongodb://{hostname}:{port}/{database if database else ''}"
-                    
-                client = MongoClient(mongo_uri, serverSelectionTimeoutMS=timeout * 1000)
-                # Test connection by listing databases
-                client.server_info()
-                client.close()
-                return True, f"Successfully connected to MongoDB database at {hostname}:{port}"
-            except Exception as e:
-                error_msg = str(e)
-                if "authentication failed" in error_msg.lower():
-                    return False, f"Authentication failed for MongoDB at {hostname}:{port}. Check username and password."
-                elif "connection refused" in error_msg.lower() or "timeout" in error_msg.lower():
-                    return False, f"Cannot connect to MongoDB at {hostname}:{port}. Server may be down or unreachable."
-                else:
+            # Human-readable location for error messages
+            location = hostname if db_type == 'mongodb+srv' else f"{hostname}:{port}"
+
+            # Stage 1: For standard (non-SRV) URIs, verify raw TCP reachability first.
+            # This lets us distinguish a true "server down" from an auth failure,
+            # regardless of what text pymongo puts in its exception messages.
+            if db_type == 'mongodb':
+                try:
+                    with socket.create_connection((hostname, port), timeout=timeout):
+                        pass
+                except OSError:
+                    return False, f"Cannot connect to MongoDB at {location}. Server may be down or unreachable."
+
+            # Stage 2: Test authentication.  'ping' is auth-free in all MongoDB
+            # versions (it is an alias for the 'hello' SDAM command).  Use
+            # list_collection_names() on the target database instead — this is a
+            # real application-level command that requires an authenticated
+            # connection.
+            #
+            # IMPORTANT: pymongo defaults the authSource to the database name in
+            # the URI path (e.g. /pulse-test → authSource=pulse-test).  Most
+            # MongoDB users (root, debezium_user) are created in the 'admin'
+            # database and therefore require authSource=admin.  When no explicit
+            # authSource is present in the URI we therefore retry with
+            # authSource=admin on the first auth failure before giving up.
+            query_str = urlparse(db_uri).query.lower()
+            has_explicit_authsource = 'authsource' in query_str
+
+            target_db = database if database else 'admin'
+            # Build the list of URIs to attempt: original first, then with
+            # authSource=admin as a fallback (only when no authSource was given
+            # and we know the server is reachable, i.e. non-SRV after TCP check).
+            uris_to_try = [db_uri]
+            if not has_explicit_authsource and db_type == 'mongodb':
+                sep = '&' if query_str else '?'
+                uris_to_try.append(f"{db_uri}{sep}authSource=admin")
+
+            # Use directConnection=True for standard mongodb:// URIs so that
+            # pymongo connects straight to the specified host without attempting
+            # replica-set member discovery.  RS members' internal hostnames are
+            # often unreachable from the application network, which would
+            # otherwise cause ServerSelectionTimeoutError even when the target
+            # host is reachable and credentials are correct.
+            # SRV URIs handle topology discovery differently, so directConnection
+            # is only applied to non-SRV connections.
+            direct = db_type == 'mongodb'
+
+            last_failure = None
+            for uri in uris_to_try:
+                try:
+                    client = MongoClient(
+                        uri,
+                        serverSelectionTimeoutMS=timeout * 1000,
+                        directConnection=direct,
+                    )
+                    client[target_db].list_collection_names()
+                    client.close()
+                    return True, f"Successfully connected to MongoDB database at {location}"
+                except OperationFailure:
+                    last_failure = 'auth'
+                    continue
+                except ServerSelectionTimeoutError:
+                    # With directConnection=True the TCP check already confirmed
+                    # reachability, so SSTE here means auth/TLS rejected the
+                    # connection.  For SRV URIs the cause is ambiguous.
+                    last_failure = 'auth' if db_type == 'mongodb' else 'connect'
+                    continue
+                except MongoConfigurationError as e:
+                    return False, f"MongoDB configuration error: {str(e)}"
+                except Exception as e:
+                    error_msg = str(e)
+                    if "authentication" in error_msg.lower() or "auth" in error_msg.lower():
+                        last_failure = 'auth'
+                        continue
                     return False, f"MongoDB connection error: {error_msg}"
+
+            if last_failure == 'auth':
+                return False, f"Authentication failed for MongoDB at {location}. Check username and password."
+            return False, f"Cannot connect to MongoDB at {location}. Server may be down or unreachable."
                     
         # SQL Server
         elif db_type in ['mssql', 'sqlserver']:
@@ -212,6 +286,8 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                     return False, f"Cannot connect to SQL Server at {hostname}:{port}. Server may be down or unreachable."
                 else:
                     return False, f"SQL Server connection error: {error_msg}"
+            except pymssql.InterfaceError:
+                return False, f"Cannot connect to SQL Server at {hostname}:{port}. Server may be down or unreachable."
         
         # Oracle
         elif db_type == 'oracle':
@@ -269,8 +345,9 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
             port = port or 9042
             # Cassandra requires cassandra-driver library
             try:
-                from cassandra.cluster import Cluster
+                from cassandra.cluster import Cluster, NoHostAvailable
                 from cassandra.auth import PlainTextAuthProvider
+                from cassandra import AuthenticationFailed as CassandraAuthFailed
                 try:
                     if username and password:
                         auth_provider = PlainTextAuthProvider(username=username, password=password)
@@ -280,14 +357,17 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                     cluster.connect()  # Test connection
                     cluster.shutdown()
                     return True, f"Successfully connected to Cassandra database at {hostname}:{port}"
-                except Exception as e:
-                    error_msg = str(e)
-                    if "authentication" in error_msg.lower() or "credentials" in error_msg.lower():
+                except CassandraAuthFailed:
+                    return False, f"Authentication failed for Cassandra at {hostname}:{port}. Check username and password."
+                except NoHostAvailable as e:
+                    # NoHostAvailable wraps per-host errors in e.errors (dict of host→exception).
+                    # Inspect the actual exception types to distinguish auth from connectivity.
+                    host_errors = getattr(e, 'errors', {})
+                    if any(isinstance(exc, CassandraAuthFailed) for exc in host_errors.values()):
                         return False, f"Authentication failed for Cassandra at {hostname}:{port}. Check username and password."
-                    elif "unable to connect" in error_msg.lower() or "connection refused" in error_msg.lower():
-                        return False, f"Cannot connect to Cassandra at {hostname}:{port}. Server may be down or unreachable."
-                    else:
-                        return False, f"Cassandra connection error: {error_msg}"
+                    return False, f"Cannot connect to Cassandra at {hostname}:{port}. Server may be down or unreachable."
+                except Exception as e:
+                    return False, f"Cassandra connection error: {str(e)}"
             except ImportError:
                 # cassandra-driver not installed, provide helpful message
                 return True, f"Cassandra database at {hostname}:{port} will be validated by Debezium connector. Install cassandra-driver library for pre-validation."
@@ -485,3 +565,352 @@ def validate_api_endpoint(api_url: str, timeout: int = 10) -> Tuple[bool, str]:
             
     except Exception as e:
         return False, f"Error validating API endpoint: {str(e)}"
+
+
+# ---------------------------------------------------------------------------
+# Table auto-discovery helpers
+# ---------------------------------------------------------------------------
+
+# Canonical e-commerce schema tables (mirrors mapping/utils/table_mapper.py)
+_CANONICAL_TABLES = [
+    "addresses", "cart_items", "categories", "customer_sessions",
+    "customers", "inventory", "marketing_campaigns", "order_items",
+    "orders", "payments", "products", "reviews", "shopping_cart",
+    "suppliers", "wishlist",
+]
+
+# Synonym map for common naming variations (mirrors mapping/utils/table_mapper.py)
+_TABLE_SYNONYMS = {
+    "customers": "customers", "customer": "customers", "users": "customers",
+    "user": "customers", "clients": "customers", "client": "customers",
+    "addresses": "addresses", "address": "addresses",
+    "locations": "addresses", "location": "addresses",
+    "products": "products", "product": "products", "items": "products",
+    "item": "products", "catalog": "products",
+    "inventories": "inventory", "inventory": "inventory",
+    "stock": "inventory", "stocks": "inventory",
+    "orders": "orders", "order": "orders", "sales": "orders", "sale": "orders",
+    "order_items": "order_items", "orderitems": "order_items",
+    "order_item": "order_items", "line_items": "order_items",
+    "lineitems": "order_items",
+    "reviews": "reviews", "review": "reviews", "ratings": "reviews",
+    "rating": "reviews", "feedback": "reviews",
+    "categories": "categories", "category": "categories",
+    "wishlists": "wishlist", "wishlist": "wishlist",
+    "favorites": "wishlist", "favourites": "wishlist", "favourite": "wishlist",
+    "payments": "payments", "payment": "payments",
+    "billing": "payments", "invoices": "payments", "invoice": "payments",
+    "shopping_carts": "shopping_cart", "shopping_cart": "shopping_cart",
+    "cart": "shopping_cart", "carts": "shopping_cart",
+    "basket": "shopping_cart", "baskets": "shopping_cart",
+    "cart_items": "cart_items", "cartitems": "cart_items",
+    "cart_item": "cart_items", "shopping_cart_items": "cart_items",
+    "basket_items": "cart_items",
+    "customer_sessions": "customer_sessions", "sessions": "customer_sessions",
+    "session": "customer_sessions", "user_sessions": "customer_sessions",
+    "marketing_campaigns": "marketing_campaigns",
+    "campaigns": "marketing_campaigns", "campaign": "marketing_campaigns",
+    "promotions": "marketing_campaigns", "promotion": "marketing_campaigns",
+    "suppliers": "suppliers", "supplier": "suppliers",
+    "vendors": "suppliers", "vendor": "suppliers",
+    "partners": "suppliers", "partner": "suppliers",
+}
+
+
+def _fuzzy_match_table(table_name: str, threshold: int = 75) -> Optional[str]:
+    """
+    Map a remote table name to a canonical schema table name.
+
+    Tries (in order):
+    1. Exact match against canonical tables
+    2. Synonym lookup
+    3. Word-boundary split (e.g. "ecommerce_orders" → "orders")
+    4. Rapidfuzz ratio / token_set_ratio similarity
+    5. Difflib fallback if rapidfuzz is unavailable
+
+    Returns the canonical name, or None if no match exceeds the threshold.
+    """
+    if not table_name:
+        return None
+    normalized = table_name.lower().strip()
+
+    # 1. Exact match
+    if normalized in _CANONICAL_TABLES:
+        return normalized
+
+    # 2. Synonym lookup
+    if normalized in _TABLE_SYNONYMS:
+        return _TABLE_SYNONYMS[normalized]
+
+    # 3. Word-boundary split: "ecommerce_orders" → ["ecommerce", "orders"]
+    #    Match each word-part against canonical tables and synonyms.
+    #    Parts shorter than 3 characters (e.g. "id", "no") are too ambiguous to match.
+    parts = [p for p in normalized.replace("-", "_").split("_") if len(p) >= 3]
+    for part in parts:
+        if part in _CANONICAL_TABLES:
+            return part
+        if part in _TABLE_SYNONYMS:
+            return _TABLE_SYNONYMS[part]
+
+    # 4. Fuzzy matching
+    try:
+        from rapidfuzz import fuzz, process as rfprocess
+        match = rfprocess.extractOne(
+            normalized, _CANONICAL_TABLES,
+            scorer=fuzz.ratio, score_cutoff=threshold,
+        )
+        if match:
+            return match[0]
+        # token_set_ratio handles extra tokens
+        match2 = rfprocess.extractOne(
+            normalized, _CANONICAL_TABLES,
+            scorer=fuzz.token_set_ratio, score_cutoff=threshold,
+        )
+        return match2[0] if match2 else None
+    except ImportError:
+        # difflib cutoff is in [0, 1] range; threshold is in [0, 100]
+        import difflib
+        matches = difflib.get_close_matches(
+            normalized, _CANONICAL_TABLES, n=1, cutoff=threshold / 100.0,
+        )
+        return matches[0] if matches else None
+
+
+# Named constants used inside discover_and_match_db_tables
+# VTGate exposes two ports: the gRPC CDC port (used by Debezium) and the
+# MySQL-compatible query port (used by pymysql for table discovery).
+_VITESS_GRPC_PORT = 15991
+# Informix systables rows with tabid < 100 are internal system tables.
+_INFORMIX_SYSTEM_TABLE_MIN_ID = 100
+
+
+def discover_and_match_db_tables(db_uri: str, timeout: int = 10) -> List[str]:
+    """
+    Connect to the database, list all tables/collections accessible to the
+    user, and return those whose names fuzzy-match the canonical e-commerce
+    schema.
+
+    The returned list contains the **original remote names** (not canonical).
+    These are passed directly to Debezium for CDC capture; the mapping layer
+    handles the canonical name translation during streaming.
+
+    Supported databases (all 11 that Debezium supports):
+    - PostgreSQL   (psycopg2)
+    - MySQL        (pymysql)
+    - MariaDB      (pymysql)
+    - MongoDB      (pymongo)
+    - SQL Server   (pymssql)
+    - Oracle       (oracledb thin mode)
+    - Db2          (ibm_db_dbi)
+    - Vitess       (pymysql via VTGate MySQL port)
+    - Google Spanner (google-cloud-spanner)
+    - Informix     (ibm_db_dbi)
+    - Cassandra    (cassandra-driver)
+
+    When a required driver is not installed, the branch is skipped and an
+    empty list is returned (safe best-effort fallback).
+    """
+    try:
+        parsed = urlparse(db_uri)
+        db_type = parsed.scheme.lower()
+        hostname = parsed.hostname
+        port = parsed.port
+        username = parsed.username
+        password = parsed.password
+        database = parsed.path.lstrip("/").split("?")[0] if parsed.path else ""
+
+        discovered: List[str] = []
+
+        if db_type in ("postgresql", "postgres"):
+            port = port or 5432
+            conn = psycopg2.connect(
+                host=hostname, port=port,
+                user=username, password=password,
+                database=database, connect_timeout=timeout,
+            )
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+            )
+            discovered = [row[0] for row in cursor.fetchall()]
+            cursor.close()
+            conn.close()
+
+        elif db_type in ("mongodb", "mongodb+srv"):
+            port = port or 27017
+            target_db = database if database else "admin"
+            direct = db_type == "mongodb"
+            query_str = parsed.query.lower() if parsed.query else ""
+            has_authsource = "authsource" in query_str
+            uris_to_try = [db_uri]
+            if not has_authsource and direct:
+                sep = "&" if query_str else "?"
+                uris_to_try.append(f"{db_uri}{sep}authSource=admin")
+            for uri in uris_to_try:
+                try:
+                    client = MongoClient(
+                        uri,
+                        serverSelectionTimeoutMS=timeout * 1000,
+                        directConnection=direct,
+                    )
+                    discovered = client[target_db].list_collection_names()
+                    client.close()
+                    break
+                except Exception:
+                    continue
+
+        elif db_type in ("mysql", "mariadb"):
+            if pymysql is not None:
+                port = port or 3306
+                conn = pymysql.connect(
+                    host=hostname, port=port,
+                    user=username, password=password,
+                    database=database, connect_timeout=timeout,
+                )
+                cursor = conn.cursor()
+                cursor.execute("SHOW TABLES")
+                discovered = [row[0] for row in cursor.fetchall()]
+                cursor.close()
+                conn.close()
+
+        elif db_type in ("mssql", "sqlserver"):
+            if pymssql is not None:
+                port = port or 1433
+                conn = pymssql.connect(
+                    server=hostname, port=str(port),
+                    user=username, password=password,
+                    database=database, timeout=timeout,
+                )
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT table_name FROM information_schema.tables "
+                    "WHERE table_type = 'BASE TABLE'"
+                )
+                discovered = [row[0] for row in cursor.fetchall()]
+                cursor.close()
+                conn.close()
+
+        elif db_type == "oracle":
+            # oracledb thin mode works without Oracle Instant Client
+            if oracledb is not None:
+                port = port or 1521
+                conn = oracledb.connect(
+                    user=username, password=password,
+                    dsn=f"{hostname}:{port}/{database}",
+                )
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT TABLE_NAME FROM ALL_TABLES WHERE OWNER = :1",
+                    [username.upper()],
+                )
+                discovered = [row[0].lower() for row in cursor.fetchall()]
+                cursor.close()
+                conn.close()
+
+        elif db_type == "db2":
+            # ibm_db_dbi is the official IBM Python driver for Db2
+            if ibm_db_dbi is not None:
+                port = port or 50000
+                dsn = (
+                    f"DATABASE={database};HOSTNAME={hostname};PORT={port};"
+                    f"PROTOCOL=TCPIP;UID={username};PWD={password};"
+                )
+                conn = ibm_db_dbi.connect(dsn, "", "")
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT TABNAME FROM SYSCAT.TABLES "
+                    "WHERE TYPE = 'T' AND TABSCHEMA = CURRENT SCHEMA"
+                )
+                discovered = [row[0].lower() for row in cursor.fetchall()]
+                cursor.close()
+                conn.close()
+
+        elif db_type == "vitess":
+            # VTGate exposes a MySQL-compatible interface on its mysql port
+            # (default 3306); the Debezium gRPC port (_VITESS_GRPC_PORT) is separate.
+            if pymysql is not None:
+                mysql_port = port if (port and port != _VITESS_GRPC_PORT) else 3306
+                conn = pymysql.connect(
+                    host=hostname, port=mysql_port,
+                    user=username or "", password=password or "",
+                    database=database, connect_timeout=timeout,
+                )
+                cursor = conn.cursor()
+                cursor.execute("SHOW TABLES")
+                discovered = [row[0] for row in cursor.fetchall()]
+                cursor.close()
+                conn.close()
+
+        elif db_type == "spanner":
+            # google-cloud-spanner SDK; requires GOOGLE_APPLICATION_CREDENTIALS
+            if gcp_spanner is not None:
+                path_parts = parsed.path.strip("/").split("/")
+                project_id = parsed.hostname or ""
+                instance_id = path_parts[0] if len(path_parts) > 0 else ""
+                database_id = path_parts[1] if len(path_parts) > 1 else ""
+                client = gcp_spanner.Client(project=project_id)
+                instance = client.instance(instance_id)
+                db_obj = instance.database(database_id)
+                with db_obj.snapshot() as snapshot:
+                    results = snapshot.execute_sql(
+                        "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
+                        "WHERE TABLE_SCHEMA = ''"
+                    )
+                    discovered = [row[0].lower() for row in results]
+
+        elif db_type == "informix":
+            # ibm_db_dbi supports Informix via IBM CLI/DRDA as well as Db2
+            if ibm_db_dbi is not None:
+                port = port or 9088
+                dsn = (
+                    f"DATABASE={database};HOSTNAME={hostname};PORT={port};"
+                    f"PROTOCOL=TCPIP;UID={username};PWD={password};"
+                )
+                conn = ibm_db_dbi.connect(dsn, "", "")
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT tabname FROM systables "
+                    f"WHERE tabtype = 'T' AND tabid >= {_INFORMIX_SYSTEM_TABLE_MIN_ID}"
+                )
+                discovered = [row[0].lower() for row in cursor.fetchall()]
+                cursor.close()
+                conn.close()
+
+        elif db_type == "cassandra":
+            # cassandra-driver lists table names from cluster metadata
+            if CassandraCluster is not None:
+                port = port or 9042
+                keyspace = database if database else None
+                auth = None
+                if username:
+                    auth = CassandraPlainTextAuthProvider(
+                        username=username, password=password or "",
+                    )
+                cluster = CassandraCluster(
+                    [hostname], port=port,
+                    auth_provider=auth,
+                    connect_timeout=timeout,
+                )
+                try:
+                    cluster.connect()
+                    if keyspace and keyspace in cluster.metadata.keyspaces:
+                        discovered = list(
+                            cluster.metadata.keyspaces[keyspace].tables.keys()
+                        )
+                finally:
+                    cluster.shutdown()
+
+        # Filter to tables whose names match the canonical schema
+        matched = [t for t in discovered if _fuzzy_match_table(t) is not None]
+        return matched
+
+    except Exception as exc:
+        # Discovery is best-effort; never let it block the pipeline start.
+        # Log at WARNING so operators can diagnose issues without a crash.
+        import logging as _logging
+        _logging.getLogger("pulse").warning(
+            "db_table_discovery: auto-discovery failed for %s: %s",
+            urlparse(db_uri).hostname, exc,
+        )
+        return []

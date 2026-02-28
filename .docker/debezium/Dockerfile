@@ -29,6 +29,10 @@ ENV DEBEZIUM_VERSION=3.4.0.Final
 
 USER root
 
+# NOTE: Docker's COPY instruction does not expand ENV/ARG variables in source
+# paths, so the filenames below are hardcoded. They must match the archives
+# present in ./jars/ and must correspond to DEBEZIUM_VERSION above.
+
 # =============================================================================
 # SECTION 1 — MariaDB Connector
 # -----------------------------------------------------------------------------
@@ -41,9 +45,9 @@ USER root
 #   "connector.class": "io.debezium.connector.mariadb.MariaDbConnector"
 #   "database.hostname": "<your-mariadb-host>"
 # =============================================================================
-RUN curl -fSL \
-    https://repo1.maven.org/maven2/io/debezium/debezium-connector-mariadb/${DEBEZIUM_VERSION}/debezium-connector-mariadb-${DEBEZIUM_VERSION}-plugin.tar.gz \
-    | tar -xzv -C /kafka/connect/
+COPY jars/debezium-connector-mariadb-3.4.0.Final-plugin.tar.gz /tmp/
+RUN tar -xzf /tmp/debezium-connector-mariadb-3.4.0.Final-plugin.tar.gz -C /kafka/connect/ && \
+    rm /tmp/debezium-connector-mariadb-3.4.0.Final-plugin.tar.gz
 
 # =============================================================================
 # SECTION 2 — Vitess Connector
@@ -51,9 +55,9 @@ RUN curl -fSL \
 # Connects to Vitess VTGate via the VStream gRPC API (port 15991, not 3306).
 # VStream must be enabled on the source Vitess cluster.
 # =============================================================================
-RUN curl -fSL \
-    https://repo1.maven.org/maven2/io/debezium/debezium-connector-vitess/${DEBEZIUM_VERSION}/debezium-connector-vitess-${DEBEZIUM_VERSION}-plugin.tar.gz \
-    | tar -xzv -C /kafka/connect/
+COPY jars/debezium-connector-vitess-3.4.0.Final-plugin.tar.gz /tmp/
+RUN tar -xzf /tmp/debezium-connector-vitess-3.4.0.Final-plugin.tar.gz -C /kafka/connect/ && \
+    rm /tmp/debezium-connector-vitess-3.4.0.Final-plugin.tar.gz
 
 # =============================================================================
 # SECTION 3 — Google Spanner Connector
@@ -67,9 +71,9 @@ RUN curl -fSL \
 #   environment:
 #     - GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials.json
 # =============================================================================
-RUN curl -fSL \
-    https://repo1.maven.org/maven2/io/debezium/debezium-connector-spanner/${DEBEZIUM_VERSION}/debezium-connector-spanner-${DEBEZIUM_VERSION}-plugin.tar.gz \
-    | tar -xzv -C /kafka/connect/
+COPY jars/debezium-connector-spanner-3.4.0.Final-plugin.tar.gz /tmp/
+RUN tar -xzf /tmp/debezium-connector-spanner-3.4.0.Final-plugin.tar.gz -C /kafka/connect/ && \
+    rm /tmp/debezium-connector-spanner-3.4.0.Final-plugin.tar.gz
 
 # =============================================================================
 # SECTION 4 — IBM Informix Connector
@@ -78,9 +82,9 @@ RUN curl -fSL \
 # Requires Informix 12.10+ with the CDC option enabled on the server.
 # Needs a schema history Kafka topic (like MySQL/SQL Server).
 # =============================================================================
-RUN curl -fSL \
-    https://repo1.maven.org/maven2/io/debezium/debezium-connector-informix/${DEBEZIUM_VERSION}/debezium-connector-informix-${DEBEZIUM_VERSION}-plugin.tar.gz \
-    | tar -xzv -C /kafka/connect/
+COPY jars/debezium-connector-informix-3.4.0.Final-plugin.tar.gz /tmp/
+RUN tar -xzf /tmp/debezium-connector-informix-3.4.0.Final-plugin.tar.gz -C /kafka/connect/ && \
+    rm /tmp/debezium-connector-informix-3.4.0.Final-plugin.tar.gz
 
 # =============================================================================
 # SECTION 5 — Debezium Scripting Extension
@@ -94,24 +98,18 @@ RUN curl -fSL \
 #   transforms.filter.language=jsr223.groovy
 #   transforms.filter.condition=value.op == 'u'
 # =============================================================================
+COPY jars/debezium-scripting-3.4.0.Final.tar.gz /tmp/
 RUN mkdir -p /kafka/connect/debezium-scripting && \
-    curl -fSL \
-    https://repo1.maven.org/maven2/io/debezium/debezium-scripting/${DEBEZIUM_VERSION}/debezium-scripting-${DEBEZIUM_VERSION}.tar.gz \
-    | tar -xzv -C /kafka/connect/debezium-scripting/
+    tar -xzf /tmp/debezium-scripting-3.4.0.Final.tar.gz -C /kafka/connect/debezium-scripting/ && \
+    rm /tmp/debezium-scripting-3.4.0.Final.tar.gz
 
 # =============================================================================
 # SECTION 6 — Oracle JDBC Driver (cannot be bundled — license restricted)
 # -----------------------------------------------------------------------------
 # The Oracle connector JARs are pre-installed in the base image, but ojdbc8.jar
-# cannot be redistributed. You must provide it manually:
-#
-#   1. Download ojdbc8.jar from:
-#      https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html
-#
-#   2. Place it at ./jars/ojdbc8.jar (next to docker-compose.yml).
-#      The file is already mounted by the debezium service in docker-compose.yml:
-#        volumes:
-#          - ./jars/ojdbc8.jar:/kafka/connect/debezium-connector-oracle/ojdbc8.jar
+# cannot be redistributed. It is mounted at runtime by docker-compose.yml:
+#   volumes:
+#     - ./jars/ojdbc8.jar:/kafka/connect/debezium-connector-oracle/ojdbc8.jar
 #
 # The Oracle connector will fail to start without this file.
 # =============================================================================

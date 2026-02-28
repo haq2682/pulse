@@ -214,6 +214,7 @@ def _postgres_config(parsed: Dict, tables: List[str], topic_prefix: str, connect
     # identifier (≤63 chars, alphanumeric + underscores only).
     safe_name = connector_name.replace("-", "_").replace(".", "_")
     slot_name = f"dz_{safe_name}"[:63]
+    table_include = _build_table_include_list("postgres", tables, parsed["database"])
     config = {
         "connector.class": CONNECTOR_CLASSES["postgres"],
         "database.hostname": parsed["host"],
@@ -222,14 +223,13 @@ def _postgres_config(parsed: Dict, tables: List[str], topic_prefix: str, connect
         "database.password": parsed["password"],
         "database.dbname": parsed["database"],
         "topic.prefix": topic_prefix,
-        "table.include.list": _build_table_include_list(
-            "postgres", tables, parsed["database"]
-        ),
         "plugin.name": "pgoutput",
         "slot.name": slot_name,
-        "publication.autocreate.mode": "filtered",
+        "publication.autocreate.mode": "filtered" if table_include else "all_tables",
         "snapshot.mode": "initial",
     }
+    if table_include:
+        config["table.include.list"] = table_include
     config.update(_common_converter_config())
     return config
 
@@ -239,6 +239,7 @@ def _mysql_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_
     # Derive a stable numeric ID from the connector name so that the same
     # connector always produces the same ID (idempotent restarts).
     server_id = int(hashlib.md5(connector_name.encode()).hexdigest()[:8], 16) % _MYSQL_SERVER_ID_RANGE + _MYSQL_SERVER_ID_BASE
+    table_include = _build_table_include_list("mysql", tables, parsed["database"])
     config = {
         "connector.class": CONNECTOR_CLASSES["mysql"],
         "database.hostname": parsed["host"],
@@ -247,12 +248,11 @@ def _mysql_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_
         "database.password": parsed["password"],
         "database.server.id": str(server_id),
         "topic.prefix": topic_prefix,
-        "table.include.list": _build_table_include_list(
-            "mysql", tables, parsed["database"]
-        ),
         "database.include.list": parsed["database"],
         "snapshot.mode": "initial",
     }
+    if table_include:
+        config["table.include.list"] = table_include
     config.update(_common_converter_config())
     config.update(_schema_history_config(parsed["database"]))
     return config
@@ -261,6 +261,7 @@ def _mysql_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_
 def _mariadb_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
     # Derive a unique server ID for MariaDB (same approach as MySQL).
     server_id = int(hashlib.md5(connector_name.encode()).hexdigest()[:8], 16) % _MYSQL_SERVER_ID_RANGE + _MYSQL_SERVER_ID_BASE
+    table_include = _build_table_include_list("mariadb", tables, parsed["database"])
     config = {
         "connector.class": CONNECTOR_CLASSES["mariadb"],
         "database.hostname": parsed["host"],
@@ -269,12 +270,11 @@ def _mariadb_config(parsed: Dict, tables: List[str], topic_prefix: str, connecto
         "database.password": parsed["password"],
         "database.server.id": str(server_id),
         "topic.prefix": topic_prefix,
-        "table.include.list": _build_table_include_list(
-            "mariadb", tables, parsed["database"]
-        ),
         "database.include.list": parsed["database"],
         "snapshot.mode": "initial",
     }
+    if table_include:
+        config["table.include.list"] = table_include
     config.update(_common_converter_config())
     config.update(_schema_history_config(parsed["database"]))
     return config
@@ -284,16 +284,20 @@ def _mongodb_config(parsed: Dict, tables: List[str], topic_prefix: str, connecto
     """
     MongoDB uses collection.include.list instead of table.include.list.
     The raw URI is passed as mongodb.connection.string.
+    When tables is empty, collection.include.list is omitted so Debezium
+    captures all collections (safe fallback when auto-discovery is unavailable).
     """
-    collection_list = ",".join(f"{parsed['database']}.{t}" for t in tables)
     config = {
         "connector.class": CONNECTOR_CLASSES["mongodb"],
         "mongodb.connection.string": parsed["raw_uri"],
         "topic.prefix": topic_prefix,
-        "collection.include.list": collection_list,
         "capture.mode": "change_streams_update_full",
         "snapshot.mode": "initial",
     }
+    if tables:
+        config["collection.include.list"] = ",".join(
+            f"{parsed['database']}.{t}" for t in tables
+        )
     config.update(_common_converter_config())
     return config
 
@@ -318,6 +322,9 @@ def _sqlserver_config(parsed: Dict, tables: List[str], topic_prefix: str, connec
 
 
 def _oracle_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
+    table_include = _build_table_include_list(
+        "oracle", tables, parsed["database"], schema=parsed["user"]
+    )
     config = {
         "connector.class": CONNECTOR_CLASSES["oracle"],
         "database.hostname": parsed["host"],
@@ -326,19 +333,21 @@ def _oracle_config(parsed: Dict, tables: List[str], topic_prefix: str, connector
         "database.password": parsed["password"],
         "database.dbname": parsed["database"],
         "topic.prefix": topic_prefix,
-        "table.include.list": _build_table_include_list(
-            "oracle", tables, parsed["database"], schema=parsed["user"]
-        ),
         "database.connection.adapter": "logminer",
         "log.mining.strategy": "online_catalog",
         "snapshot.mode": "initial",
     }
+    if table_include:
+        config["table.include.list"] = table_include
     config.update(_common_converter_config())
     config.update(_schema_history_config(parsed["database"]))
     return config
 
 
 def _db2_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
+    table_include = _build_table_include_list(
+        "db2", tables, parsed["database"], schema=parsed["user"]
+    )
     config = {
         "connector.class": CONNECTOR_CLASSES["db2"],
         "database.hostname": parsed["host"],
@@ -347,11 +356,10 @@ def _db2_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_na
         "database.password": parsed["password"],
         "database.dbname": parsed["database"],
         "topic.prefix": topic_prefix,
-        "table.include.list": _build_table_include_list(
-            "db2", tables, parsed["database"], schema=parsed["user"]
-        ),
         "snapshot.mode": "initial",
     }
+    if table_include:
+        config["table.include.list"] = table_include
     config.update(_common_converter_config())
     config.update(_schema_history_config(parsed["database"]))
     return config
@@ -361,18 +369,18 @@ def _vitess_config(parsed: Dict, tables: List[str], topic_prefix: str, connector
     """
     Vitess connects to VTGate via gRPC. No schema history needed.
     """
+    table_include = _build_table_include_list("vitess", tables, parsed["database"])
     config = {
         "connector.class": CONNECTOR_CLASSES["vitess"],
         "database.hostname": parsed["host"],
         "database.port": str(parsed["port"]),
         "vitess.keyspace": parsed["database"],
         "topic.prefix": topic_prefix,
-        "table.include.list": _build_table_include_list(
-            "vitess", tables, parsed["database"]
-        ),
         "vitess.tablet.type": "PRIMARY",
         "snapshot.mode": "initial",
     }
+    if table_include:
+        config["table.include.list"] = table_include
     config.update(_common_converter_config())
     return config
 
@@ -383,6 +391,8 @@ def _spanner_config(parsed: Dict, tables: List[str], topic_prefix: str, connecto
     URI format: spanner://project_id/instance_id/database_id
     The user must set GOOGLE_APPLICATION_CREDENTIALS env var or provide
     gcp.spanner.credentials.path / gcp.spanner.credentials.json.
+    Spanner Debezium connector does not support table.include.list;
+    filtering is done via the change stream definition itself.
     """
     config = {
         "connector.class": CONNECTOR_CLASSES["spanner"],
@@ -397,6 +407,7 @@ def _spanner_config(parsed: Dict, tables: List[str], topic_prefix: str, connecto
 
 
 def _informix_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
+    table_include = _build_table_include_list("informix", tables, parsed["database"])
     config = {
         "connector.class": CONNECTOR_CLASSES["informix"],
         "database.hostname": parsed["host"],
@@ -405,11 +416,10 @@ def _informix_config(parsed: Dict, tables: List[str], topic_prefix: str, connect
         "database.password": parsed["password"],
         "database.dbname": parsed["database"],
         "topic.prefix": topic_prefix,
-        "table.include.list": _build_table_include_list(
-            "informix", tables, parsed["database"]
-        ),
         "snapshot.mode": "initial",
     }
+    if table_include:
+        config["table.include.list"] = table_include
     config.update(_common_converter_config())
     config.update(_schema_history_config(parsed["database"]))
     return config

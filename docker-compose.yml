@@ -245,8 +245,8 @@ services:
 
   debezium:
     build:
-      context: .docker/debezium
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: .docker/debezium/Dockerfile
     container_name: debezium
     depends_on:
       - kafka
@@ -300,7 +300,6 @@ services:
       - "9042:9042"
     volumes:
       - cassandra_data:/var/lib/cassandra
-      - cassandra_commitlog:/var/lib/cassandra/commitlog
     networks:
       spark-network:
         ipv4_address: 10.5.0.55
@@ -314,7 +313,7 @@ services:
   # ─────────────────────────────────────────────────────────────────────────
   # Debezium Server — Cassandra CDC connector (separate from the Kafka Connect
   # debezium service; the Cassandra connector reads commit log files directly
-  # from the shared cassandra_commitlog volume)
+  # from the shared cassandra_data volume (read-only))
   # ─────────────────────────────────────────────────────────────────────────
   debezium-cassandra:
     image: quay.io/debezium/server:3.4
@@ -323,8 +322,8 @@ services:
       - cassandra
       - kafka
     volumes:
-      - cassandra_commitlog:/cassandra/commitlog
-      - ./conf/debezium-cassandra.properties:/debezium/conf/application.properties
+      - cassandra_data:/var/lib/cassandra:ro
+      - ./conf/debezium-cassandra.properties:/debezium/config/application.properties
     networks:
       spark-network:
         ipv4_address: 10.5.0.56
@@ -420,6 +419,7 @@ services:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
       - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-pulse_secret_key_change_me}
+      - _PIP_ADDITIONAL_REQUIREMENTS=minio scipy pandas numpy psycopg2-binary
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/plugins:/opt/airflow/plugins
@@ -471,6 +471,7 @@ services:
       - DEBEZIUM_URL=http://10.5.0.10:8083
       - PIPELINE_PYTHON_CONTAINER=python
       - PYTHONPATH=/opt/airflow/utils:/opt/airflow/config
+      - _PIP_ADDITIONAL_REQUIREMENTS=minio scipy pandas numpy psycopg2-binary
     ports:
       - "8090:8080"
     volumes:
@@ -513,6 +514,7 @@ services:
       - DEBEZIUM_URL=http://10.5.0.10:8083
       - PIPELINE_PYTHON_CONTAINER=python
       - PYTHONPATH=/opt/airflow/utils:/opt/airflow/config
+      - _PIP_ADDITIONAL_REQUIREMENTS=minio scipy pandas numpy psycopg2-binary
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/plugins:/opt/airflow/plugins
@@ -573,4 +575,3 @@ volumes:
   nifi_data:
   airflow_logs:
   cassandra_data:
-  cassandra_commitlog:

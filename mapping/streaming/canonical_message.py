@@ -124,7 +124,7 @@ def from_debezium(debezium_payload: Dict[str, Any]) -> Dict[str, Any]:
 
     op = debezium_payload.get("op")
     source = debezium_payload.get("source", {})
-    table = source.get("table")
+    table = source.get("table") or source.get("collection")
     data = debezium_payload.get("after") or debezium_payload.get("before")
 
     if not all([op, table, data]):
