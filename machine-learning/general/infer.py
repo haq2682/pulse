@@ -31,7 +31,7 @@ def main(BUCKET_NAME):
     review_sentiment(BUCKET_NAME)
     stock_status(BUCKET_NAME)
 
-    # aov(BUCKET_NAME)
+    aov(BUCKET_NAME)
     clv(BUCKET_NAME)
     restock_quantity(BUCKET_NAME)
     safety_stock(BUCKET_NAME)
