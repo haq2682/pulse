@@ -6,7 +6,7 @@ from pyspark.sql import SparkSession
 findspark.init()
 load_dotenv(find_dotenv())
 
-DB_HOST = os.getenv("POSTGRES_HOST", "localhost")
+DB_HOST = os.getenv("POSTGRES_SERVER", "localhost")
 DB_PORT = os.getenv("POSTGRES_PORT", "5432")
 DB_NAME = os.getenv("POSTGRES_DATABASE_NAME", "pulse")
 DB_USER = os.getenv("POSTGRES_USER", "postgres")
