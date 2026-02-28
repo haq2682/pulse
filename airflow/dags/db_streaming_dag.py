@@ -137,7 +137,7 @@ _streaming_defaults = dict(
 
 
 def _docker_exec(script_path: str, extra_args: str = "") -> str:
-    return f"docker exec {PYTHON_CONTAINER} python /app/{script_path} {extra_args}"
+    return f"docker exec {PYTHON_CONTAINER} python3 /app/{script_path} {extra_args}"
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +182,7 @@ def check_or_deploy_debezium(**context):
     # and then exits (availableNow trigger on zero Kafka messages → immediate exit).
     cmd = [
         "docker", "exec", PYTHON_CONTAINER,
-        "python", "/app/mapping/run_mapping.py",
+        "python3", "/app/mapping/run_mapping.py",
         "--mode", "db",
         "--business-id", bucket,
         "--db-uri",    db_uri,
