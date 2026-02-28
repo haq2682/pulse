@@ -212,6 +212,8 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                     return False, f"Cannot connect to SQL Server at {hostname}:{port}. Server may be down or unreachable."
                 else:
                     return False, f"SQL Server connection error: {error_msg}"
+            except pymssql.InterfaceError:
+                return False, f"Cannot connect to SQL Server at {hostname}:{port}. Server may be down or unreachable."
         
         # Oracle
         elif db_type == 'oracle':
@@ -269,8 +271,9 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
             port = port or 9042
             # Cassandra requires cassandra-driver library
             try:
-                from cassandra.cluster import Cluster
+                from cassandra.cluster import Cluster, NoHostAvailable
                 from cassandra.auth import PlainTextAuthProvider
+                from cassandra import AuthenticationFailed as CassandraAuthFailed
                 try:
                     if username and password:
                         auth_provider = PlainTextAuthProvider(username=username, password=password)
@@ -280,14 +283,17 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                     cluster.connect()  # Test connection
                     cluster.shutdown()
                     return True, f"Successfully connected to Cassandra database at {hostname}:{port}"
-                except Exception as e:
-                    error_msg = str(e)
-                    if "authentication" in error_msg.lower() or "credentials" in error_msg.lower():
+                except CassandraAuthFailed:
+                    return False, f"Authentication failed for Cassandra at {hostname}:{port}. Check username and password."
+                except NoHostAvailable as e:
+                    # NoHostAvailable wraps per-host errors in e.errors (dict of host→exception).
+                    # Inspect the actual exception types to distinguish auth from connectivity.
+                    host_errors = getattr(e, 'errors', {})
+                    if any(isinstance(exc, CassandraAuthFailed) for exc in host_errors.values()):
                         return False, f"Authentication failed for Cassandra at {hostname}:{port}. Check username and password."
-                    elif "unable to connect" in error_msg.lower() or "connection refused" in error_msg.lower():
-                        return False, f"Cannot connect to Cassandra at {hostname}:{port}. Server may be down or unreachable."
-                    else:
-                        return False, f"Cassandra connection error: {error_msg}"
+                    return False, f"Cannot connect to Cassandra at {hostname}:{port}. Server may be down or unreachable."
+                except Exception as e:
+                    return False, f"Cassandra connection error: {str(e)}"
             except ImportError:
                 # cassandra-driver not installed, provide helpful message
                 return True, f"Cassandra database at {hostname}:{port} will be validated by Debezium connector. Install cassandra-driver library for pre-validation."
