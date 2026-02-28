@@ -322,6 +322,9 @@ def _sqlserver_config(parsed: Dict, tables: List[str], topic_prefix: str, connec
 
 
 def _oracle_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
+    table_include = _build_table_include_list(
+        "oracle", tables, parsed["database"], schema=parsed["user"]
+    )
     config = {
         "connector.class": CONNECTOR_CLASSES["oracle"],
         "database.hostname": parsed["host"],
@@ -330,19 +333,21 @@ def _oracle_config(parsed: Dict, tables: List[str], topic_prefix: str, connector
         "database.password": parsed["password"],
         "database.dbname": parsed["database"],
         "topic.prefix": topic_prefix,
-        "table.include.list": _build_table_include_list(
-            "oracle", tables, parsed["database"], schema=parsed["user"]
-        ),
         "database.connection.adapter": "logminer",
         "log.mining.strategy": "online_catalog",
         "snapshot.mode": "initial",
     }
+    if table_include:
+        config["table.include.list"] = table_include
     config.update(_common_converter_config())
     config.update(_schema_history_config(parsed["database"]))
     return config
 
 
 def _db2_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
+    table_include = _build_table_include_list(
+        "db2", tables, parsed["database"], schema=parsed["user"]
+    )
     config = {
         "connector.class": CONNECTOR_CLASSES["db2"],
         "database.hostname": parsed["host"],
@@ -351,11 +356,10 @@ def _db2_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_na
         "database.password": parsed["password"],
         "database.dbname": parsed["database"],
         "topic.prefix": topic_prefix,
-        "table.include.list": _build_table_include_list(
-            "db2", tables, parsed["database"], schema=parsed["user"]
-        ),
         "snapshot.mode": "initial",
     }
+    if table_include:
+        config["table.include.list"] = table_include
     config.update(_common_converter_config())
     config.update(_schema_history_config(parsed["database"]))
     return config
@@ -365,18 +369,18 @@ def _vitess_config(parsed: Dict, tables: List[str], topic_prefix: str, connector
     """
     Vitess connects to VTGate via gRPC. No schema history needed.
     """
+    table_include = _build_table_include_list("vitess", tables, parsed["database"])
     config = {
         "connector.class": CONNECTOR_CLASSES["vitess"],
         "database.hostname": parsed["host"],
         "database.port": str(parsed["port"]),
         "vitess.keyspace": parsed["database"],
         "topic.prefix": topic_prefix,
-        "table.include.list": _build_table_include_list(
-            "vitess", tables, parsed["database"]
-        ),
         "vitess.tablet.type": "PRIMARY",
         "snapshot.mode": "initial",
     }
+    if table_include:
+        config["table.include.list"] = table_include
     config.update(_common_converter_config())
     return config
 
@@ -387,6 +391,8 @@ def _spanner_config(parsed: Dict, tables: List[str], topic_prefix: str, connecto
     URI format: spanner://project_id/instance_id/database_id
     The user must set GOOGLE_APPLICATION_CREDENTIALS env var or provide
     gcp.spanner.credentials.path / gcp.spanner.credentials.json.
+    Spanner Debezium connector does not support table.include.list;
+    filtering is done via the change stream definition itself.
     """
     config = {
         "connector.class": CONNECTOR_CLASSES["spanner"],
@@ -401,6 +407,7 @@ def _spanner_config(parsed: Dict, tables: List[str], topic_prefix: str, connecto
 
 
 def _informix_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
+    table_include = _build_table_include_list("informix", tables, parsed["database"])
     config = {
         "connector.class": CONNECTOR_CLASSES["informix"],
         "database.hostname": parsed["host"],
@@ -409,11 +416,10 @@ def _informix_config(parsed: Dict, tables: List[str], topic_prefix: str, connect
         "database.password": parsed["password"],
         "database.dbname": parsed["database"],
         "topic.prefix": topic_prefix,
-        "table.include.list": _build_table_include_list(
-            "informix", tables, parsed["database"]
-        ),
         "snapshot.mode": "initial",
     }
+    if table_include:
+        config["table.include.list"] = table_include
     config.update(_common_converter_config())
     config.update(_schema_history_config(parsed["database"]))
     return config

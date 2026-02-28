@@ -37,6 +37,28 @@ except ImportError:
     pymssql = None  # type: ignore[assignment]
 
 try:
+    import oracledb
+except ImportError:
+    oracledb = None  # type: ignore[assignment]
+
+try:
+    import ibm_db_dbi
+except ImportError:
+    ibm_db_dbi = None  # type: ignore[assignment]
+
+try:
+    from cassandra.cluster import Cluster as CassandraCluster
+    from cassandra.auth import PlainTextAuthProvider as CassandraPlainTextAuthProvider
+except ImportError:
+    CassandraCluster = None  # type: ignore[assignment]
+    CassandraPlainTextAuthProvider = None  # type: ignore[assignment]
+
+try:
+    from google.cloud import spanner as gcp_spanner
+except ImportError:
+    gcp_spanner = None  # type: ignore[assignment]
+
+try:
     import requests
 except ImportError:
     requests = None  # type: ignore[assignment]
@@ -654,6 +676,14 @@ def _fuzzy_match_table(table_name: str, threshold: int = 75) -> Optional[str]:
         return matches[0] if matches else None
 
 
+# Named constants used inside discover_and_match_db_tables
+# VTGate exposes two ports: the gRPC CDC port (used by Debezium) and the
+# MySQL-compatible query port (used by pymysql for table discovery).
+_VITESS_GRPC_PORT = 15991
+# Informix systables rows with tabid < 100 are internal system tables.
+_INFORMIX_SYSTEM_TABLE_MIN_ID = 100
+
+
 def discover_and_match_db_tables(db_uri: str, timeout: int = 10) -> List[str]:
     """
     Connect to the database, list all tables/collections accessible to the
@@ -664,8 +694,21 @@ def discover_and_match_db_tables(db_uri: str, timeout: int = 10) -> List[str]:
     These are passed directly to Debezium for CDC capture; the mapping layer
     handles the canonical name translation during streaming.
 
-    Supported databases: PostgreSQL, MySQL, MariaDB, MongoDB, SQL Server.
-    For other databases the function returns an empty list (safe fallback).
+    Supported databases (all 11 that Debezium supports):
+    - PostgreSQL   (psycopg2)
+    - MySQL        (pymysql)
+    - MariaDB      (pymysql)
+    - MongoDB      (pymongo)
+    - SQL Server   (pymssql)
+    - Oracle       (oracledb thin mode)
+    - Db2          (ibm_db_dbi)
+    - Vitess       (pymysql via VTGate MySQL port)
+    - Google Spanner (google-cloud-spanner)
+    - Informix     (ibm_db_dbi)
+    - Cassandra    (cassandra-driver)
+
+    When a required driver is not installed, the branch is skipped and an
+    empty list is returned (safe best-effort fallback).
     """
     try:
         parsed = urlparse(db_uri)
@@ -747,6 +790,116 @@ def discover_and_match_db_tables(db_uri: str, timeout: int = 10) -> List[str]:
                 discovered = [row[0] for row in cursor.fetchall()]
                 cursor.close()
                 conn.close()
+
+        elif db_type == "oracle":
+            # oracledb thin mode works without Oracle Instant Client
+            if oracledb is not None:
+                port = port or 1521
+                conn = oracledb.connect(
+                    user=username, password=password,
+                    dsn=f"{hostname}:{port}/{database}",
+                )
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT TABLE_NAME FROM ALL_TABLES WHERE OWNER = :1",
+                    [username.upper()],
+                )
+                discovered = [row[0].lower() for row in cursor.fetchall()]
+                cursor.close()
+                conn.close()
+
+        elif db_type == "db2":
+            # ibm_db_dbi is the official IBM Python driver for Db2
+            if ibm_db_dbi is not None:
+                port = port or 50000
+                dsn = (
+                    f"DATABASE={database};HOSTNAME={hostname};PORT={port};"
+                    f"PROTOCOL=TCPIP;UID={username};PWD={password};"
+                )
+                conn = ibm_db_dbi.connect(dsn, "", "")
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT TABNAME FROM SYSCAT.TABLES "
+                    "WHERE TYPE = 'T' AND TABSCHEMA = CURRENT SCHEMA"
+                )
+                discovered = [row[0].lower() for row in cursor.fetchall()]
+                cursor.close()
+                conn.close()
+
+        elif db_type == "vitess":
+            # VTGate exposes a MySQL-compatible interface on its mysql port
+            # (default 3306); the Debezium gRPC port (_VITESS_GRPC_PORT) is separate.
+            if pymysql is not None:
+                mysql_port = port if (port and port != _VITESS_GRPC_PORT) else 3306
+                conn = pymysql.connect(
+                    host=hostname, port=mysql_port,
+                    user=username or "", password=password or "",
+                    database=database, connect_timeout=timeout,
+                )
+                cursor = conn.cursor()
+                cursor.execute("SHOW TABLES")
+                discovered = [row[0] for row in cursor.fetchall()]
+                cursor.close()
+                conn.close()
+
+        elif db_type == "spanner":
+            # google-cloud-spanner SDK; requires GOOGLE_APPLICATION_CREDENTIALS
+            if gcp_spanner is not None:
+                path_parts = parsed.path.strip("/").split("/")
+                project_id = parsed.hostname or ""
+                instance_id = path_parts[0] if len(path_parts) > 0 else ""
+                database_id = path_parts[1] if len(path_parts) > 1 else ""
+                client = gcp_spanner.Client(project=project_id)
+                instance = client.instance(instance_id)
+                db_obj = instance.database(database_id)
+                with db_obj.snapshot() as snapshot:
+                    results = snapshot.execute_sql(
+                        "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
+                        "WHERE TABLE_SCHEMA = ''"
+                    )
+                    discovered = [row[0].lower() for row in results]
+
+        elif db_type == "informix":
+            # ibm_db_dbi supports Informix via IBM CLI/DRDA as well as Db2
+            if ibm_db_dbi is not None:
+                port = port or 9088
+                dsn = (
+                    f"DATABASE={database};HOSTNAME={hostname};PORT={port};"
+                    f"PROTOCOL=TCPIP;UID={username};PWD={password};"
+                )
+                conn = ibm_db_dbi.connect(dsn, "", "")
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT tabname FROM systables "
+                    f"WHERE tabtype = 'T' AND tabid >= {_INFORMIX_SYSTEM_TABLE_MIN_ID}"
+                )
+                discovered = [row[0].lower() for row in cursor.fetchall()]
+                cursor.close()
+                conn.close()
+
+        elif db_type == "cassandra":
+            # cassandra-driver lists table names from cluster metadata
+            if CassandraCluster is not None:
+                port = port or 9042
+                keyspace = database if database else None
+                auth = None
+                if username:
+                    auth = CassandraPlainTextAuthProvider(
+                        username=username, password=password or "",
+                    )
+                cluster = CassandraCluster(
+                    [hostname], port=port,
+                    auth_provider=auth,
+                    connect_timeout=timeout,
+                )
+                try:
+                    cluster.connect()
+                    if keyspace and keyspace in cluster.metadata.keyspaces:
+                        discovered = list(
+                            cluster.metadata.keyspaces[keyspace].tables.keys()
+                        )
+                finally:
+                    cluster.shutdown()
 
         # Filter to tables whose names match the canonical schema
         matched = [t for t in discovered if _fuzzy_match_table(t) is not None]
