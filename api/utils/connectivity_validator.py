@@ -195,10 +195,24 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                 sep = '&' if query_str else '?'
                 uris_to_try.append(f"{db_uri}{sep}authSource=admin")
 
+            # Use directConnection=True for standard mongodb:// URIs so that
+            # pymongo connects straight to the specified host without attempting
+            # replica-set member discovery.  RS members' internal hostnames are
+            # often unreachable from the application network, which would
+            # otherwise cause ServerSelectionTimeoutError even when the target
+            # host is reachable and credentials are correct.
+            # SRV URIs handle topology discovery differently, so directConnection
+            # is only applied to non-SRV connections.
+            direct = db_type == 'mongodb'
+
             last_failure = None
             for uri in uris_to_try:
                 try:
-                    client = MongoClient(uri, serverSelectionTimeoutMS=timeout * 1000)
+                    client = MongoClient(
+                        uri,
+                        serverSelectionTimeoutMS=timeout * 1000,
+                        directConnection=direct,
+                    )
                     client[target_db].list_collection_names()
                     client.close()
                     return True, f"Successfully connected to MongoDB database at {location}"
@@ -206,8 +220,9 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                     last_failure = 'auth'
                     continue
                 except ServerSelectionTimeoutError:
-                    # After TCP confirmation (non-SRV), SSTE means an auth/TLS
-                    # issue; for SRV it may be a connectivity problem.
+                    # With directConnection=True the TCP check already confirmed
+                    # reachability, so SSTE here means auth/TLS rejected the
+                    # connection.  For SRV URIs the cause is ambiguous.
                     last_failure = 'auth' if db_type == 'mongodb' else 'connect'
                     continue
                 except MongoConfigurationError as e:
