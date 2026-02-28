@@ -23,6 +23,7 @@ from typing import Tuple
 # Core dependencies (should always be available)
 import psycopg2
 from pymongo import MongoClient
+from pymongo.errors import ServerSelectionTimeoutError, OperationFailure, ConfigurationError as MongoConfigurationError
 
 # Optional dependencies - import conditionally
 try:
@@ -157,34 +158,33 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
         # MongoDB
         elif db_type in ['mongodb', 'mongodb+srv']:
             port = port or 27017
+            # Human-readable location for error messages
+            location = hostname if db_type == 'mongodb+srv' else f"{hostname}:{port}"
             try:
-                # For MongoDB, construct connection string differently
-                if db_type == 'mongodb+srv':
-                    # SRV connection string
-                    if username and password:
-                        mongo_uri = f"mongodb+srv://{username}:{password}@{hostname}/{database if database else ''}"
-                    else:
-                        mongo_uri = f"mongodb+srv://{hostname}/{database if database else ''}"
-                else:
-                    # Standard connection
-                    if username and password:
-                        mongo_uri = f"mongodb://{username}:{password}@{hostname}:{port}/{database if database else ''}"
-                    else:
-                        mongo_uri = f"mongodb://{hostname}:{port}/{database if database else ''}"
-                    
-                client = MongoClient(mongo_uri, serverSelectionTimeoutMS=timeout * 1000)
-                # Test connection by listing databases
-                client.server_info()
+                # Use the original URI directly so that query parameters such as
+                # authSource, replicaSet, tls, etc. are preserved.  Reconstructing
+                # the URI from parsed components silently drops those params.
+                client = MongoClient(db_uri, serverSelectionTimeoutMS=timeout * 1000)
+                # ping requires authentication on secured servers; it is a
+                # lightweight command that reliably tests both connectivity and
+                # credentials (unlike buildInfo which is public in MongoDB < 5).
+                client.admin.command('ping')
                 client.close()
-                return True, f"Successfully connected to MongoDB database at {hostname}:{port}"
+                return True, f"Successfully connected to MongoDB database at {location}"
+            except OperationFailure:
+                return False, f"Authentication failed for MongoDB at {location}. Check username and password."
+            except ServerSelectionTimeoutError as e:
+                error_msg = str(e)
+                if "authentication failed" in error_msg.lower() or "auth failed" in error_msg.lower():
+                    return False, f"Authentication failed for MongoDB at {location}. Check username and password."
+                return False, f"Cannot connect to MongoDB at {location}. Server may be down or unreachable."
+            except MongoConfigurationError as e:
+                return False, f"MongoDB configuration error: {str(e)}"
             except Exception as e:
                 error_msg = str(e)
-                if "authentication failed" in error_msg.lower():
-                    return False, f"Authentication failed for MongoDB at {hostname}:{port}. Check username and password."
-                elif "connection refused" in error_msg.lower() or "timeout" in error_msg.lower():
-                    return False, f"Cannot connect to MongoDB at {hostname}:{port}. Server may be down or unreachable."
-                else:
-                    return False, f"MongoDB connection error: {error_msg}"
+                if "authentication failed" in error_msg.lower() or "auth failed" in error_msg.lower():
+                    return False, f"Authentication failed for MongoDB at {location}. Check username and password."
+                return False, f"MongoDB connection error: {error_msg}"
                     
         # SQL Server
         elif db_type in ['mssql', 'sqlserver']:
