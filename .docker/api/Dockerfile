@@ -19,6 +19,7 @@ COPY ./mapping /app/mapping
 COPY ./transformation /app/transformation
 COPY ./analysis /app/analysis
 COPY ./machine-learning /app/machine-learning
+COPY ./deprecated_sql /app/schema
 
 # Change ownership while still root
 RUN chown -R appuser:appuser /app
