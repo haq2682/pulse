@@ -300,7 +300,6 @@ services:
       - "9042:9042"
     volumes:
       - cassandra_data:/var/lib/cassandra
-      - cassandra_commitlog:/var/lib/cassandra/commitlog
     networks:
       spark-network:
         ipv4_address: 10.5.0.55
@@ -314,7 +313,7 @@ services:
   # ─────────────────────────────────────────────────────────────────────────
   # Debezium Server — Cassandra CDC connector (separate from the Kafka Connect
   # debezium service; the Cassandra connector reads commit log files directly
-  # from the shared cassandra_commitlog volume)
+  # from the shared cassandra_data volume (read-only))
   # ─────────────────────────────────────────────────────────────────────────
   debezium-cassandra:
     image: quay.io/debezium/server:3.4
@@ -323,7 +322,7 @@ services:
       - cassandra
       - kafka
     volumes:
-      - cassandra_commitlog:/cassandra/commitlog
+      - cassandra_data:/var/lib/cassandra:ro
       - ./conf/debezium-cassandra.properties:/debezium/conf/application.properties
     networks:
       spark-network:
@@ -576,4 +575,3 @@ volumes:
   nifi_data:
   airflow_logs:
   cassandra_data:
-  cassandra_commitlog:
