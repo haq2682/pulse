@@ -18,7 +18,7 @@ Supports all Debezium-compatible databases:
 import socket
 import ipaddress
 from urllib.parse import urlparse
-from typing import Tuple
+from typing import List, Optional, Tuple
 
 # Core dependencies (should always be available)
 import psycopg2
@@ -543,3 +543,221 @@ def validate_api_endpoint(api_url: str, timeout: int = 10) -> Tuple[bool, str]:
             
     except Exception as e:
         return False, f"Error validating API endpoint: {str(e)}"
+
+
+# ---------------------------------------------------------------------------
+# Table auto-discovery helpers
+# ---------------------------------------------------------------------------
+
+# Canonical e-commerce schema tables (mirrors mapping/utils/table_mapper.py)
+_CANONICAL_TABLES = [
+    "addresses", "cart_items", "categories", "customer_sessions",
+    "customers", "inventory", "marketing_campaigns", "order_items",
+    "orders", "payments", "products", "reviews", "shopping_cart",
+    "suppliers", "wishlist",
+]
+
+# Synonym map for common naming variations (mirrors mapping/utils/table_mapper.py)
+_TABLE_SYNONYMS = {
+    "customers": "customers", "customer": "customers", "users": "customers",
+    "user": "customers", "clients": "customers", "client": "customers",
+    "addresses": "addresses", "address": "addresses",
+    "locations": "addresses", "location": "addresses",
+    "products": "products", "product": "products", "items": "products",
+    "item": "products", "catalog": "products",
+    "inventories": "inventory", "inventory": "inventory",
+    "stock": "inventory", "stocks": "inventory",
+    "orders": "orders", "order": "orders", "sales": "orders", "sale": "orders",
+    "order_items": "order_items", "orderitems": "order_items",
+    "order_item": "order_items", "line_items": "order_items",
+    "lineitems": "order_items",
+    "reviews": "reviews", "review": "reviews", "ratings": "reviews",
+    "rating": "reviews", "feedback": "reviews",
+    "categories": "categories", "category": "categories",
+    "wishlists": "wishlist", "wishlist": "wishlist",
+    "favorites": "wishlist", "favourites": "wishlist", "favourite": "wishlist",
+    "payments": "payments", "payment": "payments",
+    "billing": "payments", "invoices": "payments", "invoice": "payments",
+    "shopping_carts": "shopping_cart", "shopping_cart": "shopping_cart",
+    "cart": "shopping_cart", "carts": "shopping_cart",
+    "basket": "shopping_cart", "baskets": "shopping_cart",
+    "cart_items": "cart_items", "cartitems": "cart_items",
+    "cart_item": "cart_items", "shopping_cart_items": "cart_items",
+    "basket_items": "cart_items",
+    "customer_sessions": "customer_sessions", "sessions": "customer_sessions",
+    "session": "customer_sessions", "user_sessions": "customer_sessions",
+    "marketing_campaigns": "marketing_campaigns",
+    "campaigns": "marketing_campaigns", "campaign": "marketing_campaigns",
+    "promotions": "marketing_campaigns", "promotion": "marketing_campaigns",
+    "suppliers": "suppliers", "supplier": "suppliers",
+    "vendors": "suppliers", "vendor": "suppliers",
+    "partners": "suppliers", "partner": "suppliers",
+}
+
+
+def _fuzzy_match_table(table_name: str, threshold: int = 75) -> Optional[str]:
+    """
+    Map a remote table name to a canonical schema table name.
+
+    Tries (in order):
+    1. Exact match against canonical tables
+    2. Synonym lookup
+    3. Word-boundary split (e.g. "ecommerce_orders" → "orders")
+    4. Rapidfuzz ratio / token_set_ratio similarity
+    5. Difflib fallback if rapidfuzz is unavailable
+
+    Returns the canonical name, or None if no match exceeds the threshold.
+    """
+    if not table_name:
+        return None
+    normalized = table_name.lower().strip()
+
+    # 1. Exact match
+    if normalized in _CANONICAL_TABLES:
+        return normalized
+
+    # 2. Synonym lookup
+    if normalized in _TABLE_SYNONYMS:
+        return _TABLE_SYNONYMS[normalized]
+
+    # 3. Word-boundary split: "ecommerce_orders" → ["ecommerce", "orders"]
+    #    Match each word-part against canonical tables and synonyms.
+    #    Parts shorter than 3 characters (e.g. "id", "no") are too ambiguous to match.
+    parts = [p for p in normalized.replace("-", "_").split("_") if len(p) >= 3]
+    for part in parts:
+        if part in _CANONICAL_TABLES:
+            return part
+        if part in _TABLE_SYNONYMS:
+            return _TABLE_SYNONYMS[part]
+
+    # 4. Fuzzy matching
+    try:
+        from rapidfuzz import fuzz, process as rfprocess
+        match = rfprocess.extractOne(
+            normalized, _CANONICAL_TABLES,
+            scorer=fuzz.ratio, score_cutoff=threshold,
+        )
+        if match:
+            return match[0]
+        # token_set_ratio handles extra tokens
+        match2 = rfprocess.extractOne(
+            normalized, _CANONICAL_TABLES,
+            scorer=fuzz.token_set_ratio, score_cutoff=threshold,
+        )
+        return match2[0] if match2 else None
+    except ImportError:
+        # difflib cutoff is in [0, 1] range; threshold is in [0, 100]
+        import difflib
+        matches = difflib.get_close_matches(
+            normalized, _CANONICAL_TABLES, n=1, cutoff=threshold / 100.0,
+        )
+        return matches[0] if matches else None
+
+
+def discover_and_match_db_tables(db_uri: str, timeout: int = 10) -> List[str]:
+    """
+    Connect to the database, list all tables/collections accessible to the
+    user, and return those whose names fuzzy-match the canonical e-commerce
+    schema.
+
+    The returned list contains the **original remote names** (not canonical).
+    These are passed directly to Debezium for CDC capture; the mapping layer
+    handles the canonical name translation during streaming.
+
+    Supported databases: PostgreSQL, MySQL, MariaDB, MongoDB, SQL Server.
+    For other databases the function returns an empty list (safe fallback).
+    """
+    try:
+        parsed = urlparse(db_uri)
+        db_type = parsed.scheme.lower()
+        hostname = parsed.hostname
+        port = parsed.port
+        username = parsed.username
+        password = parsed.password
+        database = parsed.path.lstrip("/").split("?")[0] if parsed.path else ""
+
+        discovered: List[str] = []
+
+        if db_type in ("postgresql", "postgres"):
+            port = port or 5432
+            conn = psycopg2.connect(
+                host=hostname, port=port,
+                user=username, password=password,
+                database=database, connect_timeout=timeout,
+            )
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+            )
+            discovered = [row[0] for row in cursor.fetchall()]
+            cursor.close()
+            conn.close()
+
+        elif db_type in ("mongodb", "mongodb+srv"):
+            port = port or 27017
+            target_db = database if database else "admin"
+            direct = db_type == "mongodb"
+            query_str = parsed.query.lower() if parsed.query else ""
+            has_authsource = "authsource" in query_str
+            uris_to_try = [db_uri]
+            if not has_authsource and direct:
+                sep = "&" if query_str else "?"
+                uris_to_try.append(f"{db_uri}{sep}authSource=admin")
+            for uri in uris_to_try:
+                try:
+                    client = MongoClient(
+                        uri,
+                        serverSelectionTimeoutMS=timeout * 1000,
+                        directConnection=direct,
+                    )
+                    discovered = client[target_db].list_collection_names()
+                    client.close()
+                    break
+                except Exception:
+                    continue
+
+        elif db_type in ("mysql", "mariadb"):
+            if pymysql is not None:
+                port = port or 3306
+                conn = pymysql.connect(
+                    host=hostname, port=port,
+                    user=username, password=password,
+                    database=database, connect_timeout=timeout,
+                )
+                cursor = conn.cursor()
+                cursor.execute("SHOW TABLES")
+                discovered = [row[0] for row in cursor.fetchall()]
+                cursor.close()
+                conn.close()
+
+        elif db_type in ("mssql", "sqlserver"):
+            if pymssql is not None:
+                port = port or 1433
+                conn = pymssql.connect(
+                    server=hostname, port=str(port),
+                    user=username, password=password,
+                    database=database, timeout=timeout,
+                )
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT table_name FROM information_schema.tables "
+                    "WHERE table_type = 'BASE TABLE'"
+                )
+                discovered = [row[0] for row in cursor.fetchall()]
+                cursor.close()
+                conn.close()
+
+        # Filter to tables whose names match the canonical schema
+        matched = [t for t in discovered if _fuzzy_match_table(t) is not None]
+        return matched
+
+    except Exception as exc:
+        # Discovery is best-effort; never let it block the pipeline start.
+        # Log at WARNING so operators can diagnose issues without a crash.
+        import logging as _logging
+        _logging.getLogger("pulse").warning(
+            "db_table_discovery: auto-discovery failed for %s: %s",
+            urlparse(db_uri).hostname, exc,
+        )
+        return []
