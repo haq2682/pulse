@@ -1,269 +1,134 @@
 # Production Ingestion Setup Guide
 
-Step-by-step guide for setting up **API mode** and **Database URI (CDC) mode** ingestion.
+Everything in the stack is pre-configured. This guide only lists what you must
+do manually **on your source system** before triggering a pipeline.
 
 ---
 
-## Table of Contents
+## 1. Before Starting the Stack
 
-1. [What's Already Pre-configured](#1-whats-already-pre-configured)
-2. [Database-Specific Setup](#2-database-specific-setup)
-3. [API Mode Ingestion](#3-api-mode-ingestion)
-4. [Triggering the Pipelines](#4-triggering-the-pipelines)
-5. [Monitoring & Operations](#5-monitoring--operations)
-6. [Security Hardening Checklist](#6-security-hardening-checklist)
+Set these in `.env`:
 
----
+```env
+DEBEZIUM_PASSWORD=<strong_password>   # creates debezium_user on Pulse's PostgreSQL
+```
 
-## 1. What's Already Pre-configured
+If you use Oracle or Spanner, also place the following files (they are mounted
+into the Debezium container by `docker-compose.yml`):
 
-The following are handled automatically by `docker-compose.yml` and init
-scripts — **no manual action needed** for these:
-
-| What | How |
+| File | Source |
 |---|---|
-| PostgreSQL WAL logical replication | `POSTGRESQL_WAL_LEVEL=logical` in `docker-compose.yml` |
-| `debezium_user` on Pulse PostgreSQL | `sql/create_debezium_user.sh` runs on first container start; password from `DEBEZIUM_PASSWORD` in `.env` (default: `debezium_changeme`) |
-| Cassandra CDC service | `cassandra` + `debezium-cassandra` services already defined in `docker-compose.yml`; commit-log volume shared automatically |
-| Cassandra connector config | `conf/debezium-cassandra.properties` already mounted into the `debezium-cassandra` container |
-| Debezium connectors installed | All connectors (PostgreSQL, MySQL, MariaDB, MongoDB, SQL Server, Oracle, Db2, Vitess, Spanner, Informix) are installed in `.docker/debezium/Dockerfile` |
-
-**Two files you must place manually before starting the stack** (only if you
-use those sources):
-
-| File | Required for | Where to place |
-|---|---|---|
-| `ojdbc8.jar` | Oracle CDC | `./jars/ojdbc8.jar` |
-| `gcp-credentials.json` | Spanner CDC | `./jars/gcp-credentials.json` |
-
-These are mounted into the `debezium` container by `docker-compose.yml`.
-Download `ojdbc8.jar` from
-https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html.
+| `./jars/ojdbc8.jar` | https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html |
+| `./jars/gcp-credentials.json` | Your GCP service-account key |
 
 ---
 
-## 2. Database-Specific Setup
+## 2. Source Database Setup
 
-### 2.1 Pulse's Own PostgreSQL (Internal)
+Only needed for **external** databases. Skip this section if you are only
+ingesting from Pulse's own PostgreSQL (already configured automatically).
 
-The `debezium_user` is created automatically with `REPLICATION` login and
-`SELECT` on all public tables. Nothing to do except set `DEBEZIUM_PASSWORD` in
-`.env` before the first `docker compose up`.
-
-If you need to monitor only specific tables you can create a scoped publication
-(connect to the `pulse` database):
+### PostgreSQL (external)
 
 ```sql
-CREATE PUBLICATION debezium_pub
-  FOR TABLE orders, customers, products, payments, inventory;
-```
-
-Monitor replication slots to avoid unbounded disk growth:
-
-```sql
-SELECT slot_name, active,
-       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS lag
-FROM   pg_replication_slots;
-
--- Drop a slot when Debezium is stopped for an extended period:
-SELECT pg_drop_replication_slot('slot_name');
-```
-
-### 2.2 External PostgreSQL
-
-On the external server, run once as superuser:
-
-```sql
--- Enable logical replication (restart required if changing wal_level)
+-- Run on the external server as superuser, then restart PostgreSQL
 ALTER SYSTEM SET wal_level = logical;
 
--- Create a least-privilege replication user
-CREATE USER debezium_user
-  WITH REPLICATION LOGIN
-  PASSWORD 'REPLACE_WITH_STRONG_PASSWORD';
+-- Create the replication user
+CREATE USER debezium_user WITH REPLICATION LOGIN PASSWORD '<password>';
 
--- Per database: grant access and create a publication
-\c your_database
+-- Per database you want to monitor:
+\c <your_database>
 GRANT USAGE ON SCHEMA public TO debezium_user;
-GRANT SELECT ON TABLE orders, customers, products, payments, inventory TO debezium_user;
-CREATE PUBLICATION debezium_pub
-  FOR TABLE orders, customers, products, payments, inventory;
+GRANT SELECT ON TABLE <table1>, <table2> TO debezium_user;
+CREATE PUBLICATION debezium_pub FOR TABLE <table1>, <table2>;
 ```
 
-Verify:
-
-```bash
-psql "postgresql://debezium_user:REPLACE_WITH_STRONG_PASSWORD@<host>:5432/<database>" \
-  -c "SELECT current_setting('wal_level');"
-# Expected: logical
-```
-
-Connection URI format:
-
-```
-postgresql://debezium_user:REPLACE_WITH_STRONG_PASSWORD@<host>:5432/<database>
-# With TLS:
-postgresql://debezium_user:REPLACE_WITH_STRONG_PASSWORD@<host>:5432/<database>?sslmode=require
-```
-
-### 2.3 MongoDB
-
-MongoDB must run as a **replica set** (required for change streams).
-Initialize a single-node replica set if your instance is standalone:
+### MongoDB
 
 ```javascript
-// mongosh
+// Initialize a replica set if your instance is standalone
 rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "localhost:27017" }] })
-rs.status()  // state should be PRIMARY
-```
 
-Create a least-privilege Debezium user:
-
-```javascript
+// Create a least-privilege user
 use admin
 db.createUser({
-  user: "debezium",
-  pwd: "REPLACE_WITH_STRONG_PASSWORD",
+  user: "debezium", pwd: "<password>",
   roles: [
-    { role: "read",           db: "YOUR_DATABASE" },
-    { role: "read",           db: "local"          },
-    { role: "clusterMonitor", db: "admin"          }
+    { role: "read",           db: "<your_database>" },
+    { role: "read",           db: "local" },
+    { role: "clusterMonitor", db: "admin" }
   ]
 })
 ```
 
-Connection URI format:
+### MySQL / MariaDB
 
-```
-mongodb://debezium:REPLACE_WITH_STRONG_PASSWORD@<host>:27017/<database>?authSource=admin&replicaSet=rs0
-# With TLS:
-mongodb://debezium:REPLACE_WITH_STRONG_PASSWORD@<host>:27017/<database>?authSource=admin&replicaSet=rs0&tls=true
-```
-
-### 2.4 MySQL / MariaDB
-
-Enable binary logging on the server (`my.cnf`):
+Add to `my.cnf` and restart MySQL:
 
 ```ini
 [mysqld]
-server-id         = 1
-log_bin           = mysql-bin
-binlog_format     = ROW
-binlog_row_image  = FULL
+server-id        = 1
+log_bin          = mysql-bin
+binlog_format    = ROW
+binlog_row_image = FULL
 ```
 
-Create a user:
-
 ```sql
-CREATE USER 'debezium'@'%' IDENTIFIED BY 'REPLACE_WITH_STRONG_PASSWORD';
+CREATE USER 'debezium'@'%' IDENTIFIED BY '<password>';
 GRANT SELECT, RELOAD, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'debezium'@'%';
 FLUSH PRIVILEGES;
 ```
 
-Connection URI format:
+### Cassandra
 
+Edit `conf/debezium-cassandra.properties` (already mounted into the container):
+
+```properties
+debezium.source.cassandra.password=<password>
+debezium.source.cassandra.keyspace=<your_keyspace>
 ```
-mysql://debezium:REPLACE_WITH_STRONG_PASSWORD@<host>:3306/<database>
-mariadb://debezium:REPLACE_WITH_STRONG_PASSWORD@<host>:3306/<database>
-```
 
-### 2.5 Cassandra
-
-The `cassandra` and `debezium-cassandra` services are already defined in
-`docker-compose.yml`. You only need to:
-
-1. Edit `conf/debezium-cassandra.properties` and set:
-   - `debezium.source.cassandra.password=YOUR_PASSWORD`
-   - `debezium.source.cassandra.keyspace=YOUR_KEYSPACE`
-
-2. After starting the stack, enable CDC on each table you want to capture:
+After starting the stack, enable CDC on each table you want to capture:
 
 ```cql
--- cqlsh
-ALTER TABLE your_keyspace.orders   WITH cdc = true;
-ALTER TABLE your_keyspace.payments WITH cdc = true;
+ALTER TABLE <your_keyspace>.<table> WITH cdc = true;
 ```
 
-### 2.6 Oracle
+### SQL Server
 
-Place `ojdbc8.jar` at `./jars/ojdbc8.jar` before starting the stack (see §1).
-No other manual steps — the connector JARs are already in the Debezium image.
+Enable CDC on the database and each table you want to monitor:
 
-Connection URI format:
-
-```
-oracle://debezium:REPLACE_WITH_STRONG_PASSWORD@<host>:1521/<service_name>
+```sql
+EXEC sys.sp_cdc_enable_db;
+EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = '<table>', @role_name = NULL;
 ```
 
-### 2.7 Google Spanner
+### Oracle
 
-Place your service-account `gcp-credentials.json` at `./jars/gcp-credentials.json`
-before starting the stack (see §1). Create a change stream on the Spanner database:
+Place `./jars/ojdbc8.jar` (see §1). No other changes needed in this repo.
+
+### Google Spanner
+
+Place `./jars/gcp-credentials.json` (see §1), then create a change stream:
 
 ```sql
 CREATE CHANGE STREAM pulse_change_stream FOR ALL;
 ```
 
-Connection URI format:
+### IBM Db2 / Vitess / Informix
 
-```
-spanner://projects/<project>/instances/<instance>/databases/<database>
-```
-
----
-
-## 3. API Mode Ingestion
-
-API mode polls an HTTP endpoint every N seconds and feeds data to Kafka.
-
-### 3.1 Pulse's Built-in Ingest Endpoint
-
-The API container exposes `GET /ingest/stream` at `http://10.5.0.9:8000`.
-
-**Query parameters:**
-
-| Parameter     | Required | Description |
-|---|---|---|
-| `business_id` | Yes | MinIO bucket name (e.g. `pulse-bucket-1`) |
-| `since`       | No  | ISO-8601 datetime — only return newer files |
-| `limit`       | No  | Max records per table per poll (default 500) |
-
-**Response format:**
-
-```json
-{
-  "tables": [
-    { "table_name": "orders",    "data": [ { "order_id": "101", ... } ] },
-    { "table_name": "customers", "data": [ { "customer_id": "C1", ... } ] }
-  ]
-}
-```
-
-Returns `{ "tables": [] }` when there are no new files.
-
-Each file is served exactly once (Redis tracks served keys at
-`ingest_stream:{business_id}:served`). To re-serve all files:
-
-```bash
-docker exec redis redis-cli DEL "ingest_stream:pulse-bucket-1:served"
-```
-
-### 3.2 External API Endpoint
-
-Any external API can be used as the source as long as it returns the same
-format shown above. Pass its URL as `api_url` when triggering the DAG.
-Table name aliases (`users` → `customers`, `transactions` → `payments`, etc.)
-are resolved automatically.
+Enable the database-side CDC feature (SQL Replication for Db2, VStream gRPC
+for Vitess, CDC API for Informix) according to the Debezium documentation for
+that connector. No changes needed in this repo.
 
 ---
 
-## 4. Triggering the Pipelines
+## 3. Trigger the Pipelines
 
-> **Airflow UI**: `http://localhost:8090`  
-> **Airflow REST API**: `http://localhost:8090/api/v1/...`  
-> Default credentials: `admin` / `admin` — change these before going live.
+> Airflow UI: `http://localhost:8090` — default credentials `admin` / `admin`
 
-### 4.1 API Mode
+### API mode
 
 ```bash
 curl -s -X POST "http://localhost:8090/api/v1/dags/api_streaming/dagRuns" \
@@ -278,26 +143,10 @@ curl -s -X POST "http://localhost:8090/api/v1/dags/api_streaming/dagRuns" \
   }'
 ```
 
-For an external API, replace `api_url` with the external URL.
+Use any external API URL in `api_url` as long as it returns
+`{ "tables": [ { "table_name": "...", "data": [...] } ] }`.
 
-### 4.2 Database URI Mode
-
-**PostgreSQL example:**
-
-```bash
-curl -s -X POST "http://localhost:8090/api/v1/dags/db_streaming/dagRuns" \
-  -H "Content-Type: application/json" \
-  -u "admin:admin" \
-  -d '{
-    "conf": {
-      "bucket":    "pulse-bucket-1",
-      "db_uri":    "postgresql://debezium_user:REPLACE_WITH_STRONG_PASSWORD@<host>:5432/<database>",
-      "db_tables": "orders,customers,products,payments,inventory"
-    }
-  }'
-```
-
-**MongoDB example:**
+### Database URI mode
 
 ```bash
 curl -s -X POST "http://localhost:8090/api/v1/dags/db_streaming/dagRuns" \
@@ -306,110 +155,24 @@ curl -s -X POST "http://localhost:8090/api/v1/dags/db_streaming/dagRuns" \
   -d '{
     "conf": {
       "bucket":    "pulse-bucket-1",
-      "db_uri":    "mongodb://debezium:REPLACE_WITH_STRONG_PASSWORD@<host>:27017/<database>?authSource=admin&replicaSet=rs0",
+      "db_uri":    "<scheme>://<user>:<password>@<host>:<port>/<database>",
       "db_tables": "orders,customers,products"
     }
   }'
 ```
 
-### 4.3 Supported URI Schemes
-
-| Scheme | Database | Manual prerequisite |
-|---|---|---|
-| `postgresql://` | PostgreSQL | WAL logical + publication (automated for internal DB) |
-| `mysql://`      | MySQL      | Binlog ROW format enabled |
-| `mariadb://`    | MariaDB    | Binlog ROW format enabled |
-| `mongodb://`    | MongoDB    | Replica set initialised |
-| `mssql://`      | SQL Server | CDC enabled on tables |
-| `oracle://`     | Oracle     | `ojdbc8.jar` in `./jars/` |
-| `db2://`        | IBM Db2    | SQL Replication enabled |
-| `cassandra://`  | Cassandra  | CDC per table + `conf/debezium-cassandra.properties` updated |
-| `vitess://`     | Vitess     | VStream gRPC enabled |
-| `spanner://`    | Spanner    | Change stream created + `gcp-credentials.json` in `./jars/` |
-| `informix://`   | Informix   | CDC API enabled |
+Supported schemes: `postgresql://`, `mysql://`, `mariadb://`, `mongodb://`,
+`mssql://`, `oracle://`, `db2://`, `cassandra://`, `vitess://`, `spanner://`,
+`informix://`
 
 ---
 
-## 5. Monitoring & Operations
+## 4. Security Checklist
 
-### 5.1 Verify Kafka Topics Are Receiving Data
-
-```bash
-docker exec kafka kafka-console-consumer \
-  --bootstrap-server localhost:9092 \
-  --topic ecom.orders \
-  --from-beginning \
-  --max-messages 5
-```
-
-### 5.2 Check Debezium Connector Status
-
-```bash
-# List all connectors
-curl -s http://localhost:8083/connectors | jq .
-
-# Check a specific connector
-curl -s http://localhost:8083/connectors/pulse-bucket-1-connector/status | jq .
-# Expected: {"state": "RUNNING", ...}
-
-# Restart a failed connector
-curl -s -X POST http://localhost:8083/connectors/pulse-bucket-1-connector/restart
-```
-
-### 5.3 Monitor Logs
-
-```bash
-# Python pipeline container
-docker logs python --follow --tail=50
-
-# Airflow scheduler
-docker logs airflow-scheduler --follow --tail=30
-```
-
-### 5.4 Check the Ingest Stream Endpoint
-
-```bash
-curl -s "http://localhost:8000/ingest/stream?business_id=pulse-bucket-1" \
-  | jq '.tables | map({table: .table_name, rows: (.data | length)})'
-```
-
-### 5.5 Redis State for API Ingest Stream
-
-```bash
-# Files served so far
-docker exec redis redis-cli SCARD "ingest_stream:pulse-bucket-1:served"
-
-# Reset (re-serve all files on next poll)
-docker exec redis redis-cli DEL "ingest_stream:pulse-bucket-1:served"
-```
-
----
-
-## 6. Security Hardening Checklist
-
-### Credentials
-
-- [ ] Set `DEBEZIUM_PASSWORD` in `.env` to a strong password before first `docker compose up`
-- [ ] Replace default MinIO credentials (`minioadmin`) in `.env`
-- [ ] Replace default Airflow credentials (`admin`/`admin`) after first login
-- [ ] Use a strong `AIRFLOW_FERNET_KEY` and `AIRFLOW_SECRET_KEY` in `.env`
-- [ ] Store database URIs in **Airflow Connections** (`Admin → Connections`), not plain in DAG `conf`
-
-### Network
-
-- [ ] Do **not** expose PostgreSQL (5432), MongoDB (27017), or Kafka (9092) to the public internet
-- [ ] Restrict Debezium REST API (port 8083) to the internal Docker network
-- [ ] Use `sslmode=require` in PostgreSQL URIs and `tls=true` in MongoDB URIs
-
-### Principle of Least Privilege
-
-- [ ] PostgreSQL: `debezium_user` has `REPLICATION LOGIN` and explicit `SELECT` only — not superuser
-- [ ] MongoDB: roles `read` (source db + local) and `clusterMonitor` only — not `root`
-- [ ] Debezium user has **no write permissions** on source databases
-
-### Operational
-
-- [ ] Monitor PostgreSQL replication slots — unconsumed slots cause unbounded disk growth (see §2.1)
-- [ ] Set MongoDB oplog size appropriate to expected change rate (`--oplogSizeMB`)
-- [ ] Set up alerting on Kafka consumer lag for `ecom.*` topics
-- [ ] Enable Airflow email alerts for failed tasks (`email_on_failure=True` in task defaults)
+- [ ] Set strong values for `DEBEZIUM_PASSWORD`, `MINIO_ROOT_PASSWORD`, `AIRFLOW_FERNET_KEY`, `AIRFLOW_SECRET_KEY` in `.env`
+- [ ] Change Airflow default credentials (`admin`/`admin`) after first login
+- [ ] Do **not** expose ports 5432, 27017, 9092, or 8083 to the public internet
+- [ ] Use `sslmode=require` / `tls=true` in database URIs
+- [ ] Grant Debezium users the minimum required privileges only (no write access)
+- [ ] Monitor PostgreSQL replication slots — unused slots cause unbounded WAL growth
+- [ ] Store production database URIs in Airflow Connections (`Admin → Connections`), not in DAG `conf`
