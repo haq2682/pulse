@@ -160,29 +160,44 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
             port = port or 27017
             # Human-readable location for error messages
             location = hostname if db_type == 'mongodb+srv' else f"{hostname}:{port}"
+
+            # Stage 1: For standard (non-SRV) URIs, verify raw TCP reachability first.
+            # This lets us distinguish a true "server down" from an auth failure,
+            # regardless of what text pymongo puts in its exception messages.
+            if db_type == 'mongodb':
+                try:
+                    with socket.create_connection((hostname, port), timeout=timeout):
+                        pass
+                except OSError:
+                    return False, f"Cannot connect to MongoDB at {location}. Server may be down or unreachable."
+
+            # Stage 2: Test authentication.  'ping' is auth-free in all MongoDB
+            # versions (it is an alias for the 'hello' SDAM command).  Use
+            # list_collection_names() on the target database instead — this is a
+            # real application-level command that requires an authenticated
+            # connection.
             try:
-                # Use the original URI directly so that query parameters such as
-                # authSource, replicaSet, tls, etc. are preserved.  Reconstructing
-                # the URI from parsed components silently drops those params.
                 client = MongoClient(db_uri, serverSelectionTimeoutMS=timeout * 1000)
-                # ping requires authentication on secured servers; it is a
-                # lightweight command that reliably tests both connectivity and
-                # credentials (unlike buildInfo which is public in MongoDB < 5).
-                client.admin.command('ping')
+                target_db = database if database else 'admin'
+                client[target_db].list_collection_names()
                 client.close()
                 return True, f"Successfully connected to MongoDB database at {location}"
             except OperationFailure:
                 return False, f"Authentication failed for MongoDB at {location}. Check username and password."
-            except ServerSelectionTimeoutError as e:
-                error_msg = str(e)
-                if "authentication failed" in error_msg.lower() or "auth failed" in error_msg.lower():
+            except ServerSelectionTimeoutError:
+                # For non-SRV URIs TCP was already confirmed reachable above, so a
+                # ServerSelectionTimeoutError here means pymongo could not establish
+                # an authenticated connection (wrong credentials / authSource / TLS).
+                # For SRV URIs we cannot do a prior TCP check, so fall back to the
+                # "cannot connect" message as the cause is ambiguous.
+                if db_type == 'mongodb':
                     return False, f"Authentication failed for MongoDB at {location}. Check username and password."
                 return False, f"Cannot connect to MongoDB at {location}. Server may be down or unreachable."
             except MongoConfigurationError as e:
                 return False, f"MongoDB configuration error: {str(e)}"
             except Exception as e:
                 error_msg = str(e)
-                if "authentication failed" in error_msg.lower() or "auth failed" in error_msg.lower():
+                if "authentication" in error_msg.lower() or "auth" in error_msg.lower():
                     return False, f"Authentication failed for MongoDB at {location}. Check username and password."
                 return False, f"MongoDB connection error: {error_msg}"
                     
