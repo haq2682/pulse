@@ -2,11 +2,49 @@
 
 import os
 import sys
-import findspark
-findspark.init()
+
+# ---------------------------------------------------------------------------
+# JAR paths — baked into the repo at mapping/streaming/jars/ so they are
+# available inside the api container via the ./mapping volume mount at
+# /app/mapping/streaming/jars/ without requiring any image rebuild.
+# ---------------------------------------------------------------------------
+_SPARK_JARS_DIR = "/app/jars"
+_KAFKA_JARS = [
+    f"{_SPARK_JARS_DIR}/spark-sql-kafka-0-10_2.12-3.5.0.jar",
+    f"{_SPARK_JARS_DIR}/spark-token-provider-kafka-0-10_2.12-3.5.0.jar",
+    f"{_SPARK_JARS_DIR}/kafka-clients-3.4.0.jar",
+    f"{_SPARK_JARS_DIR}/commons-pool2-2.11.1.jar",
+]
+_S3_JARS = [
+    f"{_SPARK_JARS_DIR}/hadoop-aws-3.3.4.jar",
+    f"{_SPARK_JARS_DIR}/aws-java-sdk-bundle-1.12.262.jar",
+]
+_ALL_JARS = ",".join(_KAFKA_JARS + _S3_JARS)   # spark.jars / --jars (executors)
+_ALL_JARS_CP = ":".join(_KAFKA_JARS + _S3_JARS)  # classpath separator
+
+# PYSPARK_SUBMIT_ARGS must be set BEFORE pyspark is imported.
+# PySpark's launch_gateway() reads this env var first when spawning the
+# driver JVM — it is the only reliable way to add JARs to the driver
+# classpath when using pip-installed PySpark (as opposed to spark-submit).
+# spark.driver.extraClassPath set in SparkSession.builder can miss because
+# the gateway may have been initialised earlier in the process lifetime.
+if "PYSPARK_SUBMIT_ARGS" not in os.environ:
+    os.environ["PYSPARK_SUBMIT_ARGS"] = (
+        f"--driver-class-path {_ALL_JARS_CP} "
+        f"--jars {_ALL_JARS} "
+        "pyspark-shell"
+    )
+
+# findspark is only needed when Spark is installed as a standalone binary
+# distribution (SPARK_HOME set).  When pyspark is installed via pip it bundles
+# py4j itself and findspark.init() trips over the missing SPARK_HOME/python/lib
+# directory.  Call it only when SPARK_HOME is explicitly configured.
+if os.environ.get("SPARK_HOME"):
+    import findspark
+    findspark.init()
 
 from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import col, from_json, explode, map_keys
+from pyspark.sql.functions import col, explode, map_keys
 from pyspark.sql.types import StructType, StructField, StringType, MapType
 from minio import Minio
 from dotenv import load_dotenv, find_dotenv
@@ -43,12 +81,14 @@ def create_spark_session() -> SparkSession:
         .config("spark.dynamicAllocation.minExecutors", "0")
         .config("spark.dynamicAllocation.maxExecutors", "8")
         .config("spark.dynamicAllocation.initialExecutors", "1")
-        .config(
-            "spark.jars.packages",
-            "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,"
-            "org.apache.hadoop:hadoop-aws:3.3.4,"
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262"
-        )
+        # Use pre-downloaded local JARs instead of spark.jars.packages so that
+        # no Maven/Ivy network resolution is needed at startup.  spark.jars
+        # distributes the files to executors; spark.driver.extraClassPath makes
+        # them available in the driver JVM (this api container) so that
+        # readStream.format("kafka") can locate the data-source provider.
+        .config("spark.jars", _ALL_JARS)
+        .config("spark.driver.extraClassPath", _ALL_JARS_CP)
+        .config("spark.executor.extraClassPath", _ALL_JARS_CP)
         .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
         .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
         .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
@@ -59,52 +99,96 @@ def create_spark_session() -> SparkSession:
 
 def get_canonical_schema() -> StructType:
     """
-    Schema supporting both canonical and Debezium message formats.
-    The operation field is used for database ingestion with CDC support.
+    Output schema for the *normalized* rows produced by normalize_message_row.
+    Used when constructing the normalized DataFrame inside extract_table_dataframes.
+    The Kafka-level parsing is now done entirely in Python (see read_kafka_stream /
+    normalize_message_row) so this schema is no longer used for from_json.
     """
     return StructType([
-        # Canonical format fields
         StructField("source_type", StringType(), True),
         StructField("vendor", StringType(), True),
         StructField("table", StringType(), True),
         StructField("schema_version", StringType(), True),
         StructField("operation", StringType(), True),
         StructField("payload", MapType(StringType(), StringType()), True),
-
-        # Debezium format fields
-        StructField("op", StringType(), True),
-        StructField("before", MapType(StringType(), StringType()), True),
-        StructField("after", MapType(StringType(), StringType()), True),
-        StructField("source", MapType(StringType(), StringType()), True),
     ])
 
 
-def normalize_message_row(row):
+def normalize_message_row(json_str):
     """
-    Normalize row to canonical format.
-    Handles both canonical and Debezium formats.
+    Parse a raw Kafka JSON string and normalise to canonical format.
 
-    Returns None for Debezium tombstone events (both 'after' and 'before' are
-    None/empty) so that the caller can filter them out before processing.
+    Handles two wire formats:
+
+    1. **Debezium format** (op field present):
+       - RDBMS connectors (Postgres, MySQL …): ``after``/``before`` are nested
+         JSON objects  → ``{"field": value, …}``.
+       - MongoDB connector: ``after``/``before`` are JSON-encoded *strings*
+         → ``"{\\"field\\": value, …}"``  (double-encoded).
+       Both cases are handled by checking ``isinstance(after, str)`` and
+       JSON-decoding when necessary.
+
+    2. **Canonical format** (no op field): already in the expected structure.
+
+    Returns None for tombstone events (op present but both after and before
+    are empty/null) so the caller can filter them out.
     """
-    if row is None:
+    if not json_str:
         return None
 
-    # Check if Debezium format (has 'op' field)
-    if row.get("op") is not None:
-        # Debezium format - transform it
+    import json as _json
+
+    try:
+        row = _json.loads(json_str)
+    except (ValueError, TypeError):
+        return None
+
+    def _to_str_map(obj):
+        """Flatten a dict to {str: str}, JSON-encoding non-scalar values."""
+        if not isinstance(obj, dict):
+            return {}
+        out = {}
+        for k, v in obj.items():
+            if v is None:
+                out[str(k)] = None
+            elif isinstance(v, (dict, list)):
+                out[str(k)] = _json.dumps(v, default=str)
+            else:
+                out[str(k)] = str(v)
+        return out
+
+    # ------------------------------------------------------------------
+    # Debezium envelope
+    # ------------------------------------------------------------------
+    if "op" in row:
         op_map = {"c": "c", "u": "u", "d": "d", "r": "r"}
 
-        source = row.get("source", {})
+        source = row.get("source") or {}
         if isinstance(source, str):
-            import json
-            source = json.loads(source)
+            try:
+                source = _json.loads(source)
+            except Exception:
+                source = {}
 
-        payload = row.get("after") or row.get("before")
-        # Tombstone: Debezium sends a null-value follow-up message after a
-        # delete.  Both 'after' and 'before' will be None/empty.  Skip these
-        # so we do not write empty Parquet files or crash on 0-column DFs.
-        if not payload:
+        after  = row.get("after")
+        before = row.get("before")
+
+        # MongoDB: after/before arrive as a JSON-encoded *string*.
+        # RDBMS:   after/before are already a nested dict.
+        if isinstance(after, str):
+            try:
+                after = _json.loads(after)
+            except Exception:
+                after = None
+        if isinstance(before, str):
+            try:
+                before = _json.loads(before)
+            except Exception:
+                before = None
+
+        payload_obj = after or before
+        # Tombstone: no meaningful payload after decoding.
+        if not payload_obj:
             return None
 
         return {
@@ -113,18 +197,26 @@ def normalize_message_row(row):
             "table": source.get("table") or source.get("collection"),
             "schema_version": "v1",
             "operation": op_map.get(row.get("op"), "c"),
-            "payload": payload
+            "payload": _to_str_map(payload_obj),
         }
-    else:
-        # Already canonical format
-        return {
-            "source_type": row.get("source_type"),
-            "vendor": row.get("vendor"),
-            "table": row.get("table"),
-            "schema_version": row.get("schema_version"),
-            "operation": row.get("operation", "c"),
-            "payload": row.get("payload", {})
-        }
+
+    # ------------------------------------------------------------------
+    # Canonical format
+    # ------------------------------------------------------------------
+    payload = row.get("payload")
+    if isinstance(payload, str):
+        try:
+            payload = _json.loads(payload)
+        except Exception:
+            payload = {}
+    return {
+        "source_type": row.get("source_type"),
+        "vendor":      row.get("vendor"),
+        "table":       row.get("table"),
+        "schema_version": row.get("schema_version"),
+        "operation":   row.get("operation", "c"),
+        "payload":     _to_str_map(payload) if isinstance(payload, dict) else (payload or {}),
+    }
 
 
 def read_kafka_stream(spark: SparkSession) -> DataFrame:
@@ -139,6 +231,12 @@ def read_kafka_stream(spark: SparkSession) -> DataFrame:
     - 'u' or 'update': Updated record  
     - 'd' or 'delete': Deleted record
     - 'r' or 'read': Snapshot/initial load
+
+    Returns a DataFrame with a single column ``json_str`` containing the raw
+    Kafka message value as a UTF-8 string.  All JSON parsing is deferred to
+    Python in ``normalize_message_row`` so that both Debezium MongoDB
+    (string-encoded ``after``/``before``) and Debezium RDBMS (object-encoded
+    ``after``/``before``) are handled correctly without schema mismatch.
     """
     return (
         spark.readStream
@@ -148,15 +246,13 @@ def read_kafka_stream(spark: SparkSession) -> DataFrame:
         .option("startingOffsets", "earliest")
         .load()
         .selectExpr("CAST(value AS STRING) as json_str")
-        .select(from_json(col("json_str"), get_canonical_schema()).alias("data"))
-        .select("data.*")
     )
 
 
 def extract_table_dataframes(batch_df: DataFrame) -> tuple:
     """
     Extract DataFrames per table from batch with CDC operation info.
-    Handles both canonical and Debezium message formats.
+    Handles both canonical and Debezium message formats (RDBMS + MongoDB).
 
     Returns:
         tuple: (all_dataframes dict, operation dict mapping table to CDC operation)
@@ -164,8 +260,15 @@ def extract_table_dataframes(batch_df: DataFrame) -> tuple:
     if batch_df.rdd.isEmpty():
         return {}, {}
 
-    # Normalize messages to canonical format
-    normalized_rdd = batch_df.rdd.map(lambda row: normalize_message_row(row.asDict())).filter(lambda r: r is not None)
+    # Parse raw JSON strings entirely in Python so we can handle both:
+    #   • Debezium MongoDB  – after/before are JSON-encoded strings
+    #   • Debezium RDBMS    – after/before are nested JSON objects
+    #   • Canonical format  – flat structure with payload map
+    normalized_rdd = (
+        batch_df.rdd
+        .map(lambda row: normalize_message_row(row["json_str"]))
+        .filter(lambda r: r is not None)
+    )
 
     # Convert to DataFrame
     normalized_schema = StructType([

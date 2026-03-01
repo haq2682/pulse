@@ -71,6 +71,8 @@ services:
       - ./transformation:/app/transformation
       - ./analysis:/app/analysis
       - ./machine-learning:/app/machine-learning
+      - ./jars/deps:/app/jars/
+      - ./jars/deps/aws-java-sdk-bundle-1.12.262:/home/appuser/.ivy2/cache/com.amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
     ports:
       - "8000:8000"
     networks:
@@ -106,6 +108,8 @@ services:
       - SPARK_MASTER_URL=spark://10.5.0.3:7077
     ports:
       - "5000:5000"
+    volumes:
+      - ./jars/deps:/app/jars/
     networks:
       spark-network:
         ipv4_address: 10.5.0.2
@@ -165,6 +169,25 @@ services:
     restart: always
     command: server /data --console-address ":9001"
 
+  minio-init:
+    image: minio/mc
+    depends_on:
+      - minio
+    networks:
+      - spark-network
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO...';
+      until mc alias set local http://10.5.0.4:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} 2>/dev/null; do
+        sleep 2;
+      done;
+      echo 'Creating buckets...';
+      mc mb --ignore-existing local/pulse-bucket-1;
+      mc mb --ignore-existing local/pulse-test-bucket;
+      mc mb --ignore-existing local/pulse-checkpoints;
+      echo 'Buckets created';
+      exit 0;
+      "
   spark_master:
     build:
       context: .
@@ -567,6 +590,9 @@ volumes:
   postgres_data:
   minio_data:
   spark_data:
+  # Spark JARs shared between spark_master (read-write, populated from image on
+  # first start) and the api container (read-only, driver classpath).
+  spark_jars:
   zookeeper_data:
   zookeeper_logs:
   kafka_data:

@@ -15,8 +15,13 @@ RUN apt-get update && \
     make altinstall && \
     cd .. && rm -rf Python-3.10.19 Python-3.10.19.tgz
 
-RUN wget https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.12/3.5.0/spark-sql-kafka-0-10_2.12-3.5.0.jar \
-    -P /opt/spark/jars/
+# spark-sql-kafka and ALL transitive runtime dependencies required by the
+# Kafka structured-streaming connector.  Downloading them here means the
+# JARs are baked into the image and available to both Spark executors (which
+# load everything in /opt/spark/jars/ automatically) and to the driver
+# container (api) once the shared spark_jars volume is mounted.
+
+COPY ./jars/deps/ /opt/spark/external-jars/
 
 # Ensure python3 points to python3.10
 RUN ln -sf /usr/local/bin/python3.10 /usr/local/bin/python3
@@ -26,6 +31,7 @@ RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
 
 ENV PYSPARK_PYTHON=python3.10
 ENV PYSPARK_DRIVER_PYTHON=python3.10
+ENV SPARK_EXTRA_CLASSPATH=/opt/spark/external-jars/*
 
 COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir -r /tmp/requirements.txt

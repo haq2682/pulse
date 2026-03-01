@@ -25,13 +25,27 @@ import json
 import hashlib
 import os
 import requests
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from typing import List, Dict, Any, Optional
+
+try:
+    from pymongo import MongoClient as _MongoClient
+    from pymongo.errors import PyMongoError as _PyMongoError
+except ImportError:  # pragma: no cover
+    _MongoClient = None  # type: ignore[assignment,misc]
+    _PyMongoError = Exception  # type: ignore[assignment,misc]
 
 # MySQL/MariaDB server ID derivation constants.
 # The server ID must be in [_MYSQL_SERVER_ID_BASE, _MYSQL_SERVER_ID_BASE + _MYSQL_SERVER_ID_RANGE).
 _MYSQL_SERVER_ID_BASE = 100000
 _MYSQL_SERVER_ID_RANGE = 900000
+
+# Kafka Connect deploy timeout: (connect_timeout, read_timeout) in seconds.
+# The POST/PUT deploy calls are synchronous — Kafka Connect validates the
+# connector config (including a live DB connection) before returning, so
+# read timeouts must be generous.  The connect timeout stays short.
+_DEPLOY_CONNECT_TIMEOUT = 10
+_DEPLOY_READ_TIMEOUT = 120
 
 # URI scheme -> internal db type key
 URI_SCHEME_MAP = {
@@ -280,16 +294,101 @@ def _mariadb_config(parsed: Dict, tables: List[str], topic_prefix: str, connecto
     return config
 
 
+def _get_mongodb_replica_set_name(host: str, port: int, auth_uri: str) -> Optional[str]:
+    """
+    Connect to the MongoDB node at host:port and return the replica-set name
+    (``setName``) if the server is part of a replica set, otherwise None.
+
+    Uses directConnection=True so that pymongo does not attempt replica-set
+    member discovery (which could fail if internal hostnames are unreachable).
+    Runs the lightweight ``hello`` admin command — available in all MongoDB
+    versions ≥ 5.0 (older servers answer the legacy ``isMaster`` alias).
+
+    Returns None on any error so that callers can degrade gracefully.
+    """
+    if _MongoClient is None:
+        return None
+    try:
+        client = _MongoClient(
+            auth_uri,
+            directConnection=True,
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=5000,
+        )
+        result = client.admin.command("hello")
+        client.close()
+        return result.get("setName") or None
+    except Exception:  # noqa: BLE001 – any error means we cannot determine RS name
+        return None
+
+
 def _mongodb_config(parsed: Dict, tables: List[str], topic_prefix: str, connector_name: str = "pulse-cdc-connector") -> Dict:
     """
     MongoDB uses collection.include.list instead of table.include.list.
     The raw URI is passed as mongodb.connection.string.
     When tables is empty, collection.include.list is omitted so Debezium
     captures all collections (safe fallback when auto-discovery is unavailable).
+
+    authSource handling: MongoDB users (e.g. debezium_user) are typically
+    created in the 'admin' database.  If the URI path database (e.g. /pulse-test)
+    is used as the authSource, authentication will fail.  When no explicit
+    authSource is present in the URI we therefore append authSource=admin so
+    that Debezium authenticates against the admin database regardless of which
+    application database is being captured.
+
+    replicaSet handling: Debezium's MongoDB connector rejects the config with
+    "Replica set not specified" when the cluster topology is REPLICA_SET but
+    ``replicaSet`` is absent from the connection string.  We auto-discover the
+    replica-set name via the ``hello`` admin command and inject it when needed.
+
+    directConnection handling: When a replica set is involved the Java MongoDB
+    driver inside Kafka Connect performs topology discovery.  RS members
+    commonly advertise an internal hostname (e.g. ``localhost:27017``) that is
+    unreachable from the Kafka Connect container.  Adding ``directConnection=true``
+    tells the driver to connect *only* to the explicitly specified host and skip
+    topology-driven host substitution, while still allowing Debezium to run
+    change streams (which only require the server to be part of a replica set,
+    not that the driver resolves every member).
     """
+    raw_uri = parsed["raw_uri"]
+    parsed_uri = urlparse(raw_uri)
+    query_str = parsed_uri.query.lower()
+
+    # 1. Ensure authSource=admin so Debezium can authenticate.
+    if "authsource" not in query_str:
+        sep = "&" if parsed_uri.query else "?"
+        raw_uri = f"{raw_uri}{sep}authSource=admin"
+        # Re-parse so query_str reflects the addition.
+        parsed_uri = urlparse(raw_uri)
+        query_str = parsed_uri.query.lower()
+
+    # 2. Inject replicaSet= when the server is part of a replica set and the
+    #    caller has not already specified it in the connection string.
+    if "replicaset" not in query_str:
+        rs_name = _get_mongodb_replica_set_name(
+            parsed["host"], parsed["port"], raw_uri
+        )
+        if rs_name:
+            sep = "&" if parsed_uri.query else "?"
+            raw_uri = f"{raw_uri}{sep}replicaSet={rs_name}"
+            # Re-parse so query_str is current for the next step.
+            parsed_uri = urlparse(raw_uri)
+            query_str = parsed_uri.query.lower()
+            print(f"  Auto-detected MongoDB replica set: {rs_name}")
+
+    # 3. Add directConnection=true so the Java MongoDB driver inside Kafka
+    #    Connect connects directly to the host in the URI rather than
+    #    re-resolving members from the RS topology.  Without this, the driver
+    #    follows the replica set's advertised member list (which often contains
+    #    internal hostnames like localhost:27017 that are unreachable from the
+    #    Kafka Connect container) and the connector fails to start.
+    if "directconnection" not in query_str:
+        sep = "&" if parsed_uri.query else "?"
+        raw_uri = f"{raw_uri}{sep}directConnection=true"
+
     config = {
         "connector.class": CONNECTOR_CLASSES["mongodb"],
-        "mongodb.connection.string": parsed["raw_uri"],
+        "mongodb.connection.string": raw_uri,
         "topic.prefix": topic_prefix,
         "capture.mode": "change_streams_update_full",
         "snapshot.mode": "initial",
@@ -563,11 +662,17 @@ class DebeziumConnectorManager:
             True if deployment succeeded, False otherwise
         """
         connector_name = config["name"]
+        # Use a generous read timeout for all deploy-path requests.
+        # Kafka Connect validates the connector config synchronously (including
+        # opening a live connection to the source database) before returning,
+        # which can take well over 10 seconds for remote or replica-set databases.
+        deploy_timeout = (_DEPLOY_CONNECT_TIMEOUT, _DEPLOY_READ_TIMEOUT)
 
         try:
             # Check if connector already exists
             resp = requests.get(
-                f"{self.connect_url}/connectors/{connector_name}", timeout=10
+                f"{self.connect_url}/connectors/{connector_name}",
+                timeout=deploy_timeout,
             )
 
             if resp.status_code == 200:
@@ -577,7 +682,7 @@ class DebeziumConnectorManager:
                     f"{self.connect_url}/connectors/{connector_name}/config",
                     json=config["config"],
                     headers={"Content-Type": "application/json"},
-                    timeout=10,
+                    timeout=deploy_timeout,
                 )
             else:
                 # Create new connector
@@ -586,7 +691,7 @@ class DebeziumConnectorManager:
                     f"{self.connect_url}/connectors",
                     json=config,
                     headers={"Content-Type": "application/json"},
-                    timeout=10,
+                    timeout=deploy_timeout,
                 )
 
             if resp.status_code in (200, 201):
@@ -598,6 +703,14 @@ class DebeziumConnectorManager:
                 )
                 return False
 
+        except requests.Timeout:
+            print(
+                f"Timed out waiting for Kafka Connect to deploy '{connector_name}' "
+                f"(read timeout={_DEPLOY_READ_TIMEOUT}s). "
+                "The connector may still be deploying in the background — "
+                "check its status with get_connector_status()."
+            )
+            return False
         except requests.RequestException as e:
             print(f"Error deploying connector: {e}")
             return False

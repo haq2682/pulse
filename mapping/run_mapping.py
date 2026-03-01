@@ -19,9 +19,149 @@ import json
 import psycopg2
 from datetime import datetime, timezone
 import traceback
+import time as _time
 
 # Add current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+
+def _wait_for_debezium_snapshot(
+    topic_prefix: str,
+    expected_tables: list,
+    kafka_bootstrap: str,
+    max_wait: int = 300,
+    poll_interval: int = 5,
+) -> bool:
+    """
+    Poll Kafka until Debezium has published at least one message to each of the
+    expected CDC topics, then return True.  Returns False if ``max_wait`` seconds
+    elapse without all topics being populated.
+
+    This replaces a blind ``time.sleep`` so that:
+    - Small databases start Spark as soon as data is ready (no wasted time).
+    - Large databases are given enough time rather than a fixed 90-second cap.
+
+    Strategy
+    --------
+    1. List Kafka topics every ``poll_interval`` seconds.
+    2. Identify which expected topics (``{prefix}.{db}.{table}`` or
+       ``{prefix}.{table}``) exist.
+    3. For existing topics, fetch end offsets across all partitions.
+    4. Stop waiting once *all* expected topics have at least one message.
+       If after ``max_wait`` s some topics are still missing/empty, log a
+       warning and proceed anyway (Spark will process whatever arrived).
+    """
+    try:
+        from kafka import KafkaAdminClient, KafkaConsumer, TopicPartition
+        from kafka.errors import KafkaError
+    except ImportError:
+        print(
+            "   ⚠️  kafka-python not available; falling back to fixed wait.",
+            flush=True,
+        )
+        _time.sleep(min(max_wait, 90))
+        return False
+
+    deadline = _time.monotonic() + max_wait
+    elapsed = 0
+    last_report = -poll_interval  # force a status line on the first iteration
+
+    print(
+        f"   Polling Kafka for Debezium snapshot topics (prefix='{topic_prefix}', "
+        f"timeout={max_wait}s)…",
+        flush=True,
+    )
+
+    # Build the set of short table names we expect.
+    expected_set = set(t.lower() for t in expected_tables)
+
+    while _time.monotonic() < deadline:
+        try:
+            # -----------------------------------------------------------------
+            # Step 1: list existing Kafka topics.
+            # -----------------------------------------------------------------
+            admin = KafkaAdminClient(
+                bootstrap_servers=kafka_bootstrap,
+                request_timeout_ms=5000,
+                connections_max_idle_ms=8000,
+            )
+            all_topics = set(admin.list_topics())
+            admin.close()
+
+            # -----------------------------------------------------------------
+            # Step 2: find CDC topics that match our prefix.
+            # A Debezium topic can be:
+            #   {prefix}.{db}.{collection}  (MongoDB)
+            #   {prefix}.{schema}.{table}   (RDBMS)
+            # We match loose: any topic that starts with ``prefix.`` and whose
+            # last segment is one of the expected table names.
+            # -----------------------------------------------------------------
+            cdc_topics = [
+                t for t in all_topics
+                if t.startswith(f"{topic_prefix}.")
+                and t.split(".")[-1].lower() in expected_set
+            ]
+
+            # -----------------------------------------------------------------
+            # Step 3: for each CDC topic, sum end offsets.
+            # -----------------------------------------------------------------
+            populated_tables: set = set()
+            if cdc_topics:
+                consumer = KafkaConsumer(
+                    bootstrap_servers=kafka_bootstrap,
+                    request_timeout_ms=5000,
+                    connections_max_idle_ms=8000,
+                )
+                for topic in cdc_topics:
+                    try:
+                        partitions = consumer.partitions_for_topic(topic) or set()
+                        tps = [TopicPartition(topic, p) for p in partitions]
+                        if not tps:
+                            continue
+                        end_offsets = consumer.end_offsets(tps)
+                        total = sum(end_offsets.values())
+                        if total > 0:
+                            populated_tables.add(topic.split(".")[-1].lower())
+                    except KafkaError:
+                        pass
+                consumer.close()
+
+            # -----------------------------------------------------------------
+            # Step 4: report progress and decide whether to stop waiting.
+            # -----------------------------------------------------------------
+            elapsed = int(_time.monotonic() - (deadline - max_wait))
+            missing = expected_set - populated_tables
+
+            if elapsed - last_report >= poll_interval or not missing:
+                last_report = elapsed
+                print(
+                    f"   [{elapsed:>3}s/{max_wait}s] "
+                    f"topics with data: {len(populated_tables)}/{len(expected_set)}"
+                    + (f" — waiting for: {sorted(missing)[:5]}{'…' if len(missing) > 5 else ''}" if missing else ""),
+                    flush=True,
+                )
+
+            if not missing:
+                print(
+                    f"   ✅ All {len(expected_set)} collections snapshotted into Kafka "
+                    f"({elapsed}s).",
+                    flush=True,
+                )
+                return True
+
+        except Exception as poll_err:
+            print(f"   ⚠️  Kafka poll error (retrying): {poll_err}", flush=True)
+
+        _time.sleep(poll_interval)
+
+    # Timed out — proceed with whatever arrived.
+    elapsed = int(_time.monotonic() - (deadline - max_wait))
+    print(
+        f"   ⚠️  Snapshot wait timed out after {elapsed}s. "
+        "Proceeding — Spark will process whatever Debezium has published so far.",
+        flush=True,
+    )
+    return False
 
 # ============================================================================
 # CONFIGURATION - Edit these values to change mode and parameters
@@ -333,26 +473,20 @@ def run_db_mode(config: dict):
 
             if trigger_once:
                 # When running in trigger-once mode (initial onboarding mapping),
-                # give Debezium time to start its initial snapshot before Spark
-                # tries to read from Kafka.  Without this wait, availableNow may
-                # process 0 messages and exit before the snapshot produces events.
-                import time as _time
-                default_snapshot_wait = 90
-                env_wait = os.getenv("DEBEZIUM_SNAPSHOT_WAIT")
-                if env_wait is not None:
-                    try:
-                        snapshot_wait = max(0, int(env_wait))
-                    except ValueError:
-                        print(
-                            f"   Invalid DEBEZIUM_SNAPSHOT_WAIT='{env_wait}', "
-                            f"falling back to default {default_snapshot_wait}s.",
-                            flush=True,
-                        )
-                        snapshot_wait = default_snapshot_wait
-                else:
-                    snapshot_wait = default_snapshot_wait
-                print(f"   Waiting {snapshot_wait}s for Debezium initial snapshot...", flush=True)
-                _time.sleep(snapshot_wait)
+                # wait until Debezium has published snapshot messages to Kafka
+                # before starting Spark's availableNow query.  A blind sleep is
+                # unreliable: too short misses data, too long wastes time.
+                # _wait_for_debezium_snapshot polls Kafka until every expected
+                # topic has at least one message, or a generous timeout elapses.
+                kafka_bs = os.getenv("KAFKA_BOOTSTRAP", "10.5.0.7:9092")
+                topic_prefix = connector_config["config"].get("topic.prefix", "ecom")
+                max_wait = int(os.getenv("DEBEZIUM_SNAPSHOT_WAIT", "300"))
+                _wait_for_debezium_snapshot(
+                    topic_prefix=topic_prefix,
+                    expected_tables=tables,
+                    kafka_bootstrap=kafka_bs,
+                    max_wait=max_wait,
+                )
 
             enable_downstream = config.get("enable_downstream", False)
             run_streaming(trigger_once=trigger_once,
