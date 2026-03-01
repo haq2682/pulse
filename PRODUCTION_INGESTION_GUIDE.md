@@ -52,12 +52,32 @@ rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "localhost:27017" }] })
 
 // Create a least-privilege user
 use admin
+
+db.createRole({
+  role: "debeziumRole",
+  privileges: [
+    {
+      resource: { db: "", collection: "" },
+      actions: ["find", "changeStream", "listCollections", "listDatabases"]
+    },
+    {
+      resource: { db: "local", collection: "" },
+      actions: ["find"]
+    }
+  ],
+  roles: []
+})
+
+// Step 2: Create the Debezium user with all required roles
 db.createUser({
-  user: "debezium", pwd: "<password>",
+  user: "debezium_user",
+  pwd: "<password>",
   roles: [
-    { role: "read",           db: "<your_database>" },
-    { role: "read",           db: "local" },
-    { role: "clusterMonitor", db: "admin" }
+    { role: "debeziumRole",      db: "admin"         },
+    { role: "read",              db: "<your_database>" },
+    { role: "read",              db: "local"          },
+    { role: "clusterMonitor",    db: "admin"          },
+    { role: "readAnyDatabase",   db: "admin"          }
   ]
 })
 ```

@@ -183,21 +183,23 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
             # Human-readable location for error messages
             location = hostname if db_type == 'mongodb+srv' else f"{hostname}:{port}"
 
-            # Stage 1: For standard (non-SRV) URIs, verify raw TCP reachability first.
-            # This lets us distinguish a true "server down" from an auth failure,
-            # regardless of what text pymongo puts in its exception messages.
+            # Stage 1: Optional TCP probe for standard (non-SRV) URIs.
+            # Used only to distinguish "server down" from "auth failure" in the
+            # error message.  We do NOT hard-fail here — pymongo is the
+            # authoritative judge of reachability because it has its own retry
+            # and handshake logic that can succeed even when a raw socket connect
+            # times out on the first attempt (e.g. first TCP SYN to a cold
+            # replica-set member, IPv6/IPv4 dual-stack fallback, etc.).
+            tcp_ok: bool | None = None  # None = untested (SRV), True/False for plain
             if db_type == 'mongodb':
                 try:
-                    with socket.create_connection((hostname, port), timeout=timeout):
-                        pass
+                    with socket.create_connection((hostname, port), timeout=max(timeout, 15)):
+                        tcp_ok = True
                 except OSError:
-                    return False, f"Cannot connect to MongoDB at {location}. Server may be down or unreachable."
+                    tcp_ok = False
+                    # Do NOT return here — fall through and let pymongo try.
 
-            # Stage 2: Test authentication.  'ping' is auth-free in all MongoDB
-            # versions (it is an alias for the 'hello' SDAM command).  Use
-            # list_collection_names() on the target database instead — this is a
-            # real application-level command that requires an authenticated
-            # connection.
+            # Stage 2: Test authentication via pymongo.
             #
             # IMPORTANT: pymongo defaults the authSource to the database name in
             # the URI path (e.g. /pulse-test → authSource=pulse-test).  Most
@@ -209,9 +211,6 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
             has_explicit_authsource = 'authsource' in query_str
 
             target_db = database if database else 'admin'
-            # Build the list of URIs to attempt: original first, then with
-            # authSource=admin as a fallback (only when no authSource was given
-            # and we know the server is reachable, i.e. non-SRV after TCP check).
             uris_to_try = [db_uri]
             if not has_explicit_authsource and db_type == 'mongodb':
                 sep = '&' if query_str else '?'
@@ -223,16 +222,17 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
             # often unreachable from the application network, which would
             # otherwise cause ServerSelectionTimeoutError even when the target
             # host is reachable and credentials are correct.
-            # SRV URIs handle topology discovery differently, so directConnection
-            # is only applied to non-SRV connections.
             direct = db_type == 'mongodb'
+            # Give pymongo more time than the raw socket — use at least 20 s so
+            # a cold replica-set primary can complete its handshake.
+            mongo_timeout_ms = max(timeout, 20) * 1000
 
             last_failure = None
             for uri in uris_to_try:
                 try:
                     client = MongoClient(
                         uri,
-                        serverSelectionTimeoutMS=timeout * 1000,
+                        serverSelectionTimeoutMS=mongo_timeout_ms,
                         directConnection=direct,
                     )
                     client[target_db].list_collection_names()
@@ -242,10 +242,10 @@ def validate_database_connection(db_uri: str, timeout: int = 10) -> Tuple[bool, 
                     last_failure = 'auth'
                     continue
                 except ServerSelectionTimeoutError:
-                    # With directConnection=True the TCP check already confirmed
-                    # reachability, so SSTE here means auth/TLS rejected the
-                    # connection.  For SRV URIs the cause is ambiguous.
-                    last_failure = 'auth' if db_type == 'mongodb' else 'connect'
+                    # If the TCP probe already confirmed the port is closed/
+                    # unreachable, report that clearly.  Otherwise (tcp_ok is
+                    # True or untested for SRV) the SSTE likely means auth/TLS.
+                    last_failure = 'connect' if tcp_ok is False else 'auth'
                     continue
                 except MongoConfigurationError as e:
                     return False, f"MongoDB configuration error: {str(e)}"

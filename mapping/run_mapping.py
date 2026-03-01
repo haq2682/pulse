@@ -85,13 +85,7 @@ def _wait_for_debezium_snapshot(
 
     prev_total: int = -1
     stable_polls: int = 0
-    # Short stability window: used when we have at least as many messages as
-    # expected tables (snapshot flood is clearly winding down).
-    _STABLE_SHORT = 3           # 3 × poll_interval  (fast path for big snapshots)
-    # Long stability window: used when message count is less than expected tables
-    # (some collections may be empty; wait longer to be sure Debezium has
-    # finished traversing every collection before we proceed).
-    _STABLE_LONG  = 18          # 18 × poll_interval = 180 s (conservative path)
+    _STABLE_NEEDED = 3          # three consecutive unchanged polls = done
     last_report_t = -poll_interval
 
     while _time.monotonic() < deadline:
@@ -181,18 +175,10 @@ def _wait_for_debezium_snapshot(
                 return True
 
             # ── Signal B: rate stability (snapshot write-flood ended) ───────
-            # Use a short window (3 polls) when message count ≥ expected tables
-            # (real snapshot data present); a long window (18 polls / 180 s)
-            # when count is low so a single heartbeat cannot falsely trigger.
             if current_total > 0:
                 if current_total == prev_total:
                     stable_polls += 1
-                    needed = (
-                        _STABLE_SHORT
-                        if current_total >= len(expected_set)
-                        else _STABLE_LONG
-                    )
-                    if stable_polls >= needed:
+                    if stable_polls >= _STABLE_NEEDED:
                         print(
                             f"   ✅ Snapshot stable for "
                             f"{stable_polls * poll_interval}s "
@@ -554,8 +540,7 @@ def run_db_mode(config: dict):
             enable_downstream = config.get("enable_downstream", False)
             run_streaming(trigger_once=trigger_once,
                           enable_downstream=enable_downstream,
-                          output_bucket=bucket_name,
-                          topic_prefix=topic_prefix)
+                          output_bucket=bucket_name)
 
             # After trigger-once streaming finishes, update mapping status to
             # 'completed' if the streaming callback didn't already do it (e.g.

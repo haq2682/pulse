@@ -47,13 +47,6 @@ _MYSQL_SERVER_ID_RANGE = 900000
 _DEPLOY_CONNECT_TIMEOUT = 10
 _DEPLOY_READ_TIMEOUT = 120
 
-# Kafka bootstrap address used by connectors that need to write to internal
-# Kafka topics (schema-history for MySQL/MariaDB/SQLServer/Oracle/DB2/Informix,
-# and the Cassandra connector's Kafka producer).  This address must be reachable
-# from *inside* the Kafka Connect container (i.e. the broker's internal listener),
-# which is typically different from the client-facing address.
-KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "kafka:9092")
-
 # URI scheme -> internal db type key
 URI_SCHEME_MAP = {
     "postgresql": "postgres",
@@ -192,7 +185,7 @@ def _common_converter_config() -> Dict[str, str]:
 def _schema_history_config(db_name: str) -> Dict[str, str]:
     """Schema history config for databases that track DDL changes."""
     return {
-        "schema.history.internal.kafka.bootstrap.servers": KAFKA_BOOTSTRAP,
+        "schema.history.internal.kafka.bootstrap.servers": KAFKA_BOOTSTRAP_INTERNAL,
         "schema.history.internal.kafka.topic": f"schema-changes.{db_name}",
     }
 
@@ -547,7 +540,7 @@ def _cassandra_config(parsed: Dict, tables: List[str], topic_prefix: str, connec
         "cassandra.keyspace": parsed["database"],
         "topic.prefix": topic_prefix,
         "snapshot.mode": "INITIAL",
-        "kafka.producer.bootstrap.servers": KAFKA_BOOTSTRAP,
+        "kafka.producer.bootstrap.servers": KAFKA_BOOTSTRAP_INTERNAL,
     }
     config.update(_common_converter_config())
     return config

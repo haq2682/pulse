@@ -180,19 +180,6 @@ def normalize_message_row(json_str):
     except (ValueError, TypeError):
         return None
 
-    # --------------------------------------------------------------------------
-    # Unwrap Debezium protocol envelope:
-    #   {"schema": {...}, "payload": {"op": "r", "after": "...", "source": {...}}}
-    # Kafka Connect serialises every message with this outer wrapper; the actual
-    # CDC event lives inside "payload".  Unwrap before any further inspection.
-    # --------------------------------------------------------------------------
-    if (
-        "payload" in row
-        and isinstance(row.get("payload"), dict)
-        and "op" in row["payload"]
-    ):
-        row = row["payload"]
-
     def _to_str_map(obj):
         """Flatten a dict to {str: str}, JSON-encoding non-scalar values."""
         if not isinstance(obj, dict):
@@ -269,32 +256,33 @@ def normalize_message_row(json_str):
     }
 
 
-def read_kafka_stream(spark: SparkSession, topic_prefix: str = None) -> DataFrame:
+def read_kafka_stream(spark: SparkSession) -> DataFrame:
     """
-    Read from Kafka CDC topics with CDC support for database ingestion.
+    Read from Kafka ecom.* topics with CDC support for database ingestion.
+    
+    Topic naming convention:
+    - 'ecom.*' topics: Messages from API/DB ingestion (e.g., ecom.customers, ecom.orders)
+    
+    Database ingestion messages include an optional 'operation' field for CDC:
+    - 'c' or 'create': New record
+    - 'u' or 'update': Updated record  
+    - 'd' or 'delete': Deleted record
+    - 'r' or 'read': Snapshot/initial load
 
-    The Kafka ``subscribePattern`` is built dynamically from *topic_prefix*
-    (explicit argument) → ``TOPIC_PREFIX`` env var → ``"ecom"`` fallback, so
-    the same binary works for any Debezium connector configuration without
-    rebuilding the container image.
-
-    Returns a DataFrame with columns:
-      - ``json_str``   – raw Kafka message value as a UTF-8 string.
-      - ``kafka_topic`` – the Kafka topic name the message came from.
-    All JSON parsing is deferred to Python in ``normalize_message_row``.
+    Returns a DataFrame with a single column ``json_str`` containing the raw
+    Kafka message value as a UTF-8 string.  All JSON parsing is deferred to
+    Python in ``normalize_message_row`` so that both Debezium MongoDB
+    (string-encoded ``after``/``before``) and Debezium RDBMS (object-encoded
+    ``after``/``before``) are handled correctly without schema mismatch.
     """
-    _prefix = topic_prefix or os.getenv("TOPIC_PREFIX", "ecom")
-    # Java regex: {prefix}\. matches the literal prefix + dot separator.
-    _pattern = f"{_prefix}\\...*"
-    print(f"[read_kafka_stream] Subscribing to pattern: {_pattern}", flush=True)
     return (
         spark.readStream
         .format("kafka")
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP)
-        .option("subscribePattern", _pattern)
+        .option("subscribePattern", "ecom\\..*")
         .option("startingOffsets", "earliest")
         .load()
-        .selectExpr("CAST(value AS STRING) as json_str", "topic as kafka_topic")
+        .selectExpr("CAST(value AS STRING) as json_str")
     )
 
 
@@ -306,34 +294,8 @@ def extract_table_dataframes(batch_df: DataFrame) -> tuple:
     Returns:
         tuple: (all_dataframes dict, operation dict mapping table to CDC operation)
     """
-    # ── Driver-side raw sample (runs in the API container, always visible) ──
-    # Collect up to 5 rows to the driver BEFORE any executor-side RDD lambda.
-    # This lets us see the exact Kafka message content even when the executor-
-    # side normalize_message_row silently returns None due to an unexpected
-    # message format.
-    try:
-        debug_sample = batch_df.select("json_str", "kafka_topic").take(5)
-    except Exception as _sample_err:
-        # Fallback: kafka_topic column may not be present in older stream def.
-        try:
-            debug_sample = batch_df.select("json_str").take(5)
-        except Exception:
-            debug_sample = []
-        print(f"[extract] WARNING: could not sample batch: {_sample_err}", flush=True)
-
-    if not debug_sample:
-        print("[extract] Batch is empty (no Kafka messages in this trigger).", flush=True)
+    if batch_df.rdd.isEmpty():
         return {}, {}
-
-    print(
-        f"[extract] Batch contains {len(debug_sample)}+ rows. "
-        "First raw message (up to 500 chars):",
-        flush=True,
-    )
-    for _i, _dr in enumerate(debug_sample[:3]):
-        _topic = getattr(_dr, "kafka_topic", "?")
-        _raw   = (_dr["json_str"] or "")[:500]
-        print(f"  [msg {_i}] topic={_topic} | {_raw}", flush=True)
 
     # Parse raw JSON strings entirely in Python so we can handle both:
     #   • Debezium MongoDB  – after/before are JSON-encoded strings
@@ -711,17 +673,13 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
             print(f"   ⚠️  Could not trigger downstream: {downstream_err}")
 
 
-def run_streaming(trigger_once: bool = False, enable_downstream: bool = False, output_bucket: str = None, topic_prefix: str = None):
+def run_streaming(trigger_once: bool = False, enable_downstream: bool = False, output_bucket: str = None):
     """Main streaming pipeline.
 
     Args:
         trigger_once: When True, uses Spark's availableNow trigger so the job
                       processes all pending Kafka messages and then exits cleanly.
                       Use this for Airflow-managed micro-batch execution.
-        topic_prefix: Debezium topic prefix used to build the Kafka
-                      subscribePattern (e.g. ``"ecom"`` → subscribes to
-                      ``ecom\..*``).  Falls back to the ``TOPIC_PREFIX`` env
-                      var and then ``"ecom"`` if not supplied.
         enable_downstream: When True, runs the downstream pipeline
                            (clean → transform → analyze → ML inference)
                            inline after each micro-batch, reducing end-to-end
@@ -784,8 +742,8 @@ def run_streaming(trigger_once: bool = False, enable_downstream: bool = False, o
         minio_client.make_bucket(output_bucket)
         print(f"Created bucket: {output_bucket}")
     
-    # Read stream — pass topic_prefix so subscribePattern matches the connector
-    json_stream = read_kafka_stream(spark, topic_prefix=topic_prefix)
+    # Read stream
+    json_stream = read_kafka_stream(spark)
     
     # Process with foreachBatch
     writer = (
