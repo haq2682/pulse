@@ -126,8 +126,15 @@ def main(bucket_name=None, incremental=True, force_full=False):
     else:
         file_paths_to_process = all_file_paths
     
-    # Extract table names from file paths
-    tables_to_process = [fp.split('/')[-1].replace('.csv', '') for fp in file_paths_to_process]
+    # Extract table names from file paths.
+    # Paths can be either:
+    #   "mapped/{table}/"   (Delta / Parquet directory, ends with /)
+    #   "mapped/{table}.csv"  (CSV file)
+    tables_to_process = [
+        fp.rstrip("/").split("/")[-1].replace(".csv", "")
+        for fp in file_paths_to_process
+        if fp.rstrip("/").split("/")[-1].replace(".csv", "")
+    ]
     print(f"   Processing {len(tables_to_process)} tables: {', '.join(tables_to_process)}")
 
     dataframes, processed_file_paths = load_data_from_minio(

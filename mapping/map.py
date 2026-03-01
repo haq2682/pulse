@@ -1,3 +1,31 @@
+import os
+import sys
+
+# ---------------------------------------------------------------------------
+# JAR paths — set BEFORE pyspark is imported so the JVM gateway starts with
+# the correct driver classpath (Delta Lake + S3A).
+# ---------------------------------------------------------------------------
+_JARS_DIR = "/app/jars"
+_MAP_JARS = [
+    f"{_JARS_DIR}/hadoop-aws-3.3.4.jar",
+    f"{_JARS_DIR}/aws-java-sdk-bundle-1.12.262.jar",
+    f"{_JARS_DIR}/delta-spark_2.12-3.2.0.jar",
+    f"{_JARS_DIR}/delta-storage-3.2.0.jar",
+]
+_MAP_JARS_STR = ",".join(_MAP_JARS)
+_MAP_CP = ":".join(_MAP_JARS)
+
+if "PYSPARK_SUBMIT_ARGS" not in os.environ:
+    os.environ["PYSPARK_SUBMIT_ARGS"] = (
+        f"--driver-class-path {_MAP_CP} --jars {_MAP_JARS_STR} pyspark-shell"
+    )
+
+# findspark is only needed when Spark is installed as a standalone binary
+# (SPARK_HOME is set). pip-installed PySpark bundles py4j itself.
+if os.environ.get("SPARK_HOME"):
+    import findspark
+    findspark.init()
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit, col
 import List as mapping_list
@@ -21,11 +49,6 @@ from utils.helpers import (
 )
 from utils.table_mapper import map_table_name
 import argparse
-import os
-
-import findspark
-
-findspark.init()
 
 load_dotenv(find_dotenv())
 
@@ -201,16 +224,25 @@ spark = (
     .config("spark.dynamicAllocation.minExecutors", "0")
     .config("spark.dynamicAllocation.maxExecutors", "8")
     .config("spark.dynamicAllocation.initialExecutors", "1")
-    .config(
-        "spark.jars.packages",
-        "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-    )
+    # Use pre-downloaded local JARs — no Maven/internet access needed.
+    .config("spark.jars", _MAP_JARS_STR)
+    .config("spark.driver.extraClassPath", _MAP_CP)
+    .config("spark.executor.extraClassPath", _MAP_CP)
     .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
     .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
     .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
     .config("spark.hadoop.fs.s3a.path.style.access", "true")
     .config("inferSchema", "true")
     .config("mergeSchema", "true")
+    # Delta Lake extensions — enables Delta format reads/writes and MERGE SQL.
+    .config(
+        "spark.sql.extensions",
+        "io.delta.sql.DeltaSparkSessionExtension",
+    )
+    .config(
+        "spark.sql.catalog.spark_catalog",
+        "org.apache.spark.sql.delta.catalog.DeltaCatalog",
+    )
     .getOrCreate()
 )
 
@@ -600,17 +632,24 @@ def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="bat
 
 def save_dataframes_to_minio(results, client, bucket_name, operation=None, primary_key_col=None, folder="mapped"):
     """
-    Save processed DataFrames to MinIO bucket with append logic.
+    Save processed DataFrames to MinIO as Delta tables (all three modes).
+
+    Replaces the old toPandas() → CSV → MinIO-SDK path with direct Spark
+    Delta writes via S3A so that:
+    - No driver OOM from toPandas() on large snapshots.
+    - Append-only writes (insert / snapshot) land as partitioned Delta tables.
+    - CDC update/delete use DeltaTable.merge() for correct ACID upserts.
+    - The cleaning pipeline can read all three modes with a single
+      ``spark.read.format("delta")`` call via the updated cleaning_utils.py.
 
     Args:
-        results: Dictionary of processed results
-        client: MinIO client instance
-        bucket_name: Name of the bucket to save to
-        operation: CDC operation type ('c' for create, 'u' for update, 'd' for delete, 'r' for read/snapshot)
-        primary_key_col: Primary key column name for identifying rows to update/delete
-        folder: Folder name within bucket to save files (default: "mapped")
+        results:          Dictionary of processed results from process_all_dataframes.
+        client:           MinIO client (used only for bucket-existence check).
+        bucket_name:      Target MinIO bucket.
+        operation:        CDC op: 'c'/'r' (insert/snapshot), 'u' (update), 'd' (delete).
+        primary_key_col:  Override primary-key column name; auto-detected when None.
+        folder:           Sub-prefix inside the bucket (default: ``"mapped"``).
     """
-
     if not client.bucket_exists(bucket_name):
         client.make_bucket(bucket_name)
         print(f"Created bucket: {bucket_name}")
@@ -619,154 +658,70 @@ def save_dataframes_to_minio(results, client, bucket_name, operation=None, prima
 
     # Primary key mapping for each table
     table_primary_keys = {
-        "addresses": "address_id",
-        "customers": "customer_id",
-        "suppliers": "supplier_id",
-        "categories": "category_id",
-        "products": "product_id",
-        "inventory": "inventory_id",
-        "wishlist": "wishlist_id",
-        "shopping_cart": "cart_id",
-        "cart_items": "cart_item_id",
-        "orders": "order_id",
-        "order_items": "order_item_id",
-        "payments": "payment_id",
-        "reviews": "review_id",
+        "addresses":           "address_id",
+        "customers":           "customer_id",
+        "suppliers":           "supplier_id",
+        "categories":          "category_id",
+        "products":            "product_id",
+        "inventory":           "inventory_id",
+        "wishlist":            "wishlist_id",
+        "shopping_cart":       "cart_id",
+        "cart_items":          "cart_item_id",
+        "orders":              "order_id",
+        "order_items":         "order_item_id",
+        "payments":            "payment_id",
+        "reviews":             "review_id",
         "marketing_campaigns": "campaign_id",
-        "customer_sessions": "session_id",
+        "customer_sessions":   "session_id",
     }
+
+    from pyspark.sql import functions as F
 
     for result_key, result_data in results.items():
         table_name = result_data["table_name"]
-        final_df = result_data["final_df"]
+        final_df   = result_data["final_df"]
+        pk_col     = primary_key_col or table_primary_keys.get(table_name)
+        _sess      = final_df.sparkSession
 
         print(f"Saving {table_name} to MinIO...")
 
-        # Convert Spark DataFrame to Pandas
-        new_pdf = final_df.toPandas()
+        df_out  = final_df.withColumn("_ingested_at", F.current_timestamp())
+        s3_path = f"s3a://{bucket_name}/{folder}/{table_name}"
 
-        # File path in specified folder
-        file_name = f"{folder}/{table_name}.csv"
-
-        # Get the primary key for this table
-        pk_col = primary_key_col or table_primary_keys.get(table_name)
-
-        # Ensure primary key column has consistent data type
-        if pk_col and pk_col in new_pdf.columns:
-            new_pdf[pk_col] = new_pdf[pk_col].astype(str)
-
-        # Try to load existing data if file exists
-        existing_pdf = None
-        try:
-            response = client.get_object(bucket_name, file_name)
+        # ── CDC update / delete — use Delta MERGE ────────────────────────────
+        if operation in ("u", "update", "d", "delete") and pk_col:
             try:
-                existing_data = response.read().decode("utf-8")
-                existing_pdf = pd.read_csv(StringIO(existing_data))
-                # Ensure primary key column has consistent data type
-                if pk_col and pk_col in existing_pdf.columns:
-                    existing_pdf[pk_col] = existing_pdf[pk_col].astype(str)
-                print(f"  Loaded existing data: {len(existing_pdf)} rows")
-            finally:
-                response.close()
-                response.release_conn()
-        except Exception:
-            # File doesn't exist, will create new
-            existing_pdf = None
-            print(f"  No existing file found, creating new...")
-
-        # Handle CDC operations
-        if operation and pk_col and pk_col in new_pdf.columns:
-            if operation in ("d", "delete"):
-                # Delete operation: remove rows with matching primary keys using merge
-                if existing_pdf is not None and pk_col in existing_pdf.columns:
-                    # Use merge with indicator for efficient deletion
-                    merged = existing_pdf.merge(
-                        new_pdf[[pk_col]].drop_duplicates(), 
-                        on=pk_col, 
-                        how='left', 
-                        indicator=True
-                    )
-                    result_pdf = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
-                    deleted_count = len(existing_pdf) - len(result_pdf)
-                    print(f"  Deleted {deleted_count} rows")
-                else:
-                    result_pdf = pd.DataFrame(columns=new_pdf.columns)
-            elif operation in ("u", "update"):
-                # Update operation: replace rows with matching primary keys using merge
-                if existing_pdf is not None and pk_col in existing_pdf.columns:
-                    # Use merge with indicator for efficient update
-                    merged = existing_pdf.merge(
-                        new_pdf[[pk_col]].drop_duplicates(), 
-                        on=pk_col, 
-                        how='left', 
-                        indicator=True
-                    )
-                    existing_without_updates = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
-                    result_pdf = pd.concat([existing_without_updates, new_pdf], ignore_index=True)
-                    print(f"  Updated {len(new_pdf)} rows")
-                else:
-                    result_pdf = new_pdf
-            elif operation in ("c", "create", "r", "read"):
-                # Create/Read operation: append new rows
-                if existing_pdf is not None:
-                    # Avoid duplicates using merge with indicator
-                    if pk_col in existing_pdf.columns:
-                        merged = new_pdf.merge(
-                            existing_pdf[[pk_col]].drop_duplicates(), 
-                            on=pk_col, 
-                            how='left', 
-                            indicator=True
+                from delta.tables import DeltaTable
+                if DeltaTable.isDeltaTable(_sess, s3_path):
+                    dt = DeltaTable.forPath(_sess, s3_path)
+                    if operation in ("d", "delete"):
+                        (
+                            dt.alias("t")
+                            .merge(df_out.alias("s"), f"t.`{pk_col}` = s.`{pk_col}`")
+                            .whenMatchedDelete()
+                            .execute()
                         )
-                        new_rows = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
-                        result_pdf = pd.concat([existing_pdf, new_rows], ignore_index=True)
-                        print(f"  Appended {len(new_rows)} new rows")
+                        print(f"✅ Delta DELETE  {table_name} → {s3_path}")
                     else:
-                        result_pdf = pd.concat([existing_pdf, new_pdf], ignore_index=True)
-                else:
-                    result_pdf = new_pdf
-            else:
-                # Unknown operation, default to append
-                if existing_pdf is not None:
-                    result_pdf = pd.concat([existing_pdf, new_pdf], ignore_index=True)
-                else:
-                    result_pdf = new_pdf
-        else:
-            # No CDC operation specified - append mode with deduplication
-            if existing_pdf is not None:
-                if pk_col and pk_col in new_pdf.columns and pk_col in existing_pdf.columns:
-                    # Deduplicate using merge with indicator - more efficient for large datasets
-                    merged = new_pdf.merge(
-                        existing_pdf[[pk_col]].drop_duplicates(), 
-                        on=pk_col, 
-                        how='left', 
-                        indicator=True
-                    )
-                    new_rows = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
-                    result_pdf = pd.concat([existing_pdf, new_rows], ignore_index=True)
-                    print(f"  Appended {len(new_rows)} new rows (deduplicated)")
-                else:
-                    # No primary key, just append
-                    result_pdf = pd.concat([existing_pdf, new_pdf], ignore_index=True)
-                    print(f"  Appended {len(new_pdf)} rows")
-            else:
-                result_pdf = new_pdf
+                        (
+                            dt.alias("t")
+                            .merge(df_out.alias("s"), f"t.`{pk_col}` = s.`{pk_col}`")
+                            .whenMatchedUpdateAll()
+                            .whenNotMatchedInsertAll()
+                            .execute()
+                        )
+                        print(f"✅ Delta MERGE   {table_name} → {s3_path}")
+                    continue
+            except ImportError:
+                print(f"  ⚠️  delta-spark not available; falling back to Parquet for {table_name}")
 
-        # Save as CSV to MinIO
-        csv_buffer = BytesIO()
-        result_pdf.to_csv(csv_buffer, index=False)
-        csv_buffer.seek(0)
-
-        # Upload to MinIO
-        client.put_object(
-            bucket_name,
-            file_name,
-            csv_buffer,
-            length=len(csv_buffer.getvalue()),
-            content_type="text/csv",
-        )
-
-        print(f"✅ Saved {file_name} ({len(result_pdf)} rows)")
-        csv_buffer.close()
+        # ── Default: Delta append (insert, snapshot, or fallback) ─────────────
+        try:
+            df_out.write.format("delta").mode("append").save(s3_path)
+            print(f"✅ Delta APPEND  {table_name} → {s3_path}")
+        except Exception:  # delta not on classpath in this session
+            df_out.write.mode("append").parquet(s3_path)
+            print(f"✅ Parquet APPEND {table_name} → {s3_path}")
 
 
 if __name__ == "__main__":

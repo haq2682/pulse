@@ -29,57 +29,95 @@ def _wait_for_debezium_snapshot(
     topic_prefix: str,
     expected_tables: list,
     kafka_bootstrap: str,
-    max_wait: int = 300,
-    poll_interval: int = 5,
+    max_wait: int = 3600,
+    poll_interval: int = 10,
+    connector_name: str = None,
+    connect_url: str = "http://10.5.0.10:8083",
 ) -> bool:
     """
-    Poll Kafka until Debezium has published at least one message to each of the
-    expected CDC topics, then return True.  Returns False if ``max_wait`` seconds
-    elapse without all topics being populated.
+    Block until Debezium's initial snapshot has been fully published to Kafka.
 
-    This replaces a blind ``time.sleep`` so that:
-    - Small databases start Spark as soon as data is ready (no wasted time).
-    - Large databases are given enough time rather than a fixed 90-second cap.
+    Two independent signals are used — whichever fires first releases the wait:
 
-    Strategy
-    --------
-    1. List Kafka topics every ``poll_interval`` seconds.
-    2. Identify which expected topics (``{prefix}.{db}.{table}`` or
-       ``{prefix}.{table}``) exist.
-    3. For existing topics, fetch end offsets across all partitions.
-    4. Stop waiting once *all* expected topics have at least one message.
-       If after ``max_wait`` s some topics are still missing/empty, log a
-       warning and proceed anyway (Spark will process whatever arrived).
+    **Signal A — All-tables complete**: every expected CDC topic has ≥ 1 message.
+      This is the fastest path for relatively small databases.
+
+    **Signal B — Rate stability**: total message count across *all* observed CDC
+      topics has not grown for 3 consecutive polls (``3 × poll_interval`` seconds).
+      Debezium writes snapshots in a continuous flood; a pause of this length
+      reliably indicates the snapshot has finished.  Requires at least 1 topic
+      to have data (guards against a false-positive during connector startup).
+
+    Both signals also verify connector health via the Debezium Connect REST API
+    (``GET {connect_url}/connectors/{name}/status``).  If the connector task is
+    FAILED the wait aborts immediately so the caller can surface the error.
+
+    Args:
+        topic_prefix:    Debezium topic prefix (e.g. ``"ecom"``).
+        expected_tables: List of collection / table names to wait for.
+        kafka_bootstrap: Kafka broker address (e.g. ``"10.5.0.7:9092"``).
+        max_wait:        Hard timeout in seconds (default 3600 — 1 hour).
+        poll_interval:   Seconds between each Kafka poll (default 10).
+        connector_name:  Debezium connector name; used for REST health-check.
+        connect_url:     Kafka Connect base URL (default ``http://10.5.0.10:8083``).
     """
     try:
         from kafka import KafkaAdminClient, KafkaConsumer, TopicPartition
         from kafka.errors import KafkaError
     except ImportError:
         print(
-            "   ⚠️  kafka-python not available; falling back to fixed wait.",
+            "   ⚠️  kafka-python not available; falling back to fixed 90 s wait.",
             flush=True,
         )
         _time.sleep(min(max_wait, 90))
         return False
 
+    import requests as _req
+
     deadline = _time.monotonic() + max_wait
-    elapsed = 0
-    last_report = -poll_interval  # force a status line on the first iteration
+    expected_set = set(t.lower() for t in expected_tables)
 
     print(
-        f"   Polling Kafka for Debezium snapshot topics (prefix='{topic_prefix}', "
-        f"timeout={max_wait}s)…",
+        f"   Waiting for Debezium snapshot (prefix='{topic_prefix}', "
+        f"tables={len(expected_set)}, timeout={max_wait}s)…",
         flush=True,
     )
 
-    # Build the set of short table names we expect.
-    expected_set = set(t.lower() for t in expected_tables)
+    prev_total: int = -1
+    stable_polls: int = 0
+    # Short stability window: used when we have at least as many messages as
+    # expected tables (snapshot flood is clearly winding down).
+    _STABLE_SHORT = 3           # 3 × poll_interval  (fast path for big snapshots)
+    # Long stability window: used when message count is less than expected tables
+    # (some collections may be empty; wait longer to be sure Debezium has
+    # finished traversing every collection before we proceed).
+    _STABLE_LONG  = 18          # 18 × poll_interval = 180 s (conservative path)
+    last_report_t = -poll_interval
 
     while _time.monotonic() < deadline:
+        elapsed = int(_time.monotonic() - (deadline - max_wait))
+
+        # ── Debezium connector health-check (non-fatal if unavailable) ────────
+        if connector_name:
+            try:
+                r = _req.get(
+                    f"{connect_url}/connectors/{connector_name}/status",
+                    timeout=5,
+                )
+                if r.ok:
+                    task_states = [t["state"] for t in r.json().get("tasks", [])]
+                    if task_states and all(s == "FAILED" for s in task_states):
+                        print(
+                            f"   ❌ Debezium connector '{connector_name}' task FAILED — "
+                            "aborting snapshot wait.",
+                            flush=True,
+                        )
+                        return False
+            except Exception:
+                pass  # REST not reachable yet — keep waiting
+
+        # ── Kafka topic scan ──────────────────────────────────────────────────
         try:
-            # -----------------------------------------------------------------
-            # Step 1: list existing Kafka topics.
-            # -----------------------------------------------------------------
             admin = KafkaAdminClient(
                 bootstrap_servers=kafka_bootstrap,
                 request_timeout_ms=5000,
@@ -88,24 +126,15 @@ def _wait_for_debezium_snapshot(
             all_topics = set(admin.list_topics())
             admin.close()
 
-            # -----------------------------------------------------------------
-            # Step 2: find CDC topics that match our prefix.
-            # A Debezium topic can be:
-            #   {prefix}.{db}.{collection}  (MongoDB)
-            #   {prefix}.{schema}.{table}   (RDBMS)
-            # We match loose: any topic that starts with ``prefix.`` and whose
-            # last segment is one of the expected table names.
-            # -----------------------------------------------------------------
             cdc_topics = [
                 t for t in all_topics
                 if t.startswith(f"{topic_prefix}.")
                 and t.split(".")[-1].lower() in expected_set
             ]
 
-            # -----------------------------------------------------------------
-            # Step 3: for each CDC topic, sum end offsets.
-            # -----------------------------------------------------------------
-            populated_tables: set = set()
+            populated: set = set()
+            current_total: int = 0
+
             if cdc_topics:
                 consumer = KafkaConsumer(
                     bootstrap_servers=kafka_bootstrap,
@@ -119,46 +148,76 @@ def _wait_for_debezium_snapshot(
                         if not tps:
                             continue
                         end_offsets = consumer.end_offsets(tps)
-                        total = sum(end_offsets.values())
-                        if total > 0:
-                            populated_tables.add(topic.split(".")[-1].lower())
+                        n = sum(end_offsets.values())
+                        current_total += n
+                        if n > 0:
+                            populated.add(topic.split(".")[-1].lower())
                     except KafkaError:
                         pass
                 consumer.close()
 
-            # -----------------------------------------------------------------
-            # Step 4: report progress and decide whether to stop waiting.
-            # -----------------------------------------------------------------
-            elapsed = int(_time.monotonic() - (deadline - max_wait))
-            missing = expected_set - populated_tables
-
-            if elapsed - last_report >= poll_interval or not missing:
-                last_report = elapsed
+            # ── Signal A: all tables populated ─────────────────────────────
+            missing = expected_set - populated
+            if elapsed - last_report_t >= poll_interval or not missing:
+                last_report_t = elapsed
                 print(
-                    f"   [{elapsed:>3}s/{max_wait}s] "
-                    f"topics with data: {len(populated_tables)}/{len(expected_set)}"
-                    + (f" — waiting for: {sorted(missing)[:5]}{'…' if len(missing) > 5 else ''}" if missing else ""),
+                    f"   [{elapsed:>4}s/{max_wait}s] "
+                    f"topics with data: {len(populated)}/{len(expected_set)}, "
+                    f"total msgs: {current_total:,}"
+                    + (
+                        f" — waiting for: "
+                        f"{sorted(missing)[:5]}{'…' if len(missing) > 5 else ''}"
+                        if missing
+                        else ""
+                    ),
                     flush=True,
                 )
 
             if not missing:
                 print(
-                    f"   ✅ All {len(expected_set)} collections snapshotted into Kafka "
-                    f"({elapsed}s).",
+                    f"   ✅ All {len(expected_set)} tables in Kafka ({elapsed}s).",
                     flush=True,
                 )
                 return True
+
+            # ── Signal B: rate stability (snapshot write-flood ended) ───────
+            # Use a short window (3 polls) when message count ≥ expected tables
+            # (real snapshot data present); a long window (18 polls / 180 s)
+            # when count is low so a single heartbeat cannot falsely trigger.
+            if current_total > 0:
+                if current_total == prev_total:
+                    stable_polls += 1
+                    needed = (
+                        _STABLE_SHORT
+                        if current_total >= len(expected_set)
+                        else _STABLE_LONG
+                    )
+                    if stable_polls >= needed:
+                        print(
+                            f"   ✅ Snapshot stable for "
+                            f"{stable_polls * poll_interval}s "
+                            f"(total msgs: {current_total:,}, "
+                            f"populated: {len(populated)}/{len(expected_set)}). "
+                            "Proceeding.",
+                            flush=True,
+                        )
+                        return True
+                else:
+                    stable_polls = 0  # reset on any growth
+            else:
+                stable_polls = 0
+
+            prev_total = current_total
 
         except Exception as poll_err:
             print(f"   ⚠️  Kafka poll error (retrying): {poll_err}", flush=True)
 
         _time.sleep(poll_interval)
 
-    # Timed out — proceed with whatever arrived.
     elapsed = int(_time.monotonic() - (deadline - max_wait))
     print(
         f"   ⚠️  Snapshot wait timed out after {elapsed}s. "
-        "Proceeding — Spark will process whatever Debezium has published so far.",
+        "Proceeding with whatever Debezium has published so far.",
         flush=True,
     )
     return False
@@ -473,25 +532,30 @@ def run_db_mode(config: dict):
 
             if trigger_once:
                 # When running in trigger-once mode (initial onboarding mapping),
-                # wait until Debezium has published snapshot messages to Kafka
-                # before starting Spark's availableNow query.  A blind sleep is
-                # unreliable: too short misses data, too long wastes time.
-                # _wait_for_debezium_snapshot polls Kafka until every expected
-                # topic has at least one message, or a generous timeout elapses.
+                # wait until Debezium has fully published its snapshot to Kafka
+                # before starting Spark's availableNow query.
+                # _wait_for_debezium_snapshot uses two signals:
+                # 1. All expected topics have ≥1 message (fast path).
+                # 2. Message-rate stability: total count unchanged for 30 s
+                #    (handles large databases where snapshot takes many minutes).
                 kafka_bs = os.getenv("KAFKA_BOOTSTRAP", "10.5.0.7:9092")
+                connect_url = os.getenv("KAFKA_CONNECT_URL", "http://10.5.0.10:8083")
                 topic_prefix = connector_config["config"].get("topic.prefix", "ecom")
-                max_wait = int(os.getenv("DEBEZIUM_SNAPSHOT_WAIT", "300"))
+                max_wait = int(os.getenv("DEBEZIUM_SNAPSHOT_WAIT", "3600"))
                 _wait_for_debezium_snapshot(
                     topic_prefix=topic_prefix,
                     expected_tables=tables,
                     kafka_bootstrap=kafka_bs,
                     max_wait=max_wait,
+                    connector_name=connector_name,
+                    connect_url=connect_url,
                 )
 
             enable_downstream = config.get("enable_downstream", False)
             run_streaming(trigger_once=trigger_once,
                           enable_downstream=enable_downstream,
-                          output_bucket=bucket_name)
+                          output_bucket=bucket_name,
+                          topic_prefix=topic_prefix)
 
             # After trigger-once streaming finishes, update mapping status to
             # 'completed' if the streaming callback didn't already do it (e.g.

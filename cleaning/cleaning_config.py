@@ -4,13 +4,34 @@ Configuration module for Spark session and MinIO client setup.
 
 import os
 
+# ---------------------------------------------------------------------------
+# JAR paths — set BEFORE pyspark is imported so the JVM gateway starts with
+# the correct driver classpath (Delta Lake + S3A), no Maven download needed.
+# ---------------------------------------------------------------------------
+_JARS_DIR = "/app/jars"
+_CLEAN_JARS = [
+    f"{_JARS_DIR}/hadoop-aws-3.3.4.jar",
+    f"{_JARS_DIR}/aws-java-sdk-bundle-1.12.262.jar",
+    f"{_JARS_DIR}/delta-spark_2.12-3.2.0.jar",
+    f"{_JARS_DIR}/delta-storage-3.2.0.jar",
+]
+_CLEAN_JARS_STR = ",".join(_CLEAN_JARS)
+_CLEAN_CP = ":".join(_CLEAN_JARS)
+
+if "PYSPARK_SUBMIT_ARGS" not in os.environ:
+    os.environ["PYSPARK_SUBMIT_ARGS"] = (
+        f"--driver-class-path {_CLEAN_CP} --jars {_CLEAN_JARS_STR} pyspark-shell"
+    )
+
+# findspark is only needed when Spark is installed as a standalone binary.
+if os.environ.get("SPARK_HOME"):
+    import findspark
+    findspark.init()
+
 from dotenv import load_dotenv, find_dotenv
 from minio import Minio
-import findspark
 from pyspark.sql import SparkSession
 
-# Initialize findspark and load environment variables
-findspark.init()
 load_dotenv(find_dotenv())
 
 
@@ -61,11 +82,10 @@ def create_spark_session():
         .config("spark.dynamicAllocation.minExecutors", "0")
         .config("spark.dynamicAllocation.maxExecutors", "8")
         .config("spark.dynamicAllocation.initialExecutors", "1")
-        # S3A/MinIO JAR dependencies for PySpark 3.5.0
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        )
+        # Use pre-downloaded local JARs — no Maven/internet access needed.
+        .config("spark.jars", _CLEAN_JARS_STR)
+        .config("spark.driver.extraClassPath", _CLEAN_CP)
+        .config("spark.executor.extraClassPath", _CLEAN_CP)
         # S3A/MinIO configuration
         .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
         .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
@@ -79,6 +99,15 @@ def create_spark_session():
         )
         .config("inferSchema", "true")
         .config("mergeSchema", "true")
+        # Delta Lake extensions
+        .config(
+            "spark.sql.extensions",
+            "io.delta.sql.DeltaSparkSessionExtension",
+        )
+        .config(
+            "spark.sql.catalog.spark_catalog",
+            "org.apache.spark.sql.delta.catalog.DeltaCatalog",
+        )
         .getOrCreate()
     )
     spark.sparkContext.setLogLevel("ERROR")
