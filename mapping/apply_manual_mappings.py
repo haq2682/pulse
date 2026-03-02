@@ -128,194 +128,297 @@ def find_column_in_ingested(column_name: str, ingested_cache: dict):
     return None, None
 
 
+def _detect_streaming_parquet_tables(bucket_name: str, temp_folder: str) -> dict:
+    """
+    Detect tables stored as partitioned Parquet under mapped-temp/ (db/api streaming mode).
+
+    Layout written by _write_spark_native:
+        mapped-temp/{table_name}/_batch_id=0/part-*.parquet
+
+    Returns a dict mapping table_name -> list of MinIO object keys for that table's
+    Parquet files.  Returns an empty dict if no Parquet files are found.
+    """
+    try:
+        all_objects = list(
+            minio_client.list_objects(bucket_name, prefix=temp_folder, recursive=True)
+        )
+    except Exception as e:
+        print(f"  ⚠️  Could not list {temp_folder}: {e}")
+        return {}
+
+    tables = {}
+    for obj in all_objects:
+        if not obj.object_name.endswith(".parquet"):
+            continue
+        # Strip "mapped-temp/" prefix → "table_name/_batch_id=0/part-xxxx.parquet"
+        rel = obj.object_name[len(temp_folder):]
+        # First segment is the table name
+        parts = rel.split("/", 1)
+        if not parts:
+            continue
+        table_name = parts[0]
+        tables.setdefault(table_name, []).append(obj.object_name)
+
+    return tables
+
+
+def _apply_mappings_to_df(df: pd.DataFrame, table_name: str, manual_mappings: dict,
+                           ingested_cache: dict, updated_results: dict) -> pd.DataFrame:
+    """
+    Apply manual column renames (and cross-table lookups) to a DataFrame in-place.
+    Shared by both CSV and Parquet paths.
+    """
+    if table_name not in manual_mappings:
+        return df
+
+    table_map = manual_mappings[table_name]
+    print(f"  📝 Applying manual mappings for {table_name}...")
+
+    for canonical_col, source_col in table_map.items():
+        if source_col in df.columns:
+            df.rename(columns={source_col: canonical_col}, inplace=True)
+            print(f"     ✅ Mapped {source_col} → {canonical_col}")
+        else:
+            # Try cross-table lookup from ingested files
+            print(f"     🔍 '{source_col}' not found in {table_name} — searching ingested files...")
+            source_table, source_df = find_column_in_ingested(source_col, ingested_cache)
+
+            if source_table is not None:
+                min_len = min(len(df), len(source_df))
+                df[canonical_col] = pd.NA
+                df.loc[:min_len - 1, canonical_col] = source_df[source_col].iloc[:min_len].values
+                print(
+                    f"     ✅ Mapped {source_col} (from {source_table}) → {canonical_col} in {table_name}"
+                )
+            else:
+                warning_msg = (
+                    f"Source column '{source_col}' not found in {table_name} "
+                    "or any ingested files"
+                )
+                print(f"     ⚠️  {warning_msg}")
+                updated_results["failed_mappings"].append({
+                    "table": table_name,
+                    "canonical_column": canonical_col,
+                    "source_column": source_col,
+                    "error": warning_msg,
+                    "stage": "column_mapping",
+                })
+
+    return df
+
+
 def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
     """
     Apply manual mappings to files in the mapped-temp folder.
-    
+
+    Supports two storage layouts written by the mapping pipeline:
+
+    **Batch mode (CSV)**
+        ``mapped-temp/{table_name}.csv``  →  ``mapped/{table_name}.csv``
+
+    **Streaming mode — db / api (Parquet)**
+        ``mapped-temp/{table_name}/_batch_id=0/part-*.parquet``
+        →  ``mapped/{table_name}/_batch_id=0/part-0.parquet``
+
     Args:
         bucket_name: Name of the MinIO bucket
         manual_mappings: Dictionary of manual column mappings
                         Format: {table_name: {canonical_col: source_col}}
-    
+
     Returns:
         dict: Updated mapping results with missing_cols and extra_cols
     """
     print(f"\n{'='*60}")
     print(f"Applying Manual Mappings to Bucket: {bucket_name}")
     print(f"{'='*60}\n")
-    
+
     if not minio_client.bucket_exists(bucket_name):
         raise ValueError(f"Bucket '{bucket_name}' does not exist")
-    
+
     updated_results = {
         "missing_cols": [],
         "extra_cols": [],
-        "failed_mappings": []  # Track mappings that failed to apply
+        "failed_mappings": []
     }
-    
-    # Load all ingested files into cache for cross-table column lookup
-    print(f"📂 Loading ingested files for cross-table column lookup...")
+
+    # Load ingested files for cross-table column lookup (batch mode uses these;
+    # streaming mode may not have an ingested/ folder — that's fine).
+    print("📂 Loading ingested files for cross-table column lookup...")
     ingested_cache = load_ingested_files_cache(bucket_name)
     print(f"   Cached {len(ingested_cache)} ingested files\n")
-    
-    # List all files in mapped-temp folder
+
     temp_folder = "mapped-temp/"
+
+    # ── Detect storage format ─────────────────────────────────────────────────
     try:
-        objects = list(minio_client.list_objects(bucket_name, prefix=temp_folder, recursive=False))
+        top_objects = list(
+            minio_client.list_objects(bucket_name, prefix=temp_folder, recursive=False)
+        )
     except Exception as e:
         raise ValueError(f"Failed to list objects in {temp_folder}: {e}")
-    
-    # Filter to CSV files only
-    csv_objects = [obj for obj in objects if obj.object_name.endswith('.csv')]
-    
+
+    csv_objects = [obj for obj in top_objects if obj.object_name.endswith(".csv")]
+
+    # Streaming mode: look for Parquet files one level deeper
+    streaming_tables = {}
     if not csv_objects:
-        raise ValueError(f"No CSV files found in {bucket_name}/{temp_folder}. Initial mapping may not have completed or files may have already been moved.")
+        streaming_tables = _detect_streaming_parquet_tables(bucket_name, temp_folder)
+
+    if not csv_objects and not streaming_tables:
+        raise ValueError(
+            f"No mapped files found in {bucket_name}/{temp_folder}. "
+            "Initial mapping may not have completed or files may have already been moved."
+        )
     
-    # Track successfully processed files for cleanup
-    successfully_processed_files = []
-    failed_files = []
-    
-    # Use try-finally to ensure cleanup happens even if there's an error
+    successfully_processed_files = []   # object keys to delete after success
+    failed_tables = []
+
     try:
-        for obj in csv_objects:
-            # Extract table name from file path (e.g., "mapped-temp/customers.csv" -> "customers")
-            table_name = obj.object_name.replace(temp_folder, '').replace('.csv', '')
-            
-            print(f"Processing table: {table_name}")
-            
-            # Load the CSV file from MinIO
-            try:
-                response = minio_client.get_object(bucket_name, obj.object_name)
-                csv_data = response.read().decode("utf-8")
-                df = pd.read_csv(StringIO(csv_data))
-                response.close()
-                response.release_conn()
-                print(f"  Loaded {len(df)} rows from {obj.object_name}")
-            except Exception as e:
-                error_msg = f"Error loading {obj.object_name}: {e}"
-                print(f"  ⚠️  {error_msg}")
-                failed_files.append(obj.object_name)
-                updated_results["failed_mappings"].append({
-                    "table": table_name,
-                    "error": error_msg,
-                    "stage": "loading"
-                })
-                continue
-            
-            # Get current columns
-            current_columns = set(df.columns)
-            
-            # Apply manual mappings for this table if provided
-            if table_name in manual_mappings:
-                print(f"  📝 Applying manual mappings for {table_name}...")
-                table_mappings = manual_mappings[table_name]
-                
-                for canonical_col, source_col in table_mappings.items():
-                    if source_col in df.columns:
-                        # Rename the column
-                        df.rename(columns={source_col: canonical_col}, inplace=True)
-                        print(f"     ✅ Mapped {source_col} → {canonical_col}")
-                        
-                        # Update column sets
-                        current_columns.discard(source_col)
-                        current_columns.add(canonical_col)
-                    else:
-                        # Source column not found in mapped-temp file
-                        # Search for it across ALL ingested files
-                        print(f"     🔍 Searching for '{source_col}' across ingested files...")
-                        source_table, source_df = find_column_in_ingested(source_col, ingested_cache)
-                        
-                        if source_table is not None:
-                            # Found the source column in another ingested file
-                            print(f"     ✅ Found '{source_col}' in ingested/{source_table}.csv")
-                            
-                            # Add the column data from source to target dataframe
-                            # Handle case where dataframes have different lengths
-                            if len(source_df) != len(df):
-                                print(f"     ⚠️  Row count mismatch: {table_name} has {len(df)} rows, {source_table} has {len(source_df)} rows")
-                                print(f"        Using first {min(len(df), len(source_df))} rows for mapping")
-                            
-                            # Copy column data (truncate or pad as necessary)
-                            min_len = min(len(df), len(source_df))
-                            df[canonical_col] = pd.NA  # Initialize with pd.NA for better null handling
-                            df.loc[:min_len-1, canonical_col] = source_df[source_col].iloc[:min_len].values
-                            
-                            # Warn if there are unmapped rows
-                            if len(df) > min_len:
-                                print(f"        ⚠️  {len(df) - min_len} rows in {table_name} will have {canonical_col}=NA due to insufficient source data")
-                            
-                            print(f"     ✅ Mapped {source_col} (from {source_table}) → {canonical_col} (in {table_name})")
-                            current_columns.add(canonical_col)
-                        else:
-                            # Column not found anywhere
-                            warning_msg = f"Source column '{source_col}' not found in mapped-temp/{table_name}.csv or any ingested files"
-                            print(f"     ⚠️  {warning_msg}")
-                            updated_results["failed_mappings"].append({
-                                "table": table_name,
-                                "canonical_column": canonical_col,
-                                "source_column": source_col,
-                                "error": warning_msg,
-                                "stage": "column_mapping"
-                            })
-            
-            # Save the updated dataframe to the mapped folder
-            try:
-                mapped_file_name = f"mapped/{table_name}.csv"
-                csv_buffer = BytesIO()
-                df.to_csv(csv_buffer, index=False)
-                csv_buffer.seek(0)
-                
-                minio_client.put_object(
-                    bucket_name,
-                    mapped_file_name,
-                    csv_buffer,
-                    length=len(csv_buffer.getvalue()),
-                    content_type="text/csv",
-                )
-                print(f"  ✅ Saved to {mapped_file_name} ({len(df)} rows)")
-                csv_buffer.close()
-                
-                # Track successfully processed file for cleanup
-                successfully_processed_files.append(obj.object_name)
-            except Exception as e:
-                error_msg = f"Error saving {mapped_file_name}: {e}"
-                print(f"  ⚠️  {error_msg}")
-                failed_files.append(obj.object_name)
-                updated_results["failed_mappings"].append({
-                    "table": table_name,
-                    "error": error_msg,
-                    "stage": "saving"
-                })
-                # Don't add to successfully_processed_files since save failed
-    
+        # ── BATCH MODE: flat CSV files ────────────────────────────────────────
+        if csv_objects:
+            print(f"📋 Detected batch mode ({len(csv_objects)} CSV files)\n")
+            for obj in csv_objects:
+                table_name = obj.object_name.replace(temp_folder, "").replace(".csv", "")
+                print(f"Processing table: {table_name}")
+
+                try:
+                    response = minio_client.get_object(bucket_name, obj.object_name)
+                    csv_data = response.read().decode("utf-8")
+                    df = pd.read_csv(StringIO(csv_data))
+                    response.close()
+                    response.release_conn()
+                    print(f"  Loaded {len(df)} rows from {obj.object_name}")
+                except Exception as e:
+                    error_msg = f"Error loading {obj.object_name}: {e}"
+                    print(f"  ⚠️  {error_msg}")
+                    failed_tables.append(table_name)
+                    updated_results["failed_mappings"].append(
+                        {"table": table_name, "error": error_msg, "stage": "loading"}
+                    )
+                    continue
+
+                df = _apply_mappings_to_df(df, table_name, manual_mappings,
+                                            ingested_cache, updated_results)
+
+                try:
+                    mapped_file_name = f"mapped/{table_name}.csv"
+                    csv_buffer = BytesIO()
+                    df.to_csv(csv_buffer, index=False)
+                    csv_buffer.seek(0)
+                    minio_client.put_object(
+                        bucket_name,
+                        mapped_file_name,
+                        csv_buffer,
+                        length=len(csv_buffer.getvalue()),
+                        content_type="text/csv",
+                    )
+                    print(f"  ✅ Saved to {mapped_file_name} ({len(df)} rows)")
+                    csv_buffer.close()
+                    successfully_processed_files.append(obj.object_name)
+                except Exception as e:
+                    error_msg = f"Error saving {mapped_file_name}: {e}"
+                    print(f"  ⚠️  {error_msg}")
+                    failed_tables.append(table_name)
+                    updated_results["failed_mappings"].append(
+                        {"table": table_name, "error": error_msg, "stage": "saving"}
+                    )
+
+        # ── STREAMING MODE: partitioned Parquet directories ───────────────────
+        else:
+            print(f"🌊 Detected streaming mode ({len(streaming_tables)} Parquet tables)\n")
+            for table_name, parquet_keys in streaming_tables.items():
+                print(f"Processing table: {table_name} ({len(parquet_keys)} parquet file(s))")
+
+                # Read all parquet files for this table and concatenate
+                frames = []
+                load_failed = False
+                for key in parquet_keys:
+                    try:
+                        response = minio_client.get_object(bucket_name, key)
+                        data = response.read()
+                        response.close()
+                        response.release_conn()
+                        frames.append(pd.read_parquet(BytesIO(data)))
+                    except Exception as e:
+                        error_msg = f"Error loading {key}: {e}"
+                        print(f"  ⚠️  {error_msg}")
+                        updated_results["failed_mappings"].append(
+                            {"table": table_name, "error": error_msg, "stage": "loading"}
+                        )
+                        load_failed = True
+                        break
+
+                if load_failed or not frames:
+                    failed_tables.append(table_name)
+                    continue
+
+                df = pd.concat(frames, ignore_index=True)
+                print(f"  Loaded {len(df)} rows ({len(frames)} file(s))")
+
+                df = _apply_mappings_to_df(df, table_name, manual_mappings,
+                                            ingested_cache, updated_results)
+
+                # Preserve Spark-compatible column types so schema-merge succeeds when
+                # the next CDC micro-batch is appended by Spark to the same directory.
+                # Spark writes _ingested_at via current_timestamp() → TimestampType
+                # (pyarrow: timestamp[us, tz=UTC]).  Pandas may drop the timezone when
+                # round-tripping through read_parquet / to_parquet, so we restore it
+                # explicitly here to keep the file schema identical to what Spark writes.
+                if "_ingested_at" in df.columns:
+                    df["_ingested_at"] = pd.to_datetime(df["_ingested_at"], utc=True)
+
+                # Write to mapped/{table_name}/_batch_id=0/part-0.parquet
+                # This matches the layout expected by cleaning_utils / Spark downstream.
+                try:
+                    mapped_file_name = f"mapped/{table_name}/_batch_id=0/part-0.parquet"
+                    parquet_buffer = BytesIO()
+                    df.to_parquet(parquet_buffer, index=False, engine="pyarrow")
+                    parquet_buffer.seek(0)
+                    parquet_bytes = parquet_buffer.getvalue()
+                    minio_client.put_object(
+                        bucket_name,
+                        mapped_file_name,
+                        BytesIO(parquet_bytes),
+                        length=len(parquet_bytes),
+                        content_type="application/octet-stream",
+                    )
+                    print(f"  ✅ Saved to {mapped_file_name} ({len(df)} rows)")
+                    successfully_processed_files.extend(parquet_keys)
+                except Exception as e:
+                    error_msg = f"Error saving parquet for {table_name}: {e}"
+                    print(f"  ⚠️  {error_msg}")
+                    failed_tables.append(table_name)
+                    updated_results["failed_mappings"].append(
+                        {"table": table_name, "error": error_msg, "stage": "saving"}
+                    )
+
     finally:
-        # Clean up: Remove ONLY successfully processed files from mapped-temp folder
+        # Remove ONLY successfully migrated source files from mapped-temp/
         print(f"\n🧹 Cleaning up temporary files...")
-        
         if successfully_processed_files:
-            print(f"  Removing {len(successfully_processed_files)} successfully processed files...")
+            print(f"  Removing {len(successfully_processed_files)} source file(s)...")
             for file_path in successfully_processed_files:
                 try:
                     minio_client.remove_object(bucket_name, file_path)
                     print(f"  ✅ Removed {file_path}")
                 except Exception as e:
                     print(f"  ⚠️  Error removing {file_path}: {e}")
-        
-        if failed_files:
-            print(f"\n  ⚠️  {len(failed_files)} files had errors and were NOT moved:")
-            for file_path in failed_files:
-                print(f"     - {file_path}")
+
+        if failed_tables:
+            print(f"\n  ⚠️  {len(failed_tables)} table(s) had errors and were NOT moved:")
+            for t in failed_tables:
+                print(f"     - {t}")
             print(f"  These files remain in {bucket_name}/mapped-temp/ for manual review")
     
     print(f"\n{'='*60}")
-    if len(failed_files) == 0:
+    if not failed_tables:
         print(f"✅ Manual Mappings Applied Successfully")
-        print(f"   Processed {len(successfully_processed_files)} tables")
+        print(f"   Processed {len(successfully_processed_files)} file(s) across tables")
         print(f"   Files moved from {bucket_name}/mapped-temp/ to {bucket_name}/mapped/")
     else:
         print(f"⚠️  Manual Mappings Completed with Warnings")
-        print(f"   Successfully processed: {len(successfully_processed_files)} tables")
-        print(f"   Failed: {len(failed_files)} tables (remain in mapped-temp)")
+        print(f"   Successfully processed: {len(streaming_tables) + len(csv_objects) - len(failed_tables)} table(s)")
+        print(f"   Failed: {len(failed_tables)} table(s) (remain in mapped-temp)")
     print(f"{'='*60}\n")
     
     return updated_results

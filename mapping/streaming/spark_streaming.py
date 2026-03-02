@@ -2,6 +2,7 @@
 
 import os
 import sys
+import threading
 
 # ---------------------------------------------------------------------------
 # JAR paths — baked into the repo at mapping/streaming/jars/ so they are
@@ -78,17 +79,46 @@ _FIRST_BATCH_FLAG_TTL_SECONDS = 86400 * 7
 # TTL for mapping results stored in Redis (24 hours).
 _MAPPING_RESULTS_TTL_SECONDS = 86400
 
+# Event used in trigger-once (onboarding) mode to stop the streaming query
+# immediately after the first-ever micro-batch has been written.  This
+# prevents ``availableNow`` from continuing to process batch 1, 2, …
+# while the user reviews the auto-mapped results on the onboarding mapping
+# page.  The continuous db_streaming / api_streaming Airflow DAG picks up
+# the remaining Kafka messages after the user confirms their mappings via
+# POST /onboarding/confirm-mapping.
+_stop_after_first_batch_event: threading.Event = threading.Event()
+
 
 def create_spark_session() -> SparkSession:
-    """Create Spark session with Kafka and S3 support"""
+    """Create Spark session with Kafka and S3 support.
+
+    IMPORTANT: map.py creates a SparkSession at module-import time (appName
+    "NormalizeData", master from SPARK_SERVER / local[*]).  Calling
+    getOrCreate() naively would return that pre-existing session and the
+    streaming job would run in local mode on the driver instead of using the
+    cluster.  We explicitly stop any existing session first so that the
+    streaming-specific configuration (cluster master, executor count, Kafka
+    JARs) is always applied.
+    """
+    existing = SparkSession.getActiveSession()
+    if existing is not None:
+        existing.stop()
+
+    # Prefer SPARK_MASTER_URL (set in docker-compose) over the hardcoded URL
+    # so the master address can be changed via an env var without code edits.
+    spark_master = (
+        os.getenv("SPARK_MASTER_URL", "spark://10.5.0.3:7077")
+    )
+
     return (
         SparkSession.builder
         .appName("StreamingNormalization")
-        .master("spark://10.5.0.3:7077")
-        .config("spark.dynamicAllocation.enabled", "true")
-        .config("spark.dynamicAllocation.minExecutors", "0")
-        .config("spark.dynamicAllocation.maxExecutors", "8")
-        .config("spark.dynamicAllocation.initialExecutors", "1")
+        .master(spark_master)
+        # Dynamic allocation requires an external shuffle service that is not
+        # configured on this standalone cluster.  Use a fixed executor count
+        # matching the 2 workers × 2 cores each = 4 total cores.
+        .config("spark.dynamicAllocation.enabled", "false")
+        .config("spark.executor.instances", os.getenv("SPARK_EXECUTOR_INSTANCES", "4"))
         # Driver classpath: JARs are mounted at /app/jars/ in the api container.
         # Do NOT use spark.jars here — that would re-upload these JARs from the
         # driver to the executor, creating duplicate class definitions on the
@@ -115,6 +145,10 @@ def create_spark_session() -> SparkSession:
             "spark.sql.catalog.spark_catalog",
             "org.apache.spark.sql.delta.catalog.DeltaCatalog",
         )
+        # Tune shuffle partitions to match the cluster (2 workers × 2 cores).
+        # The default of 200 creates hundreds of tiny tasks for our data volume,
+        # wasting scheduler overhead.  16 is a sensible 4× multiplier of cores.
+        .config("spark.sql.shuffle.partitions", os.getenv("SPARK_SHUFFLE_PARTITIONS", "16"))
         .getOrCreate()
     )
 
@@ -271,16 +305,18 @@ def normalize_message_row(json_str):
     }
 
 
-def read_kafka_stream(spark: SparkSession) -> DataFrame:
+def read_kafka_stream(spark: SparkSession, topic_prefix: str = "ecom") -> DataFrame:
     """
-    Read from Kafka ecom.* topics with CDC support for database ingestion.
-    
-    Topic naming convention:
-    - 'ecom.*' topics: Messages from API/DB ingestion (e.g., ecom.customers, ecom.orders)
-    
+    Read from Kafka {topic_prefix}.* topics with CDC support for database ingestion.
+
+    topic_prefix is the per-tenant Kafka topic prefix.  Each tenant's Debezium
+    connector publishes to ``{topic_prefix}.{schema}.{table}`` topics; using the
+    tenant's business_id UUID as the prefix ensures complete topic-level
+    isolation — one tenant's Spark job never reads another tenant's data.
+
     Database ingestion messages include an optional 'operation' field for CDC:
     - 'c' or 'create': New record
-    - 'u' or 'update': Updated record  
+    - 'u' or 'update': Updated record
     - 'd' or 'delete': Deleted record
     - 'r' or 'read': Snapshot/initial load
 
@@ -290,12 +326,24 @@ def read_kafka_stream(spark: SparkSession) -> DataFrame:
     (string-encoded ``after``/``before``) and Debezium RDBMS (object-encoded
     ``after``/``before``) are handled correctly without schema mismatch.
     """
+    # Cap the number of Kafka offsets consumed per micro-batch.
+    # Without this, availableNow trigger attempts to read ALL pending offsets
+    # (9 M+ rows from a Debezium snapshot) as a single batch, which causes
+    # the Python UDF + shuffle to run for hours.  200 K rows per batch keeps
+    # each batch under ~30 s and produces predictable memory pressure.
+    # Override via KAFKA_MAX_OFFSETS_PER_TRIGGER env var.
+    max_offsets = int(os.getenv("KAFKA_MAX_OFFSETS_PER_TRIGGER", "200000"))
+    # Escape literal dots in the prefix (e.g. "my.org") so the regex only
+    # matches topic names that start with the exact prefix string.
+    escaped_prefix = topic_prefix.replace(".", "\\.")
+
     return (
         spark.readStream
         .format("kafka")
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP)
-        .option("subscribePattern", "ecom\\..*")
+        .option("subscribePattern", f"{escaped_prefix}\\..*")
         .option("startingOffsets", "earliest")
+        .option("maxOffsetsPerTrigger", max_offsets)
         .load()
         .selectExpr("CAST(value AS STRING) as json_str")
     )
@@ -409,37 +457,39 @@ def extract_table_dataframes(batch_df: DataFrame) -> tuple:
     if not normalized_df.limit(1).collect():
         return {}, {}
 
-    table_names = [
-        row["table"]
-        for row in normalized_df.select("table").distinct().collect()
-        if row["table"] is not None
-    ]
+    # ── Single-pass key + operation discovery ───────────────────────────────
+    # Previously each table triggered its own distinct().collect() call,
+    # resulting in O(tables) = 15 separate Spark jobs per micro-batch.
+    # This single job collects all (table, operation, payload_key) tuples
+    # at once, then the driver groups them in Python — 1 Spark action total.
+    meta_rows = (
+        normalized_df
+        .select(
+            "table",
+            "operation",
+            explode(map_keys(col("payload"))).alias("k"),
+        )
+        .distinct()
+        .collect()
+    )
+
+    # Build per-table key sets and first-seen operation.
+    table_keys: dict = {}
+    table_ops: dict = {}
+    for r in meta_rows:
+        tbl = r["table"]
+        if tbl is None:
+            continue
+        table_keys.setdefault(tbl, set()).add(r["k"])
+        table_ops.setdefault(tbl, r["operation"] or "c")
+
     all_dataframes = {}
     operations = {}
 
-    for table_name in table_names:
+    for table_name, payload_keys in table_keys.items():
         table_df = normalized_df.filter(col("table") == table_name)
 
-        # Get payload keys and operation from first row
-        sample = table_df.select("payload", "operation").limit(1).collect()
-
-        if not sample:
-            continue
-
-        payload_keys = list(sample[0]["payload"].keys())
-
-        # Union keys from all rows in the table using Spark's map_keys so that
-        # schema variation (e.g. partial Debezium updates) doesn't cause columns
-        # present in later rows to be silently dropped.  This collects only the
-        # distinct key strings — not the full rows — to the driver.
-        all_keys = [
-            row[0]
-            for row in table_df.select(explode(map_keys(col("payload"))).alias("k"))
-            .select("k").distinct().collect()
-        ]
-        if all_keys:
-            payload_keys = all_keys
-        operation = sample[0]["operation"] if sample[0]["operation"] else "c"
+        operation = table_ops.get(table_name, "c")
 
         # Extract payload columns
         select_exprs = [col("payload").getItem(k).alias(k) for k in payload_keys]
@@ -490,6 +540,22 @@ def _write_spark_native(
             .withColumn("_batch_id",    F.lit(batch_id))
             .withColumn("_ingested_at", F.current_timestamp())
         )
+
+        # Cast VOID (NullType) columns to StringType.
+        # Parquet rejects columns whose entire micro-batch contained only NULL
+        # values — Spark infers them as NullType / VOID and the writer raises
+        # AnalysisException: [UNSUPPORTED_DATA_TYPE_FOR_DATASOURCE].  Casting
+        # to StringType is safe because those columns will remain all-null; the
+        # downstream cleaning / transformation stages already handle null strings.
+        from pyspark.sql.types import NullType, StringType as _StringType
+        void_cols = [f.name for f in df_out.schema.fields if isinstance(f.dataType, NullType)]
+        if void_cols:
+            for _vc in void_cols:
+                df_out = df_out.withColumn(_vc, df_out[_vc].cast(_StringType()))
+            print(
+                f"  ℹ️  Cast {len(void_cols)} VOID column(s) to StringType for {table_name}: {void_cols}",
+                flush=True,
+            )
 
         s3_path = f"s3a://{bucket_name}/{folder}/{table_name}"
 
@@ -711,12 +777,13 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
                                 SET mapping_status = %s,
                                     mapping_completed_at = %s,
                                     mapping_error = NULL,
-                                    current_step = 'mapping'
+                                    current_step = 'mapping',
+                                    mapping_results = %s::jsonb
                                 WHERE business_id = %s
                                 AND is_completed = false
-                            """, ("completed", datetime.now(timezone.utc), business_id))
+                            """, ("completed", datetime.now(timezone.utc), json.dumps(mapping_results), business_id))
                             conn.commit()
-                    print(f"   Database status updated to 'completed'")
+                    print(f"   Database status updated to 'completed' (mapping_results persisted to DB)")
                 except Exception as db_error:
                     print(f"⚠️  Warning: Could not update database status: {db_error}")
                     
@@ -749,6 +816,16 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
     print(f"✅ Batch {batch_id} completed: {len(results)} tables processed")
     print(f"   Data saved to {output_bucket}/{target_folder}/")
 
+    # In trigger-once (onboarding) mode, signal the main thread to stop the
+    # streaming query after the first-ever micro-batch so the user can review
+    # mapping results before any further batches are processed.  Subsequent
+    # batches (the remaining snapshot tail + future CDC events) are consumed
+    # by the continuous db_streaming / api_streaming Airflow DAG once the
+    # user confirms their mappings via POST /onboarding/confirm-mapping.
+    if is_first_ever_batch and trigger_once:
+        print("   🛑 First batch complete — signalling trigger-once stream to stop for user review.")
+        _stop_after_first_batch_event.set()
+
     # ── Trigger inline downstream pipeline (clean → transform → analyze → ML) ──
     # Only runs when:
     #  1. enable_downstream is True (set by --enable-downstream flag)
@@ -763,7 +840,7 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
             print(f"   ⚠️  Could not trigger downstream: {downstream_err}")
 
 
-def run_streaming(trigger_once: bool = False, enable_downstream: bool = False, output_bucket: str = None):
+def run_streaming(trigger_once: bool = False, enable_downstream: bool = False, output_bucket: str = None, topic_prefix: str = None):
     """Main streaming pipeline.
 
     Args:
@@ -776,6 +853,10 @@ def run_streaming(trigger_once: bool = False, enable_downstream: bool = False, o
                            latency from ~10 min to ~10 s – 2 min.
         output_bucket: MinIO bucket name to write mapped files to.  Defaults to
                        the OUTPUT_BUCKET environment variable.
+        topic_prefix: Kafka topic prefix to subscribe to.  Should be the
+                      tenant's business_id UUID so only that tenant's topics
+                      (``{business_id}.{schema}.{table}``) are consumed.
+                      Falls back to the KAFKA_TOPIC_PREFIX env var, then "ecom".
     """
     # Resolve output bucket: prefer explicit argument, then env var, then fallback.
     if output_bucket is None:
@@ -831,9 +912,14 @@ def run_streaming(trigger_once: bool = False, enable_downstream: bool = False, o
     if not minio_client.bucket_exists(output_bucket):
         minio_client.make_bucket(output_bucket)
         print(f"Created bucket: {output_bucket}")
-    
-    # Read stream
-    json_stream = read_kafka_stream(spark)
+
+    # Resolve topic prefix: explicit arg → env var → legacy default.
+    if topic_prefix is None:
+        topic_prefix = os.getenv("KAFKA_TOPIC_PREFIX", "ecom")
+    print(f"Topic prefix: {topic_prefix}")
+
+    # Read stream — scoped to this tenant's topics only.
+    json_stream = read_kafka_stream(spark, topic_prefix)
     
     # Process with foreachBatch
     writer = (
@@ -846,6 +932,10 @@ def run_streaming(trigger_once: bool = False, enable_downstream: bool = False, o
         .option("checkpointLocation", checkpoint_location)
     )
 
+    # Reset the stop signal before starting a new streaming query so that a
+    # process restart does not immediately stop if the event is still set.
+    _stop_after_first_batch_event.clear()
+
     if trigger_once:
         # availableNow: process all pending Kafka messages then stop (Airflow-friendly)
         writer = writer.trigger(availableNow=True)
@@ -854,6 +944,31 @@ def run_streaming(trigger_once: bool = False, enable_downstream: bool = False, o
         print("Streaming query started. Press Ctrl+C to stop.\n")
 
     query = writer.start()
+
+    # In trigger-once (onboarding) mode, launch a monitor thread that waits
+    # for the first-ever batch to complete and then calls query.stop().
+    # This ensures the job exits after batch 0 instead of continuing to
+    # consume all available Kafka messages in subsequent micro-batches.
+    # On a Spark restart (streaming_first_batch_done flag already set), the
+    # event will never fire so the monitor times out harmlessly — the
+    # availableNow trigger will let the query exit naturally on its own.
+    if trigger_once:
+        def _first_batch_stopper():
+            # Wait at most 2 hours for the first batch to complete.
+            fired = _stop_after_first_batch_event.wait(timeout=7200)
+            if fired and query.isActive:
+                print("\n🛑 Stopping trigger-once streaming — first batch done, user review required.")
+                try:
+                    query.stop()
+                except Exception as _stop_err:
+                    print(f"   Warning: query.stop() raised: {_stop_err}")
+
+        _monitor = threading.Thread(
+            target=_first_batch_stopper,
+            name="first-batch-stopper",
+            daemon=True,
+        )
+        _monitor.start()
 
     try:
         query.awaitTermination()

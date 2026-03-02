@@ -41,8 +41,9 @@ database URI during onboarding (POST /onboarding/start-mapping, mode=db).
                  }
 
 Do NOT trigger this DAG multiple times for the same tenant — it would
-start a second competing streaming job. Use max_active_runs=1 to guard
-against accidental double-triggers.
+start a second competing streaming job for the same bucket.  The API
+layer (POST /onboarding/start-mapping) is responsible for checking
+whether a run is already active for a given business_id before firing.
 
 Why not scheduled?
 ------------------
@@ -210,7 +211,7 @@ with DAG(
     schedule_interval=None,      # USER-TRIGGERED — never runs on a schedule
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    max_active_runs=1,           # prevent duplicate competing streaming jobs
+    max_active_runs=25,          # one perpetual run per active tenant; no hard cap needed
     tags=["pulse", "db", "cdc", "streaming"],
     default_args=_batch_defaults,
     params={

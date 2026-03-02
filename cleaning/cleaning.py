@@ -48,6 +48,46 @@ from incremental_cleaner import IncrementalCleaner
 from pyspark.sql.functions import regexp_extract, col, when
 
 
+def _expand_to_partition_paths(minio_client, bucket_name, file_paths):
+    """
+    Expand Parquet directory paths to their ``_batch_id=N`` sub-partition directory paths
+    for fine-grained incremental tracking.
+
+    For a CSV path (``mapped/t.csv``) the mapping is 1-to-1 — the path is returned
+    unchanged so that CSV-based tables are still tracked the same way as before.
+
+    For a Parquet directory (``mapped/t/``) we list its direct children and return only
+    those whose name contains ``_batch_id=``.  When a new CDC micro-batch arrives it
+    creates ``_batch_id=N/`` — a path not yet in ``cleaning_state`` — which triggers
+    re-cleaning of the full table while skipping tables that have no new batches.
+
+    If no ``_batch_id=N`` children are found the directory path itself is returned as a
+    single-element list so that data written without batch partitioning is still tracked.
+
+    Returns:
+        dict: {original_table_path -> [tracked_partition_path, ...]}
+    """
+    result = {}
+    for fp in file_paths:
+        if not fp.endswith("/"):
+            # CSV or flat file — track at file level unchanged
+            result[fp] = [fp]
+            continue
+        try:
+            objs = list(
+                minio_client.list_objects(bucket_name, prefix=fp, recursive=False)
+            )
+            batch_dirs = sorted(
+                obj.object_name if obj.object_name.endswith("/") else obj.object_name + "/"
+                for obj in objs
+                if "_batch_id=" in obj.object_name
+            )
+            result[fp] = batch_dirs if batch_dirs else [fp]
+        except Exception:
+            result[fp] = [fp]
+    return result
+
+
 def main(bucket_name=None, incremental=True, force_full=False):
     """
     Main function to execute the data cleaning pipeline.
@@ -115,16 +155,29 @@ def main(bucket_name=None, incremental=True, force_full=False):
     # Get available file paths
     all_file_paths = get_file_paths_from_minio(minio_client, bucket_name, table_names, folder="mapped")
     print(f"   Found {len(all_file_paths)} files in MinIO")
-    
+
     # Filter to unprocessed files if in incremental mode
     if incremental and cleaner:
-        file_paths_to_process = cleaner.get_unprocessed_files(all_file_paths)
+        # Expand Parquet dirs to _batch_id=N partition paths for fine-grained tracking.
+        # This ensures that a new CDC batch (e.g. _batch_id=1/) triggers re-cleaning
+        # of the full table even though the parent directory path hasn't changed.
+        partitions_by_table = _expand_to_partition_paths(minio_client, bucket_name, all_file_paths)
+        all_partition_paths = [p for parts in partitions_by_table.values() for p in parts]
+        unprocessed_partitions = set(cleaner.get_unprocessed_files(all_partition_paths))
+        # Keep only table-level paths that have at least one unprocessed partition
+        file_paths_to_process = [
+            table_path
+            for table_path, parts in partitions_by_table.items()
+            if any(part in unprocessed_partitions for part in parts)
+        ]
         if not file_paths_to_process:
             print("\n✅ No new files to process. Cleaning pipeline complete!")
             spark.stop()
             return
     else:
         file_paths_to_process = all_file_paths
+        unprocessed_partitions = set()
+        partitions_by_table = {}
     
     # Extract table names from file paths.
     # Paths can be either:
@@ -246,13 +299,28 @@ def main(bucket_name=None, incremental=True, force_full=False):
         file_records = {}
         for table_name, file_path in processed_file_paths.items():
             if table_name in dataframes:
-                df = dataframes[table_name]
-                record_count = df.count()
-                file_records[file_path] = {
-                    'record_count': record_count,
-                    'file_size': None,  # Could calculate if needed
-                    'checksum': None    # Could calculate if needed
-                }
+                spark_df = dataframes[table_name]
+                record_count = spark_df.count()
+                # Mark the specific _batch_id=N partition paths that were new (not the
+                # table-level directory) so the next arriving _batch_id is detected.
+                new_parts = [
+                    p for p in unprocessed_partitions
+                    if p.startswith(file_path)
+                ]
+                if new_parts:
+                    for part in new_parts:
+                        file_records[part] = {
+                            'record_count': record_count,
+                            'file_size': None,
+                            'checksum': None,
+                        }
+                else:
+                    # CSV or legacy directory-level path — track directly
+                    file_records[file_path] = {
+                        'record_count': record_count,
+                        'file_size': None,
+                        'checksum': None,
+                    }
         cleaner.mark_multiple_processed(file_records)
 
     # 22. Stop Spark session

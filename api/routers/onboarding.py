@@ -48,22 +48,77 @@ router = APIRouter(
 
 logger = logging.getLogger("pulse")
 
-async def _trigger_api_streaming_dag(business_id: str, api_url: str) -> None:
-    """
-    Trigger the api_streaming Airflow DAG via the Airflow REST API.
+def _airflow_auth_header() -> str:
+    """Return a Basic-auth header value for Airflow REST API calls."""
+    import base64
+    user = os.getenv("AIRFLOW_USERNAME", "admin")
+    pwd  = os.getenv("AIRFLOW_PASSWORD", "admin")
+    return "Basic " + base64.b64encode(f"{user}:{pwd}".encode()).decode()
 
-    Called from confirm-mapping for API-mode businesses so that the user's
-    external endpoint is polled continuously (with Airflow auto-restart).
-    The initial bounded subprocess started during start-mapping has already
-    exited (poll_duration window), so there is no duplication.
+
+def _dag_active_run_exists_for_bucket(dag_id: str, business_id: str) -> bool:
+    """
+    Return True if the given Airflow DAG already has a ``running`` or ``queued``
+    run whose ``conf.bucket`` matches *business_id*.
+
+    Called synchronously from within ``run_in_threadpool`` so it never blocks
+    the async event loop.  Any network error is treated as "no active run found"
+    (fail-open) so a temporary Airflow outage cannot prevent a new run from
+    being triggered.
     """
     import urllib.request
     import urllib.error
     import json as _json
 
     airflow_base = os.getenv("AIRFLOW_BASE_URL", "http://airflow-webserver:8080")
-    airflow_user = os.getenv("AIRFLOW_USERNAME", "admin")
-    airflow_password = os.getenv("AIRFLOW_PASSWORD", "admin")
+    # Fetch the 50 most-recent running/queued runs for this DAG in one call.
+    # 50 is far more than any realistic concurrent-run count for a single DAG.
+    url = (
+        f"{airflow_base}/api/v1/dags/{dag_id}/dagRuns"
+        "?state=running&state=queued&limit=50&order_by=-execution_date"
+    )
+    req = urllib.request.Request(
+        url,
+        headers={"Authorization": _airflow_auth_header()},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = _json.loads(resp.read())
+        for run in data.get("dag_runs", []):
+            conf = run.get("conf") or {}
+            if conf.get("bucket") == business_id:
+                print(
+                    f"[idempotency] DAG '{dag_id}' already has an active run "
+                    f"(run_id={run.get('dag_run_id')}) for bucket '{business_id}' — skipping trigger."
+                )
+                return True
+    except Exception as exc:
+        # Fail-open: if we cannot reach Airflow, allow the trigger rather than
+        # silently blocking the user's confirmation.
+        print(f"[idempotency] Could not check active runs for DAG '{dag_id}': {exc} — proceeding.")
+    return False
+
+
+async def _trigger_api_streaming_dag(business_id: str, api_url: str) -> None:
+    """
+    Idempotently trigger the api_streaming Airflow DAG.
+
+    Checks for an already-running or queued run for this tenant before
+    creating a new DAG run, so a double-confirm or HTTP retry never spawns
+    a second competing streaming job on the same Kafka consumer group.
+    """
+    import urllib.request
+    import json as _json
+
+    # Idempotency guard — runs in threadpool to avoid blocking the event loop.
+    already_running = await run_in_threadpool(
+        _dag_active_run_exists_for_bucket, "api_streaming", business_id
+    )
+    if already_running:
+        return
+
+    airflow_base = os.getenv("AIRFLOW_BASE_URL", "http://airflow-webserver:8080")
     poll_interval = int(os.getenv("API_POLL_INTERVAL", "30"))
 
     url = f"{airflow_base}/api/v1/dags/api_streaming/dagRuns"
@@ -75,16 +130,12 @@ async def _trigger_api_streaming_dag(business_id: str, api_url: str) -> None:
         }
     }).encode()
 
-    credentials = f"{airflow_user}:{airflow_password}"
-    import base64
-    encoded = base64.b64encode(credentials.encode()).decode()
-
     req = urllib.request.Request(
         url,
         data=payload,
         headers={
             "Content-Type":  "application/json",
-            "Authorization": f"Basic {encoded}",
+            "Authorization": _airflow_auth_header(),
         },
         method="POST",
     )
@@ -98,20 +149,24 @@ async def _trigger_api_streaming_dag(business_id: str, api_url: str) -> None:
 
 async def _trigger_db_streaming_dag(business_id: str, db_uri: str, db_tables: str) -> None:
     """
-    Trigger the db_streaming Airflow DAG via the Airflow REST API.
+    Idempotently trigger the db_streaming Airflow DAG.
 
-    Called from confirm-mapping for DB-mode businesses so that Debezium CDC
-    streaming runs continuously under Airflow supervision (with auto-restart).
-    The initial bounded subprocess started during start-mapping (--trigger-once)
-    has already exited, so there is no duplication.
+    Checks for an already-running or queued run for this tenant before
+    creating a new DAG run, so a double-confirm or HTTP retry never spawns
+    two competing Debezium CDC streaming jobs sharing the same Kafka
+    consumer group and MinIO checkpoint.
     """
     import urllib.request
-    import urllib.error
     import json as _json
 
+    # Idempotency guard — runs in threadpool to avoid blocking the event loop.
+    already_running = await run_in_threadpool(
+        _dag_active_run_exists_for_bucket, "db_streaming", business_id
+    )
+    if already_running:
+        return
+
     airflow_base = os.getenv("AIRFLOW_BASE_URL", "http://airflow-webserver:8080")
-    airflow_user = os.getenv("AIRFLOW_USERNAME", "admin")
-    airflow_password = os.getenv("AIRFLOW_PASSWORD", "admin")
 
     url = f"{airflow_base}/api/v1/dags/db_streaming/dagRuns"
     payload = _json.dumps({
@@ -122,16 +177,12 @@ async def _trigger_db_streaming_dag(business_id: str, db_uri: str, db_tables: st
         }
     }).encode()
 
-    credentials = f"{airflow_user}:{airflow_password}"
-    import base64
-    encoded = base64.b64encode(credentials.encode()).decode()
-
     req = urllib.request.Request(
         url,
         data=payload,
         headers={
             "Content-Type":  "application/json",
-            "Authorization": f"Basic {encoded}",
+            "Authorization": _airflow_auth_header(),
         },
         method="POST",
     )
@@ -848,6 +899,18 @@ async def cancel_mapping(request: Request, db=Depends(get_db)):
             # Clear Redis keys only after successful database commit
             await redis.delete(f"mapping_process:{business_id}")
             await redis.delete(f"mapping_log:{business_id}")
+
+            # For initial auto-mapping cancellation (not manual review), also
+            # tear down the streaming-layer resources that were created so far
+            # (Debezium connector, Kafka topics, Spark checkpoint, Airflow DAG).
+            if not is_manual_mapping_cancellation:
+                from services.pipeline_service import PipelineService
+                from routers.pipeline import websocket_manager as _ws_manager
+                ps = PipelineService(db, _ws_manager)
+                try:
+                    await ps.cleanup_streaming_resources(business_id)
+                except Exception as _ce:
+                    print(f"Warning: streaming resource cleanup failed during cancel-mapping: {_ce}")
             
         except Exception as db_error:
             db.rollback()
@@ -1558,6 +1621,15 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
         )
         db.commit()
         
+        # Clear the "use temp folder" flag now that mapped-temp → mapped
+        # migration has been completed.  This ensures that the continuous
+        # db_streaming / api_streaming Airflow DAG writes subsequent
+        # micro-batches directly to mapped/ rather than mapped-temp/.
+        try:
+            await redis.delete(f"streaming_use_temp:{business_id}")
+        except Exception as _redis_err:
+            print(f"Warning: could not clear streaming_use_temp flag: {_redis_err}")
+
         # Build response message
         message = "Manual mappings applied successfully"
         if len(mapping_results.get("missing_cols", [])) > 0:

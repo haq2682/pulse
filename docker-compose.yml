@@ -508,7 +508,7 @@ services:
       - ./airflow/config:/opt/airflow/config
       - airflow_logs:/opt/airflow/logs
       - /var/run/docker.sock:/var/run/docker.sock
-    command: webserver
+    command: airflow webserver
     networks:
       spark-network:
         ipv4_address: 10.5.0.17

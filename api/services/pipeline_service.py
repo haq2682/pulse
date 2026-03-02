@@ -752,6 +752,160 @@ class PipelineService:
             logger.error("Error getting pipeline status info: %s", e, exc_info=True)
             return None
     
+    async def cleanup_streaming_resources(self, business_id: str) -> None:
+        """
+        Remove ALL streaming-layer resources created for a tenant:
+          1. Airflow  – mark any running db_streaming / api_streaming DAG runs as failed
+          2. Debezium – delete the Kafka Connect connector
+          3. Kafka    – delete all topics whose name starts with ``{business_id}.``
+          4. MinIO    – delete the Spark Structured Streaming checkpoint directory
+                        (s3a://pulse-checkpoints/normalize-stream-{business_id}/)
+          5. Redis    – delete all per-business keys
+
+        Every step is best-effort: a failure in one step is logged but does NOT
+        prevent the remaining steps from running.
+
+        Called by:
+          - ``delete_business``  (analytics router) – full teardown
+          - ``cancel_mapping``   (onboarding router) – mid-onboarding teardown
+        """
+        logger.info("Starting streaming resource cleanup for business %s", business_id)
+
+        # ── 1. Cancel Airflow streaming DAG runs ─────────────────────────────
+        try:
+            import base64
+            import urllib.request
+            import json as _json
+
+            airflow_base = os.getenv("AIRFLOW_BASE_URL", "http://airflow-webserver:8080")
+            airflow_user = os.getenv("AIRFLOW_USERNAME", "admin")
+            airflow_password = os.getenv("AIRFLOW_PASSWORD", "admin")
+            encoded_creds = base64.b64encode(
+                f"{airflow_user}:{airflow_password}".encode()
+            ).decode()
+            headers = {"Authorization": f"Basic {encoded_creds}", "Content-Type": "application/json"}
+
+            for dag_id in ("db_streaming", "api_streaming"):
+                list_url = f"{airflow_base}/api/v1/dags/{dag_id}/dagRuns?state=running&limit=100"
+                try:
+                    req = urllib.request.Request(list_url, headers=headers)
+                    with urllib.request.urlopen(req, timeout=10) as r:
+                        runs = _json.loads(r.read()).get("dag_runs", [])
+                except Exception:
+                    runs = []
+
+                for run in runs:
+                    conf = run.get("conf") or {}
+                    if conf.get("bucket") != business_id:
+                        continue
+                    run_id = run["dag_run_id"]
+                    patch_url = f"{airflow_base}/api/v1/dags/{dag_id}/dagRuns/{run_id}"
+                    patch_payload = _json.dumps({"state": "failed"}).encode()
+                    req = urllib.request.Request(
+                        patch_url, data=patch_payload, headers=headers, method="PATCH"
+                    )
+                    try:
+                        urllib.request.urlopen(req, timeout=10)
+                        logger.info("Cancelled Airflow DAG run %s/%s", dag_id, run_id)
+                    except Exception as e:
+                        logger.warning("Could not cancel DAG run %s/%s: %s", dag_id, run_id, e)
+        except Exception as e:
+            logger.error("Error cancelling Airflow DAG runs for %s: %s", business_id, e, exc_info=True)
+
+        # ── 2. Delete Debezium connector ──────────────────────────────────────
+        try:
+            import requests as _req
+            connect_url = os.getenv("KAFKA_CONNECT_URL", "http://10.5.0.10:8083")
+            connector_name = f"pulse-{business_id}-connector"
+            resp = _req.delete(f"{connect_url}/connectors/{connector_name}", timeout=10)
+            if resp.status_code in (200, 204):
+                logger.info("Deleted Debezium connector: %s", connector_name)
+            elif resp.status_code == 404:
+                logger.info("Debezium connector %s not found (already deleted)", connector_name)
+            else:
+                logger.warning("Unexpected status deleting connector %s: %s", connector_name, resp.status_code)
+        except Exception as e:
+            logger.error("Error deleting Debezium connector for %s: %s", business_id, e, exc_info=True)
+
+        # ── 3. Delete Kafka topics ────────────────────────────────────────────
+        try:
+            from kafka.admin import KafkaAdminClient
+            from kafka.errors import UnknownTopicOrPartitionError
+
+            bootstrap = os.getenv("KAFKA_BOOTSTRAP", "10.5.0.7:9092")
+            admin = KafkaAdminClient(
+                bootstrap_servers=bootstrap,
+                client_id=f"pulse-cleanup-{business_id}",
+                request_timeout_ms=10000,
+            )
+            all_topics = admin.list_topics()
+            prefix = f"{business_id}."
+            tenant_topics = [t for t in all_topics if t.startswith(prefix)]
+            if tenant_topics:
+                admin.delete_topics(tenant_topics, timeout_ms=15000)
+                logger.info("Deleted %d Kafka topics for %s: %s", len(tenant_topics), business_id, tenant_topics)
+            else:
+                logger.info("No Kafka topics found for prefix %s", prefix)
+            admin.close()
+        except Exception as e:
+            logger.error("Error deleting Kafka topics for %s: %s", business_id, e, exc_info=True)
+
+        # ── 4. Delete Spark checkpoint from MinIO ─────────────────────────────
+        try:
+            import boto3
+            from botocore.client import Config
+
+            s3_client = boto3.client(
+                "s3",
+                endpoint_url=os.getenv("MINIO_ENDPOINT", "http://localhost:9000"),
+                aws_access_key_id=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
+                aws_secret_access_key=os.getenv("MINIO_SECRET_KEY", "minioadmin"),
+                config=Config(signature_version="s3v4"),
+                region_name="us-east-1",
+            )
+            checkpoint_bucket = "pulse-checkpoints"
+            checkpoint_prefix = f"normalize-stream-{business_id}/"
+            paginator = s3_client.get_paginator("list_objects_v2")
+            deleted_count = 0
+            for page in paginator.paginate(Bucket=checkpoint_bucket, Prefix=checkpoint_prefix):
+                if "Contents" in page:
+                    objects = [{"Key": obj["Key"]} for obj in page["Contents"]]
+                    if objects:
+                        s3_client.delete_objects(
+                            Bucket=checkpoint_bucket, Delete={"Objects": objects}
+                        )
+                        deleted_count += len(objects)
+            logger.info(
+                "Deleted %d checkpoint objects for %s (prefix: %s)",
+                deleted_count, business_id, checkpoint_prefix,
+            )
+        except Exception as e:
+            logger.error("Error deleting Spark checkpoint for %s: %s", business_id, e, exc_info=True)
+
+        # ── 5. Clean up Redis keys ────────────────────────────────────────────
+        try:
+            import redis as _redis
+
+            redis_client = _redis.Redis(
+                host=os.getenv("REDIS_HOST", "redis"),
+                port=int(os.getenv("REDIS_PORT", "6379")),
+                decode_responses=True,
+            )
+            keys_to_delete = [
+                f"manual_mappings:{business_id}",
+                f"mapping_results:{business_id}",
+                f"streaming_first_batch_done:{business_id}",
+                f"streaming_use_temp:{business_id}",
+                f"mapping_process:{business_id}",
+                f"mapping_log:{business_id}",
+            ]
+            deleted = redis_client.delete(*keys_to_delete)
+            logger.info("Deleted %d Redis keys for %s", deleted, business_id)
+        except Exception as e:
+            logger.error("Error cleaning up Redis keys for %s: %s", business_id, e, exc_info=True)
+
+        logger.info("Streaming resource cleanup complete for business %s", business_id)
+
     async def delete_business_bucket(self, business_id: str):
         """
         Delete the entire business bucket from MinIO.

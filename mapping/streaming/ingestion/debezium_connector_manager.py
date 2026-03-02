@@ -649,11 +649,96 @@ class DebeziumConnectorManager:
 
         return {"name": connector_name, "config": config}
 
+    def _wait_for_task_state(
+        self, connector_name: str, desired_states: set, timeout: int = 30
+    ) -> Optional[str]:
+        """
+        Poll connector task status until any task reaches one of the desired
+        states or the timeout expires.  Returns the observed state or None.
+        """
+        import time as _time
+        deadline = _time.monotonic() + timeout
+        while _time.monotonic() < deadline:
+            status = self.get_connector_status(connector_name)
+            if status:
+                for task in status.get("tasks", []):
+                    if task.get("state") in desired_states:
+                        return task["state"]
+            _time.sleep(2)
+        return None
+
+    def _reset_offsets(self, connector_name: str) -> bool:
+        """
+        Clear stored Kafka Connect offsets for *connector_name* using the
+        stop → DELETE /offsets → resume flow required by Kafka Connect 3.6+.
+
+        Returns True if offsets were successfully cleared, False otherwise.
+        Silently succeeds if the connector has no stored offsets.
+        """
+        import time as _time
+        short = (5, 15)
+
+        # 1. Stop the connector (moves it to STOPPED state).
+        stop_resp = requests.put(
+            f"{self.connect_url}/connectors/{connector_name}/stop",
+            timeout=short,
+        )
+        if stop_resp.status_code not in (200, 202, 204):
+            print(f"  ⚠️  Could not stop connector for offset reset: {stop_resp.status_code}")
+            return False
+
+        # 2. Wait until STOPPED.
+        stopped = self._wait_for_task_state(connector_name, {"STOPPED"}, timeout=20)
+        # Kafka Connect reports STOPPED at connector level, not task level.
+        # Fall back to checking the connector-level state after a brief wait.
+        if not stopped:
+            _time.sleep(5)
+
+        # 3. Delete offsets.
+        del_resp = requests.delete(
+            f"{self.connect_url}/connectors/{connector_name}/offsets",
+            timeout=short,
+        )
+        if del_resp.status_code in (200, 204):
+            print(f"  ✅ Stale offsets cleared for '{connector_name}'")
+        else:
+            print(
+                f"  ⚠️  Offset delete returned {del_resp.status_code}: {del_resp.text[:120]}"
+            )
+
+        # 4. Resume the connector.
+        resume_resp = requests.post(
+            f"{self.connect_url}/connectors/{connector_name}/resume",
+            timeout=short,
+        )
+        if resume_resp.status_code not in (200, 202, 204):
+            print(f"  ⚠️  Could not resume connector after offset reset: {resume_resp.status_code}")
+            return False
+
+        _time.sleep(3)
+        return True
+
     def deploy_connector(self, config: Dict[str, Any]) -> bool:
         """
         Deploy a connector to Kafka Connect.
 
-        If a connector with the same name exists, it will be updated.
+        If a connector with the same name exists it is updated; otherwise a
+        new connector is created.  After deployment, connector task health is
+        verified for up to 30 seconds.  If a task enters FAILED state due to
+        stale / corrupted Kafka Connect offsets (e.g. after a manual connector
+        delete followed by re-deploy) the method automatically:
+          1. Stops the connector.
+          2. Clears stored offsets via DELETE /connectors/{name}/offsets.
+          3. Resumes the connector for a clean fresh run.
+
+        PUT path snapshot-mode override
+        --------------------------------
+        When updating an already-running connector the snapshot.mode is
+        overridden from "initial" to "no_data" so that a config change does
+        NOT trigger a full re-snapshot of the database, which would flood
+        Kafka with duplicate messages (Kafka does not auto-delete old records).
+        "no_data" tells Debezium to skip the snapshot and stream from the
+        current WAL / oplog position instead.
 
         Args:
             config: Connector configuration dictionary
@@ -661,6 +746,8 @@ class DebeziumConnectorManager:
         Returns:
             True if deployment succeeded, False otherwise
         """
+        import time as _time
+
         connector_name = config["name"]
         # Use a generous read timeout for all deploy-path requests.
         # Kafka Connect validates the connector config synchronously (including
@@ -675,17 +762,26 @@ class DebeziumConnectorManager:
                 timeout=deploy_timeout,
             )
 
-            if resp.status_code == 200:
-                # Update existing connector
+            is_new = resp.status_code != 200
+
+            if not is_new:
+                # Update existing connector.
+                # IMPORTANT: override snapshot.mode to "no_data" so that a
+                # config update does NOT trigger a new full database snapshot.
+                # "no_data" tells Debezium to skip the snapshot and resume CDC
+                # streaming from the current oplog / WAL position instead.
+                update_config = dict(config["config"])
+                if update_config.get("snapshot.mode") == "initial":
+                    update_config["snapshot.mode"] = "no_data"
                 print(f"Updating existing connector: {connector_name}")
                 resp = requests.put(
                     f"{self.connect_url}/connectors/{connector_name}/config",
-                    json=config["config"],
+                    json=update_config,
                     headers={"Content-Type": "application/json"},
                     timeout=deploy_timeout,
                 )
             else:
-                # Create new connector
+                # Create new connector.
                 print(f"Creating new connector: {connector_name}")
                 resp = requests.post(
                     f"{self.connect_url}/connectors",
@@ -694,14 +790,58 @@ class DebeziumConnectorManager:
                     timeout=deploy_timeout,
                 )
 
-            if resp.status_code in (200, 201):
-                print(f"Connector '{connector_name}' deployed successfully")
-                return True
-            else:
+            if resp.status_code not in (200, 201):
                 print(
                     f"Failed to deploy connector: {resp.status_code} - {resp.text}"
                 )
                 return False
+
+            print(f"Connector '{connector_name}' deployed successfully")
+
+            # ── Post-deploy task health check ────────────────────────────────
+            # Poll for up to 30 s to confirm at least one task is RUNNING.
+            # If a task is FAILED (typically due to stale / corrupted Kafka
+            # Connect offsets left over from a previous truncated snapshot run)
+            # automatically stop the connector, clear its stored offsets via
+            # the Kafka Connect REST API, and resume it for a clean start.
+            print(f"  Verifying connector task health (up to 30s)…")
+            observed = self._wait_for_task_state(
+                connector_name, {"RUNNING", "FAILED"}, timeout=30
+            )
+            if observed == "RUNNING":
+                print(f"  ✅ Connector task is RUNNING")
+                return True
+            if observed == "FAILED":
+                print(
+                    f"  ⚠️  Task FAILED — likely stale offsets from a previous "
+                    f"run.  Attempting automatic offset reset…"
+                )
+                if self._reset_offsets(connector_name):
+                    # After reset, wait again to confirm recovery.
+                    recovered = self._wait_for_task_state(
+                        connector_name, {"RUNNING", "FAILED"}, timeout=30
+                    )
+                    if recovered == "RUNNING":
+                        print(f"  ✅ Connector recovered after offset reset")
+                        return True
+                    print(
+                        f"  ❌ Connector still FAILED after offset reset. "
+                        f"Check Kafka Connect logs for details."
+                    )
+                    return False
+                # reset_offsets failed; return True anyway — the connector
+                # config is deployed even if tasks are stuck.
+                print(
+                    "  ⚠️  Offset reset did not succeed.  Connector config is "
+                    "deployed but tasks may need manual intervention."
+                )
+                return True
+            # Timeout — connector may still be initialising.
+            print(
+                f"  ⚠️  Could not confirm task state within 30s "
+                f"(connector may still be starting up)"
+            )
+            return True
 
         except requests.Timeout:
             print(

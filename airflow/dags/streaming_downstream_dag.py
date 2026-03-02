@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 
 from airflow import DAG
@@ -62,6 +63,15 @@ SCHEDULE = Variable.get("streaming_downstream_interval", default_var="*/2 * * * 
 
 # Per-step hard timeout for downstream subprocess calls (15 minutes).
 _STEP_TIMEOUT_SECONDS = 900
+
+# Maximum number of tenant buckets processed in parallel inside a single
+# Airflow task.  Each parallel worker spawns its own ``docker exec`` chain
+# (clean → transform → analyze → ML), so set this to a value that the host
+# can sustain without OOM.  Override with DOWNSTREAM_MAX_PARALLEL_BUCKETS
+# in the environment / Airflow Variables.
+_MAX_PARALLEL_BUCKETS = int(
+    Variable.get("downstream_max_parallel_buckets", default_var="8")
+)
 
 _task_defaults = dict(
     owner=DEFAULT_TASK_ARGS["owner"],
@@ -154,25 +164,29 @@ def ensure_specific_models_trained(**context):
     Guarantee that specific ML models are trained for EVERY active tenant
     bucket discovered by get_active_business_ids.
 
-    Logic per bucket:
-      1. Check MinIO for each specific model's drift baseline JSON.
-         (Baseline existence ≡ model has been trained at least once.)
-      2. If ALL baselines exist → skip (fast path, completes in seconds).
-      3. If ANY baseline is missing → run specific/train.py inside the
-         python container, then save fresh baselines for all specific models.
-
-    This runs every 2 minutes with the DAG, but after the first successful
-    training the MinIO check short-circuits in milliseconds.
+    Buckets are processed in parallel (up to _MAX_PARALLEL_BUCKETS concurrent
+    threads) so that N-tenant first-run training does not take N × training_time.
     """
     buckets = (
         context["ti"].xcom_pull(task_ids="get_active_buckets", key="active_buckets")
         or [BUCKET]
     )
-    for bucket in buckets:
-        print(f"\n{'='*60}")
-        print(f"Ensuring specific models for bucket: {bucket}")
-        print(f"{'='*60}")
-        _ensure_specific_models_for_bucket(bucket)
+
+    def _train_one(bucket):
+        print(f"\n{'='*60}\nEnsuring specific models for bucket: {bucket}\n{'='*60}")
+        try:
+            _ensure_specific_models_for_bucket(bucket)
+            return bucket, None
+        except Exception as exc:
+            return bucket, exc
+
+    with ThreadPoolExecutor(max_workers=min(len(buckets), _MAX_PARALLEL_BUCKETS)) as pool:
+        futures = {pool.submit(_train_one, b): b for b in buckets}
+        for fut in as_completed(futures):
+            bucket, err = fut.result()
+            if err:
+                # Non-fatal: log and continue so other tenants are not blocked.
+                print(f"  ⚠️  ensure_specific_models failed for {bucket}: {err}")
 
 
 def trigger_drift_check_for_all_buckets(**context):
@@ -251,39 +265,95 @@ def get_active_business_ids(**context):
     return buckets
 
 
-def run_downstream_for_all_buckets(**context):
+def _run_downstream_for_bucket(bucket: str) -> tuple[str, bool]:
     """
-    Run the full downstream pipeline (clean → transform → analyze → ML) for
-    every active tenant bucket discovered by get_active_business_ids.
-    Processes tenants sequentially to avoid resource exhaustion on a single
-    Python container.
+    Execute the full downstream pipeline for a single tenant bucket.
+
+    Steps run sequentially (each depends on the previous one's output),
+    but multiple buckets run this function concurrently via ThreadPoolExecutor.
+
+    Returns (bucket, success_bool).
     """
     import subprocess
-    buckets = context["ti"].xcom_pull(task_ids="get_active_buckets", key="active_buckets") or [BUCKET]
 
     _steps = [
-        ("cleaning",       "cleaning/cleaning.py",           "--bucket-name {b} --incremental"),
-        ("transformation", "transformation/transformation.py","--bucket-name {b}"),
-        ("analysis",       "analysis/analysis.py",           "--bucket-name {b}"),
-        ("ml_inference",   "machine-learning/infer_all.py",  "--bucket-name {b}"),
+        ("cleaning",       "cleaning/cleaning.py",            f"--bucket-name {bucket} --incremental"),
+        ("transformation", "transformation/transformation.py", f"--bucket-name {bucket}"),
+        ("analysis",       "analysis/analysis.py",            f"--bucket-name {bucket}"),
+        ("ml_inference",   "machine-learning/infer_all.py",   f"--bucket-name {bucket}"),
     ]
 
-    for bucket in buckets:
-        print(f"\n{'='*60}")
-        print(f"Processing downstream for bucket: {bucket}")
-        print(f"{'='*60}")
-        for step_name, script, args_tpl in _steps:
-            args = args_tpl.format(b=bucket).split()
-            cmd = ["docker", "exec", PYTHON_CONTAINER, "python3", f"/app/{script}"] + args
-            print(f"  ▶ {step_name}: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=_STEP_TIMEOUT_SECONDS, check=False)
-            if result.returncode == 0:
-                print(f"  ✅ {step_name} completed for {bucket}")
-            else:
-                stderr_tail = (result.stderr or "")[-500:]
-                print(f"  ⚠️  {step_name} failed for {bucket} (exit {result.returncode}){': ' + stderr_tail if stderr_tail else ''}")
-                print(f"  ⏭  Skipping remaining steps for {bucket} to avoid processing stale data.")
-                break
+    print(f"\n{'='*60}\nProcessing downstream for bucket: {bucket}\n{'='*60}")
+
+    for step_name, script, args_str in _steps:
+        args = args_str.split()
+        cmd = ["docker", "exec", PYTHON_CONTAINER, "python3", f"/app/{script}"] + args
+        print(f"  [{bucket}] ▶ {step_name}: {' '.join(cmd)}")
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=_STEP_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            print(f"  [{bucket}] ⏱  {step_name} timed out after {_STEP_TIMEOUT_SECONDS}s — aborting bucket.")
+            return bucket, False
+
+        if result.returncode == 0:
+            print(f"  [{bucket}] ✅ {step_name} completed")
+        else:
+            stderr_tail = (result.stderr or "")[-600:]
+            print(
+                f"  [{bucket}] ⚠️  {step_name} failed (exit {result.returncode})"
+                + (f"\n     stderr: {stderr_tail}" if stderr_tail else "")
+            )
+            print(f"  [{bucket}] ⏭  Skipping remaining steps to avoid processing stale data.")
+            return bucket, False
+
+    return bucket, True
+
+
+def run_downstream_for_all_buckets(**context):
+    """
+    Run the full downstream pipeline for every active tenant bucket **in
+    parallel** — up to _MAX_PARALLEL_BUCKETS concurrent pipelines.
+
+    Each bucket's pipeline (clean → transform → analyze → ML) runs
+    sequentially inside its own thread so that inter-step dependencies are
+    preserved, while different tenants do not block each other.
+
+    With the sequential implementation a single slow tenant (e.g. cold
+    Spark start on a large dataset) would delay ALL subsequent tenants;
+    this parallel fan-out keeps the fallback DAG within its 2-minute
+    schedule even with hundreds of active tenants.
+    """
+    buckets = (
+        context["ti"].xcom_pull(task_ids="get_active_buckets", key="active_buckets")
+        or [BUCKET]
+    )
+
+    print(f"Starting parallel downstream for {len(buckets)} bucket(s), "
+          f"max_workers={min(len(buckets), _MAX_PARALLEL_BUCKETS)}")
+
+    failed_buckets = []
+    with ThreadPoolExecutor(
+        max_workers=min(len(buckets), _MAX_PARALLEL_BUCKETS),
+        thread_name_prefix="downstream-bucket",
+    ) as pool:
+        futures = {pool.submit(_run_downstream_for_bucket, b): b for b in buckets}
+        for fut in as_completed(futures):
+            bucket, ok = fut.result()
+            if not ok:
+                failed_buckets.append(bucket)
+
+    if failed_buckets:
+        # Log individually but do not raise — partial success is acceptable;
+        # the next scheduled run and the inline downstream will catch up.
+        print(f"\n⚠️  {len(failed_buckets)} bucket(s) had downstream errors: {failed_buckets}")
+    else:
+        print(f"\n✅ All {len(buckets)} bucket(s) processed successfully.")
 
 
 with DAG(

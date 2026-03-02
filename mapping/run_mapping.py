@@ -506,6 +506,7 @@ def run_db_mode(config: dict):
             db_uri=db_uri,
             tables=tables,
             connector_name=connector_name,
+            topic_prefix=bucket_name,
         )
     except Exception as e:
         error_msg = "DB mode error: Failed to create connector configuration"
@@ -530,6 +531,12 @@ def run_db_mode(config: dict):
         try:
             trigger_once = config.get("trigger_once", False)
 
+            # Extract the actual topic prefix from the deployed connector config.
+            # This is bucket_name (the per-tenant UUID), not the hardcoded "ecom".
+            # Both _wait_for_debezium_snapshot and run_streaming/read_kafka_stream
+            # must use the same prefix so they watch the right Kafka topics.
+            topic_prefix = connector_config["config"].get("topic.prefix", bucket_name)
+
             if trigger_once:
                 # When running in trigger-once mode (initial onboarding mapping),
                 # wait until Debezium has fully published its snapshot to Kafka
@@ -540,7 +547,6 @@ def run_db_mode(config: dict):
                 #    (handles large databases where snapshot takes many minutes).
                 kafka_bs = os.getenv("KAFKA_BOOTSTRAP", "10.5.0.7:9092")
                 connect_url = os.getenv("KAFKA_CONNECT_URL", "http://10.5.0.10:8083")
-                topic_prefix = connector_config["config"].get("topic.prefix", "ecom")
                 max_wait = int(os.getenv("DEBEZIUM_SNAPSHOT_WAIT", "3600"))
                 _wait_for_debezium_snapshot(
                     topic_prefix=topic_prefix,
@@ -554,7 +560,8 @@ def run_db_mode(config: dict):
             enable_downstream = config.get("enable_downstream", False)
             run_streaming(trigger_once=trigger_once,
                           enable_downstream=enable_downstream,
-                          output_bucket=bucket_name)
+                          output_bucket=bucket_name,
+                          topic_prefix=topic_prefix)
 
             # After trigger-once streaming finishes, update mapping status to
             # 'completed' if the streaming callback didn't already do it (e.g.

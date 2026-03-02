@@ -157,22 +157,29 @@ async def delete_business(request: Request, db=Depends(get_db)):
         db.commit()
         print(f"Deleted pipeline status records for business {business_id}")
         
-        # 3. Delete the business bucket from MinIO
+        # 3. Clean up all streaming-layer resources (connector, topics, checkpoint, Redis)
+        try:
+            await pipeline_service.cleanup_streaming_resources(business_id)
+        except Exception as e:
+            print(f"Warning: Error during streaming resource cleanup: {e}")
+            # Continue — best-effort
+
+        # 4. Delete the business bucket from MinIO
         try:
             await pipeline_service.delete_business_bucket(business_id)
         except Exception as e:
             print(f"Warning: Error deleting MinIO bucket (may not exist): {e}")
             # Continue even if bucket deletion fails - it might not exist
         
-        # 4. Delete onboarding records
+        # 5. Delete onboarding records
         db.execute(
             text("DELETE FROM onboarding WHERE business_id = :business_id"),
             {"business_id": business_id}
         )
         db.commit()
         print(f"Deleted onboarding records for business {business_id}")
-        
-        # 5. Delete business record
+
+        # 6. Delete business record
         db.execute(
             text("DELETE FROM businesses WHERE business_id = :business_id"),
             {"business_id": business_id}

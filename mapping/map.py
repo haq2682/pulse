@@ -221,13 +221,23 @@ minio_client = Minio(
 )
 
 
+# Resolve the Spark master: honour SPARK_SERVER first (legacy name), then
+# SPARK_MASTER_URL (set in docker-compose for the api/python containers),
+# then fall back to local[*] for plain-Python / unit-test use.
+_spark_master = (
+    os.getenv("SPARK_SERVER")
+    or os.getenv("SPARK_MASTER_URL")
+    or "local[*]"
+)
+
 spark = (
     SparkSession.builder.appName("NormalizeData")
-    .master(os.getenv("SPARK_SERVER", "local[*]"))
-    .config("spark.dynamicAllocation.enabled", "true")
-    .config("spark.dynamicAllocation.minExecutors", "0")
-    .config("spark.dynamicAllocation.maxExecutors", "8")
-    .config("spark.dynamicAllocation.initialExecutors", "1")
+    .master(_spark_master)
+    # Dynamic allocation requires an external shuffle service on standalone
+    # clusters which is not configured here.  Disable it so executor count
+    # stays predictable; the caller (create_spark_session in spark_streaming)
+    # manages its own session and overrides this via getOrCreate anyway.
+    .config("spark.dynamicAllocation.enabled", "false")
     # Use pre-downloaded local JARs — no Maven/internet access needed.
     # Do NOT set spark.jars to local driver paths — that uploads them to the
     # executor and creates duplicate class definitions alongside the copies
