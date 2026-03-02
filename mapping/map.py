@@ -9,15 +9,19 @@ _JARS_DIR = "/app/jars"
 _MAP_JARS = [
     f"{_JARS_DIR}/hadoop-aws-3.3.4.jar",
     f"{_JARS_DIR}/aws-java-sdk-bundle-1.12.262.jar",
-    f"{_JARS_DIR}/delta-spark_2.12-3.2.0.jar",
-    f"{_JARS_DIR}/delta-storage-3.2.0.jar",
+    f"{_JARS_DIR}/delta-spark_2.12-3.0.0.jar",
+    f"{_JARS_DIR}/delta-storage-3.0.0.jar",
 ]
-_MAP_JARS_STR = ",".join(_MAP_JARS)
 _MAP_CP = ":".join(_MAP_JARS)
 
 if "PYSPARK_SUBMIT_ARGS" not in os.environ:
+    # Only the driver-side classpath.  If running in cluster mode the executor
+    # (spark-master-py310 image) already has these JARs at
+    # /opt/spark/external-jars/.  Passing --jars here would re-upload them,
+    # producing duplicate class definitions and ClassCastException on Scala
+    # collection types at runtime.
     os.environ["PYSPARK_SUBMIT_ARGS"] = (
-        f"--driver-class-path {_MAP_CP} --jars {_MAP_JARS_STR} pyspark-shell"
+        f"--driver-class-path {_MAP_CP} pyspark-shell"
     )
 
 # findspark is only needed when Spark is installed as a standalone binary
@@ -225,9 +229,14 @@ spark = (
     .config("spark.dynamicAllocation.maxExecutors", "8")
     .config("spark.dynamicAllocation.initialExecutors", "1")
     # Use pre-downloaded local JARs — no Maven/internet access needed.
-    .config("spark.jars", _MAP_JARS_STR)
+    # Do NOT set spark.jars to local driver paths — that uploads them to the
+    # executor and creates duplicate class definitions alongside the copies
+    # already present in /opt/spark/external-jars/ (SPARK_EXTRA_CLASSPATH in
+    # the spark-master-py310 image), causing ClassCastException at runtime.
     .config("spark.driver.extraClassPath", _MAP_CP)
-    .config("spark.executor.extraClassPath", _MAP_CP)
+    # In cluster mode the executor has these JARs at /opt/spark/external-jars/.
+    # In local[*] mode this path is ignored (same JVM as driver).
+    .config("spark.executor.extraClassPath", "/opt/spark/external-jars/*")
     .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
     .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
     .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))

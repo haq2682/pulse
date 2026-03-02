@@ -12,8 +12,8 @@ _JARS_DIR = "/app/jars"
 _CLEAN_JARS = [
     f"{_JARS_DIR}/hadoop-aws-3.3.4.jar",
     f"{_JARS_DIR}/aws-java-sdk-bundle-1.12.262.jar",
-    f"{_JARS_DIR}/delta-spark_2.12-3.2.0.jar",
-    f"{_JARS_DIR}/delta-storage-3.2.0.jar",
+    f"{_JARS_DIR}/delta-spark_2.12-3.0.0.jar",
+    f"{_JARS_DIR}/delta-storage-3.0.0.jar",
 ]
 _CLEAN_JARS_STR = ",".join(_CLEAN_JARS)
 _CLEAN_CP = ":".join(_CLEAN_JARS)

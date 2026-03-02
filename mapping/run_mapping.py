@@ -87,6 +87,8 @@ def _wait_for_debezium_snapshot(
     stable_polls: int = 0
     _STABLE_NEEDED = 3          # three consecutive unchanged polls = done
     last_report_t = -poll_interval
+    consecutive_failed: int = 0   # debezium health check: consecutive FAILED polls
+    _FAILED_NEEDED = 3            # abort only after this many consecutive FAILED polls
 
     while _time.monotonic() < deadline:
         elapsed = int(_time.monotonic() - (deadline - max_wait))
@@ -101,12 +103,24 @@ def _wait_for_debezium_snapshot(
                 if r.ok:
                     task_states = [t["state"] for t in r.json().get("tasks", [])]
                     if task_states and all(s == "FAILED" for s in task_states):
-                        print(
-                            f"   ❌ Debezium connector '{connector_name}' task FAILED — "
-                            "aborting snapshot wait.",
-                            flush=True,
-                        )
-                        return False
+                        consecutive_failed += 1
+                        if consecutive_failed >= _FAILED_NEEDED:
+                            print(
+                                f"   ❌ Debezium connector '{connector_name}' task FAILED "
+                                f"for {consecutive_failed} consecutive polls — "
+                                "aborting snapshot wait.",
+                                flush=True,
+                            )
+                            return False
+                        else:
+                            print(
+                                f"   ⚠️  Debezium connector '{connector_name}' tasks FAILED "
+                                f"({consecutive_failed}/{_FAILED_NEEDED} consecutive) — "
+                                "may be transient, retrying…",
+                                flush=True,
+                            )
+                    else:
+                        consecutive_failed = 0  # reset on any non-all-FAILED response
             except Exception:
                 pass  # REST not reachable yet — keep waiting
 

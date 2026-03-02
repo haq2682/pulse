@@ -72,7 +72,7 @@ services:
       - ./analysis:/app/analysis
       - ./machine-learning:/app/machine-learning
       - ./jars/deps:/app/jars/
-      - ./jars/deps/aws-java-sdk-bundle-1.12.262:/home/appuser/.ivy2/cache/com.amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
+      - ./jars/deps/aws-java-sdk-bundle-1.12.262.jar:/home/appuser/.ivy2/cache/com.amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
     ports:
       - "8000:8000"
     networks:
@@ -219,6 +219,7 @@ services:
     restart: always
     depends_on:
       - minio
+      - python
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
 
   zookeeper:
@@ -430,8 +431,9 @@ services:
   # It exits after completing; docker restart policy is "on-failure" so it
   # won't loop if it succeeds.
   airflow-init:
-    image: apache/airflow:2.8.0-python3.10
-    container_name: airflow-init
+    build:
+      context: .
+      dockerfile: .docker/airflow/Dockerfile
     depends_on:
       - postgresql
       - redis
@@ -463,7 +465,9 @@ services:
     restart: on-failure
 
   airflow-webserver:
-    image: apache/airflow:2.8.0-python3.10
+    build:
+      context: .
+      dockerfile: .docker/airflow/Dockerfile
     container_name: airflow-webserver
     depends_on:
       - airflow-init
@@ -511,7 +515,9 @@ services:
     restart: always
 
   airflow-scheduler:
-    image: apache/airflow:2.8.0-python3.10
+    build:
+      context: .
+      dockerfile: .docker/airflow/Dockerfile
     container_name: airflow-scheduler
     depends_on:
       - airflow-webserver

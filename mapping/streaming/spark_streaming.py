@@ -12,7 +12,7 @@ _SPARK_JARS_DIR = "/app/jars"
 _KAFKA_JARS = [
     f"{_SPARK_JARS_DIR}/spark-sql-kafka-0-10_2.12-3.5.0.jar",
     f"{_SPARK_JARS_DIR}/spark-token-provider-kafka-0-10_2.12-3.5.0.jar",
-    f"{_SPARK_JARS_DIR}/kafka-clients-3.4.0.jar",
+    f"{_SPARK_JARS_DIR}/kafka-clients-3.4.1.jar",
     f"{_SPARK_JARS_DIR}/commons-pool2-2.11.1.jar",
 ]
 _S3_JARS = [
@@ -20,11 +20,10 @@ _S3_JARS = [
     f"{_SPARK_JARS_DIR}/aws-java-sdk-bundle-1.12.262.jar",
 ]
 _DELTA_JARS = [
-    f"{_SPARK_JARS_DIR}/delta-spark_2.12-3.2.0.jar",
-    f"{_SPARK_JARS_DIR}/delta-storage-3.2.0.jar",
+    f"{_SPARK_JARS_DIR}/delta-spark_2.12-3.0.0.jar",
+    f"{_SPARK_JARS_DIR}/delta-storage-3.0.0.jar",
 ]
-_ALL_JARS = ",".join(_KAFKA_JARS + _S3_JARS + _DELTA_JARS)    # spark.jars / --jars
-_ALL_JARS_CP = ":".join(_KAFKA_JARS + _S3_JARS + _DELTA_JARS)  # classpath separator
+_ALL_JARS_CP = ":".join(_KAFKA_JARS + _S3_JARS + _DELTA_JARS)  # driver classpath separator
 
 # PYSPARK_SUBMIT_ARGS must be set BEFORE pyspark is imported.
 # PySpark's launch_gateway() reads this env var first when spawning the
@@ -33,9 +32,14 @@ _ALL_JARS_CP = ":".join(_KAFKA_JARS + _S3_JARS + _DELTA_JARS)  # classpath separ
 # spark.driver.extraClassPath set in SparkSession.builder can miss because
 # the gateway may have been initialised earlier in the process lifetime.
 if "PYSPARK_SUBMIT_ARGS" not in os.environ:
+    # Only set the driver-side classpath here.  The executor (spark worker
+    # container, spark-master-py310 image) already has all of these JARs
+    # pre-installed at /opt/spark/external-jars/ via SPARK_EXTRA_CLASSPATH.
+    # Adding --jars here would re-upload them, creating duplicate class
+    # definitions across two classloaders and causing ClassCastException on
+    # Scala collection types (List$SerializationProxy / Seq mismatch).
     os.environ["PYSPARK_SUBMIT_ARGS"] = (
         f"--driver-class-path {_ALL_JARS_CP} "
-        f"--jars {_ALL_JARS} "
         "pyspark-shell"
     )
 
@@ -48,7 +52,7 @@ if os.environ.get("SPARK_HOME"):
     findspark.init()
 
 from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import col, explode, map_keys
+from pyspark.sql.functions import col, explode, map_keys, udf
 from pyspark.sql.types import StructType, StructField, StringType, MapType
 from minio import Minio
 from dotenv import load_dotenv, find_dotenv
@@ -85,14 +89,18 @@ def create_spark_session() -> SparkSession:
         .config("spark.dynamicAllocation.minExecutors", "0")
         .config("spark.dynamicAllocation.maxExecutors", "8")
         .config("spark.dynamicAllocation.initialExecutors", "1")
-        # Use pre-downloaded local JARs instead of spark.jars.packages so that
-        # no Maven/Ivy network resolution is needed at startup.  spark.jars
-        # distributes the files to executors; spark.driver.extraClassPath makes
-        # them available in the driver JVM (this api container) so that
-        # readStream.format("kafka") can locate the data-source provider.
-        .config("spark.jars", _ALL_JARS)
+        # Driver classpath: JARs are mounted at /app/jars/ in the api container.
+        # Do NOT use spark.jars here — that would re-upload these JARs from the
+        # driver to the executor, creating duplicate class definitions on the
+        # executor alongside the copies already present in
+        # /opt/spark/external-jars/ (loaded via SPARK_EXTRA_CLASSPATH in the
+        # spark-master-py310 image).  Duplicate JARs across two classloaders
+        # produce ClassCastException on Scala collection types at runtime.
         .config("spark.driver.extraClassPath", _ALL_JARS_CP)
-        .config("spark.executor.extraClassPath", _ALL_JARS_CP)
+        # Executor classpath: JARs are pre-installed in the worker image at
+        # /opt/spark/external-jars/ (COPY ./jars/deps/ in the Spark Dockerfile).
+        # This must match the path inside the worker container, NOT the driver.
+        .config("spark.executor.extraClassPath", "/opt/spark/external-jars/*")
         .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
         .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
         .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
@@ -169,6 +177,13 @@ def normalize_message_row(json_str):
 
     Returns None for tombstone events (op present but both after and before
     are empty/null) so the caller can filter them out.
+
+    NOTE: This function is kept for non-Spark Python callers (e.g. unit tests).
+    The PySpark UDF uses ``_udf_normalize`` defined locally inside
+    ``extract_table_dataframes`` — a local function is serialised by cloudpickle
+    by-value (bytecode), avoiding the ModuleNotFoundError that occurs when a
+    module-level function from this file is reconstructed on the executor worker
+    which does not have /app/mapping on sys.path.
     """
     if not json_str:
         return None
@@ -294,30 +309,105 @@ def extract_table_dataframes(batch_df: DataFrame) -> tuple:
     Returns:
         tuple: (all_dataframes dict, operation dict mapping table to CDC operation)
     """
-    if batch_df.rdd.isEmpty():
+    # Avoid DataFrame -> RDD conversion for Spark DataSource V2 micro-batches.
+    # Some Spark/runtime combinations can fail with ClassCastException when
+    # PythonRDD is used against DataSourceRDDPartition. Keep processing in
+    # DataFrame APIs and apply Python normalization via a UDF.
+    if not batch_df.select("json_str").limit(1).collect():
         return {}, {}
 
-    # Parse raw JSON strings entirely in Python so we can handle both:
-    #   • Debezium MongoDB  – after/before are JSON-encoded strings
-    #   • Debezium RDBMS    – after/before are nested JSON objects
-    #   • Canonical format  – flat structure with payload map
-    normalized_rdd = (
-        batch_df.rdd
-        .map(lambda row: normalize_message_row(row["json_str"]))
-        .filter(lambda r: r is not None)
+    normalized_schema = get_canonical_schema()
+
+    # ----------------------------------------------------------------
+    # Define the normalization logic as a *local* function so that
+    # cloudpickle serialises it by-value (bytecode + closure) instead
+    # of by-reference (module import path).  The executor Python worker
+    # does not have /app/mapping on sys.path, so any module-level
+    # function inside this file causes ModuleNotFoundError when the
+    # worker tries to reconstruct the UDF via `import streaming`.
+    # A locally-scoped function has no __module__ anchor and is always
+    # serialised inline.
+    # ----------------------------------------------------------------
+    def _udf_normalize(json_str):
+        if not json_str:
+            return None
+        import json as _j
+        try:
+            row = _j.loads(json_str)
+        except (ValueError, TypeError):
+            return None
+
+        def _to_str_map(obj):
+            if not isinstance(obj, dict):
+                return {}
+            out = {}
+            for k, v in obj.items():
+                if v is None:
+                    out[str(k)] = None
+                elif isinstance(v, (dict, list)):
+                    out[str(k)] = _j.dumps(v, default=str)
+                else:
+                    out[str(k)] = str(v)
+            return out
+
+        if "op" in row:
+            op_map = {"c": "c", "u": "u", "d": "d", "r": "r"}
+            source = row.get("source") or {}
+            if isinstance(source, str):
+                try:
+                    source = _j.loads(source)
+                except Exception:
+                    source = {}
+            after  = row.get("after")
+            before = row.get("before")
+            if isinstance(after, str):
+                try:
+                    after = _j.loads(after)
+                except Exception:
+                    after = None
+            if isinstance(before, str):
+                try:
+                    before = _j.loads(before)
+                except Exception:
+                    before = None
+            payload_obj = after or before
+            if not payload_obj:
+                return None
+            return {
+                "source_type": "db",
+                "vendor": "debezium",
+                "table": source.get("table") or source.get("collection"),
+                "schema_version": "v1",
+                "operation": op_map.get(row.get("op"), "c"),
+                "payload": _to_str_map(payload_obj),
+            }
+
+        payload = row.get("payload")
+        if isinstance(payload, str):
+            try:
+                payload = _j.loads(payload)
+            except Exception:
+                payload = {}
+        return {
+            "source_type": row.get("source_type"),
+            "vendor":      row.get("vendor"),
+            "table":       row.get("table"),
+            "schema_version": row.get("schema_version"),
+            "operation":   row.get("operation", "c"),
+            "payload":     _to_str_map(payload) if isinstance(payload, dict) else (payload or {}),
+        }
+
+    normalize_udf = udf(_udf_normalize, normalized_schema)
+
+    normalized_df = (
+        batch_df
+        .select(normalize_udf(col("json_str")).alias("normalized"))
+        .select("normalized.*")
+        .filter(col("table").isNotNull())
     )
 
-    # Convert to DataFrame
-    normalized_schema = StructType([
-        StructField("source_type", StringType()),
-        StructField("vendor", StringType()),
-        StructField("table", StringType()),
-        StructField("schema_version", StringType()),
-        StructField("operation", StringType()),
-        StructField("payload", MapType(StringType(), StringType()))
-    ])
-
-    normalized_df = batch_df.sparkSession.createDataFrame(normalized_rdd, normalized_schema)
+    if not normalized_df.limit(1).collect():
+        return {}, {}
 
     table_names = [
         row["table"]
