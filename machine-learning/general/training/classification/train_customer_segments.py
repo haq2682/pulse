@@ -1,14 +1,20 @@
 import os
+
 import sys
+from pathlib import Path
+# Import spark_utils FIRST to set up JARs before pyspark imports
+_ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
+if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT_VAR))
+
+from spark_utils import create_ml_spark_session
+
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when, lit
 from pyspark.ml.feature import VectorAssembler, StringIndexer, StandardScaler, OneHotEncoder
 from pyspark.ml.classification import LogisticRegression, RandomForestClassifier
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
-import findspark
-
-findspark.init()
-
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from utils.multi_bucket_loader import (
@@ -50,33 +56,15 @@ TARGET_COLUMN = "customer_segment_label"
 
 
 def create_spark_session():
-    """Initialize Spark session with MinIO configuration"""
-    return SparkSession.builder \
-        .appName("CustomerSegmentTraining") \
-        .master(os.getenv("SPARK_SERVER", "local[*]")) \
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        ) \
-        .config("spark.dynamicAllocation.enabled", "true") \
-        .config("spark.dynamicAllocation.minExecutors", "0") \
-        .config("spark.dynamicAllocation.maxExecutors", "1000") \
-        .config("spark.dynamicAllocation.initialExecutors", "1") \
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT")) \
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY")) \
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY")) \
-        .config("spark.hadoop.fs.s3a.path.style.access", "true") \
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false") \
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        ) \
-        .config("inferSchema", "true") \
-        .config("mergeSchema", "true") \
-        .getOrCreate()
-
-
+    """Initialize Spark session"""
+    return create_ml_spark_session(
+        "CustomerSegmentTraining",
+        extra_configs={
+                    "spark.sql.shuffle.partitions": "8",
+                    "inferSchema": "true",
+                    "mergeSchema": "true"
+                },
+    )
 def load_data(spark, path):
     """Load data from MinIO"""
     try:
@@ -90,25 +78,35 @@ def load_data(spark, path):
 
 def join_datasets(customers_df, rfm_df):
     """
-    Join agg_customers and agg_rfm_segmentation on customer_id
-    Only select unique columns from RFM table to avoid duplicates
-    
-    Both tables share: recency_score, frequency_score, monetary_score, 
-    customer_segment_label, rfm_segment, rfm_overall_score, rfm_category, churn_risk
-    
-    Unique to RFM: days_since_last_order, total_orders_rfm, total_revenue_rfm,
-    engagement_level, purchase_behavior, spending_pattern
+    Join agg_customers and agg_rfm_segmentation on customer_id AND _source_bucket.
+
+    The _source_bucket composite key prevents cross-tenant ID collisions: two
+    different tenants can each have a customer_id of 1, so the join must be
+    scoped to the same bucket (tenant).
     """
     if customers_df is None or rfm_df is None:
         return None
-    
+
     # Select only unique columns from RFM table (avoid duplicates)
-    rfm_unique_cols = ["customer_id", "days_since_last_order"]
-    rfm_selected = rfm_df.select(*rfm_unique_cols)
-    
-    # Join on customer_id
-    joined_df = customers_df.join(rfm_selected, on="customer_id", how="left")
-    
+    rfm_cols = ["customer_id", "days_since_last_order"]
+    # Include _source_bucket if present so the join can be bucket-scoped
+    if "_source_bucket" in rfm_df.columns:
+        rfm_cols.append("_source_bucket")
+    rfm_selected = rfm_df.select(*rfm_cols)
+
+    if "_source_bucket" in customers_df.columns and "_source_bucket" in rfm_selected.columns:
+        # Rename to avoid column ambiguity after join
+        customers_df = customers_df.withColumnRenamed("_source_bucket", "_bucket_cust")
+        rfm_selected = rfm_selected.withColumnRenamed("_source_bucket", "_bucket_rfm")
+        joined_df = customers_df.join(
+            rfm_selected,
+            (customers_df.customer_id == rfm_selected.customer_id)
+            & (customers_df._bucket_cust == rfm_selected._bucket_rfm),
+            how="left",
+        ).drop(rfm_selected.customer_id).drop("_bucket_rfm").withColumnRenamed("_bucket_cust", "_source_bucket")
+    else:
+        joined_df = customers_df.join(rfm_selected, on="customer_id", how="left")
+
     print(f"✓ Joined datasets: {joined_df.count()} records")
     return joined_df
 
@@ -346,13 +344,14 @@ def main():
     
     spark = create_spark_session()
     
-    # Load data from all buckets
+    # Load data from all buckets — keep _source_bucket for bucket-safe join
     print("\nStep 1: Loading data from all MinIO buckets...")
     customers_df, customers_count = load_data_from_all_buckets(
         spark,
         INPUT_RELATIVE_PATH,
         required_columns=NUMERICAL_FEATURES,
-        filter_nulls=True
+        filter_nulls=True,
+        keep_source_bucket=True,
     )
     
     if customers_df is None:
@@ -370,12 +369,13 @@ def main():
         spark.stop()
         return
     
-    # Load RFM data from all buckets
+    # Load RFM data from all buckets — keep _source_bucket for bucket-safe join
     rfm_required_cols = ["customer_id", "days_since_last_order"]
     rfm_df, _ = load_data_from_all_buckets(
-        spark, INPUT_RFM_PATH, 
+        spark, INPUT_RFM_PATH,
         required_columns=rfm_required_cols,
-        filter_nulls=True
+        filter_nulls=True,
+        keep_source_bucket=True,
     )
     
     if rfm_df is None:
@@ -383,12 +383,16 @@ def main():
         spark.stop()
         return
     
-    # Join datasets
+    # Join datasets (bucket-scoped to prevent cross-tenant ID collisions)
     df = join_datasets(customers_df, rfm_df)
     if df is None:
         print("⚠️  Training skipped: Failed to join datasets")
         spark.stop()
         return
+
+    # Drop _source_bucket — not a training feature; used only for safe joining
+    if "_source_bucket" in df.columns:
+        df = df.drop("_source_bucket")
     
     # Generate labels if not present
     if TARGET_COLUMN not in df.columns:

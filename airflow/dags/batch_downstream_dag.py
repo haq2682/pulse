@@ -26,10 +26,11 @@ trained model files already live in the shared  pulse-bucket-1  bucket.
 General inference reads those global models and writes per-business results
 to the business bucket — no per-business training is needed or performed.
 
-Specific models are per-business mini-models that must be trained exactly
-once on THIS business's own cleaned data before inference can produce useful
-results.  The  ml_train  step below calls  specific/train.py  to do this.
-All subsequent retraining is driven by the  ml_retrain  DAG (KS-test drift).
+Specific models are per-business mini-models trained on THIS business's own
+cleaned data.  The  ml_train  step below calls  specific/train.py  to do this.
+After onboarding, specific models are retrained unconditionally on every
+subsequent scheduled_batch run so they always reflect the latest tenant data.
+General models are retrained only when KS-test drift is detected (ml_retrain DAG).
 
 Flow (fully sequential — no parallel branches)
 ----------------------------------------------
@@ -60,14 +61,17 @@ from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.models import Variable
-from airflow.operators.bash import BashOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+from airflow.providers.docker.operators.docker import DockerOperator
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from config.pipeline_config import (
     DEFAULT_BUCKET,
     DEFAULT_TASK_ARGS,
-    PYTHON_CONTAINER,
+    PYTHON_IMAGE,
+    SPARK_NETWORK,
+    docker_pipeline_env,
+    docker_app_mounts,
 )
 
 BUCKET = Variable.get("default_bucket", default_var=DEFAULT_BUCKET)
@@ -85,9 +89,6 @@ _task_defaults = dict(
 )
 
 
-def _docker_exec(script_path: str, extra_args: str = "") -> str:
-    return f"docker exec {PYTHON_CONTAINER} python3 /app/{script_path} {extra_args}"
-
 
 with DAG(
     dag_id="batch_downstream",
@@ -98,7 +99,7 @@ with DAG(
     schedule_interval=None,      # USER-TRIGGERED ONLY — never runs on a schedule
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    max_active_runs=1,
+    max_active_runs=10,   # one run per tenant allowed concurrently
     tags=["pulse", "batch"],
     default_args=_task_defaults,
     params={"bucket": BUCKET},
@@ -106,55 +107,90 @@ with DAG(
 ) as dag:
 
     # ── 1. Clean ───────────────────────────────────────────────────────────
-    clean = BashOperator(
+    clean = DockerOperator(
         task_id="clean",
-        bash_command=_docker_exec(
-            "cleaning/cleaning.py",
-            "--bucket-name {{ params.bucket }}",
-        ),
+        image=PYTHON_IMAGE,
+        command=[
+            "python3", "/app/cleaning/cleaning.py",
+            "--bucket-name", "{{ dag_run.conf.get('bucket') or params.bucket }}",
+        ],
+        environment=docker_pipeline_env(),
+        network_mode=SPARK_NETWORK,
+        mounts=docker_app_mounts(),
+        auto_remove="force",
+        do_xcom_push=False,
+        mount_tmp_dir=False,
     )
 
     # ── 2. Transform ───────────────────────────────────────────────────────
-    transform = BashOperator(
+    transform = DockerOperator(
         task_id="transform",
-        bash_command=_docker_exec(
-            "transformation/transformation.py",
-            "--bucket-name {{ params.bucket }}",
-        ),
+        image=PYTHON_IMAGE,
+        command=[
+            "python3", "/app/transformation/transformation.py",
+            "--bucket-name", "{{ dag_run.conf.get('bucket') or params.bucket }}",
+        ],
+        environment=docker_pipeline_env(),
+        network_mode=SPARK_NETWORK,
+        mounts=docker_app_mounts(),
+        auto_remove="force",
+        do_xcom_push=False,
+        mount_tmp_dir=False,
     )
 
     # ── 3. Analyze ─────────────────────────────────────────────────────────
-    analyze = BashOperator(
+    analyze = DockerOperator(
         task_id="analyze",
-        bash_command=_docker_exec(
-            "analysis/analysis.py",
-            "--bucket-name {{ params.bucket }}",
-        ),
+        image=PYTHON_IMAGE,
+        command=[
+            "python3", "/app/analysis/analysis.py",
+            "--bucket-name", "{{ dag_run.conf.get('bucket') or params.bucket }}",
+        ],
+        environment=docker_pipeline_env(),
+        network_mode=SPARK_NETWORK,
+        mounts=docker_app_mounts(),
+        auto_remove="force",
+        do_xcom_push=False,
+        mount_tmp_dir=False,
     )
 
     # ── 4. Train specific ML models for this business bucket ──────────────
     # General models are pre-trained globally (pulse-bucket-1) and require no
     # per-business training.  Specific models are per-business and must be
     # trained once on this business's own cleaned data before inference runs.
-    ml_train = BashOperator(
+    ml_train = DockerOperator(
         task_id="ml_train",
-        bash_command=_docker_exec(
-            "machine-learning/specific/train.py",
-            "--bucket-name {{ params.bucket }}",
-        ),
-        execution_timeout=timedelta(hours=2),  # training can be slow on large datasets
+        image=PYTHON_IMAGE,
+        command=[
+            "python3", "/app/machine-learning/specific/train.py",
+            "--bucket-name", "{{ dag_run.conf.get('bucket') or params.bucket }}",
+        ],
+        environment=docker_pipeline_env(),
+        network_mode=SPARK_NETWORK,
+        mounts=docker_app_mounts(),
+        auto_remove="force",
+        do_xcom_push=False,
+        mount_tmp_dir=False,
+        execution_timeout=timedelta(hours=2),
     )
 
     # ── 5. ML Inference ────────────────────────────────────────────────────
     # Runs infer_all.py (general + specific models).
     # General models load from pulse-bucket-1 (global); specific models load
     # from this business bucket (guaranteed trained by the previous step).
-    ml_infer = BashOperator(
+    ml_infer = DockerOperator(
         task_id="ml_infer",
-        bash_command=_docker_exec(
-            "machine-learning/infer_all.py",
-            "--bucket-name {{ params.bucket }}",
-        ),
+        image=PYTHON_IMAGE,
+        command=[
+            "python3", "/app/machine-learning/infer_all.py",
+            "--bucket-name", "{{ dag_run.conf.get('bucket') or params.bucket }}",
+        ],
+        environment=docker_pipeline_env(),
+        network_mode=SPARK_NETWORK,
+        mounts=docker_app_mounts(),
+        auto_remove="force",
+        do_xcom_push=False,
+        mount_tmp_dir=False,
     )
 
     # ── 6. Trigger KS drift check + conditional retraining ────────────────
@@ -162,7 +198,7 @@ with DAG(
     trigger_drift_check = TriggerDagRunOperator(
         task_id="trigger_drift_check",
         trigger_dag_id="ml_retrain",
-        conf={"bucket": "{{ params.bucket }}", "source_dag": "batch_downstream"},
+        conf={"bucket": "{{ dag_run.conf.get('bucket') or params.bucket }}", "source_dag": "batch_downstream"},
         wait_for_completion=False,
     )
 

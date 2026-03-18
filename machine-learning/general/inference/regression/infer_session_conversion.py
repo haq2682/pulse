@@ -4,16 +4,14 @@ Predicts expected order value if a session converts
 """
 
 import os
+
 import findspark
 from dotenv import load_dotenv
-
-findspark.init()
-
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 from pyspark.sql.types import StringType
-from pyspark.ml.feature import VectorAssembler, StandardScaler, StringIndexer
+from pyspark.ml.feature import VectorAssembler, StandardScalerModel, StringIndexerModel
 from pyspark.ml.regression import LinearRegressionModel, RandomForestRegressionModel, GBTRegressionModel
 from datetime import datetime
 import uuid
@@ -38,35 +36,25 @@ NUMERIC_FEATURES = [
 ]
 
 
+import sys
+from pathlib import Path
+
+_ML_ROOT = next(p for p in Path(__file__).resolve().parents if p.name == "machine-learning")
+if str(_ML_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT))
+
+from spark_utils import create_ml_spark_session
+
 def create_spark_session():
     """Initialize Spark session"""
-    return (
-        SparkSession.builder
-        .appName("Session_Conversion_Value_Inference")
-        .master(os.getenv("SPARK_SERVER", "local[*]"))
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        )
-        .config("spark.dynamicAllocation.enabled", "true")
-        .config("spark.dynamicAllocation.minExecutors", "0")
-        .config("spark.dynamicAllocation.maxExecutors", "1000")
-        .config("spark.dynamicAllocation.initialExecutors", "1")
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        )
-        .config("inferSchema", "true")
-        .config("mergeSchema", "true")
-        .getOrCreate()
+    return create_ml_spark_session(
+        "Session_Conversion_Value_Inference",
+        extra_configs={
+            "spark.sql.shuffle.partitions": "8",
+            "inferSchema": "true",
+            "mergeSchema": "true",
+        },
     )
-
 
 def load_model(model_name, MODEL_BASE_PATH):
     """Load trained model"""
@@ -100,6 +88,22 @@ def validate_dataset(spark, path, name):
     except Exception as e:
         print(f"✗ {name} dataset validation failed: {str(e)}")
         return None, 0
+
+
+def load_preprocessors(model_base_path):
+    """Load training-time preprocessors so inference exactly matches training transforms."""
+    try:
+        preprocessors = {
+            "device_indexer": StringIndexerModel.load(f"{model_base_path}device_type_indexer"),
+            "referrer_indexer": StringIndexerModel.load(f"{model_base_path}referrer_source_indexer"),
+            "segment_indexer": StringIndexerModel.load(f"{model_base_path}customer_segment_indexer"),
+            "scaler": StandardScalerModel.load(f"{model_base_path}scaler"),
+        }
+        print(f"✓ Preprocessors loaded from: {model_base_path}")
+        return preprocessors
+    except Exception as e:
+        print(f"✗ Failed to load preprocessors: {str(e)}")
+        return None
 
 
 def create_inference_features(sessions_df, customers_df):
@@ -192,49 +196,23 @@ def create_inference_features(sessions_df, customers_df):
     return session_features
 
 
-def prepare_inference_data(df):
+def prepare_inference_data(df, preprocessors):
     """Prepare and scale features"""
-    device_indexer = StringIndexer(
-        inputCol="device_type",
-        outputCol="device_type_idx",
-        handleInvalid="keep"
-    )
-    
-    referrer_indexer = StringIndexer(
-        inputCol="referrer_source",
-        outputCol="referrer_source_idx",
-        handleInvalid="keep"
-    )
-    
-    segment_indexer = StringIndexer(
-        inputCol="customer_segment",
-        outputCol="customer_segment_idx",
-        handleInvalid="keep"
-    )
-    
-    df_indexed = device_indexer.fit(df).transform(df)
-    df_indexed = referrer_indexer.fit(df_indexed).transform(df_indexed)
-    df_indexed = segment_indexer.fit(df_indexed).transform(df_indexed)
+    df_indexed = preprocessors["device_indexer"].transform(df)
+    df_indexed = preprocessors["referrer_indexer"].transform(df_indexed)
+    df_indexed = preprocessors["segment_indexer"].transform(df_indexed)
     
     existing_features = [f for f in NUMERIC_FEATURES if f in df_indexed.columns]
     
     assembler = VectorAssembler(
         inputCols=existing_features,
         outputCol="features_unscaled",
-        handleInvalid="keep"
+        handleInvalid="skip"
     )
     
     df_assembled = assembler.transform(df_indexed)
     
-    scaler = StandardScaler(
-        inputCol="features_unscaled",
-        outputCol="features",
-        withStd=True,
-        withMean=True
-    )
-    
-    scaler_model = scaler.fit(df_assembled)
-    df_scaled = scaler_model.transform(df_assembled)
+    df_scaled = preprocessors["scaler"].transform(df_assembled)
     
     df_prepared = df_scaled.select(
         "session_id",
@@ -450,7 +428,7 @@ def main(BUCKET_NAME):
     INPUT_SESSIONS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customer_sessions.parquet"
     INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
     OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/session_conversion_value/"
-    MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/session_conversion_value/"
+    MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/session_conversion/"
 
     # ⚠️ MANUAL CONFIGURATION REQUIRED:
     MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
@@ -471,6 +449,12 @@ def main(BUCKET_NAME):
     
     if model is None:
         print("\n✗ Inference aborted: Model not found")
+        spark.stop()
+        return
+
+    preprocessors = load_preprocessors(MODEL_BASE_PATH)
+    if preprocessors is None:
+        print("\n✗ Inference aborted: Preprocessors not found")
         spark.stop()
         return
     
@@ -494,7 +478,7 @@ def main(BUCKET_NAME):
     # Prepare data
     print("\nStep 4: Data Preparation & Encoding")
     print("-" * 80)
-    df_prepared = prepare_inference_data(df_features)
+    df_prepared = prepare_inference_data(df_features, preprocessors)
     
     # Generate predictions
     print("\nStep 5: Generate Predictions")

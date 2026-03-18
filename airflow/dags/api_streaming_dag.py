@@ -18,24 +18,14 @@ python container:
     column-mapping pipeline, and writes normalised Parquet files to
     MinIO  mapped/.
 
-Inline downstream pipeline (``--enable-downstream``)
-------------------------------------------------------
-After each micro-batch is written to ``mapped/``, the downstream pipeline
-(cleaning → transformation → analysis → ML inference) is triggered
-**inline** in a background thread so the next micro-batch can start
-immediately.  A pending-flag drain loop in ``downstream_runner.py``
-guarantees that no accumulated micro-batch data is ever left unprocessed:
-if new polls arrive while a downstream run is in progress, a flag is set
-and the active run immediately re-runs after finishing (a "catch-up" run),
-picking up all data accumulated in ``mapped/`` since the previous run.
-
-The ``streaming_downstream`` Airflow DAG remains as an additional
-safety-net fallback (every 2 minutes), but correctness no longer depends
-on it.
+This DAG is responsible ONLY for ingestion + mapping (streaming layer).
+All downstream processing (cleaning → transformation → analysis → ML)
+runs separately in the ``scheduled_batch`` DAG every 10 minutes.
 
 When does this DAG run?
 -----------------------
-ONCE — triggered automatically from the onboarding confirm-mapping step
+ONCE -- triggered automatically from the onboarding confirm-mapping step
+after the user confirms their column mappings.
 after the user confirms their column mappings. The API backend calls the
 Airflow REST API:
 
@@ -59,13 +49,15 @@ The API ingestion service polls continuously (e.g., every 30 seconds) and
 the Spark consumer processes each batch.  The column-mapping algorithm runs
 on every batch, but the mapping CONFIGURATION (which source columns map to
 which canonical schema columns) is fixed after the user completes the
-onboarding mapping step and is stored in Redis.  Subsequent polls reuse
-that configuration automatically — no further user action is needed.
+onboarding mapping step. Runtime reads from Redis first and falls back to the
+onboarding database record for the same business_id when Redis keys are
+missing/expired. Subsequent polls reuse that configuration automatically --
+no further user action is needed.
 
 Crash handling & auto-restart
 ------------------------------
 ``run_api_streaming`` runs forever.  On crash:
-  - docker exec exits non-zero
+  - DockerOperator container exits non-zero
   - Airflow marks task FAILED, waits 1 min, restarts
   - retries=9999 means effectively infinite restarts
   - Spark checkpoint persists in MinIO so no data is lost
@@ -89,7 +81,7 @@ from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.models import Variable
-from airflow.operators.bash import BashOperator
+from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.operators.python import PythonOperator
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -97,11 +89,18 @@ from config.pipeline_config import (
     API_POLL_INTERVAL,
     DEFAULT_BUCKET,
     DEFAULT_TASK_ARGS,
-    PYTHON_CONTAINER,
+    PYTHON_IMAGE,
+    SPARK_NETWORK,
+    POSTGRES_SERVER,
+    POSTGRES_DB,
+    POSTGRES_USER,
+    POSTGRES_PASSWORD,
+    docker_pipeline_env,
+    docker_app_mounts,
 )
 
 BUCKET        = Variable.get("default_bucket",    default_var=DEFAULT_BUCKET)
-# api_url has NO system-wide default — it must come from dag_run.conf per run.
+# api_url has NO system-wide default -- it must come from dag_run.conf per run.
 POLL_INTERVAL = int(Variable.get("api_poll_interval", default_var=str(API_POLL_INTERVAL)))
 
 _batch_defaults = dict(
@@ -126,24 +125,93 @@ _streaming_defaults = dict(
 )
 
 
-def _docker_exec(script_path: str, extra_args: str = "") -> str:
-    return f"docker exec {PYTHON_CONTAINER} python3 /app/{script_path} {extra_args}"
 
 
 # ---------------------------------------------------------------------------
 # Health check callable
 # ---------------------------------------------------------------------------
+def _resolve_runtime_api_conf(bucket: str, api_url: str, poll_interval: int):
+    """
+    Resolve runtime API streaming config with business-specific onboarding values.
+
+    Priority:
+      1) Explicit dag_run.conf values (api_url / poll_interval)
+      2) Latest onboarding row for this business (api_url)
+      3) Airflow params/variables defaults
+    """
+    resolved_url = (api_url or "").strip()
+    try:
+        resolved_poll = int(poll_interval)
+    except Exception:
+        resolved_poll = int(API_POLL_INTERVAL)
+
+    source = "dag_run_conf_or_airflow_defaults"
+    if resolved_url:
+        return bucket, resolved_url, resolved_poll, source
+
+    try:
+        import psycopg2 as _psycopg2
+
+        conn = _psycopg2.connect(
+            host=POSTGRES_SERVER,
+            database=POSTGRES_DB,
+            user=POSTGRES_USER,
+            password=POSTGRES_PASSWORD,
+        )
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT api_url
+                    FROM onboarding
+                    WHERE business_id = %s
+                    ORDER BY is_completed DESC, updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+                    LIMIT 1
+                    """,
+                    (bucket,),
+                )
+                row = cur.fetchone()
+                if row and (row[0] or "").strip():
+                    resolved_url = (row[0] or "").strip()
+                    source = "onboarding"
+    except Exception as exc:
+        print(f"Warning: Could not resolve onboarding API config for {bucket}: {exc}")
+
+    return bucket, resolved_url, resolved_poll, source
+
+
 def verify_api_health(**context):
     """
     Check that the user-provided API endpoint is reachable before starting
     the continuous polling process.  Raises on failure so Airflow retries.
     """
-    conf    = context["dag_run"].conf or {}
-    api_url = conf.get("api_url", "").strip()
+    conf = context["dag_run"].conf or {}
+
+    # IMPORTANT: mirror db_streaming precedence behavior.
+    # Use only explicit dag_run.conf values for first-pass resolution.
+    # If omitted, resolver pulls onboarding values; only then we apply
+    # Airflow defaults.
+    explicit_bucket = conf.get("bucket")
+    explicit_api_url = conf.get("api_url")
+    explicit_poll_interval = conf.get("poll_interval")
+
+    bucket = explicit_bucket or BUCKET
+    api_url = explicit_api_url
+    poll_interval = explicit_poll_interval if explicit_poll_interval is not None else POLL_INTERVAL
+
+    bucket, api_url, poll_interval, cfg_source = _resolve_runtime_api_conf(
+        bucket,
+        api_url,
+        poll_interval,
+    )
+
+    print(f"Resolved api_streaming config source: {cfg_source}")
+    print(f"Resolved API URL: {api_url}")
+    print(f"Resolved poll interval: {poll_interval}s")
 
     if not api_url:
         raise RuntimeError(
-            "dag_run.conf must include 'api_url' — the user's external API endpoint. "
+            "dag_run.conf must include 'api_url' -- the user's external API endpoint. "
             "Example: POST dagRuns with conf={\"bucket\": \"<id>\", "
             "\"api_url\": \"https://api.example.com/data\", \"poll_interval\": 30}"
         )
@@ -156,7 +224,12 @@ def verify_api_health(**context):
         try:
             with urllib.request.urlopen(url, timeout=10) as resp:
                 print(f"API reachable at {url} (HTTP {resp.status})")
-                return   # success
+                return {
+                    "bucket": bucket,
+                    "api_url": api_url,
+                    "poll_interval": poll_interval,
+                    "config_source": cfg_source,
+                }
         except urllib.error.HTTPError as exc:
             if exc.code == 404:
                 continue   # endpoint doesn't exist, try next
@@ -179,14 +252,14 @@ with DAG(
         "Manages the continuous frontend-API polling → Kafka → Spark Streaming → "
         "MinIO mapped/ pipeline. Triggered ONCE when the user connects their API endpoint."
     ),
-    schedule_interval=None,      # USER-TRIGGERED — never runs on a schedule
+    schedule_interval=None,      # USER-TRIGGERED -- never runs on a schedule
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    max_active_runs=None,           # allow one run per tenant simultaneously
+    max_active_runs=25,             # one perpetual run per active tenant; matches db_streaming_dag
     default_args=_batch_defaults,
     params={
         "bucket":        BUCKET,
-        "api_url":       "",          # REQUIRED — provided per run via dag_run.conf
+        "api_url":       "",          # REQUIRED -- provided per run via dag_run.conf
         "poll_interval": POLL_INTERVAL,
     },
     render_template_as_native_obj=True,
@@ -207,20 +280,27 @@ with DAG(
     #
     # NOTE: no --trigger-once / --poll-duration here.
     # The job polls indefinitely at poll_interval seconds per cycle.
-    run_api_streaming = BashOperator(
+    run_api_streaming = DockerOperator(
         task_id="run_api_mapping_stream",
-        bash_command=_docker_exec(
-            "mapping/run_mapping.py",
-            (
-                "--mode api "
-                "--business-id {{ params.bucket }} "
-                "--api-url {{ params.api_url }} "
-                "--api-poll-interval {{ params.poll_interval }} "
-                "--enable-downstream"
-                # No --trigger-once: must run indefinitely
-                # No --poll-duration: must poll forever
-            ),
-        ),
+        image=PYTHON_IMAGE,
+        command=[
+            "python3", "/app/mapping/run_mapping.py",
+            "--mode", "api",
+            # dag_run.conf overrides; params are fallback for manual UI runs.
+            "--business-id",     "{{ (ti.xcom_pull(task_ids='check_api_health') or {}).get('bucket') or dag_run.conf.get('bucket') or params.bucket }}",
+            "--api-url",         "{{ (ti.xcom_pull(task_ids='check_api_health') or {}).get('api_url') or dag_run.conf.get('api_url') or params.api_url }}",
+            "--api-poll-interval","{{ (ti.xcom_pull(task_ids='check_api_health') or {}).get('poll_interval') or dag_run.conf.get('poll_interval') or params.poll_interval }}",
+            # No --trigger-once: must run indefinitely.
+            # No --poll-duration: must poll forever.
+            # No --enable-downstream: downstream is a scheduled Airflow batch job.
+        ],
+        environment=docker_pipeline_env(),
+        network_mode=SPARK_NETWORK,
+        mounts=docker_app_mounts(),
+        auto_remove="force",
+        do_xcom_push=False,
+        mount_tmp_dir=False,
+        tty=True,
         **_streaming_defaults,
     )
 

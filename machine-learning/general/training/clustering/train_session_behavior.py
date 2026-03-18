@@ -4,11 +4,9 @@ Clusters sessions by user behavior patterns with stability validation
 """
 
 import os
+
 import sys
-import findspark
-
-findspark.init()
-
+from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from utils.multi_bucket_loader import (
     load_data_from_all_buckets,
@@ -17,6 +15,14 @@ from utils.multi_bucket_loader import (
     get_training_window,
     GENERAL_MODEL_BUCKET
 )
+
+# Import spark_utils FIRST to set up JARs before pyspark imports
+_ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
+if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT_VAR))
+
+from spark_utils import create_ml_spark_session
+
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when, lit, coalesce, log1p, expr, count
@@ -56,27 +62,7 @@ NUMERIC_FEATURES = [
 
 def create_spark_session():
     """Initialize Spark session"""
-    return (
-        SparkSession.builder.appName("SessionBehaviorClustering")
-        .master(os.getenv("SPARK_SERVER", "local[*]"))
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        )
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        )
-        .getOrCreate()
-    )
-
-
+    return create_ml_spark_session("SessionBehaviorClustering")
 def load_and_validate_data(spark):
     """Load session data using multi-bucket loader"""
     df, record_count = load_data_from_all_buckets(

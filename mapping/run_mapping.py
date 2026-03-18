@@ -20,9 +20,32 @@ import psycopg2
 from datetime import datetime, timezone
 import traceback
 import time as _time
+import re
 
 # Add current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+
+_QUALIFIED_REF_RE = re.compile(r'^\s*"(?P<table>[^"]+)"\s*\.\s*"(?P<column>[^"]+)"\s*$')
+_UNQUOTED_REF_RE = re.compile(r'^\s*(?P<table>[A-Za-z_][\w$]*)\s*\.\s*(?P<column>[A-Za-z_][\w$]*)\s*$')
+
+
+def _qualify_source_ref(table_name: str, source_ref: str) -> str:
+    raw = str(source_ref or "").strip()
+    if not raw:
+        return ""
+
+    match = _QUALIFIED_REF_RE.match(raw) or _UNQUOTED_REF_RE.match(raw)
+    if match:
+        src_table = match.group("table").strip().strip('"')
+        src_col = match.group("column").strip().strip('"')
+    else:
+        src_table = str(table_name or "").strip().strip('"')
+        src_col = raw.strip().strip('"')
+
+    if not src_table or not src_col:
+        return ""
+    return f'"{src_table}"."{src_col}"'
 
 
 def _wait_for_debezium_snapshot(
@@ -315,6 +338,107 @@ def update_mapping_status(business_id: str, status: str, error_message: Optional
         # Don't re-raise - we want the original error to be the main one
 
 
+def _save_auto_mappings_for_business(business_id: str, auto_mappings: dict):
+    """
+    Persist auto mappings to onboarding.auto_mappings for the latest in-progress row.
+    """
+    try:
+        db_host = os.getenv("POSTGRES_SERVER", "10.5.0.5")
+        db_name = os.getenv("POSTGRES_DATABASE_NAME", os.getenv("POSTGRES_DB", "pulse"))
+        db_user = os.getenv("POSTGRES_USER", "postgres")
+        db_password = os.getenv("POSTGRES_PASSWORD", "postgres")
+
+        payload = auto_mappings if isinstance(auto_mappings, dict) else {}
+
+        with psycopg2.connect(
+            host=db_host,
+            database=db_name,
+            user=db_user,
+            password=db_password,
+        ) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE onboarding
+                    SET auto_mappings = %s::jsonb,
+                        updated_at = NOW()
+                    WHERE business_id = %s
+                      AND is_completed = false
+                    """,
+                    (json.dumps(payload), business_id),
+                )
+                conn.commit()
+
+        print(
+            f"✅ Saved auto_mappings to DB for business '{business_id}' "
+            f"({len(payload)} tables)",
+            flush=True,
+        )
+    except Exception as db_error:
+        print(f"⚠️  Could not persist auto_mappings to DB: {db_error}", flush=True)
+
+
+def load_combined_mappings_for_business(business_id: str):
+    """
+    Load effective/combined mappings for a business from onboarding table.
+
+    Source of truth:
+      onboarding.combined_mappings (latest row for business)
+    """
+    business_found_in_db = False
+    try:
+        db_host = os.getenv("POSTGRES_SERVER", "10.5.0.5")
+        db_name = os.getenv("POSTGRES_DATABASE_NAME", os.getenv("POSTGRES_DB", "pulse"))
+        db_user = os.getenv("POSTGRES_USER", "postgres")
+        db_password = os.getenv("POSTGRES_PASSWORD", "postgres")
+
+        with psycopg2.connect(
+            host=db_host,
+            database=db_name,
+            user=db_user,
+            password=db_password,
+        ) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT business_id, combined_mappings
+                    FROM onboarding
+                    WHERE business_id = %s
+                    ORDER BY is_completed DESC, updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+                    LIMIT 1
+                    """,
+                    (business_id,),
+                )
+                row = cursor.fetchone()
+
+        if row:
+            business_found_in_db = True
+        if row and row[1]:
+            payload = row[1]
+            combined_mappings = json.loads(payload) if isinstance(payload, str) else payload
+            if isinstance(combined_mappings, dict) and combined_mappings:
+                print(
+                    f"✅ Retrieved combined mappings from DB: {list(combined_mappings.keys())}",
+                    flush=True,
+                )
+                return combined_mappings
+    except Exception as db_error:
+        print(f"⚠️  Could not retrieve combined mappings from DB: {db_error}", flush=True)
+
+    if business_found_in_db:
+        print(
+            f"ℹ️  No combined mappings found for business '{business_id}' in DB. Proceeding with automatic mapping from scratch.",
+            flush=True,
+        )
+    else:
+        print(
+            f"ℹ️  Business '{business_id}' not found in onboarding DB. Proceeding with automatic mapping from scratch.",
+            flush=True,
+        )
+
+    return None
+
+
 def run_batch_mode(bucket_name: str):
     """
     Batch mode: Load data from MinIO ingested folder, process through mapping, 
@@ -327,7 +451,6 @@ def run_batch_mode(bucket_name: str):
     print(f"BATCH MODE: Processing files from bucket '{bucket_name}/ingested'", flush=True)
     print(f"{'='*60}\n", flush=True)
     
-    # Import and run the batch processing
     try:
         from map import (
             load_all_files_from_minio,
@@ -338,415 +461,436 @@ def run_batch_mode(bucket_name: str):
             COLUMNS_INFO,
         )
         import List as mapping_list
-        
-        # Try to retrieve manual mappings from Redis
-        manual_mappings = None
-        try:
-            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=int(os.getenv("REDIS_PORT", "6379")), decode_responses=True)
-            manual_mappings_str = redis_client.get(f"manual_mappings:{bucket_name}")
-            if manual_mappings_str:
-                manual_mappings = json.loads(manual_mappings_str)
-                print(f"\n✅ Retrieved manual mappings from Redis", flush=True)
-                print(f"   Tables with manual mappings: {list(manual_mappings.keys())}", flush=True)
-        except Exception as redis_error:
-            print(f"⚠️  Warning: Could not retrieve manual mappings from Redis: {redis_error}", flush=True)
-        
+
+        combined_mappings = load_combined_mappings_for_business(bucket_name)
+
         print(f"Loading files from {bucket_name}/ingested...", flush=True)
         all_dataframes = load_all_files_from_minio(minio_client, bucket_name, spark)
-        
+
         if not all_dataframes:
             print("⚠️  No files found in ingested folder", flush=True)
             return
-        
+
         print(f"\nProcessing {len(all_dataframes)} dataframes through mapping pipeline...", flush=True)
         results = process_all_dataframes(
-            all_dataframes, 
-            COLUMNS_INFO, 
+            all_dataframes,
+            COLUMNS_INFO,
             mapping_list,
             mode="batch",
-            manual_mappings=manual_mappings
+            manual_mappings=combined_mappings,
         )
-        
-        # Collect mapping results (missing_cols and extra_cols)
-        mapping_results = {
-            "missing_cols": [],
-            "extra_cols": []
-        }
-        
-        for key, result in results.items():
+
+        auto_mappings = {}
+        for _, result in results.items():
+            table_name = result.get("table_name")
+            mapped_cols = result.get("mapped_cols")
+            if table_name and isinstance(mapped_cols, dict):
+                filtered = {
+                    str(k): _qualify_source_ref(table_name, str(v))
+                    for k, v in mapped_cols.items()
+                    if str(k).strip() and str(v).strip() and _qualify_source_ref(table_name, str(v))
+                }
+                if filtered:
+                    auto_mappings[table_name] = filtered
+
+        _save_auto_mappings_for_business(bucket_name, auto_mappings)
+
+        mapping_results = {"missing_cols": [], "extra_cols": []}
+
+        for _, result in results.items():
             table_name = result.get("table_name", "")
             missing_cols = result.get("missing_cols", [])
             extra_cols = result.get("extra_cols", [])
-            
-            # Add table name to each column for frontend display
+
             for missing_col in missing_cols:
-                mapping_results["missing_cols"].append({
-                    "column": missing_col,
-                    "table": table_name
-                })
-            
+                mapping_results["missing_cols"].append({"column": missing_col, "table": table_name})
+
             for extra_col in extra_cols:
-                mapping_results["extra_cols"].append({
-                    "column": extra_col,
-                    "table": table_name
-                })
-        
-        # Save mapping results to Redis for the API to retrieve
+                mapping_results["extra_cols"].append({"column": extra_col, "table": table_name})
+
         try:
-            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=int(os.getenv("REDIS_PORT", "6379")), decode_responses=True)
+            redis_client = redis.Redis(
+                host=os.getenv("REDIS_HOST", "redis"),
+                port=int(os.getenv("REDIS_PORT", "6379")),
+                decode_responses=True,
+            )
             redis_client.setex(
                 f"mapping_results:{bucket_name}",
-                86400,  # 24 hours
-                json.dumps(mapping_results)
+                86400,
+                json.dumps(mapping_results),
             )
-            print(f"\n✅ Mapping results saved to Redis", flush=True)
+            print("\n✅ Mapping results saved to Redis", flush=True)
             print(f"   Missing columns: {len(mapping_results['missing_cols'])}", flush=True)
             print(f"   Extra columns: {len(mapping_results['extra_cols'])}", flush=True)
-            
-            # Provide clear feedback about mapping completeness
-            if len(mapping_results['missing_cols']) == 0:
-                print(f"\n🎉 SUCCESS: All required columns have been successfully mapped!", flush=True)
-                print(f"   No missing columns detected.", flush=True)
+
+            if len(mapping_results["missing_cols"]) == 0:
+                print("\n🎉 SUCCESS: All required columns have been successfully mapped!", flush=True)
+                print("   No missing columns detected.", flush=True)
             else:
-                missing_count = len(mapping_results['missing_cols'])
+                missing_count = len(mapping_results["missing_cols"])
                 column_word = "column" if missing_count == 1 else "columns"
                 print(f"\n⚠️  WARNING: {missing_count} required {column_word} missing.", flush=True)
                 print(f"   {'This' if missing_count == 1 else 'These'} will need to be mapped manually.", flush=True)
-                
         except Exception as redis_error:
             print(f"⚠️  Warning: Could not save mapping results to Redis: {redis_error}", flush=True)
-        
-        # Determine which folder to save to based on whether manual mapping is needed
-        has_missing_columns = len(mapping_results['missing_cols']) > 0
+
+        has_missing_columns = len(mapping_results["missing_cols"]) > 0
         target_folder = "mapped-temp" if has_missing_columns else "mapped"
-        
+
         print(f"\nSaving results to {bucket_name}/{target_folder}...", flush=True)
         if has_missing_columns:
-            print(f"   💡 Saving to temporary location for manual mapping review", flush=True)
+            print("   💡 Saving to temporary location for manual mapping review", flush=True)
         save_dataframes_to_minio(results, minio_client, bucket_name, folder=target_folder)
-        
+
         print(f"\n{'='*60}", flush=True)
-        print(f"✅ BATCH MODE COMPLETE", flush=True)
+        print("✅ BATCH MODE COMPLETE", flush=True)
         print(f"   Processed {len(results)} tables", flush=True)
         print(f"   Results saved to {bucket_name}/{target_folder}/", flush=True)
         if has_missing_columns:
-            print(f"   📝 Awaiting manual mapping before moving to final location", flush=True)
+            print("   📝 Awaiting manual mapping before moving to final location", flush=True)
         else:
-            print(f"   🎉 All columns mapped - ready for use", flush=True)
+            print("   🎉 All columns mapped - ready for use", flush=True)
         print(f"{'='*60}\n", flush=True)
-        
-        # Update database with success status
-        # Set current_step to 'mapping' so user can review results before continuing
+
         update_mapping_status(bucket_name, "completed")
-        
         spark.stop()
-        
+
     except Exception as e:
         error_msg = "Batch mode: Failed during data processing"
         print(f"❌ {error_msg}: {str(e)}", flush=True)
         traceback.print_exc()
-        
-        # Update database with error status so frontend can display it
         update_mapping_status(bucket_name, "failed", error_msg)
-        
         sys.exit(1)
 
 
 
 def run_db_mode(config: dict):
     """
-    DB mode: Deploy Debezium CDC connector, stream real-time changes to Kafka,
-    consume via Spark Streaming -> mapped folder.
+    DB mode — two sub-paths depending on ``trigger_once``.
 
-    Auto-detects the database type from the URI scheme and builds the correct
-    Debezium connector configuration. Supports all Debezium source connectors:
-    PostgreSQL, MySQL, MariaDB, MongoDB, SQL Server, Oracle, Db2,
-    Vitess, Spanner, Informix, Cassandra.
+    trigger_once=True  (initial onboarding)
+    ----------------------------------------
+    1. Deploy Debezium CDC connector with ``snapshot.mode=never`` so it
+       registers the current WAL/oplog position without performing a full
+       database snapshot (we do our own bulk read instead).
+    2. Run a JDBC / PyMongo chunked initial load: every table is read in
+       chunks of ≤200 k rows and written to
+       ``ingested/{canonical_table}/chunk_NNNN.parquet`` inside the tenant
+       bucket.
+    3. Call ``run_batch_mode`` which reads ``ingested/``, runs the
+       7-algorithm mapping pipeline, writes results to ``mapped-temp/`` (when
+       there are missing columns) or ``mapped/`` (when fully auto-mapped), and
+       sets ``mapping_status = 'completed'`` in the DB — making the results
+       available to the frontend for user review.
+
+    trigger_once=False  (Airflow continuous CDC streaming)
+    -------------------------------------------------------
+    The Debezium connector already exists from the initial-load phase.
+    ``deploy_connector`` will verify it is RUNNING and update its config if
+    needed (with ``snapshot.mode`` silently overridden to ``no_data`` on
+    updates so no duplicate snapshot occurs).  Then the continuous Spark
+    Structured Streaming job starts, reading CDC events from Kafka and
+    applying confirmed combined mappings on every micro-batch loaded
+    from onboarding.combined_mappings in Postgres by business_id.
+
+    Subsequent batches and confirmed mappings
+    -----------------------------------------
+    The continuous Spark streaming job (``process_microbatch``) re-reads
+    effective mappings from onboarding.combined_mappings in Postgres on every
+    micro-batch and passes them to ``process_all_dataframes``. After
+    ``confirm_mapping`` saves user-approved mappings, subsequent CDC batches
+    are automatically mapped correctly — no further user action required.
 
     Args:
-        config: Configuration dictionary with db_uri and db_tables
+        config: Configuration dictionary with db_uri, db_tables, bucket_name,
+                trigger_once.
     """
     from streaming.ingestion.debezium_connector_manager import DebeziumConnectorManager
     from streaming.spark_streaming import run_streaming
 
-    db_uri = config["db_uri"]
-    tables = config.get("db_tables", [])
+    db_uri      = config["db_uri"]
+    tables      = config.get("db_tables", [])
     bucket_name = config["bucket_name"]
+    trigger_once = config.get("trigger_once", False)
 
-    print(f"\n{'='*60}")
-    print(f"DB MODE: Real-time CDC via Debezium")
-    print(f"{'='*60}\n")
-    
-    # Try to retrieve manual mappings from Redis
-    manual_mappings = None
-    try:
-        redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=int(os.getenv("REDIS_PORT", "6379")), decode_responses=True)
-        manual_mappings_str = redis_client.get(f"manual_mappings:{bucket_name}")
-        if manual_mappings_str:
-            manual_mappings = json.loads(manual_mappings_str)
-            print(f"\n✅ Retrieved manual mappings from Redis")
-            print(f"   Tables with manual mappings: {list(manual_mappings.keys())}")
-    except Exception as redis_error:
-        print(f"⚠️  Warning: Could not retrieve manual mappings from Redis: {redis_error}")
+    print(f"\n{'='*60}", flush=True)
+    print(f"DB MODE: {'Initial load (JDBC → batch mapping)' if trigger_once else 'Continuous CDC streaming'}", flush=True)
+    print(f"{'='*60}\n", flush=True)
 
-    manager = DebeziumConnectorManager()
+    manager        = DebeziumConnectorManager()
+    connector_name = f"pulse-{bucket_name}-connector"
 
+    # ── Wait for Kafka Connect to be ready ────────────────────────────────
     if not manager.wait_for_connect():
         error_msg = "DB mode error: Kafka Connect not available"
-        print(f"❌ {error_msg}")
+        print(f"❌ {error_msg}", flush=True)
         update_mapping_status(bucket_name, "failed", error_msg)
         sys.exit(1)
 
-    # Auto-detect database type from URI and build connector config.
-    # Use a per-tenant connector name so that different tenants' connectors
-    # do not collide and the DAG health-check finds the same name we deploy.
-    connector_name = f"pulse-{bucket_name}-connector"
+    # ── Build & deploy the Debezium connector ─────────────────────────────
+    # For the initial load we use snapshot.mode=never so Debezium starts
+    # tracking the WAL from NOW without duplicating the JDBC bulk snapshot.
+    # For the continuous Airflow job we use the default (initial), which
+    # deploy_connector silently overrides to no_data on connector updates to
+    # prevent re-snapshoting an already-running connector.
+    _snap_mode = "never" if trigger_once else "initial"
     try:
         connector_config = manager.create_connector_config(
             db_uri=db_uri,
             tables=tables,
             connector_name=connector_name,
             topic_prefix=bucket_name,
+            snapshot_mode=_snap_mode,
         )
     except Exception as e:
         error_msg = "DB mode error: Failed to create connector configuration"
-        print(f"❌ {error_msg}: {str(e)}")
+        print(f"❌ {error_msg}: {str(e)}", flush=True)
         traceback.print_exc()
         update_mapping_status(bucket_name, "failed", error_msg)
         sys.exit(1)
 
-    # Deploy connector and start streaming
-    if manager.deploy_connector(connector_config):
-        print("\nDebezium connector deployed")
-        print("   Starting Spark streaming...\n")
+    if not manager.deploy_connector(connector_config):
+        error_msg = "DB mode error: Failed to deploy Debezium connector"
+        print(f"❌ {error_msg}", flush=True)
+        update_mapping_status(bucket_name, "failed", error_msg)
+        sys.exit(1)
 
-        # Pass business ID and manual mappings to the streaming session.
-        # We set BUSINESS_ID here (needed for Redis flags inside spark_streaming).
-        # output_bucket is now passed directly as an argument — no module-level
-        # variable evaluation race.
-        os.environ["BUSINESS_ID"] = bucket_name
-        if manual_mappings:
-            os.environ["MANUAL_MAPPINGS"] = json.dumps(manual_mappings)
-        
+    print("\nDebezium connector deployed/verified", flush=True)
+
+    # ════════════════════════════════════════════════════════════════════
+    # PATH A — trigger_once: JDBC bulk snapshot → batch mapping pipeline
+    # ════════════════════════════════════════════════════════════════════
+    if trigger_once:
+        print("\n📥 Starting JDBC initial load …\n", flush=True)
         try:
-            trigger_once = config.get("trigger_once", False)
-
-            # Extract the actual topic prefix from the deployed connector config.
-            # This is bucket_name (the per-tenant UUID), not the hardcoded "ecom".
-            # Both _wait_for_debezium_snapshot and run_streaming/read_kafka_stream
-            # must use the same prefix so they watch the right Kafka topics.
-            topic_prefix = connector_config["config"].get("topic.prefix", bucket_name)
-
-            if trigger_once:
-                # When running in trigger-once mode (initial onboarding mapping),
-                # wait until Debezium has fully published its snapshot to Kafka
-                # before starting Spark's availableNow query.
-                # _wait_for_debezium_snapshot uses two signals:
-                # 1. All expected topics have ≥1 message (fast path).
-                # 2. Message-rate stability: total count unchanged for 30 s
-                #    (handles large databases where snapshot takes many minutes).
-                kafka_bs = os.getenv("KAFKA_BOOTSTRAP", "10.5.0.7:9092")
-                connect_url = os.getenv("KAFKA_CONNECT_URL", "http://10.5.0.10:8083")
-                max_wait = int(os.getenv("DEBEZIUM_SNAPSHOT_WAIT", "3600"))
-                _wait_for_debezium_snapshot(
-                    topic_prefix=topic_prefix,
-                    expected_tables=tables,
-                    kafka_bootstrap=kafka_bs,
-                    max_wait=max_wait,
-                    connector_name=connector_name,
-                    connect_url=connect_url,
-                )
-
-            enable_downstream = config.get("enable_downstream", False)
-            run_streaming(trigger_once=trigger_once,
-                          enable_downstream=enable_downstream,
-                          output_bucket=bucket_name,
-                          topic_prefix=topic_prefix)
-
-            # After trigger-once streaming finishes, update mapping status to
-            # 'completed' if the streaming callback didn't already do it (e.g.
-            # because no data was available from the snapshot yet).
-            if trigger_once:
-                try:
-                    import psycopg2
-                    db_host = os.getenv("POSTGRES_SERVER", "postgresql")
-                    db_name_pg = os.getenv("POSTGRES_DATABASE_NAME", "pulse")
-                    db_user = os.getenv("POSTGRES_USER", "postgres")
-                    db_password = os.getenv("POSTGRES_PASSWORD", "postgres")
-                    with psycopg2.connect(host=db_host, database=db_name_pg,
-                                          user=db_user, password=db_password) as conn:
-                        with conn.cursor() as cur:
-                            cur.execute(
-                                "SELECT mapping_status FROM onboarding WHERE business_id = %s AND is_completed = false",
-                                (bucket_name,)
-                            )
-                            row = cur.fetchone()
-                            if row and row[0] == "running":
-                                from datetime import datetime, timezone
-                                cur.execute("""
-                                    UPDATE onboarding
-                                    SET mapping_status = 'completed',
-                                        mapping_completed_at = %s,
-                                        mapping_error = NULL,
-                                        current_step = 'mapping'
-                                    WHERE business_id = %s
-                                    AND is_completed = false
-                                """, (datetime.now(timezone.utc), bucket_name))
-                                conn.commit()
-                                print("   Mapping status set to 'completed' (trigger-once fallback)")
-                except Exception as status_err:
-                    print(f"⚠️  Could not update mapping status after trigger-once: {status_err}")
+            from streaming.initial_load import run_jdbc_initial_load
+            chunk_size = int(os.getenv("INITIAL_LOAD_CHUNK_SIZE", "200000"))
+            row_counts = run_jdbc_initial_load(
+                db_uri=db_uri,
+                tables=tables,
+                bucket_name=bucket_name,
+                chunk_size=chunk_size,
+            )
+            if not row_counts:
+                # DB was empty or no tables matched the canonical schema.
+                # Still mark as completed so the user sees the mapping UI
+                # (with zero missing-column suggestions).
+                print("⚠️  No rows loaded — database may be empty.", flush=True)
         except Exception as e:
-            error_msg = "DB mode error: Streaming failed"
-            print(f"❌ {error_msg}: {str(e)}")
+            error_msg = "DB mode error: JDBC initial load failed"
+            print(f"❌ {error_msg}: {str(e)}", flush=True)
             traceback.print_exc()
             update_mapping_status(bucket_name, "failed", error_msg)
             sys.exit(1)
-    else:
-        error_msg = "DB mode error: Failed to deploy Debezium connector"
-        print(f"❌ {error_msg}")
-        update_mapping_status(bucket_name, "failed", error_msg)
+
+        print("\n🗺️  Running batch mapping pipeline on ingested data …\n", flush=True)
+        try:
+            run_batch_mode(bucket_name)
+        except Exception as e:
+            error_msg = "DB mode error: Batch mapping failed after initial load"
+            print(f"❌ {error_msg}: {str(e)}", flush=True)
+            traceback.print_exc()
+            update_mapping_status(bucket_name, "failed", error_msg)
+            sys.exit(1)
+        # run_batch_mode already calls update_mapping_status('completed').
+        return
+
+    # ════════════════════════════════════════════════════════════════════
+    # PATH B — continuous: Spark Structured Streaming (Airflow CDC job)
+    # ════════════════════════════════════════════════════════════════════
+    # Retrieve effective combined mappings from Postgres so they are passed
+    # to every micro-batch via MANUAL_MAPPINGS env var read by run_streaming.
+    combined_mappings = load_combined_mappings_for_business(bucket_name)
+
+    os.environ["BUSINESS_ID"] = bucket_name
+    if combined_mappings:
+        os.environ["MANUAL_MAPPINGS"] = json.dumps(combined_mappings)
+
+    topic_prefix = connector_config["config"].get("topic.prefix", bucket_name)
+    try:
+        run_streaming(
+            trigger_once=False,
+            output_bucket=bucket_name,
+            topic_prefix=topic_prefix,
+        )
+    except Exception as e:
+        error_msg = "DB mode error: Continuous streaming failed"
+        print(f"❌ {error_msg}: {str(e)}", flush=True)
+        traceback.print_exc()
+        print(
+            "ℹ️  Skipping onboarding mapping_status failure update for continuous streaming runtime error.",
+            flush=True,
+        )
         sys.exit(1)
 
 
 def run_api_mode(api_url: str, bucket_name: str, poll_interval: int = 10,
                  kafka_bootstrap: Optional[str] = None,
-                 poll_duration: int = 0, trigger_once: bool = False,
-                 enable_downstream: bool = False):
+                 poll_duration: int = 0, trigger_once: bool = False):
     """
-    API mode: Ingest from API endpoint -> Kafka -> Spark Streaming -> mapped folder.
-    
-    This mode runs two processes:
-    1. API ingestion service (polls API and sends to Kafka)
-    2. Spark streaming consumer (consumes from Kafka, maps, saves to MinIO)
-    
+    API mode — two sub-paths depending on ``trigger_once``.
+
+    trigger_once=True  (initial onboarding)
+    ----------------------------------------
+    Polls the user's external API for *poll_duration* seconds and writes all
+    collected records directly to ``ingested/{canonical_table}/chunk_NNNN.parquet``
+    inside the tenant bucket — no Kafka, no Spark Streaming.  After the poll
+    window closes, ``run_batch_mode`` runs the same 7-algorithm mapping
+    pipeline used for uploaded-file batch mode.
+
+    trigger_once=False  (Airflow continuous API streaming)
+    -------------------------------------------------------
+    Runs two parallel processes:
+    1. API ingestion service — polls every *poll_interval* seconds → Kafka
+    2. Spark Structured Streaming consumer — Kafka → MinIO mapped/
+    Confirmed combined mappings are re-read by ``process_microbatch`` on every
+    micro-batch from onboarding.combined_mappings in Postgres, so subsequent
+    batches are mapped correctly without further user action.
+
+    Downstream processing (cleaning → transformation → analysis → ML) is
+    handled exclusively by the ``scheduled_batch`` Airflow DAG every 10 minutes.
+
     Args:
         api_url: API endpoint URL
         bucket_name: Name of the MinIO bucket
-        poll_interval: Polling interval in seconds
-        kafka_bootstrap: Kafka bootstrap servers (defaults to env var)
+        poll_interval: Polling interval in seconds (initial-load or continuous)
+        kafka_bootstrap: Kafka bootstrap servers (defaults to env var, continuous only)
+        poll_duration: Seconds to poll in initial-load mode (trigger_once=True)
+        trigger_once: True → initial onboarding load; False → continuous streaming
     """
-    print(f"\n{'='*60}")
-    print(f"API MODE: Ingesting from API endpoint")
-    print(f"{'='*60}")
-    print(f"API URL: {api_url}")
-    print(f"Bucket: {bucket_name}")
-    print(f"Poll interval: {poll_interval}s\n")
-    
-    # Try to retrieve manual mappings from Redis
-    manual_mappings = None
-    try:
-        redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=int(os.getenv("REDIS_PORT", "6379")), decode_responses=True)
-        manual_mappings_str = redis_client.get(f"manual_mappings:{bucket_name}")
-        if manual_mappings_str:
-            manual_mappings = json.loads(manual_mappings_str)
-            print(f"\n✅ Retrieved manual mappings from Redis")
-            print(f"   Tables with manual mappings: {list(manual_mappings.keys())}")
-    except Exception as redis_error:
-        print(f"⚠️  Warning: Could not retrieve manual mappings from Redis: {redis_error}")
-    
-    # Get Kafka bootstrap from env if not provided
+    print(f"\n{'='*60}", flush=True)
+    print(f"API MODE: {'Initial load (API poll → batch mapping)' if trigger_once else 'Continuous API streaming'}", flush=True)
+    print(f"{'='*60}", flush=True)
+    print(f"API URL: {api_url}", flush=True)
+    print(f"Bucket:  {bucket_name}", flush=True)
+    print(f"Poll interval: {poll_interval}s", flush=True)
+    if trigger_once:
+        print(f"Poll duration: {poll_duration}s\n", flush=True)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # PATH A — trigger_once: poll API → ingested/ → batch mapping pipeline
+    # ══════════════════════════════════════════════════════════════════════════
+    if trigger_once:
+        _duration = poll_duration if poll_duration > 0 else 300
+        print(f"\n📥 Polling API for {_duration}s → writing to ingested/ …\n", flush=True)
+        try:
+            from streaming.initial_load import run_api_initial_load
+            row_counts = run_api_initial_load(
+                api_url=api_url,
+                poll_duration=_duration,
+                bucket_name=bucket_name,
+                poll_interval=poll_interval,
+            )
+            if not row_counts:
+                print("⚠️  No records collected from API — mapping will proceed with empty ingested/", flush=True)
+        except Exception as e:
+            error_msg = "API mode error: Initial API load failed"
+            print(f"❌ {error_msg}: {str(e)}", flush=True)
+            traceback.print_exc()
+            update_mapping_status(bucket_name, "failed", error_msg)
+            sys.exit(1)
+
+        print("\n🗺️  Running batch mapping pipeline on ingested data …\n", flush=True)
+        try:
+            run_batch_mode(bucket_name)
+        except Exception as e:
+            error_msg = "API mode error: Batch mapping failed after API initial load"
+            print(f"❌ {error_msg}: {str(e)}", flush=True)
+            traceback.print_exc()
+            update_mapping_status(bucket_name, "failed", error_msg)
+            sys.exit(1)
+        # run_batch_mode already calls update_mapping_status('completed').
+        return
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # PATH B — continuous: parallel API ingestion + Spark Structured Streaming
+    # ══════════════════════════════════════════════════════════════════════════
+    # Retrieve effective combined mappings from Postgres so they are available
+    # to Spark's process_microbatch on every micro-batch.
+    combined_mappings = load_combined_mappings_for_business(bucket_name)
+
     if kafka_bootstrap is None:
         from dotenv import load_dotenv, find_dotenv
         load_dotenv(find_dotenv())
         kafka_bootstrap = os.getenv("KAFKA_BOOTSTRAP", "10.5.0.7:9092")
-    
-    print(f"Using Kafka: {kafka_bootstrap}\n")
-    
-    # Import the necessary modules
+
+    print(f"Using Kafka: {kafka_bootstrap}\n", flush=True)
+
     try:
         from streaming.ingestion.api_ingest_service import run as run_api_ingestion
         from streaming.spark_streaming import run_streaming
-        
-        # Function to run API ingestion in a separate process
+
         def run_api_service():
-            print("Starting API ingestion service...")
+            print("Starting API ingestion service…", flush=True)
             run_api_ingestion(
                 api_url=api_url,
                 poll_interval=poll_interval,
                 kafka_bootstrap=kafka_bootstrap,
+                business_id=bucket_name,
             )
 
-        # Function to run Spark streaming in a separate process
         def run_spark_consumer():
-            print("Starting Spark streaming consumer...")
-            # Set BUSINESS_ID for Redis flag usage inside spark_streaming.
-            # output_bucket is passed as an explicit argument so the module-level
-            # variable race in spark_streaming.py is avoided entirely.
+            print("Starting Spark streaming consumer…", flush=True)
             os.environ["BUSINESS_ID"] = bucket_name
-            if manual_mappings:
-                os.environ["MANUAL_MAPPINGS"] = json.dumps(manual_mappings)
-            run_streaming(trigger_once=trigger_once,
-                          enable_downstream=enable_downstream,
-                          output_bucket=bucket_name)
-        
-        # Run both processes
-        print("Starting parallel processes:")
-        print("  1. API ingestion -> Kafka")
-        print("  2. Spark streaming -> MinIO mapped/\n")
-        
-        api_process = multiprocessing.Process(target=run_api_service)
+            if combined_mappings:
+                os.environ["MANUAL_MAPPINGS"] = json.dumps(combined_mappings)
+            run_streaming(
+                trigger_once=False,
+                output_bucket=bucket_name,
+                topic_prefix=bucket_name,
+            )
+
+        print("Starting parallel processes:", flush=True)
+        print("  1. API ingestion → Kafka", flush=True)
+        print("  2. Spark streaming → MinIO mapped/\n", flush=True)
+
+        api_process   = multiprocessing.Process(target=run_api_service)
         spark_process = multiprocessing.Process(target=run_spark_consumer)
-        
+
         api_process.start()
         spark_process.start()
-        
-        print("Both processes started. Press Ctrl+C to stop.\n")
+
+        print("Both processes started. Press Ctrl+C to stop.\n", flush=True)
 
         try:
-            if poll_duration > 0:
-                # Run the API ingestion for a bounded window (e.g. initial schema
-                # discovery during onboarding), then stop both processes cleanly.
-                print(f"Bounded run: will stop API ingestion after {poll_duration}s.")
-                api_process.join(timeout=poll_duration)
-                if api_process.is_alive():
-                    api_process.terminate()
-                    api_process.join()
-                # Give Spark a little time to drain remaining Kafka messages.
-                spark_process.join(timeout=30)
-                if spark_process.is_alive():
-                    spark_process.terminate()
-                    spark_process.join()
-                print(f"✅ API MODE COMPLETED ({poll_duration}s window)\n")
-            else:
-                # Production streaming: monitor both processes concurrently.
-                # If either one exits (crash or normal), terminate the other so
-                # Airflow gets a non-zero exit and can restart the whole task.
-                import time as _time
-                while True:
-                    api_alive = api_process.is_alive()
-                    spark_alive = spark_process.is_alive()
-                    if not api_alive or not spark_alive:
-                        if not api_alive:
-                            print("⚠️  API ingestion process exited — terminating Spark consumer")
-                            if spark_alive:
-                                spark_process.terminate()
-                                spark_process.join()
-                        else:
-                            print("⚠️  Spark consumer process exited — terminating API ingestion")
-                            api_process.terminate()
-                            api_process.join()
-                        break
-                    _time.sleep(5)
-                # Both processes are now stopped.  Always exit non-zero so that
-                # Airflow marks this task as FAILED and schedules a restart.
-                # (The streaming job must run 24/7; a clean exit is still a bug.)
-                exit_code = max(api_process.exitcode or 0, spark_process.exitcode or 0)
-                print(f"❌ API MODE exited (exit code {exit_code}) — Airflow will restart")
-                sys.exit(exit_code if exit_code != 0 else 1)
+            # Production streaming: monitor both processes concurrently.
+            # If either one exits (crash or normal), terminate the other so
+            # Airflow gets a non-zero exit and can restart the whole task.
+            import time as _time
+            while True:
+                api_alive   = api_process.is_alive()
+                spark_alive = spark_process.is_alive()
+                if not api_alive or not spark_alive:
+                    if not api_alive:
+                        print("⚠️  API ingestion process exited — terminating Spark consumer", flush=True)
+                        if spark_alive:
+                            spark_process.terminate()
+                            spark_process.join()
+                    else:
+                        print("⚠️  Spark consumer process exited — terminating API ingestion", flush=True)
+                        api_process.terminate()
+                        api_process.join()
+                    break
+                _time.sleep(5)
+            exit_code = max(api_process.exitcode or 0, spark_process.exitcode or 0)
+            print(f"❌ API MODE exited (exit code {exit_code}) — Airflow will restart", flush=True)
+            sys.exit(exit_code if exit_code != 0 else 1)
         except KeyboardInterrupt:
-            print("\n\nStopping processes...")
+            print("\n\nStopping processes…", flush=True)
             api_process.terminate()
             spark_process.terminate()
             api_process.join()
             spark_process.join()
-            print("✅ API MODE STOPPED\n")
-            
+            print("✅ API MODE STOPPED\n", flush=True)
+
     except Exception as e:
         error_msg = "API mode error: An unexpected error occurred"
-        print(f"❌ {error_msg}: {str(e)}")
+        print(f"❌ {error_msg}: {str(e)}", flush=True)
         traceback.print_exc()
-        update_mapping_status(bucket_name, "failed", error_msg)
+        print(
+            "ℹ️  Skipping onboarding mapping_status failure update for continuous API streaming runtime error.",
+            flush=True,
+        )
         sys.exit(1)
 
 
@@ -769,18 +913,20 @@ def main():
                         help='Process all available Kafka messages then exit (db/api mode, Airflow-friendly)')
     parser.add_argument('--poll-duration', type=int, default=0,
                         help='For api mode: run ingestion for N seconds then stop (0=run forever)')
-    parser.add_argument('--enable-downstream', action='store_true',
-                        help='Run downstream pipeline (clean/transform/analyze/ML) inline '
-                             'after each micro-batch for near-real-time latency (db/api mode)')
-    
+    parser.add_argument('--deploy-connector-only', action='store_true',
+                        help='(db mode) Deploy / verify the Debezium CDC connector and exit '
+                             'immediately — no JDBC initial load, no Spark streaming. '
+                             'Use this for Airflow connector health-check tasks so a '
+                             'connector restart never triggers a full database re-snapshot.')
+
     args = parser.parse_args()
-    
+
     # Use command-line args if provided, otherwise use CONFIG
     mode = args.mode if args.mode else CONFIG["mode"]
     bucket_name = args.business_id if args.business_id else CONFIG["bucket_name"]
     trigger_once = args.trigger_once
     poll_duration = args.poll_duration
-    enable_downstream = args.enable_downstream
+    deploy_connector_only = args.deploy_connector_only
     
     # Wrap execution in try-except to catch any uncaught errors
     try:
@@ -809,14 +955,45 @@ def main():
             display_uri = db_uri.split("@")[-1] if "@" in db_uri else db_uri
             print(f"  Database: {display_uri}", flush=True)
             print(f"  Tables: {db_tables}", flush=True)
-            print(f"{'='*60}\n", flush=True)
 
+            # ── deploy-connector-only: Airflow connector health-check ──────────
+            # Deploy (or verify) the Debezium connector with snapshot.mode=no_data
+            # so that restarting a connector NEVER triggers a full DB re-snapshot.
+            # Used by check_or_deploy_debezium in db_streaming_dag.py.
+            if deploy_connector_only:
+                print(f"{'='*60}", flush=True)
+                print("  Mode: deploy-connector-only (no JDBC load, no Spark)", flush=True)
+                print(f"{'='*60}\n", flush=True)
+                try:
+                    from streaming.ingestion.debezium_connector_manager import DebeziumConnectorManager
+                    manager        = DebeziumConnectorManager()
+                    connector_name = f"pulse-{bucket_name}-connector"
+                    if not manager.wait_for_connect():
+                        print("❌ Kafka Connect not available", flush=True)
+                        sys.exit(1)
+                    connector_config = manager.create_connector_config(
+                        db_uri=db_uri,
+                        tables=db_tables,
+                        connector_name=connector_name,
+                        topic_prefix=bucket_name,
+                        snapshot_mode="no_data",  # NEVER re-snapshot on restart
+                    )
+                    if not manager.deploy_connector(connector_config):
+                        print("❌ Failed to deploy Debezium connector", flush=True)
+                        sys.exit(1)
+                    print("✅ Connector deployed/verified (deploy-connector-only — exiting)", flush=True)
+                except Exception as e:
+                    print(f"❌ deploy-connector-only failed: {e}", flush=True)
+                    traceback.print_exc()
+                    sys.exit(1)
+                return  # done — do NOT run JDBC load or Spark streaming
+
+            print(f"{'='*60}\n", flush=True)
             run_db_mode({
                 "db_uri": db_uri,
                 "db_tables": db_tables,
                 "bucket_name": bucket_name,
                 "trigger_once": trigger_once,
-                "enable_downstream": enable_downstream,
             })
 
         elif mode == "api":
@@ -829,8 +1006,7 @@ def main():
             print(f"{'='*60}\n", flush=True)
             
             run_api_mode(api_url, bucket_name, poll_interval, kafka_bootstrap,
-                         poll_duration=poll_duration, trigger_once=trigger_once,
-                         enable_downstream=enable_downstream)
+                         poll_duration=poll_duration, trigger_once=trigger_once)
 
         else:
             error_msg = f"Invalid mode '{mode}'. Valid modes: batch, db, api"

@@ -3,6 +3,7 @@
 import os
 import sys
 import threading
+import re
 
 # ---------------------------------------------------------------------------
 # JAR paths — baked into the repo at mapping/streaming/jars/ so they are
@@ -88,6 +89,27 @@ _MAPPING_RESULTS_TTL_SECONDS = 86400
 # POST /onboarding/confirm-mapping.
 _stop_after_first_batch_event: threading.Event = threading.Event()
 
+_QUALIFIED_REF_RE = re.compile(r'^\s*"(?P<table>[^"]+)"\s*\.\s*"(?P<column>[^"]+)"\s*$')
+_UNQUOTED_REF_RE = re.compile(r'^\s*(?P<table>[A-Za-z_][\w$]*)\s*\.\s*(?P<column>[A-Za-z_][\w$]*)\s*$')
+
+
+def _qualify_source_ref(table_name: str, source_ref: str) -> str:
+    raw = str(source_ref or "").strip()
+    if not raw:
+        return ""
+
+    match = _QUALIFIED_REF_RE.match(raw) or _UNQUOTED_REF_RE.match(raw)
+    if match:
+        src_table = match.group("table").strip().strip('"')
+        src_col = match.group("column").strip().strip('"')
+    else:
+        src_table = str(table_name or "").strip().strip('"')
+        src_col = raw.strip().strip('"')
+
+    if not src_table or not src_col:
+        return ""
+    return f'"{src_table}"."{src_col}"'
+
 
 def create_spark_session() -> SparkSession:
     """Create Spark session with Kafka and S3 support.
@@ -116,9 +138,13 @@ def create_spark_session() -> SparkSession:
         .master(spark_master)
         # Dynamic allocation requires an external shuffle service that is not
         # configured on this standalone cluster.  Use a fixed executor count
-        # matching the 2 workers × 2 cores each = 4 total cores.
+        # constrained to 1 core / 1 GiB for this streaming workload.
         .config("spark.dynamicAllocation.enabled", "false")
-        .config("spark.executor.instances", os.getenv("SPARK_EXECUTOR_INSTANCES", "4"))
+        .config("spark.executor.instances", os.getenv("SPARK_EXECUTOR_INSTANCES", "1"))
+        .config("spark.executor.cores", os.getenv("SPARK_EXECUTOR_CORES", "1"))
+        .config("spark.executor.memory", os.getenv("SPARK_EXECUTOR_MEMORY", "1g"))
+        .config("spark.driver.memory", os.getenv("SPARK_DRIVER_MEMORY", "1g"))
+        .config("spark.cores.max", os.getenv("SPARK_CORES_MAX", "1"))
         # Driver classpath: JARs are mounted at /app/jars/ in the api container.
         # Do NOT use spark.jars here — that would re-upload these JARs from the
         # driver to the executor, creating duplicate class definitions on the
@@ -145,6 +171,9 @@ def create_spark_session() -> SparkSession:
             "spark.sql.catalog.spark_catalog",
             "org.apache.spark.sql.delta.catalog.DeltaCatalog",
         )
+        # Write timestamps as MICROS — avoids "Illegal Parquet type:
+        # INT64 (TIMESTAMP(NANOS,true))" in downstream Spark readers.
+        .config("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS")
         # Tune shuffle partitions to match the cluster (2 workers × 2 cores).
         # The default of 200 creates hundreds of tiny tasks for our data volume,
         # wasting scheduler overhead.  16 is a sensible 4× multiplier of cores.
@@ -332,7 +361,7 @@ def read_kafka_stream(spark: SparkSession, topic_prefix: str = "ecom") -> DataFr
     # the Python UDF + shuffle to run for hours.  200 K rows per batch keeps
     # each batch under ~30 s and produces predictable memory pressure.
     # Override via KAFKA_MAX_OFFSETS_PER_TRIGGER env var.
-    max_offsets = int(os.getenv("KAFKA_MAX_OFFSETS_PER_TRIGGER", "200000"))
+    max_offsets = int(os.getenv("KAFKA_MAX_OFFSETS_PER_TRIGGER", "50000"))
     # Escape literal dots in the prefix (e.g. "my.org") so the regex only
     # matches topic names that start with the exact prefix string.
     escaped_prefix = topic_prefix.replace(".", "\\.")
@@ -557,6 +586,57 @@ def _write_spark_native(
                 flush=True,
             )
 
+        # ── When writing to mapped-temp, persist extra_df to a companion path ──
+        # The trigger-once initial batch runs BEFORE the user reviews mappings,
+        # so columns the 7-algorithm pipeline could not auto-map (e.g.
+        # completion_date) land in extra_df while the canonical slot (e.g.
+        # end_date) becomes a VOID/null placeholder in final_df.
+        #
+        # NOTE: we intentionally do NOT try to add extra_df columns via
+        # df_out.withColumn(extra_df[col]) — extra_df and df_out originate from
+        # different Spark query-plan branches (split by the mapping pipeline),
+        # so Spark's analyzer raises MISSING_ATTRIBUTES when the column from
+        # extra_df's plan is referenced in df_out's projection.  Instead we
+        # write extra_df as a standalone Parquet to a companion directory:
+        #   mapped-temp/{table_name}/_extra_cols/
+        # apply_manual_mappings.py reads it by itself and uses it as the source
+        # for renaming columns into their canonical slots.
+        if "temp" in folder:
+            extra_df_src = result_data.get("extra_df")
+            if extra_df_src is not None and extra_df_src.columns:
+                extra_s3_path = f"s3a://{bucket_name}/{folder}/{table_name}/_extra_cols"
+                try:
+                    # Cast VOID/NullType columns in extra_df_src for the same reason
+                    # as df_out above: canonical null-placeholder columns inferred as
+                    # NullType cause UNSUPPORTED_DATA_TYPE_FOR_DATASOURCE from Spark's
+                    # Parquet writer.  extra_df contains the full schema (canonical +
+                    # extra source cols), so the same fix is required here.
+                    _extra_void_cols = [
+                        f.name for f in extra_df_src.schema.fields
+                        if isinstance(f.dataType, NullType)
+                    ]
+                    if _extra_void_cols:
+                        for _evc in _extra_void_cols:
+                            extra_df_src = extra_df_src.withColumn(
+                                _evc, extra_df_src[_evc].cast(_StringType())
+                            )
+                    (
+                        extra_df_src.write
+                        .mode("overwrite")
+                        .parquet(extra_s3_path)
+                    )
+                    print(
+                        f"  ℹ️  Extra source cols written for {table_name} → {extra_s3_path}: "
+                        f"{extra_df_src.columns}",
+                        flush=True,
+                    )
+                except Exception as _ee:
+                    # Non-fatal — worst case we just can’t back-fill this table.
+                    print(
+                        f"  ⚠️  Could not write _extra_cols for {table_name}: {_ee}",
+                        flush=True,
+                    )
+
         s3_path = f"s3a://{bucket_name}/{folder}/{table_name}"
 
         # ── Delta MERGE path for updates and deletes ─────────────────────
@@ -630,8 +710,14 @@ def _write_spark_native(
         )
 
 
-def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_client, manual_mappings=None, business_id=None, enable_downstream=False, trigger_once=False, output_bucket=None):
-    """Process each micro-batch with CDC operation support and optional inline downstream."""
+def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_client, manual_mappings=None, business_id=None, trigger_once=False, output_bucket=None):
+    """Process each micro-batch with CDC operation support.
+
+    Downstream processing (cleaning → transformation → analysis → ML) is handled
+    exclusively by the scheduled_batch Airflow DAG (every 10 minutes) and is never
+    triggered inline here.  This keeps the streaming layer responsible only for
+    ingestion and mapping.
+    """
     if output_bucket is None:
         output_bucket = os.getenv("OUTPUT_BUCKET", "pulse-bucket-stream")
     print(f"\n{'='*60}")
@@ -647,23 +733,56 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
     print(f"Tables in batch: {list(all_dataframes.keys())}")
     print(f"Operations: {operations}")
     
-    # Check Redis for updated manual mappings (especially important for subsequent batches)
-    # This allows new batches to use mappings applied by user after stream started
+    def _load_combined_mappings_from_db(_business_id: str):
+        if not _business_id:
+            return None
+        try:
+            import psycopg2
+            import json
+
+            db_host = os.getenv("POSTGRES_SERVER", "postgresql")
+            db_name = os.getenv("POSTGRES_DATABASE_NAME", os.getenv("POSTGRES_DB", "pulse"))
+            db_user = os.getenv("POSTGRES_USER", "postgres")
+            db_password = os.getenv("POSTGRES_PASSWORD", "postgres")
+
+            with psycopg2.connect(
+                host=db_host,
+                database=db_name,
+                user=db_user,
+                password=db_password,
+            ) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT combined_mappings
+                        FROM onboarding
+                        WHERE business_id = %s
+                        ORDER BY is_completed DESC, updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+                        LIMIT 1
+                        """,
+                        (_business_id,),
+                    )
+                    row = cursor.fetchone()
+
+            if row and row[0]:
+                payload = row[0]
+                parsed = json.loads(payload) if isinstance(payload, str) else payload
+                if isinstance(parsed, dict) and parsed:
+                    return parsed
+        except Exception as db_error:
+            print(f"   ⚠️  Could not retrieve combined mappings from DB: {db_error}")
+        return None
+
+    # Reload combined mappings from Postgres per batch so latest confirmed
+    # mappings are applied without relying on Redis mapping state.
     current_manual_mappings = manual_mappings  # Default to initial mappings
     if business_id:
-        try:
-            import redis
-            import json
-            redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "redis"), port=_REDIS_PORT, decode_responses=True)
-            redis_mappings_str = redis_client.get(f"manual_mappings:{business_id}")
-            if redis_mappings_str:
-                current_manual_mappings = json.loads(redis_mappings_str)
-                if batch_id > 0 and current_manual_mappings:
-                    print(f"   ✅ Retrieved updated manual mappings from Redis for batch {batch_id}")
-                    print(f"   Tables with manual mappings: {list(current_manual_mappings.keys())}")
-        except Exception as redis_error:
-            print(f"   ⚠️  Could not retrieve manual mappings from Redis: {redis_error}")
-            # Fall back to initial manual_mappings passed as parameter
+        db_combined_mappings = _load_combined_mappings_from_db(business_id)
+        if db_combined_mappings:
+            current_manual_mappings = db_combined_mappings
+            if batch_id > 0:
+                print(f"   ✅ Retrieved updated combined mappings from DB for batch {batch_id}")
+                print(f"   Tables with mappings: {list(current_manual_mappings.keys())}")
     
     # Call existing mapping function with mode="stream" and current manual_mappings
     results = process_all_dataframes(
@@ -673,6 +792,19 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
         mode="stream",
         manual_mappings=current_manual_mappings
     )
+
+    auto_mappings = {}
+    for _, result in results.items():
+        table_name = result.get("table_name")
+        mapped_cols = result.get("mapped_cols")
+        if table_name and isinstance(mapped_cols, dict):
+            filtered = {
+                str(k): _qualify_source_ref(table_name, str(v))
+                for k, v in mapped_cols.items()
+                if str(k).strip() and str(v).strip() and _qualify_source_ref(table_name, str(v))
+            }
+            if filtered:
+                auto_mappings[table_name] = filtered
     
     # Determine target folder based on batch_id and missing columns
     target_folder = "mapped"  # Default for subsequent batches
@@ -778,10 +910,17 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
                                     mapping_completed_at = %s,
                                     mapping_error = NULL,
                                     current_step = 'mapping',
-                                    mapping_results = %s::jsonb
+                                    mapping_results = %s::jsonb,
+                                    auto_mappings = %s::jsonb
                                 WHERE business_id = %s
                                 AND is_completed = false
-                            """, ("completed", datetime.now(timezone.utc), json.dumps(mapping_results), business_id))
+                            """, (
+                                "completed",
+                                datetime.now(timezone.utc),
+                                json.dumps(mapping_results),
+                                json.dumps(auto_mappings),
+                                business_id,
+                            ))
                             conn.commit()
                     print(f"   Database status updated to 'completed' (mapping_results persisted to DB)")
                 except Exception as db_error:
@@ -826,31 +965,23 @@ def process_microbatch(batch_df: DataFrame, batch_id: int, columns_info, minio_c
         print("   🛑 First batch complete — signalling trigger-once stream to stop for user review.")
         _stop_after_first_batch_event.set()
 
-    # ── Trigger inline downstream pipeline (clean → transform → analyze → ML) ──
-    # Only runs when:
-    #  1. enable_downstream is True (set by --enable-downstream flag)
-    #  2. Data was written to the final "mapped" folder (not "mapped-temp")
-    #  3. Not in trigger-once mode (Airflow handles downstream for trigger-once runs)
-    if enable_downstream and target_folder == "mapped" and not trigger_once:
-        try:
-            from streaming.downstream_runner import trigger_downstream
-            trigger_downstream(output_bucket, batch_id)
-        except Exception as downstream_err:
-            # Never let downstream errors crash the mapping stream
-            print(f"   ⚠️  Could not trigger downstream: {downstream_err}")
+    # NOTE: downstream processing (cleaning → transformation → analysis → ML)
+    # is NOT triggered here.  It runs as a separate scheduled Airflow batch job
+    # (scheduled_batch_dag, every 10 minutes), keeping the streaming layer
+    # responsible only for ingestion and column mapping.
 
 
-def run_streaming(trigger_once: bool = False, enable_downstream: bool = False, output_bucket: str = None, topic_prefix: str = None):
-    """Main streaming pipeline.
+def run_streaming(trigger_once: bool = False, output_bucket: str = None, topic_prefix: str = None):
+    """Main streaming pipeline — ingestion + mapping only.
+
+    All downstream processing (cleaning → transformation → analysis → ML) is
+    handled by the ``scheduled_batch`` Airflow DAG (every 10 minutes) and is
+    never triggered inline here.
 
     Args:
         trigger_once: When True, uses Spark's availableNow trigger so the job
                       processes all pending Kafka messages and then exits cleanly.
                       Use this for Airflow-managed micro-batch execution.
-        enable_downstream: When True, runs the downstream pipeline
-                           (clean → transform → analyze → ML inference)
-                           inline after each micro-batch, reducing end-to-end
-                           latency from ~10 min to ~10 s – 2 min.
         output_bucket: MinIO bucket name to write mapped files to.  Defaults to
                        the OUTPUT_BUCKET environment variable.
         topic_prefix: Kafka topic prefix to subscribe to.  Should be the
@@ -866,6 +997,7 @@ def run_streaming(trigger_once: bool = False, enable_downstream: bool = False, o
     manual_mappings = None
     business_id = os.getenv("BUSINESS_ID")
 
+
     # Per-business checkpoint so that different tenants do not share Kafka
     # consumer-group state and Spark streaming state.
     if business_id:
@@ -878,7 +1010,7 @@ def run_streaming(trigger_once: bool = False, enable_downstream: bool = False, o
     print(f"Checkpoint: {checkpoint_location}")
     print(f"Output bucket: {output_bucket}")
     print(f"Trigger-once mode: {trigger_once}")
-    print(f"Inline downstream: {enable_downstream}\n")
+    print(f"Downstream processing: scheduled_batch Airflow DAG (every 10 min)\n")
     
     manual_mappings_str = os.getenv("MANUAL_MAPPINGS")
     if manual_mappings_str:
@@ -926,7 +1058,7 @@ def run_streaming(trigger_once: bool = False, enable_downstream: bool = False, o
         json_stream.writeStream
         .foreachBatch(lambda df, bid: process_microbatch(
             df, bid, columns_info, minio_client, manual_mappings,
-            business_id, enable_downstream, trigger_once, output_bucket
+            business_id, trigger_once, output_bucket
         ))
         .outputMode("append")
         .option("checkpointLocation", checkpoint_location)

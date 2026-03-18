@@ -1,5 +1,14 @@
+import logging
 from rapidfuzz import fuzz, process
 from pyspark.sql.functions import lit
+
+
+logger = logging.getLogger(__name__)
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    )
 
 
 def rapidfuzz_column_mapping(df, missing_cols, extra_cols, mapped_cols, threshold=85):
@@ -25,7 +34,12 @@ def rapidfuzz_column_mapping(df, missing_cols, extra_cols, mapped_cols, threshol
         )
         if match:
             best_match, score = match[0], match[1]
-            print(f"RapidFuzz Mapping: {best_match} -> {missing_col}: {score:.2f}")
+            logger.info(
+                "RapidFuzz mapping | source=%s target=%s score=%.2f%%",
+                best_match,
+                missing_col,
+                score,
+            )
             mapped_cols[missing_col] = best_match
             missing_cols.remove(missing_col)
             extra_cols.remove(best_match)

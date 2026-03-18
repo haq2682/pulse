@@ -1,5 +1,16 @@
 import os
+import sys
+
 import uuid
+from pathlib import Path
+# Import spark_utils FIRST to set up JARs before pyspark imports
+_ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
+if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT_VAR))
+
+from spark_utils import create_ml_spark_session
+
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, lit, udf, current_timestamp, when, abs as spark_abs
 from pyspark.sql.types import StringType, DoubleType, BooleanType
@@ -8,11 +19,6 @@ from pyspark.ml.classification import (
     LogisticRegressionModel, RandomForestClassificationModel,
     DecisionTreeClassificationModel, MultilayerPerceptronClassificationModel
 )
-import findspark
-
-findspark.init()
-
-
 # Feature columns (must match training EXACTLY)
 NUMERICAL_FEATURES = [
     "co_occurrence_count",
@@ -33,33 +39,14 @@ CATEGORICAL_FEATURES = [
 
 
 def create_spark_session():
-    """Initialize Spark session with MinIO configuration"""
-    return SparkSession.builder \
-        .appName("ProductBundlingInference") \
-        .master(os.getenv("SPARK_SERVER", "local[*]")) \
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        ) \
-        .config("spark.dynamicAllocation.enabled", "true") \
-        .config("spark.dynamicAllocation.minExecutors", "0") \
-        .config("spark.dynamicAllocation.maxExecutors", "8") \
-        .config("spark.dynamicAllocation.initialExecutors", "1") \
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT")) \
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY")) \
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY")) \
-        .config("spark.hadoop.fs.s3a.path.style.access", "true") \
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false") \
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        ) \
-        .config("inferSchema", "true") \
-        .config("mergeSchema", "true") \
-        .getOrCreate()
-
-
+    """Initialize Spark session"""
+    return create_ml_spark_session(
+        "ProductBundlingInference",
+        extra_configs={
+                    "inferSchema": "true",
+                    "mergeSchema": "true"
+                },
+    )
 def load_data(spark, path):
     """Load data from MinIO"""
     try:

@@ -7,9 +7,6 @@ Two-step process: 1) Calculate theoretical (formula), 2) Predict adjustment fact
 import os
 import findspark
 from dotenv import load_dotenv
-
-findspark.init()
-
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
@@ -66,27 +63,18 @@ NUMERIC_FEATURES = [
 ]
 
 
+import sys
+from pathlib import Path
+
+_ML_ROOT = next(p for p in Path(__file__).resolve().parents if p.name == "machine-learning")
+if str(_ML_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT))
+
+from spark_utils import create_ml_spark_session
+
 def create_spark_session():
     """Initialize Spark session"""
-    return (
-        SparkSession.builder
-        .appName("Safety_Stock_Adjustment_Inference")
-        .master(os.getenv("SPARK_SERVER", "local[*]"))
-        .config("spark.jars.packages", "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4")
-        .config("spark.executor.memory", "4g")
-        .config("spark.driver.memory", "4g")
-        .config("spark.dynamicAllocation.enabled", "true")
-        .config("spark.dynamicAllocation.maxExecutors", "100")
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-        .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
-        .getOrCreate()
-    )
-
+    return create_ml_spark_session("Safety_Stock_Adjustment_Inference")
 
 def load_model(model_name, MODEL_BASE_PATH):
     """Load trained adjustment factor model"""

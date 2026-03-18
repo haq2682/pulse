@@ -1,6 +1,7 @@
 import json
 import time
 import os
+from pathlib import Path
 from google import genai
 from google.genai import types
 from google.genai.errors import APIError
@@ -8,10 +9,34 @@ from pyspark.sql.functions import lit
 from dotenv import load_dotenv, find_dotenv
 from utils.helpers import make_json_safe
 
-load_dotenv(find_dotenv())
+# Load env from nearest .env plus common container/workspace locations.
+load_dotenv(find_dotenv(), override=False)
+for _candidate in (
+    Path("/app/.env"),
+    Path(__file__).resolve().parents[2] / ".env",
+):
+    if _candidate.exists():
+        load_dotenv(_candidate, override=False)
 
-# Single client instance reused across all calls
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+# Single client instance reused across all calls (lazy-init to avoid
+# import-time failure in environments where GEMINI_API_KEY is intentionally
+# absent and fallback mapping should be used instead).
+_client = None
+
+
+def _get_gemini_client():
+    global _client
+    if _client is not None:
+        return _client
+
+    api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
+    if not api_key:
+        raise ValueError(
+            "GEMINI_API_KEY is not set. Falling back to non-LLM column mapping."
+        )
+
+    _client = genai.Client(api_key=api_key)
+    return _client
 
 # Build config once — safety settings disable all filters for data engineering tasks
 _GENERATE_CONFIG = types.GenerateContentConfig(
@@ -79,6 +104,8 @@ def _is_response_blocked(response) -> bool:
 
 def call_gemini_with_retry(prompt, max_retries=3, initial_delay=1):
     """Call Gemini API with exponential backoff retry logic and safety settings."""
+
+    client = _get_gemini_client()
 
     for attempt in range(max_retries):
         try:

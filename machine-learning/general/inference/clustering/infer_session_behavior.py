@@ -4,9 +4,6 @@ Generates behavior personas with confidence scores and recommendations
 """
 
 import os
-import findspark
-
-findspark.init()
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
@@ -35,28 +32,18 @@ NUMERIC_FEATURES = [
 ]
 
 
+import sys
+from pathlib import Path
+
+_ML_ROOT = next(p for p in Path(__file__).resolve().parents if p.name == "machine-learning")
+if str(_ML_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT))
+
+from spark_utils import create_ml_spark_session
+
 def create_spark_session():
     """Initialize Spark session"""
-    return (
-        SparkSession.builder.appName("SessionBehaviorInference")
-        .master(os.getenv("SPARK_SERVER", "local[*]"))
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        )
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        )
-        .getOrCreate()
-    )
-
+    return create_ml_spark_session("SessionBehaviorInference")
 
 def load_data(spark, INPUT_PATH):
     """Load session data"""

@@ -1,9 +1,18 @@
+import logging
 import numpy as np
 from gensim.models import KeyedVectors
 from gensim.models import Word2Vec
 import re
 import uuid
 from pyspark.sql.functions import lit
+
+
+logger = logging.getLogger(__name__)
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    )
 
 
 def preprocess_column_name(column):
@@ -121,7 +130,12 @@ def word2vec_column_mapping(
                 best_match = extra_col
 
         if best_match:
-            print(f"Word2Vec Mapping: {best_match} -> {missing_col}: {best_score:.2f}")
+            logger.info(
+                "Word2Vec mapping | source=%s target=%s score=%.2f%%",
+                best_match,
+                missing_col,
+                best_score * 100,
+            )
             mapped_cols[missing_col] = best_match
             missing_cols.remove(missing_col)
             extra_cols.remove(best_match)

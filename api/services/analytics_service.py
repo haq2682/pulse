@@ -11,6 +11,8 @@ This service handles:
 import os
 import io
 import json
+from pathlib import Path
+import hashlib
 from typing import Dict, List, Optional, Any
 from minio import Minio
 from minio.error import S3Error
@@ -268,6 +270,72 @@ class AnalyticsService:
         self.minio_client = self._create_minio_client()
         self.cache = {}  # Simple in-memory cache
         self.cache_duration = timedelta(minutes=5)
+        self.redis_cache_ttl_seconds = int(os.getenv("ANALYTICS_REDIS_CACHE_TTL_SECONDS", "900"))
+        self.revision_cache_ttl_seconds = int(os.getenv("ANALYTICS_REVISION_CACHE_TTL_SECONDS", "20"))
+        self.redis_client = self._create_redis_client()
+        self.expected_schema = self._load_expected_schema()
+        self._revision_cache: Dict[str, Dict[str, Any]] = {}
+
+    def _create_redis_client(self):
+        """Create Redis client for analytics response caching (best-effort)."""
+        try:
+            import redis
+
+            host = os.getenv("REDIS_HOST", "10.5.0.11")
+            port = int(os.getenv("REDIS_PORT", "6379"))
+            db = int(os.getenv("ANALYTICS_REDIS_DB", "0"))
+            password = os.getenv("REDIS_PASSWORD") or None
+
+            client = redis.Redis(
+                host=host,
+                port=port,
+                db=db,
+                password=password,
+                decode_responses=True,
+                socket_timeout=3,
+                socket_connect_timeout=3,
+            )
+            client.ping()
+            return client
+        except Exception as e:
+            print(f"Warning: Redis analytics cache disabled: {e}")
+            return None
+
+    def _handle_redis_error(self, err: Exception, context: str, business_id: Optional[str] = None) -> None:
+        business_part = f" for {business_id}" if business_id else ""
+        print(f"Warning: Redis {context} failed{business_part}: {err}")
+        msg = str(err).lower()
+        if any(token in msg for token in ["connection reset", "broken pipe", "connection refused", "timed out"]):
+            self.redis_client = None
+            print("Warning: Redis analytics cache disabled after connection failure")
+
+    def _load_expected_schema(self) -> Dict[str, Dict[str, List[str]]]:
+        """
+        Load expected analytics schema from ANALYTICS_SCHEMA.txt.
+
+        File format includes human-readable header text plus a JSON payload.
+        Returns an empty mapping when parsing fails (non-fatal).
+        """
+        try:
+            repo_root = Path(__file__).resolve().parents[2]
+            schema_path = repo_root / "ANALYTICS_SCHEMA.txt"
+            if not schema_path.exists():
+                return {}
+
+            raw = schema_path.read_text(encoding="utf-8")
+            start = raw.find("{")
+            end = raw.rfind("}")
+            if start == -1 or end == -1 or end <= start:
+                return {}
+
+            payload = raw[start : end + 1]
+            parsed = json.loads(payload)
+            if isinstance(parsed, dict):
+                return parsed
+            return {}
+        except Exception as e:
+            print(f"Warning: Could not parse ANALYTICS_SCHEMA.txt: {e}")
+            return {}
     
     def _sanitize(self, obj):
         """Recursively replace nan/inf floats with None."""
@@ -305,6 +373,96 @@ class AnalyticsService:
         if not cached_at:
             return False
         return datetime.now() - cached_at < self.cache_duration
+
+    def _get_cached_file_entry_if_fresh(self, business_id: str, file_name: str):
+        """
+        Return cached DataFrame only if in-memory cache is valid AND object metadata
+        in MinIO has not changed since it was cached.
+        """
+        cache_key = self._get_cache_key(business_id, file_name)
+        cache_entry = self.cache.get(cache_key)
+        if not cache_entry or not self._is_cache_valid(cache_entry):
+            return None
+
+        cached_version = cache_entry.get("object_version")
+        if not cached_version:
+            return None
+
+        found_category = next(
+            (category for category, values in self.ANALYTICS_CATEGORIES.items() if file_name in values),
+            None
+        )
+        if not found_category:
+            return None
+
+        object_path = f"analytics/{found_category}/{file_name}.parquet"
+        try:
+            stat = self.minio_client.stat_object(business_id, object_path)
+            current_version = (
+                stat.last_modified.isoformat() if stat.last_modified else "",
+                int(stat.size or 0),
+            )
+            if current_version == cached_version:
+                return cache_entry.get("data")
+        except Exception:
+            return None
+
+        return None
+
+    def _get_business_analytics_revision(self, business_id: str) -> str:
+        """
+        Build a deterministic revision hash from analytics parquet metadata.
+        Any file add/modify/remove changes this revision and automatically
+        invalidates response-level Redis caches.
+        """
+        now = datetime.now()
+        revision_entry = self._revision_cache.get(business_id)
+        if revision_entry:
+            cached_at = revision_entry.get("cached_at")
+            if cached_at and (now - cached_at).total_seconds() < self.revision_cache_ttl_seconds:
+                return revision_entry.get("revision", "empty")
+
+        records: list[str] = []
+        try:
+            objects = self.minio_client.list_objects(
+                business_id,
+                prefix="analytics/",
+                recursive=True,
+            )
+            for obj in objects:
+                if not obj.object_name.endswith(".parquet"):
+                    continue
+                lm = obj.last_modified.isoformat() if obj.last_modified else ""
+                records.append(f"{obj.object_name}|{lm}|{int(obj.size or 0)}")
+        except Exception as e:
+            # If metadata listing fails, force a non-cacheable pseudo-revision.
+            fallback = f"error-{int(now.timestamp())}"
+            self._revision_cache[business_id] = {"revision": fallback, "cached_at": now}
+            print(f"Warning: Could not compute analytics revision for {business_id}: {e}")
+            return fallback
+
+        if not records:
+            revision = "empty"
+        else:
+            joined = "\n".join(sorted(records))
+            revision = hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+        self._revision_cache[business_id] = {"revision": revision, "cached_at": now}
+        return revision
+
+    def _build_redis_all_key(self, business_id: str, categories: List[str], revision: str) -> str:
+        categories_key = ",".join(sorted(categories))
+        return f"analytics:all:{business_id}:{revision}:{categories_key}"
+
+    def _clear_redis_business_keys(self, business_id: str) -> None:
+        if not self.redis_client:
+            return
+        try:
+            pattern = f"analytics:*:{business_id}:*"
+            for key in self.redis_client.scan_iter(match=pattern, count=500):
+                self.redis_client.delete(key)
+        except Exception as e:
+            self._handle_redis_error(e, "clear", business_id)
     
     async def fetch_analytics_file(self, business_id: str, file_name: str) -> Optional[pd.DataFrame]:
         """
@@ -317,16 +475,17 @@ class AnalyticsService:
         Returns:
             DataFrame or None if file doesn't exist
         """
-        # Check cache first
-        cache_key = self._get_cache_key(business_id, file_name)
-        if cache_key in self.cache and self._is_cache_valid(self.cache[cache_key]):
-            return self.cache[cache_key]["data"]
+        cached_df = self._get_cached_file_entry_if_fresh(business_id, file_name)
+        if cached_df is not None:
+            return cached_df
         
         try:
             found_category = next(
                 (category for category, values in self.ANALYTICS_CATEGORIES.items() if file_name in values),
                 None
             )
+            if not found_category:
+                return None
             # Path in MinIO: analytics/{file_name}.parquet
             object_path = f"analytics/{found_category}/{file_name}.parquet"
             
@@ -340,9 +499,15 @@ class AnalyticsService:
             df = pd.read_parquet(io.BytesIO(data))
             
             # Cache the result
+            cache_key = self._get_cache_key(business_id, file_name)
+            stat = self.minio_client.stat_object(business_id, object_path)
             self.cache[cache_key] = {
                 "data": df,
-                "cached_at": datetime.now()
+                "cached_at": datetime.now(),
+                "object_version": (
+                    stat.last_modified.isoformat() if stat.last_modified else "",
+                    int(stat.size or 0),
+                ),
             }
             
             return df
@@ -355,7 +520,13 @@ class AnalyticsService:
             print(f"Error fetching analytics file {file_name}: {e}")
             raise
     
-    async def fetch_category_analytics(self, business_id: str, category: str) -> Dict[str, Any]:
+    async def fetch_category_analytics(
+        self,
+        business_id: str,
+        category: str,
+        file_names: Optional[List[str]] = None,
+        row_limit: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """
         Fetch all analytics for a specific category.
         
@@ -369,24 +540,58 @@ class AnalyticsService:
         if category not in self.ANALYTICS_CATEGORIES:
             raise ValueError(f"Invalid category: {category}")
         
-        file_names = self.ANALYTICS_CATEGORIES[category]
+        category_files = self.ANALYTICS_CATEGORIES[category]
+        if file_names:
+            selected_files = [f for f in file_names if f in category_files]
+            file_names = selected_files
+        else:
+            file_names = category_files
         results = {}
+        file_errors = {}
         
         for file_name in file_names:
-            df = await self.fetch_analytics_file(business_id, file_name)
-            if df is not None:
-                # Convert DataFrame to dict for JSON serialization
-                results[file_name] = self._sanitize({
-                    "data": df.where(pd.notna(df), None).to_dict(orient="records"),
-                    "columns": list(df.columns),
-                    "row_count": len(df),
-                    "fetched_at": datetime.now().isoformat()
-                })
+            try:
+                df = await self.fetch_analytics_file(business_id, file_name)
+                if df is not None:
+                    df_for_payload = df.head(row_limit) if row_limit and row_limit > 0 else df
+                    expected_cols = (
+                        self.expected_schema.get(category, {}).get(file_name)
+                        if self.expected_schema
+                        else None
+                    )
+                    if expected_cols:
+                        missing_cols = [c for c in expected_cols if c not in df.columns]
+                        if missing_cols:
+                            file_errors[file_name] = (
+                                "Missing required columns: " + ", ".join(missing_cols)
+                            )
+                            print(
+                                f"Warning: Skipping analytics file {file_name} for business {business_id} "
+                                f"due to missing columns: {missing_cols}"
+                            )
+                            continue
+
+                    # Convert DataFrame to dict for JSON serialization
+                    results[file_name] = self._sanitize({
+                        "data": df_for_payload.where(pd.notna(df_for_payload), None).to_dict(orient="records"),
+                        "columns": list(df_for_payload.columns),
+                        "row_count": len(df),
+                        "fetched_at": datetime.now().isoformat()
+                    })
+            except Exception as e:
+                # A single corrupt/incompatible parquet should not break the
+                # whole category or the entire dashboard page.
+                file_errors[file_name] = str(e)
+                print(
+                    f"Warning: Failed to load analytics file {file_name} "
+                    f"for business {business_id}: {e}"
+                )
         
         return {
             "category": category,
             "analytics": results,
-            "total_count": len(results)
+            "total_count": len(results),
+            "file_errors": file_errors,
         }
     
     async def fetch_all_analytics(self, business_id: str, categories: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -402,11 +607,45 @@ class AnalyticsService:
         """
         if categories is None:
             categories = list(self.ANALYTICS_CATEGORIES.keys())
+        else:
+            categories = [c for c in categories if c in self.ANALYTICS_CATEGORIES]
+
+        revision = self._get_business_analytics_revision(business_id)
+
+        # Fast path: serve Redis cached response for this exact category set +
+        # current MinIO analytics revision.
+        if self.redis_client and categories:
+            redis_key = self._build_redis_all_key(business_id, categories, revision)
+            try:
+                cached_payload = self.redis_client.get(redis_key)
+                if cached_payload:
+                    parsed = json.loads(cached_payload)
+                    parsed["cache"] = {
+                        "source": "redis",
+                        "revision": revision,
+                    }
+                    return parsed
+            except Exception as e:
+                self._handle_redis_error(e, "read", business_id)
         
         results = {}
         for category in categories:
             if category in self.ANALYTICS_CATEGORIES:
-                results[category] = await self.fetch_category_analytics(business_id, category)
+                try:
+                    results[category] = await self.fetch_category_analytics(business_id, category)
+                except Exception as e:
+                    # Keep API responsive even if one category has an
+                    # unexpected failure.
+                    print(
+                        f"Warning: Failed to load analytics category {category} "
+                        f"for business {business_id}: {e}"
+                    )
+                    results[category] = {
+                        "category": category,
+                        "analytics": {},
+                        "total_count": 0,
+                        "file_errors": {"_category": str(e)},
+                    }
         
         # Calculate totals
         total_analytics = sum(
@@ -414,13 +653,30 @@ class AnalyticsService:
             for cat_data in results.values()
         )
         
-        return {
+        payload = {
             "business_id": business_id,
             "categories": results,
             "total_categories": len(results),
             "total_analytics": total_analytics,
-            "fetched_at": datetime.now().isoformat()
+            "fetched_at": datetime.now().isoformat(),
+            "cache": {
+                "source": "minio",
+                "revision": revision,
+            },
         }
+
+        if self.redis_client and categories:
+            redis_key = self._build_redis_all_key(business_id, categories, revision)
+            try:
+                self.redis_client.setex(
+                    redis_key,
+                    self.redis_cache_ttl_seconds,
+                    json.dumps(payload, default=str, allow_nan=False),
+                )
+            except Exception as e:
+                self._handle_redis_error(e, "write", business_id)
+
+        return payload
     
     async def list_available_analytics(self, business_id: str) -> List[str]:
         """
@@ -467,6 +723,16 @@ class AnalyticsService:
             keys_to_remove = [k for k in self.cache.keys() if k.startswith(f"{business_id}:")]
             for key in keys_to_remove:
                 del self.cache[key]
+            if business_id in self._revision_cache:
+                del self._revision_cache[business_id]
+            self._clear_redis_business_keys(business_id)
         else:
             # Clear all cache
             self.cache.clear()
+            self._revision_cache.clear()
+            if self.redis_client:
+                try:
+                    for key in self.redis_client.scan_iter(match="analytics:*", count=1000):
+                        self.redis_client.delete(key)
+                except Exception as e:
+                    self._handle_redis_error(e, "clear")

@@ -4,11 +4,9 @@ Clusters geographic regions by sales performance and market characteristics
 """
 
 import os
+
 import sys
-import findspark
-
-findspark.init()
-
+from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from utils.multi_bucket_loader import (
     load_data_from_all_buckets,
@@ -17,6 +15,14 @@ from utils.multi_bucket_loader import (
     get_training_window,
     GENERAL_MODEL_BUCKET
 )
+
+# Import spark_utils FIRST to set up JARs before pyspark imports
+_ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
+if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT_VAR))
+
+from spark_utils import create_ml_spark_session
+
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when, lit, coalesce, log1p, concat_ws
@@ -50,33 +56,14 @@ NUMERIC_FEATURES = [
 
 def create_spark_session():
     """Initialize Spark session"""
-    return (
-        SparkSession.builder.appName("GeographicClusteringTraining")
-        .master(os.getenv("SPARK_SERVER", "local[*]"))
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        )
-        .config("spark.dynamicAllocation.enabled", "true")
-        .config("spark.dynamicAllocation.minExecutors", "0")
-        .config("spark.dynamicAllocation.maxExecutors", "1000")
-        .config("spark.dynamicAllocation.initialExecutors", "1")
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        )
-        .config("inferSchema", "true")
-        .config("mergeSchema", "true")
-        .getOrCreate()
+    return create_ml_spark_session(
+        "GeographicClusteringTraining",
+        extra_configs={
+                    "spark.sql.shuffle.partitions": "8",
+                    "inferSchema": "true",
+                    "mergeSchema": "true"
+                },
     )
-
-
 def load_and_validate_data(spark):
     """Load geographic data from city-level aggregations using multi-bucket loader"""
     # Load city-level data from all buckets
@@ -297,6 +284,12 @@ def train_bisecting_kmeans(df, features_col, k_values):
         )
         model = bkm.fit(df)
         predictions = model.transform(df)
+
+        num_clusters = predictions.select("prediction").distinct().count()
+        if num_clusters <= 1:
+            print(f"Only {num_clusters} cluster. Skipping.")
+            continue
+
         silhouette = evaluator.evaluate(predictions)
         wssse = model.summary.trainingCost
         print(f"Silhouette={silhouette:.4f}, WSSSE={wssse:.2f}")
@@ -348,13 +341,17 @@ def save_models(
     else:
         print("No valid GMM models to save")
 
-    # Save best Bisecting K-Means
-    best_bkm = max(bkm_metrics, key=lambda x: x["silhouette"])
-    best_bkm_model = next(m for m in bkm_models if m["k"] == best_bkm["k"])
-    best_bkm_model["model"].write().overwrite().save(
-        f"{MODEL_OUTPUT_DIR}/geographic_bisecting_kmeans"
-    )
-    print(f"Saved Bisecting K-Means k={best_bkm['k']} (silhouette={best_bkm['silhouette']:.4f})")
+    # Save best Bisecting K-Means if exists
+    best_bkm = None
+    if bkm_metrics:
+        best_bkm = max(bkm_metrics, key=lambda x: x["silhouette"])
+        best_bkm_model = next(m for m in bkm_models if m["k"] == best_bkm["k"])
+        best_bkm_model["model"].write().overwrite().save(
+            f"{MODEL_OUTPUT_DIR}/geographic_bisecting_kmeans"
+        )
+        print(f"Saved Bisecting K-Means k={best_bkm['k']} (silhouette={best_bkm['silhouette']:.4f})")
+    else:
+        print("No valid Bisecting K-Means models to save")
 
     # Save metrics
     os.makedirs(LOCAL_METRICS_PATH, exist_ok=True)
@@ -365,7 +362,9 @@ def save_models(
             "gmm": {"k": best_gmm["k"], "silhouette": best_gmm["silhouette"]}
             if best_gmm
             else None,
-            "bisecting_kmeans": {"k": best_bkm["k"], "silhouette": best_bkm["silhouette"]},
+            "bisecting_kmeans": {"k": best_bkm["k"], "silhouette": best_bkm["silhouette"]}
+            if best_bkm
+            else None,
         },
         "all_models": all_metrics,
         "features": NUMERIC_FEATURES,

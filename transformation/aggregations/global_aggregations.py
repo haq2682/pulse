@@ -1,251 +1,325 @@
 from pyspark.sql import SparkSession
+from pyspark import StorageLevel
 
 from pyspark.sql.functions import (
     col,
     sum as spark_sum,
     avg as spark_avg,
     count,
+    countDistinct,
     current_timestamp,
     datediff,
     lower,
     lit,
     to_date,
+    when,
 )
 
 
+def _df(dataframes, name):
+    """Return the DataFrame or None if absent/empty (without triggering a count)."""
+    return dataframes.get(name)
+
+
 def global_aggregations(spark, dataframes):
-    # Skip aggregation if required dataframes don't exist
+    # Skip aggregation if required dataframes don't exist.
+    # Use isEmpty() (no shuffle, no full scan) instead of .count() == 0.
     required_dataframes = ["orders", "customers", "products"]
     for df_name in required_dataframes:
-        if df_name not in dataframes or dataframes[df_name] is None or dataframes[df_name].count() == 0:
+        df = _df(dataframes, df_name)
+        if df is None or df.rdd.isEmpty():
             print(f"⚠️ Skipping global_aggregations: '{df_name}' dataframe not found or empty")
             return
-    
-    # Calculate global metrics across entire dataset
+
     global_metrics = {}
 
-    # Total revenue all time
-    global_metrics["total_revenue_all_time"] = (
+    # ------------------------------------------------------------------
+    # ORDERS — one combined aggregation pass (avoids 5+ separate actions)
+    # ------------------------------------------------------------------
+    orders = (
         dataframes["orders"]
-        .filter(col("total_amount").isNotNull() & (col("total_amount") > 0))
-        .agg(spark_sum("total_amount").alias("value"))
-        .collect()[0]["value"]
-        or 0.0
-    )
-
-    # Total orders all time
-    global_metrics["total_orders_all_time"] = dataframes["orders"].count()
-
-    # Total customers all time
-    global_metrics["total_customers_all_time"] = dataframes["customers"].count()
-
-    # Average order value global
-    global_metrics["avg_order_value_global"] = (
-        dataframes["orders"]
-        .filter(col("total_amount").isNotNull() & (col("total_amount") > 0))
-        .agg(spark_avg("total_amount").alias("value"))
-        .collect()[0]["value"]
-        or 0.0
-    )
-
-    # Total products in catalog
-    global_metrics["total_products_catalog"] = dataframes["products"].count()
-
-    # Average customer lifetime value global
-    global_metrics["avg_customer_lifetime_value_global"] = (
-        dataframes["customers"]
-        .filter(col("customer_lifetime_value").isNotNull())
-        .agg(spark_avg("customer_lifetime_value").alias("value"))
-        .collect()[0]["value"]
-        or 0.0
-    )
-
-    # Overall conversion rate (sessions with orders / total sessions)
-    total_sessions = dataframes["customer_sessions"].count()
-    converted_sessions = (
-        dataframes["customer_sessions"].filter(col("conversion_flag") == 1).count()
-    )
-
-    global_metrics["overall_conversion_rate"] = (
-        (converted_sessions / total_sessions * 100) if total_sessions > 0 else 0.0
-    )
-
-    # Overall cart abandonment rate
-    total_carts = dataframes["shopping_cart"].select("cart_id").distinct().count()
-    abandoned_carts = (
-        dataframes["shopping_cart"]
-        .filter(
-            col("cart_status").isNotNull()
-            & ~lower(col("cart_status")).isin("purchased", "completed", "ordered")
+        .select(
+            "customer_id",
+            "total_amount",
+            "order_shipped_at",
+            "order_delivered_at",
+            "order_placed_at",
         )
-        .select("cart_id")
-        .distinct()
-        .count()
+        .persist(StorageLevel.MEMORY_AND_DISK)
     )
 
-    global_metrics["overall_cart_abandonment_rate"] = (
-        (abandoned_carts / total_carts * 100) if total_carts > 0 else 0.0
+    orders_agg = (
+        orders
+        .agg(
+            count("*").alias("total_orders"),
+            countDistinct("customer_id").alias("active_customers"),
+            spark_avg(
+                when(col("total_amount").isNotNull() & (col("total_amount") > 0),
+                     col("total_amount"))
+            ).alias("avg_order_value"),
+            spark_sum(
+                when(col("total_amount").isNotNull() & (col("total_amount") > 0),
+                     col("total_amount"))
+            ).alias("total_revenue"),
+        )
+        .collect()[0]
     )
 
-    # Average delivery time in days
+    global_metrics["total_orders_all_time"]  = int(orders_agg["total_orders"] or 0)
+    global_metrics["total_revenue_all_time"] = float(orders_agg["total_revenue"] or 0.0)
+    global_metrics["avg_order_value_global"] = float(orders_agg["avg_order_value"] or 0.0)
+    global_metrics["total_active_customers"] = int(orders_agg["active_customers"] or 0)
+
+    # Delivery & processing time — needs withColumn, keep as a single action each
     global_metrics["avg_delivery_time_days"] = (
-        dataframes["orders"]
-        .filter(
-            col("order_shipped_at").isNotNull() & col("order_delivered_at").isNotNull()
-        )
-        .withColumn(
-            "delivery_time",
-            datediff(col("order_delivered_at"), col("order_shipped_at")),
-        )
+        orders
+        .filter(col("order_shipped_at").isNotNull() & col("order_delivered_at").isNotNull())
+        .withColumn("delivery_time", datediff(col("order_delivered_at"), col("order_shipped_at")))
         .filter(col("delivery_time") >= 0)
-        .agg(spark_avg("delivery_time").alias("value"))
-        .collect()[0]["value"]
-        or 0.0
+        .agg(spark_avg("delivery_time").alias("v"))
+        .collect()[0]["v"] or 0.0
     )
 
-    # Overall customer satisfaction (average rating)
-    global_metrics["overall_customer_satisfaction"] = (
-        dataframes["reviews"]
-        .filter(col("rating").isNotNull() & (col("rating") > 0))
-        .agg(spark_avg("rating").alias("value"))
-        .collect()[0]["value"]
-        or 0.0
+    global_metrics["avg_order_processing_days"] = (
+        orders
+        .filter(col("order_placed_at").isNotNull() & col("order_shipped_at").isNotNull())
+        .withColumn("processing_time", datediff(col("order_shipped_at"), to_date(col("order_placed_at"))))
+        .filter(col("processing_time") >= 0)
+        .agg(spark_avg("processing_time").alias("v"))
+        .collect()[0]["v"] or 0.0
     )
 
-    # Additional useful global metrics
-    # Total units sold all time
-    global_metrics["total_units_sold_all_time"] = (
-        dataframes["order_items"]
-        .filter(col("quantity").isNotNull() & (col("quantity") > 0))
-        .agg(spark_sum("quantity").alias("value"))
-        .collect()[0]["value"]
-        or 0
+    orders.unpersist(blocking=False)
+
+    # ------------------------------------------------------------------
+    # CUSTOMERS — one combined pass
+    # ------------------------------------------------------------------
+    customers = (
+        dataframes["customers"]
+        .select("customer_lifetime_value")
+        .persist(StorageLevel.MEMORY_AND_DISK)
     )
 
-    # Total active customers (with at least one order)
-    global_metrics["total_active_customers"] = (
-        dataframes["orders"].select("customer_id").distinct().count()
+    cust_agg = (
+        customers
+        .agg(
+            count("*").alias("total_customers"),
+            spark_avg(
+                when(col("customer_lifetime_value").isNotNull(),
+                     col("customer_lifetime_value"))
+            ).alias("avg_clv"),
+        )
+        .collect()[0]
     )
 
-    # Customer activation rate
+    global_metrics["total_customers_all_time"]            = int(cust_agg["total_customers"] or 0)
+    global_metrics["avg_customer_lifetime_value_global"]  = float(cust_agg["avg_clv"] or 0.0)
+
+    customers.unpersist(blocking=False)
+
     global_metrics["customer_activation_rate"] = (
-        (
-            global_metrics["total_active_customers"]
-            / global_metrics["total_customers_all_time"]
-            * 100
-        )
-        if global_metrics["total_customers_all_time"] > 0
-        else 0.0
+        (global_metrics["total_active_customers"] / global_metrics["total_customers_all_time"] * 100)
+        if global_metrics["total_customers_all_time"] > 0 else 0.0
     )
 
-    # Average items per order
-    global_metrics["avg_items_per_order"] = (
-        dataframes["order_items"]
-        .filter(col("quantity").isNotNull() & (col("quantity") > 0))
-        .groupBy("order_id")
-        .agg(spark_sum("quantity").alias("order_items"))
-        .agg(spark_avg("order_items").alias("value"))
-        .collect()[0]["value"]
-        or 0.0
-    )
-
-    # Total reviews submitted
-    global_metrics["total_reviews_all_time"] = dataframes["reviews"].count()
-
-    # Review participation rate
-    global_metrics["review_participation_rate"] = (
-        (
-            global_metrics["total_reviews_all_time"]
-            / global_metrics["total_orders_all_time"]
-            * 100
-        )
-        if global_metrics["total_orders_all_time"] > 0
-        else 0.0
-    )
-
-    # Total suppliers
-    global_metrics["total_suppliers"] = dataframes["suppliers"].count()
-
-    # Average products per supplier
-    global_metrics["avg_products_per_supplier"] = (
+    # ------------------------------------------------------------------
+    # PRODUCTS — one combined pass
+    # ------------------------------------------------------------------
+    products = (
         dataframes["products"]
+        .select("product_id", "category", "sell_price", "supplier_id", "cost_price")
+        .persist(StorageLevel.MEMORY_AND_DISK)
+    )
+
+    prod_agg = (
+        products
+        .agg(
+            count("*").alias("total_products"),
+            countDistinct(when(col("category").isNotNull(), col("category"))).alias("total_categories"),
+            spark_avg(
+                when(col("sell_price").isNotNull() & (col("sell_price") > 0),
+                     col("sell_price"))
+            ).alias("avg_price"),
+        )
+        .collect()[0]
+    )
+
+    global_metrics["total_products_catalog"] = int(prod_agg["total_products"] or 0)
+    global_metrics["total_categories"]       = int(prod_agg["total_categories"] or 0)
+    global_metrics["avg_product_price"]      = float(prod_agg["avg_price"] or 0.0)
+
+    global_metrics["avg_products_per_supplier"] = (
+        products
         .filter(col("supplier_id").isNotNull())
         .groupBy("supplier_id")
         .agg(count("product_id").alias("product_count"))
-        .agg(spark_avg("product_count").alias("value"))
-        .collect()[0]["value"]
-        or 0.0
+        .agg(spark_avg("product_count").alias("v"))
+        .collect()[0]["v"] or 0.0
     )
 
-    # Total categories
-    global_metrics["total_categories"] = (
-        dataframes["products"]
-        .select("category")
-        .filter(col("category").isNotNull())
-        .distinct()
-        .count()
-    )
-
-    # Average price point
-    global_metrics["avg_product_price"] = (
-        dataframes["products"]
-        .filter(col("sell_price").isNotNull() & (col("sell_price") > 0))
-        .agg(spark_avg("sell_price").alias("value"))
-        .collect()[0]["value"]
-        or 0.0
-    )
-
-    # Total marketing campaigns
-    global_metrics["total_marketing_campaigns"] = dataframes[
-        "marketing_campaigns"
-    ].count()
-
-    # Average campaign ROI
-    global_metrics["avg_campaign_roi"] = (
-        dataframes["marketing_campaigns"]
-        .filter(col("roi").isNotNull())
-        .agg(spark_avg("roi").alias("value"))
-        .collect()[0]["value"]
-        or 0.0
-    )
-
-    # Total inventory value
-    global_metrics["total_inventory_value"] = (
-        dataframes["inventory"]
-        .join(
-            dataframes["products"].select(
-                col("product_id").alias("inv_prod_id"), "cost_price"
-            ),
-            dataframes["inventory"]["product_id"] == col("inv_prod_id"),
-            "left",
+    # ------------------------------------------------------------------
+    # ORDER_ITEMS — one combined pass
+    # ------------------------------------------------------------------
+    order_items = _df(dataframes, "order_items")
+    if order_items is not None:
+        order_items = (
+            order_items
+            .select("order_id", "quantity")
+            .persist(StorageLevel.MEMORY_AND_DISK)
         )
-        .filter(
-            col("stock_quantity").isNotNull()
-            & col("cost_price").isNotNull()
-            & (col("stock_quantity") > 0)
-            & (col("cost_price") > 0)
+        oi_agg = (
+            order_items
+            .filter(col("quantity").isNotNull() & (col("quantity") > 0))
+            .agg(spark_sum("quantity").alias("total_units"))
+            .collect()[0]
         )
-        .withColumn("inventory_value", col("stock_quantity") * col("cost_price"))
-        .agg(spark_sum("inventory_value").alias("value"))
-        .collect()[0]["value"]
-        or 0.0
+        global_metrics["total_units_sold_all_time"] = int(oi_agg["total_units"] or 0)
+
+        global_metrics["avg_items_per_order"] = (
+            order_items
+            .filter(col("quantity").isNotNull() & (col("quantity") > 0))
+            .groupBy("order_id")
+            .agg(spark_sum("quantity").alias("order_qty"))
+            .agg(spark_avg("order_qty").alias("v"))
+            .collect()[0]["v"] or 0.0
+        )
+        order_items.unpersist(blocking=False)
+    else:
+        global_metrics["total_units_sold_all_time"] = 0
+        global_metrics["avg_items_per_order"]       = 0.0
+
+    # ------------------------------------------------------------------
+    # REVIEWS — one combined pass
+    # ------------------------------------------------------------------
+    reviews = _df(dataframes, "reviews")
+    if reviews is not None:
+        rev_agg = (
+            reviews
+            .agg(
+                count("*").alias("total_reviews"),
+                spark_avg(
+                    when(col("rating").isNotNull() & (col("rating") > 0), col("rating"))
+                ).alias("avg_rating"),
+            )
+            .collect()[0]
+        )
+        global_metrics["total_reviews_all_time"]       = int(rev_agg["total_reviews"] or 0)
+        global_metrics["overall_customer_satisfaction"] = float(rev_agg["avg_rating"] or 0.0)
+    else:
+        global_metrics["total_reviews_all_time"]       = 0
+        global_metrics["overall_customer_satisfaction"] = 0.0
+
+    global_metrics["review_participation_rate"] = (
+        (global_metrics["total_reviews_all_time"] / global_metrics["total_orders_all_time"] * 100)
+        if global_metrics["total_orders_all_time"] > 0 else 0.0
     )
 
-    # Average order processing time (days)
-    global_metrics["avg_order_processing_days"] = (
-        dataframes["orders"]
-        .filter(
-            col("order_placed_at").isNotNull() & col("order_shipped_at").isNotNull()
+    # ------------------------------------------------------------------
+    # CUSTOMER SESSIONS — one combined pass
+    # ------------------------------------------------------------------
+    sessions = _df(dataframes, "customer_sessions")
+    if sessions is not None:
+        sess_agg = (
+            sessions
+            .agg(
+                count("*").alias("total_sessions"),
+                spark_sum(when(col("conversion_flag") == 1, lit(1)).otherwise(lit(0))).alias("converted"),
+            )
+            .collect()[0]
         )
-        .withColumn(
-            "processing_time",
-            datediff(col("order_shipped_at"), to_date(col("order_placed_at"))),
+        total_sessions_val   = int(sess_agg["total_sessions"] or 0)
+        converted_sessions   = int(sess_agg["converted"] or 0)
+        global_metrics["overall_conversion_rate"] = (
+            (converted_sessions / total_sessions_val * 100) if total_sessions_val > 0 else 0.0
         )
-        .filter(col("processing_time") >= 0)
-        .agg(spark_avg("processing_time").alias("value"))
-        .collect()[0]["value"]
-        or 0.0
+    else:
+        global_metrics["overall_conversion_rate"] = 0.0
+
+    # ------------------------------------------------------------------
+    # SHOPPING CART — one combined pass
+    # ------------------------------------------------------------------
+    cart = _df(dataframes, "shopping_cart")
+    if cart is not None:
+        cart_agg = (
+            cart
+            .select("cart_id", "cart_status")
+            .agg(
+                countDistinct("cart_id").alias("total_carts"),
+                countDistinct(
+                    when(
+                        col("cart_status").isNotNull()
+                        & ~lower(col("cart_status")).isin("purchased", "completed", "ordered"),
+                        col("cart_id"),
+                    )
+                ).alias("abandoned_carts"),
+            )
+            .collect()[0]
+        )
+        total_carts_val   = int(cart_agg["total_carts"] or 0)
+        abandoned_carts   = int(cart_agg["abandoned_carts"] or 0)
+        global_metrics["overall_cart_abandonment_rate"] = (
+            (abandoned_carts / total_carts_val * 100) if total_carts_val > 0 else 0.0
+        )
+    else:
+        global_metrics["overall_cart_abandonment_rate"] = 0.0
+
+    # ------------------------------------------------------------------
+    # SUPPLIERS
+    # ------------------------------------------------------------------
+    suppliers = _df(dataframes, "suppliers")
+    global_metrics["total_suppliers"] = (
+        suppliers.agg(count("*").alias("n")).collect()[0]["n"] if suppliers is not None else 0
     )
+
+    # ------------------------------------------------------------------
+    # MARKETING CAMPAIGNS — one combined pass
+    # ------------------------------------------------------------------
+    campaigns = _df(dataframes, "marketing_campaigns")
+    if campaigns is not None:
+        camp_agg = (
+            campaigns
+            .agg(
+                count("*").alias("total_campaigns"),
+                spark_avg(when(col("roi").isNotNull(), col("roi"))).alias("avg_roi"),
+            )
+            .collect()[0]
+        )
+        global_metrics["total_marketing_campaigns"] = int(camp_agg["total_campaigns"] or 0)
+        global_metrics["avg_campaign_roi"]          = float(camp_agg["avg_roi"] or 0.0)
+    else:
+        global_metrics["total_marketing_campaigns"] = 0
+        global_metrics["avg_campaign_roi"]          = 0.0
+
+    # ------------------------------------------------------------------
+    # INVENTORY — join with products cache already released; re-read narrow slice
+    # ------------------------------------------------------------------
+    inventory = _df(dataframes, "inventory")
+    if inventory is not None:
+        inv_value = (
+            inventory
+            .select("product_id", "stock_quantity")
+            .join(
+                products.select(
+                    col("product_id").alias("inv_prod_id"), "cost_price"
+                ),
+                inventory["product_id"] == col("inv_prod_id"),
+                "left",
+            )
+            .filter(
+                col("stock_quantity").isNotNull()
+                & col("cost_price").isNotNull()
+                & (col("stock_quantity") > 0)
+                & (col("cost_price") > 0)
+            )
+            .withColumn("inventory_value", col("stock_quantity") * col("cost_price"))
+            .agg(spark_sum("inventory_value").alias("v"))
+            .collect()[0]["v"]
+        )
+        global_metrics["total_inventory_value"] = float(inv_value or 0.0)
+    else:
+        global_metrics["total_inventory_value"] = 0.0
+
+    products.unpersist(blocking=False)
 
     # Create DataFrame from global metrics
     global_aggregations_data = [(k, float(v)) for k, v in global_metrics.items()]

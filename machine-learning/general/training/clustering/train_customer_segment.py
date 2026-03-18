@@ -4,11 +4,9 @@ Trains K-Means and Gaussian Mixture Models on RFM metrics
 """
 
 import os
+
 import sys
-import findspark
-
-findspark.init()
-
+from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from utils.multi_bucket_loader import (
     load_data_from_all_buckets,
@@ -17,6 +15,14 @@ from utils.multi_bucket_loader import (
     get_training_window,
     GENERAL_MODEL_BUCKET
 )
+
+# Import spark_utils FIRST to set up JARs before pyspark imports
+_ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
+if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT_VAR))
+
+from spark_utils import create_ml_spark_session
+
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when, lit, coalesce
@@ -57,43 +63,25 @@ FEATURE_COLS = [
 
 
 def create_spark_session():
-    """Initialize Spark session with MinIO configuration"""
-    return (
-        SparkSession.builder.appName("CustomerSegmentationTraining")
-        .master(os.getenv("SPARK_SERVER", "local[*]"))
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        )
-        .config("spark.dynamicAllocation.enabled", "true")
-        .config("spark.dynamicAllocation.minExecutors", "0")
-        .config("spark.dynamicAllocation.maxExecutors", "1000")
-        .config("spark.dynamicAllocation.initialExecutors", "1")
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        )
-        .config("inferSchema", "true")
-        .config("mergeSchema", "true")
-        .getOrCreate()
+    """Initialize Spark session"""
+    return create_ml_spark_session(
+        "CustomerSegmentationTraining",
+        extra_configs={
+                    "spark.sql.shuffle.partitions": "8",
+                    "inferSchema": "true",
+                    "mergeSchema": "true"
+                },
     )
-
-
 def load_and_validate_data(spark):
     """Load data from multiple tables using multi-bucket loader and validate required columns"""
-    # Load agg_customers from all buckets
+    # Load agg_customers from all buckets — keep _source_bucket for join safety
     customers_df, customers_count = load_data_from_all_buckets(
         spark,
         INPUT_RELATIVE_PATH,
         required_columns=["customer_id", "total_orders", "total_revenue", "avg_order_value", 
                          "customer_tenure_days", "session_conversion_rate"],
-        filter_nulls=False
+        filter_nulls=False,
+        keep_source_bucket=True,
     )
 
     if customers_df is None:
@@ -102,12 +90,13 @@ def load_and_validate_data(spark):
 
     print(f"Loaded {customers_count} customers from all buckets")
 
-    # Load agg_rfm_segmentation from all buckets
+    # Load agg_rfm_segmentation from all buckets — keep _source_bucket for join safety
     rfm_df, rfm_count = load_data_from_all_buckets(
         spark,
         INPUT_RELATIVE_PATH_RFM,
         required_columns=["customer_id", "days_since_last_order"],
-        filter_nulls=False
+        filter_nulls=False,
+        keep_source_bucket=True,
     )
 
     if rfm_df is None:
@@ -120,10 +109,20 @@ def load_and_validate_data(spark):
     rfm_df = rfm_df.select(
         col("customer_id"),
         col("days_since_last_order"),
+        col("_source_bucket"),
     )
 
-    # Join tables on customer_id
-    df = customers_df.join(rfm_df, on="customer_id", how="inner")
+    # Join tables on customer_id AND _source_bucket to prevent cross-tenant
+    # ID collisions (two tenants can both have customer_id=1).
+    customers_df = customers_df.withColumnRenamed("_source_bucket", "_bucket_cust")
+    rfm_df = rfm_df.withColumnRenamed("_source_bucket", "_bucket_rfm")
+
+    df = customers_df.join(
+        rfm_df,
+        (customers_df.customer_id == rfm_df.customer_id)
+        & (customers_df._bucket_cust == rfm_df._bucket_rfm),
+        how="inner",
+    ).drop(rfm_df.customer_id).drop("_bucket_rfm").withColumnRenamed("_bucket_cust", "_source_bucket")
 
     record_count = df.count()
     print(f"Joined dataset shape: {record_count} rows, {len(df.columns)} columns")
@@ -319,24 +318,25 @@ def main():
         spark.stop()
         return
 
-    # Assemble features into vector
+    # Assemble features into vector (drop _source_bucket — not a training feature)
+    df_for_ml = df.drop("_source_bucket")
     assembler = VectorAssembler(inputCols=FEATURE_COLS, outputCol="features_raw")
-    df = assembler.transform(df)
+    df_for_ml = assembler.transform(df_for_ml)
 
     # Normalize features
     scaler = StandardScaler(inputCol="features_raw", outputCol="features", withStd=True, withMean=True)
-    scaler_model = scaler.fit(df)
-    df = scaler_model.transform(df)
+    scaler_model = scaler.fit(df_for_ml)
+    df_for_ml = scaler_model.transform(df_for_ml)
 
     # Cache for multiple model training
-    df.cache()
+    df_for_ml.cache()
 
     # Train multiple K-Means models
     k_values = [3, 4, 5, 6]
-    kmeans_models, kmeans_metrics = train_kmeans(df, "features", k_values)
+    kmeans_models, kmeans_metrics = train_kmeans(df_for_ml, "features", k_values)
 
     # Train multiple GMM models
-    gmm_models, gmm_metrics = train_gmm(df, "features", k_values)
+    gmm_models, gmm_metrics = train_gmm(df_for_ml, "features", k_values)
 
     # Combine all metrics for comparison
     all_metrics = kmeans_metrics + gmm_metrics

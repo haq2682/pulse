@@ -15,13 +15,21 @@ from sqlalchemy.exc import SQLAlchemyError
 class IncrementalCleaner:
     """
     Manages incremental cleaning by tracking which files have been processed.
-    
-    This class maintains a state table in PostgreSQL to track processed files,
-    enabling the cleaning pipeline to skip files that have already been processed.
+
+    Each instance is scoped to a single ``bucket_name`` (business_id) so that
+    multiple tenants running concurrently never see each other's watermarks.
+    The ``cleaning_state`` table uses ``(bucket_name, file_path)`` as its
+    composite primary key.
     """
-    
-    def __init__(self):
-        """Initialize the incremental cleaner with database connection."""
+
+    def __init__(self, bucket_name: str = ""):
+        """Initialize the incremental cleaner with database connection.
+
+        Args:
+            bucket_name: MinIO bucket name (business_id).  Used to scope all
+                state queries so that different tenants do not share watermarks.
+        """
+        self.bucket_name = bucket_name or ""
         # Construct PostgreSQL connection string from environment variables
         postgres_user = os.getenv("POSTGRES_USER", "postgres")
         postgres_password = os.getenv("POSTGRES_PASSWORD", "")
@@ -36,42 +44,90 @@ class IncrementalCleaner:
         
         self.engine = create_engine(connection_string, echo=False)
         self._ensure_state_table()
-    
+
     def _ensure_state_table(self):
-        """Ensure the state tracking table exists."""
-        create_table_sql = """
-        CREATE TABLE IF NOT EXISTS cleaning_state (
-            file_path VARCHAR(500) PRIMARY KEY,
-            processed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            file_size BIGINT,
-            record_count BIGINT,
-            checksum VARCHAR(64),
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-        
-        CREATE INDEX IF NOT EXISTS idx_cleaning_state_processed_at 
-        ON cleaning_state(processed_at DESC);
+        """Ensure the state tracking table exists with the correct schema.
+
+        Handles two cases:
+        1. First-time creation  — creates the table with the composite PK
+           ``(bucket_name, file_path)`` from the start.
+        2. Migration from the old single-column PK schema — adds the
+           ``bucket_name`` column (defaulting to '') and promotes the PK to
+           the composite form so existing rows are preserved.
         """
-        
         try:
             with self.engine.connect() as conn:
-                conn.execute(text(create_table_sql))
+                # ── 1. Create table (new installations) ───────────────────────
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS cleaning_state (
+                        bucket_name  VARCHAR(255) NOT NULL DEFAULT '',
+                        file_path    VARCHAR(500) NOT NULL,
+                        processed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        file_size    BIGINT,
+                        record_count BIGINT,
+                        checksum     VARCHAR(64),
+                        created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (bucket_name, file_path)
+                    )
+                """))
+
+                # ── 2. Migration: add bucket_name if the old schema is present ─
+                conn.execute(text("""
+                    ALTER TABLE cleaning_state
+                        ADD COLUMN IF NOT EXISTS bucket_name VARCHAR(255) NOT NULL DEFAULT ''
+                """))
+
+                # ── 3. Migration: promote PK to composite form if still single ─
+                #    Uses a DO block so Airflow/psycopg2 see a single statement.
+                conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        -- Only act when the current PK covers exactly one column
+                        IF EXISTS (
+                            SELECT 1
+                            FROM   pg_constraint c
+                            JOIN   pg_class      t ON t.oid = c.conrelid
+                            WHERE  t.relname          = 'cleaning_state'
+                              AND  c.contype           = 'p'
+                              AND  array_length(c.conkey, 1) = 1
+                        ) THEN
+                            ALTER TABLE cleaning_state DROP CONSTRAINT cleaning_state_pkey;
+                            ALTER TABLE cleaning_state ADD PRIMARY KEY (bucket_name, file_path);
+                        END IF;
+                    END
+                    $$
+                """))
+
+                # ── 4. Ensure supporting indexes exist ─────────────────────────
+                conn.execute(text("""
+                    CREATE INDEX IF NOT EXISTS idx_cleaning_state_processed_at
+                        ON cleaning_state(processed_at DESC)
+                """))
+                conn.execute(text("""
+                    CREATE INDEX IF NOT EXISTS idx_cleaning_state_bucket
+                        ON cleaning_state(bucket_name)
+                """))
+
                 conn.commit()
                 print("✅ State tracking table ready")
         except SQLAlchemyError as e:
-            print(f"⚠️  Warning: Could not create state table: {e}")
+            print(f"⚠️  Warning: Could not create/migrate state table: {e}")
     
     def get_processed_files(self):
         """
-        Get set of already processed file paths.
-        
+        Get set of already-processed file paths **for this tenant bucket**.
+
         Returns:
-            set: Set of file paths that have been processed
+            set: Set of file paths (MinIO object keys) that have been processed
+                 for ``self.bucket_name``.
         """
         try:
             with self.engine.connect() as conn:
-                result = conn.execute(text("SELECT file_path FROM cleaning_state"))
+                result = conn.execute(
+                    text("SELECT file_path FROM cleaning_state WHERE bucket_name = :bn"),
+                    {"bn": self.bucket_name},
+                )
                 processed = {row[0] for row in result}
                 return processed
         except SQLAlchemyError as e:
@@ -111,21 +167,22 @@ class IncrementalCleaner:
         try:
             with self.engine.connect() as conn:
                 conn.execute(text("""
-                    INSERT INTO cleaning_state 
-                    (file_path, processed_at, file_size, record_count, checksum)
-                    VALUES (:path, :ts, :size, :count, :checksum)
-                    ON CONFLICT (file_path) DO UPDATE 
-                    SET processed_at = :ts, 
-                        file_size = :size, 
-                        record_count = :count,
-                        checksum = :checksum,
-                        updated_at = :ts
+                    INSERT INTO cleaning_state
+                    (bucket_name, file_path, processed_at, file_size, record_count, checksum)
+                    VALUES (:bn, :path, :ts, :size, :count, :checksum)
+                    ON CONFLICT (bucket_name, file_path) DO UPDATE
+                    SET processed_at  = :ts,
+                        file_size     = :size,
+                        record_count  = :count,
+                        checksum      = :checksum,
+                        updated_at    = :ts
                 """), {
-                    "path": file_path,
-                    "ts": datetime.utcnow(),
-                    "size": file_size,
+                    "bn":    self.bucket_name,
+                    "path":  file_path,
+                    "ts":    datetime.utcnow(),
+                    "size":  file_size,
                     "count": record_count,
-                    "checksum": checksum
+                    "checksum": checksum,
                 })
                 conn.commit()
                 print(f"  ✓ Marked {file_path} as processed")
@@ -147,21 +204,22 @@ class IncrementalCleaner:
             with self.engine.connect() as conn:
                 for file_path, metadata in file_records.items():
                     conn.execute(text("""
-                        INSERT INTO cleaning_state 
-                        (file_path, processed_at, file_size, record_count, checksum)
-                        VALUES (:path, :ts, :size, :count, :checksum)
-                        ON CONFLICT (file_path) DO UPDATE 
-                        SET processed_at = :ts, 
-                            file_size = :size, 
-                            record_count = :count,
-                            checksum = :checksum,
-                            updated_at = :ts
+                        INSERT INTO cleaning_state
+                        (bucket_name, file_path, processed_at, file_size, record_count, checksum)
+                        VALUES (:bn, :path, :ts, :size, :count, :checksum)
+                        ON CONFLICT (bucket_name, file_path) DO UPDATE
+                        SET processed_at  = :ts,
+                            file_size     = :size,
+                            record_count  = :count,
+                            checksum      = :checksum,
+                            updated_at    = :ts
                     """), {
-                        "path": file_path,
-                        "ts": datetime.utcnow(),
-                        "size": metadata.get('file_size'),
-                        "count": metadata.get('record_count'),
-                        "checksum": metadata.get('checksum')
+                        "bn":    self.bucket_name,
+                        "path":  file_path,
+                        "ts":    datetime.utcnow(),
+                        "size":  metadata.get("file_size"),
+                        "count": metadata.get("record_count"),
+                        "checksum": metadata.get("checksum"),
                     })
                 conn.commit()
                 print(f"✅ Marked {len(file_records)} files as processed")
@@ -175,9 +233,12 @@ class IncrementalCleaner:
         """
         try:
             with self.engine.connect() as conn:
-                conn.execute(text("DELETE FROM cleaning_state"))
+                conn.execute(
+                    text("DELETE FROM cleaning_state WHERE bucket_name = :bn"),
+                    {"bn": self.bucket_name},
+                )
                 conn.commit()
-                print("✅ State table reset - all files will be reprocessed on next run")
+                print(f"✅ State table reset for bucket '{self.bucket_name}' - all files will be reprocessed on next run")
         except SQLAlchemyError as e:
             print(f"❌ Error resetting state table: {e}")
     
@@ -191,13 +252,14 @@ class IncrementalCleaner:
         try:
             with self.engine.connect() as conn:
                 result = conn.execute(text("""
-                    SELECT 
-                        COUNT(*) as total_files,
-                        SUM(record_count) as total_records,
-                        MAX(processed_at) as last_processed,
-                        MIN(processed_at) as first_processed
+                    SELECT
+                        COUNT(*)         AS total_files,
+                        SUM(record_count) AS total_records,
+                        MAX(processed_at) AS last_processed,
+                        MIN(processed_at) AS first_processed
                     FROM cleaning_state
-                """))
+                    WHERE bucket_name = :bn
+                """), {"bn": self.bucket_name})
                 row = result.fetchone()
                 if row:
                     return {

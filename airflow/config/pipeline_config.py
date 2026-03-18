@@ -12,6 +12,24 @@ import os
 # ---------------------------------------------------------------------------
 PYTHON_CONTAINER = os.getenv("PIPELINE_PYTHON_CONTAINER", "python")
 
+# Docker image and network used by DockerOperator tasks.
+# These must match what is defined in docker-compose.yml.
+PYTHON_IMAGE  = os.getenv("PIPELINE_PYTHON_IMAGE",  "python-py310")
+SPARK_NETWORK = os.getenv("PIPELINE_SPARK_NETWORK",  "spark-network")
+
+# Absolute HOST path to the Pulse workspace root.  DockerOperator bind-mounts
+# these directories so each spawned container sees the same live code and JARs
+# as the long-running `python` docker-compose service.
+# MUST be set via the PULSE_APP_HOST_PATH environment variable in docker-compose.
+_app_host_path_raw = os.getenv("PULSE_APP_HOST_PATH", "")
+if not _app_host_path_raw:
+    raise EnvironmentError(
+        "PULSE_APP_HOST_PATH environment variable is not set. "
+        "Add it to the Airflow scheduler/webserver environment in docker-compose.yml "
+        "(e.g. PULSE_APP_HOST_PATH=/path/to/pulse)."
+    )
+APP_HOST_PATH = _app_host_path_raw
+
 # ---------------------------------------------------------------------------
 # MinIO
 # ---------------------------------------------------------------------------
@@ -81,13 +99,12 @@ API_POLL_INTERVAL = int(os.getenv("API_POLL_INTERVAL", "30"))   # seconds per po
 API_INITIAL_POLL_DURATION = int(os.getenv("API_INITIAL_POLL_DURATION", "120"))
 
 # ---------------------------------------------------------------------------
-# Inline downstream processing (streaming modes)
+# Scheduled batch processing (streaming modes)
 # ---------------------------------------------------------------------------
-# When --enable-downstream is passed to run_mapping.py, the downstream
-# pipeline (clean → transform → analyze → ML inference) runs inline
-# in a background thread immediately after each Spark micro-batch.
-# This reduces end-to-end latency from ~10 min (Airflow cron) to ~10 s – 2 min.
-# The streaming_downstream DAG remains as a fallback at a reduced interval.
+# Downstream processing (clean → transform → analyze → ML inference) runs
+# as a scheduled Airflow batch job (scheduled_batch_dag, every 10 minutes)
+# for db/api streaming tenants.  It is NEVER triggered inline from the
+# Spark micro-batch — the streaming layer handles ingestion + mapping only.
 STREAMING_DOWNSTREAM_TIMEOUT = int(os.getenv("STREAMING_DOWNSTREAM_TIMEOUT", "900"))  # 15 min per step
 
 # ---------------------------------------------------------------------------
@@ -325,3 +342,62 @@ SPECIFIC_MODELS = [
     "product_bundling", "fulfillment_risk",                    # classification
     "product_affinity", "product_lifecycle",                   # clustering
 ]
+
+
+# ---------------------------------------------------------------------------
+# DockerOperator helpers
+# ---------------------------------------------------------------------------
+
+def docker_pipeline_env() -> dict:
+    """
+    Return the environment dict forwarded into every DockerOperator container.
+    Values are read from the Airflow scheduler's own environment at task-run
+    time, so they stay in sync with whatever is in docker-compose / .env.
+    """
+    import os as _os
+    return {
+        "POSTGRES_USER":     POSTGRES_USER,
+        "POSTGRES_PASSWORD": POSTGRES_PASSWORD,
+        "POSTGRES_DB":       POSTGRES_DB,
+        "POSTGRES_SERVER":   POSTGRES_SERVER,
+        "POSTGRES_DATABASE_NAME": POSTGRES_DB,
+        "MINIO_ENDPOINT":    MINIO_ENDPOINT,
+        "MINIO_ACCESS_KEY":  MINIO_ACCESS_KEY,
+        "MINIO_SECRET_KEY":  MINIO_SECRET_KEY,
+        "KAFKA_BOOTSTRAP":   KAFKA_BOOTSTRAP,
+        "REDIS_HOST":        REDIS_HOST,
+        "REDIS_PORT":        str(REDIS_PORT),
+        "GEMINI_API_KEY":    _os.getenv("GEMINI_API_KEY", ""),
+        "GEMINI_MODEL":      _os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite"),
+        "SPARK_MASTER_URL":  _os.getenv("SPARK_MASTER_URL", "spark://10.5.0.3:7077"),
+        "SPARK_SERVER":      _os.getenv("SPARK_MASTER_URL", "spark://10.5.0.3:7077"),
+    }
+
+
+def docker_app_mounts() -> list:
+    """
+    Return a list of docker.types.Mount objects that replicate the bind-mounts
+    defined for the `python` docker-compose service.  Every DockerOperator
+    container therefore sees the same live code and JAR files without needing
+    a full image rebuild whenever a script changes.
+
+    Source paths are resolved relative to APP_HOST_PATH, which must be set to
+    the absolute path of the Pulse workspace root ON THE HOST machine (i.e.
+    the PULSE_APP_HOST_PATH env var injected into the Airflow containers).
+    """
+    from docker.types import Mount
+    base = APP_HOST_PATH
+    return [
+        Mount(target="/app/jars",
+              source=f"{base}/jars/deps",         type="bind", read_only=True),
+        Mount(target="/app/cleaning",
+              source=f"{base}/cleaning",           type="bind", read_only=True),
+        Mount(target="/app/transformation",
+              source=f"{base}/transformation",     type="bind", read_only=True),
+        Mount(target="/app/analysis",
+              source=f"{base}/analysis",           type="bind", read_only=True),
+        Mount(target="/app/machine-learning",
+              source=f"{base}/machine-learning",   type="bind", read_only=True),
+        Mount(target="/app/mapping",
+              source=f"{base}/mapping",            type="bind", read_only=True),
+    ]

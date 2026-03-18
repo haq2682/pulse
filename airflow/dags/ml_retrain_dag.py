@@ -52,13 +52,15 @@ MODEL_FEATURE_MAP:
 
 Flow
 ----
-  load_current_features            validate transformed/ data exists
-    → run_ks_tests                 scipy KS-2-sample per model/feature
-    → evaluate_drift_report        split models → general vs specific
-    → should_retrain               ShortCircuit: skip if no drift
-    → [retrain_general | retrain_specific]   parallel
-    → save_new_baselines           update MinIO drift baselines
-    → run_inference_after_retrain  run infer_all with new models
+    load_current_features            validate transformed/ data exists
+        → run_ks_tests                 scipy KS-2-sample per model/feature
+        → evaluate_drift_report        filter to general models needing retrain
+        → should_retrain               ShortCircuit: skip if no general drift
+        → retrain_general              retrain affected general models
+        → save_new_baselines           update MinIO drift baselines
+
+NOTE: Specific models are NOT managed here. They are per-tenant and are
+retrained unconditionally on every scheduled_batch pipeline run.
 """
 
 from __future__ import annotations
@@ -70,7 +72,7 @@ from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.models import Variable
-from airflow.operators.bash import BashOperator
+from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.operators.python import PythonOperator, ShortCircuitOperator
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -81,8 +83,10 @@ from config.pipeline_config import (
     KS_ALPHA,
     KS_MIN_SAMPLE_SIZE,
     MODEL_FEATURE_MAP,
-    PYTHON_CONTAINER,
-    SPECIFIC_MODELS,
+    PYTHON_IMAGE,
+    SPARK_NETWORK,
+    docker_pipeline_env,
+    docker_app_mounts,
 )
 
 BUCKET = Variable.get("default_bucket", default_var=DEFAULT_BUCKET)
@@ -99,9 +103,6 @@ _task_defaults = dict(
     email_on_retry=DEFAULT_TASK_ARGS["email_on_retry"],
 )
 
-
-def _docker_exec(script_path: str, extra_args: str = "") -> str:
-    return f"docker exec {PYTHON_CONTAINER} python3 /app/{script_path} {extra_args}"
 
 
 # ---------------------------------------------------------------------------
@@ -164,8 +165,8 @@ def run_ks_tests(**context):
     ti.xcom_push(key="bucket", value=bucket)
 
     if force:
-        all_models = list(MODEL_FEATURE_MAP.keys())
-        print(f"force_retrain=True — marking all {len(all_models)} models for retraining.")
+        all_models = list(GENERAL_MODELS)   # only general models: specific retrain unconditionally in scheduled_batch
+        print(f"force_retrain=True — marking all {len(all_models)} general models for retraining.")
         ti.xcom_push(key="models_to_retrain", value=all_models)
         ti.xcom_push(key="any_drift",         value=True)
         ti.xcom_push(key="ks_report",         value={
@@ -185,6 +186,7 @@ def run_ks_tests(**context):
     print(f"Running KS drift tests for bucket: {bucket}")
     report = run_ks_tests_all_models(
         bucket=bucket,
+        model_names=GENERAL_MODELS,   # only test general models; specific models retrain unconditionally
         alpha=KS_ALPHA,
         min_samples=KS_MIN_SAMPLE_SIZE,
     )
@@ -193,16 +195,16 @@ def run_ks_tests(**context):
     any_drift         = report["any_drift_detected"]
 
     # ── Auto-detect first-run / missing baselines ──────────────────────────
-    # If the vast majority of models have errors (= no baseline exists), treat
-    # it as a forced full retrain so we bootstrap the system automatically.
-    total        = len(MODEL_FEATURE_MAP)
+    # If the vast majority of GENERAL models have errors (= no baseline exists),
+    # treat it as a forced full retrain to bootstrap the system automatically.
+    total        = len(GENERAL_MODELS)
     error_count  = len(report["models_with_errors"])
     if error_count > total * 0.8:
         print(
-            f"\nNo baseline found for {error_count}/{total} models. "
+            f"\nNo baseline found for {error_count}/{total} general models. "
             "This looks like a first-time run — forcing full initial training."
         )
-        models_to_retrain = list(MODEL_FEATURE_MAP.keys())
+        models_to_retrain = list(GENERAL_MODELS)
         any_drift         = True
         report["models_with_drift"]  = models_to_retrain
         report["any_drift_detected"] = True
@@ -232,37 +234,37 @@ def run_ks_tests(**context):
 
 def evaluate_drift_report(**context):
     """
-    Split models needing retraining into general vs specific buckets
-    for the parallel retrain tasks downstream.
+    Filter models needing retraining to general models only.
+
+    Specific models are retrained unconditionally on every pipeline run by
+    scheduled_batch_dag — they must not be drift-triggered here because they
+    are per-tenant and trained with tenant-specific data.
     """
     ti                = context["task_instance"]
     models_to_retrain = ti.xcom_pull(task_ids="run_ks_tests", key="models_to_retrain") or []
-    any_drift         = ti.xcom_pull(task_ids="run_ks_tests", key="any_drift")
 
-    general_retrain  = [m for m in models_to_retrain if m in GENERAL_MODELS]
-    specific_retrain = [m for m in models_to_retrain if m in SPECIFIC_MODELS]
+    general_retrain = [m for m in models_to_retrain if m in GENERAL_MODELS]
 
-    ti.xcom_push(key="general_retrain",  value=general_retrain)
-    ti.xcom_push(key="specific_retrain", value=specific_retrain)
+    ti.xcom_push(key="general_retrain", value=general_retrain)
 
     print(f"General models to retrain : {general_retrain}")
-    print(f"Specific models to retrain: {specific_retrain}")
+    print(f"(Specific models excluded — retrained unconditionally by scheduled_batch_dag)")
 
-    return bool(any_drift)
+    return bool(general_retrain)
 
 
 def should_retrain_callable(**context):
     """
-    ShortCircuit: return True to proceed with retraining, False to skip.
-    Reads the decision made by evaluate_drift_report via its return value.
+    ShortCircuit: proceed only if at least one general model needs retraining.
+    Specific models are excluded — they retrain unconditionally each pipeline run.
     """
-    ti        = context["task_instance"]
-    any_drift = ti.xcom_pull(task_ids="run_ks_tests", key="any_drift")
-    if not any_drift:
-        print("No drift detected and force_retrain not set. Skipping retraining.")
+    ti              = context["task_instance"]
+    general_retrain = ti.xcom_pull(task_ids="evaluate_drift_report", key="general_retrain") or []
+    if not general_retrain:
+        print("No general model drift detected. Skipping general model retraining.")
     else:
-        print("Drift detected (or forced). Proceeding with retraining.")
-    return bool(any_drift)
+        print(f"General models flagged for retraining: {general_retrain}")
+    return bool(general_retrain)
 
 
 def save_new_baselines(**context):
@@ -273,10 +275,10 @@ def save_new_baselines(**context):
     ti                = context["task_instance"]
     conf              = context["dag_run"].conf or {}
     bucket            = conf.get("bucket", ti.xcom_pull(task_ids="run_ks_tests", key="bucket") or BUCKET)
-    models_to_retrain = ti.xcom_pull(task_ids="run_ks_tests", key="models_to_retrain") or []
+    models_to_retrain = ti.xcom_pull(task_ids="evaluate_drift_report", key="general_retrain") or []
 
     if not models_to_retrain:
-        print("No models were retrained — no baselines to update.")
+        print("No general models were retrained — no baselines to update.")
         return
 
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -331,48 +333,34 @@ with DAG(
         python_callable=evaluate_drift_report,
     )
 
-    # ── 4. Gate: skip all downstream if no drift and not force_retrain ────
+    # ── 4. Gate: skip retraining if no general model drift detected ───────
     gate_retrain = ShortCircuitOperator(
         task_id="should_retrain",
         python_callable=should_retrain_callable,
         ignore_downstream_trigger_rules=True,
     )
 
-    # ── 5a. Retrain general models ─────────────────────────────────────────
-    retrain_general = BashOperator(
+    # ── 5. Retrain general models ──────────────────────────────────────────
+    # General models intentionally train on ALL tenant buckets (no --bucket-name arg).
+    # The triggering bucket only determines WHICH drift was detected; the retrain
+    # always uses the full cross-tenant dataset so the shared model stays accurate.
+    retrain_general = DockerOperator(
         task_id="retrain_general",
-        bash_command=_docker_exec(
-            "machine-learning/general/train.py",
-            "--bucket-name {{ params.bucket }}",
-        ),
+        image=PYTHON_IMAGE,
+        command=["python3", "/app/machine-learning/general/train.py"],
+        environment=docker_pipeline_env(),
+        network_mode=SPARK_NETWORK,
+        mounts=docker_app_mounts(),
+        auto_remove="force",
+        do_xcom_push=False,
+        mount_tmp_dir=False,
         execution_timeout=timedelta(hours=4),
     )
 
-    # ── 5b. Retrain specific models (parallel with general) ────────────────
-    retrain_specific = BashOperator(
-        task_id="retrain_specific",
-        bash_command=_docker_exec(
-            "machine-learning/specific/train.py",
-            "--bucket-name {{ params.bucket }}",
-        ),
-        execution_timeout=timedelta(hours=4),
-    )
-
-    # ── 6. Save updated drift baselines ───────────────────────────────────
+    # ── 6. Save updated drift baselines for retrained general models ───────
     save_baselines = PythonOperator(
         task_id="save_new_baselines",
         python_callable=save_new_baselines,
-        trigger_rule="all_done",   # run even if one retrain branch was skipped
-    )
-
-    # ── 7. Run inference with the freshly trained models ──────────────────
-    infer_after_retrain = BashOperator(
-        task_id="run_inference_after_retrain",
-        bash_command=_docker_exec(
-            "machine-learning/infer_all.py",
-            "--bucket-name {{ params.bucket }}",
-        ),
-        trigger_rule="all_done",
     )
 
     # ── Dependencies ───────────────────────────────────────────────────────
@@ -381,7 +369,6 @@ with DAG(
         >> ks_tests
         >> evaluate_drift
         >> gate_retrain
-        >> [retrain_general, retrain_specific]
+        >> retrain_general
         >> save_baselines
-        >> infer_after_retrain
     )

@@ -75,13 +75,34 @@ def create_spark_session():
     Returns:
         SparkSession: Configured Spark session
     """
-    spark = (
+    spark_master = os.getenv("SPARK_SERVER", "local[*]")
+    is_local = spark_master.startswith("local")
+
+    builder = (
         SparkSession.builder.appName("Cleaning")
-        .master(os.getenv("SPARK_SERVER", "local[*]"))
-        .config("spark.dynamicAllocation.enabled", "true")
-        .config("spark.dynamicAllocation.minExecutors", "0")
-        .config("spark.dynamicAllocation.maxExecutors", "8")
-        .config("spark.dynamicAllocation.initialExecutors", "1")
+        .master(spark_master)
+    )
+
+    if not is_local:
+        builder = (
+            builder
+            .config("spark.dynamicAllocation.enabled", "true")
+            .config("spark.dynamicAllocation.minExecutors", "0")
+            .config("spark.dynamicAllocation.initialExecutors", "1")
+        )
+    else:
+        builder = (
+            builder
+            .config("spark.dynamicAllocation.enabled", "false")
+            .config("spark.sql.shuffle.partitions", "4")
+        )
+
+    spark = (
+        builder
+        # Performance tuning
+        .config("spark.sql.adaptive.enabled", "true")
+        .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
+        .config("spark.sql.execution.arrow.pyspark.enabled", "true")
         # Use pre-downloaded local JARs — no Maven/internet access needed.
         .config("spark.jars", _CLEAN_JARS_STR)
         .config("spark.driver.extraClassPath", _CLEAN_CP)
@@ -108,6 +129,12 @@ def create_spark_session():
             "spark.sql.catalog.spark_catalog",
             "org.apache.spark.sql.delta.catalog.DeltaCatalog",
         )
+        # Write timestamps as MICROS to stay compatible with all readers.
+        .config("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS")
+        # Tolerate TIMESTAMP(NANOS,true) in Parquet files already on disk
+        # (written before this fix).  Reads nanos as a Long rather than
+        # raising "Illegal Parquet type: INT64 (TIMESTAMP(NANOS,true))".
+        .config("spark.sql.legacy.parquet.nanosAsLong", "true")
         .getOrCreate()
     )
     spark.sparkContext.setLogLevel("ERROR")

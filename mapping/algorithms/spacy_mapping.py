@@ -1,6 +1,15 @@
+import logging
 import spacy
 import re
 from pyspark.sql.functions import lit
+
+
+logger = logging.getLogger(__name__)
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    )
 
 
 def preprocess_column_name(column):
@@ -50,7 +59,12 @@ def spacy_column_mapping(df, missing_cols, extra_cols, mapped_cols, threshold=0.
                 best_match = extra_col
 
         if best_match:
-            print(f"spaCy Mapping: {best_match} -> {missing_col}: {best_score:.2f}")
+            logger.info(
+                "spaCy mapping | source=%s target=%s score=%.2f%%",
+                best_match,
+                missing_col,
+                best_score * 100,
+            )
             mapped_cols[missing_col] = best_match
             missing_cols.remove(missing_col)
             extra_cols.remove(best_match)

@@ -261,9 +261,15 @@ const Mapping = () => {
                         manualMappings[table] = {};
                     }
                     
-                    // Extract the actual column name from the selected value
+                    // Extract and preserve source table + column for backend mapping
                     const selectedValue = mappings[key];
-                    const actualColumn = typeof selectedValue === 'object' ? selectedValue.originalColumn : selectedValue;
+                    const sourceColumn = typeof selectedValue === 'object'
+                        ? (selectedValue.originalColumn || selectedValue.value)
+                        : selectedValue;
+                    const sourceTable = typeof selectedValue === 'object'
+                        ? (selectedValue.table || table)
+                        : table;
+                    const actualColumn = `"${sourceTable}"."${sourceColumn}"`;
                     
                     manualMappings[table][column] = actualColumn;
                 }
@@ -300,7 +306,21 @@ const Mapping = () => {
             }
         } catch (e) {
             console.error('Error saving mappings:', e);
-            setError(e.response?.data?.detail || 'Failed to process mappings. Please check your configuration and try again.');
+            const detail = e.response?.data?.detail;
+            if (typeof detail === 'string') {
+                setError(detail);
+            } else if (detail?.invalidMappings && Array.isArray(detail.invalidMappings) && detail.invalidMappings.length > 0) {
+                const firstFew = detail.invalidMappings.slice(0, 5).map(item => (
+                    `${item.targetTable}.${item.targetColumn} ← ${item.sourceTable}.${item.sourceColumn}`
+                ));
+                const extraCount = detail.invalidMappings.length - firstFew.length;
+                const summary = detail.message || 'Invalid cross-table mappings detected.';
+                setError(
+                    `${summary}\n${firstFew.join('\n')}${extraCount > 0 ? `\n...and ${extraCount} more` : ''}`
+                );
+            } else {
+                setError('Failed to process mappings. Please check your configuration and try again.');
+            }
             setMappingLoading(false);
         }
     };

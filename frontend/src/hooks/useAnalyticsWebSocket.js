@@ -20,6 +20,7 @@ export const useAnalyticsWebSocket = (businessId) => {
     const MAX_RECONNECT_ATTEMPTS = 5;
     const RECONNECT_DELAY = 3000; // 3 seconds
     const PING_INTERVAL = 30000; // 30 seconds
+    const MAX_UPDATES_HISTORY = 50;
     
     // Get WebSocket URL
     const getWebSocketUrl = useCallback((businessId) => {
@@ -95,7 +96,13 @@ export const useAnalyticsWebSocket = (businessId) => {
                         };
                         
                         setLastUpdate(update);
-                        setUpdates(prev => [...prev, update]);
+                        setUpdates(prev => {
+                            const next = [...prev, update];
+                            if (next.length <= MAX_UPDATES_HISTORY) {
+                                return next;
+                            }
+                            return next.slice(next.length - MAX_UPDATES_HISTORY);
+                        });
                     }
                 } catch (err) {
                     console.error('Error parsing analytics WebSocket message:', err);

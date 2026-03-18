@@ -240,7 +240,12 @@ async def get_all_analytics(
 
 
 @router.get("/data/{business_id}/category/{category}")
-async def get_category_analytics(business_id: str, category: str):
+async def get_category_analytics(
+    business_id: str,
+    category: str,
+    files: str = Query(None, description="Comma-separated analytics file names to include"),
+    row_limit: int = Query(None, ge=1, le=50000, description="Optional max rows per file"),
+):
     """
     Fetch analytics for a specific category.
     
@@ -255,8 +260,15 @@ async def get_category_analytics(business_id: str, category: str):
         GET /analytics/data/business_123/category/customer_acquisition
     """
     try:
-        result = await analytics_service.fetch_category_analytics(business_id, category)
-        return result
+        requested_files = [f.strip() for f in files.split(",") if f.strip()] if files else None
+        result = await analytics_service.fetch_category_analytics(
+            business_id,
+            category,
+            file_names=requested_files,
+            row_limit=row_limit,
+        )
+        json_str = json.dumps(result, cls=AnalyticsJSONEncoder, allow_nan=False)
+        return Response(content=json_str, media_type="application/json")
         
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -389,7 +401,11 @@ async def analytics_websocket(websocket: WebSocket, business_id: str):
             "total_files": 2
         }
     """
-    await websocket_manager.connect(websocket, business_id)
+    try:
+        await websocket_manager.connect(websocket, business_id)
+    except RuntimeError as exc:
+        print(f"Analytics WebSocket connect skipped for {business_id}: {exc}")
+        return
     
     # Start monitoring this business's analytics if not already monitoring
     watcher = get_analytics_watcher()
@@ -422,8 +438,13 @@ async def analytics_websocket(websocket: WebSocket, business_id: str):
     except WebSocketDisconnect:
         websocket_manager.disconnect(websocket, business_id)
         print(f"Analytics WebSocket disconnected for business {business_id}")
-        
-        # Stop monitoring if no more connections for this business
+    except RuntimeError as exc:
+        websocket_manager.disconnect(websocket, business_id)
+        print(f"Analytics WebSocket closed for business {business_id}: {exc}")
+    except Exception as exc:
+        websocket_manager.disconnect(websocket, business_id)
+        print(f"Analytics WebSocket error for business {business_id}: {exc}")
+    finally:
         if websocket_manager.get_connection_count(business_id) == 0 and watcher:
             watcher.stop_monitoring(business_id)
             print(f"Stopped analytics monitoring for business {business_id} (no more connections)")

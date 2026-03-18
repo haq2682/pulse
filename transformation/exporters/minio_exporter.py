@@ -1,10 +1,20 @@
 import os
 from minio import Minio
-from minio.commonconfig import CopySource
 from .schema_enforcer_parquet import (
     enforce_schema_with_types, 
     get_expected_schema
 )
+
+
+def _is_df_empty(df):
+    """
+    JVM-side emptiness check to avoid expensive Python RDD conversion.
+    Falls back to a minimal LIMIT 1 action when needed.
+    """
+    try:
+        return bool(df._jdf.isEmpty())
+    except Exception:
+        return df.limit(1).count() == 0
 
 
 def parse_minio_endpoint(endpoint_url):
@@ -116,13 +126,17 @@ def export_to_minio(dataframes, bucket_name=None, sql_schema_path=None,
     failed = 0
     schema_enforced = 0
     
+    # Full row counting can be very expensive on large aggregation outputs and
+    # may trigger JVM heap pressure. Keep it opt-in for diagnostics only.
+    log_row_counts = os.getenv("EXPORT_LOG_ROW_COUNTS", "false").lower() == "true"
+
     for df_name, table_name in TABLE_MAPPINGS.items():
         if df_name in dataframes and dataframes[df_name] is not None:
             try:
                 df = dataframes[df_name]
-                row_count = df.count()
-                
-                if row_count == 0:
+
+                # Lightweight emptiness check without javaToPython() conversion.
+                if _is_df_empty(df):
                     print(f"  ⭕ {table_name}: Skipped (empty)")
                     continue
                 
@@ -142,48 +156,36 @@ def export_to_minio(dataframes, bucket_name=None, sql_schema_path=None,
                     else:
                         print(f"  ⚠️  {table_name}: No schema definition found, exporting as-is")
                 
-                # Write to temporary Spark location in MinIO
-                temp_path = f"s3a://{bucket_name}/temp_{table_name}"
-                
-                df.coalesce(1).write \
-                    .mode("overwrite") \
-                    .option("compression", compression) \
-                    .parquet(temp_path)
-                
-                # Find the parquet file in the temp directory
-                temp_objects = list(minio_client.list_objects(
-                    bucket_name, 
-                    prefix=f"temp_{table_name}/", 
-                    recursive=True
-                ))
-                
-                parquet_file = next(
-                    (obj for obj in temp_objects if obj.object_name.endswith(".parquet")), 
-                    None
+                # Write directly to the final parquet directory in MinIO.
+                # Avoid coalesce(1), which can force all data through a single
+                # partition and cause executor/driver OOM on larger datasets.
+                final_path = f"s3a://{bucket_name}/transformed/{table_name}.parquet"
+
+                (df.write
+                   .mode("overwrite")
+                   .option("compression", compression)
+                   .parquet(final_path))
+
+                # Calculate total written parquet size under this directory
+                object_prefix = f"transformed/{table_name}.parquet/"
+                written_objects = list(
+                    minio_client.list_objects(bucket_name, prefix=object_prefix, recursive=True)
                 )
-                
-                if parquet_file:
-                    final_path = f"transformed/{table_name}.parquet"
-                    
-                    minio_client.copy_object(
-                        bucket_name,
-                        final_path,
-                        CopySource(bucket_name, parquet_file.object_name)
-                    )
-                    
-                    # Clean up temp files
-                    for obj in temp_objects:
-                        minio_client.remove_object(bucket_name, obj.object_name)
-                    
-                    # Get file size for reporting
-                    stat = minio_client.stat_object(bucket_name, final_path)
-                    file_size_mb = stat.size / (1024 * 1024)
-                    
-                    print(f"  ✅ {table_name}: {row_count:,} rows saved ({file_size_mb:.2f} MB)")
-                else:
-                    print(f"  ⚠️  {table_name}: Parquet file not found in temp directory")
+                parquet_objects = [obj for obj in written_objects if obj.object_name.endswith(".parquet")]
+
+                if not parquet_objects:
+                    print(f"  ⚠️  {table_name}: No parquet part files found after write")
                     failed += 1
                     continue
+
+                total_bytes = sum(obj.size for obj in parquet_objects)
+                file_size_mb = total_bytes / (1024 * 1024)
+
+                if log_row_counts:
+                    row_count = df.count()
+                    print(f"  ✅ {table_name}: {row_count:,} rows saved ({file_size_mb:.2f} MB)")
+                else:
+                    print(f"  ✅ {table_name}: saved ({file_size_mb:.2f} MB)")
                 
                 successful += 1
                 

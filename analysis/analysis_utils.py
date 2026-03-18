@@ -80,23 +80,31 @@ def get_agg_tables(spark, db_config=None, bucket_name=None):
         print(f"Loading aggregated tables from MinIO bucket: {bucket_name}")
         print(f"Directory: transformed/")
         
-        # List all CSV files in the transformed/ directory
+        # List all parquet objects in transformed/ (supports both single-file
+        # and directory-style parquet outputs).
         objects = minio_client.list_objects(bucket_name, prefix="transformed/", recursive=True)
         
         spark_dfs = {}
-        tables_found = []
+        tables_found = set()
+        log_row_counts = os.getenv("ANALYSIS_LOG_ROW_COUNTS", "false").lower() == "true"
         
         for obj in objects:
             if not obj.object_name.endswith(".parquet"):
                 continue
-                
-            # Extract table name from path: transformed/{table_name}.parquet
-            table_name = obj.object_name.replace("transformed/", "").replace(".parquet", "")
-            tables_found.append(table_name)
+
+            # Handle both layouts:
+            # 1) transformed/{table_name}.parquet                (single object)
+            # 2) transformed/{table_name}.parquet/part-*.parquet (directory)
+            rel = obj.object_name.replace("transformed/", "", 1)
+            root = rel.split("/", 1)[0]
+            if root.endswith(".parquet"):
+                table_name = root[:-8]
+                if table_name:
+                    tables_found.add(table_name)
         
-        print(f"Found tables: {tables_found}")
+        print(f"Found tables: {sorted(tables_found)}")
         
-        for table_name in tables_found:
+        for table_name in sorted(tables_found):
             try:
                 file_path = f"transformed/{table_name}.parquet"
                 print(f"Loading table: {table_name}...")
@@ -109,7 +117,10 @@ def get_agg_tables(spark, db_config=None, bucket_name=None):
                 )
                 
                 spark_dfs[table_name] = df
-                print(f"  ✅ Loaded {table_name}: {df.count()} rows")
+                if log_row_counts:
+                    print(f"  ✅ Loaded {table_name}: {df.count()} rows")
+                else:
+                    print(f"  ✅ Loaded {table_name}")
                 
             except Exception as e:
                 print(f"  ❌ Error loading {table_name}: {e}")

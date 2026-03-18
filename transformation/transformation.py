@@ -6,7 +6,6 @@ from config.spark_config import create_spark_session
 from config.minio_config import create_minio_client, BUCKET_NAME
 from loaders.data_loader import load_data_from_minio
 from exporters.minio_exporter import export_to_minio
-from exporters.minio_exporter import export_to_minio
 from transformations.campaigns import transform_campaigns
 from transformations.carts import transform_carts
 from transformations.customer_sessions import transform_customer_sessions
@@ -21,7 +20,7 @@ from aggregations.cart_abandonment import cart_abandonment_aggregations
 from aggregations.categories import aggregate_categories
 from aggregations.customers import aggregate_customers
 from aggregations.geographic import geographic_aggregations
-from aggregations.global_aggregations import global_aggregations
+# from aggregations.global_aggregations import global_aggregations
 from aggregations.inventory_health import inventory_health_aggregations
 from aggregations.product_affinity import product_affinity
 from aggregations.products import aggregate_products
@@ -74,7 +73,7 @@ def main(bucket_name=None):
     inventory_health_aggregations(dataframes)
     rfm_segmentation(dataframes)
     product_affinity(dataframes)
-    global_aggregations(spark, dataframes)
+    # global_aggregations(spark, dataframes)
     
     if "order_items" in dataframes and dataframes["order_items"] is not None:
         dataframes["order_items"] = dataframes["order_items"].dropDuplicates(

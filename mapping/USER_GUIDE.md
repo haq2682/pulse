@@ -163,25 +163,28 @@ python run_mapping.py
 
 **What happens:**
 1. Polls the API endpoint every configured interval
-2. Expects JSON response with structure: `{"tables": [{"name": "...", "data": [...]}]}`
-3. Maps table names to canonical schema
-4. Streams data to Kafka topics
-5. Spark Streaming consumes from Kafka, applies mapping
-6. Saves normalized results to `pulse-bucket-1/mapped/` as CSV files
+2. After the first (baseline) poll, appends `?updated_since=<ISO8601>` to subsequent requests so only new/modified records are transferred
+3. The `updated_since` watermark is persisted in Redis (`api_last_poll:{bucket_name}`) — survives restarts
+4. Maps table names to canonical schema via fuzzy matching
+5. Streams data to Kafka topics
+6. Spark Streaming consumes from Kafka, applies mapping
+7. Saves normalized results to `pulse-bucket-1/mapped/` as Parquet files
+
+**Incremental polling:** On the first run Pulse fetches all data (baseline). On every subsequent poll it sends `updated_since` with the start timestamp of the previous successful poll.  Configure your API endpoint to filter records by this timestamp to avoid redundant data transfer.  If the API ignores the parameter, all records are returned and downstream deduplication handles the overlap safely.
 
 **Expected API Response Format:**
 ```json
 {
   "tables": [
     {
-      "name": "customers",
+      "table_name": "customers",
       "data": [
         {"customer_id": "C001", "name": "John Doe", "email": "john@example.com"},
         {"customer_id": "C002", "name": "Jane Smith", "email": "jane@example.com"}
       ]
     },
     {
-      "name": "products",
+      "table_name": "products",
       "data": [
         {"product_id": "P001", "name": "Widget", "price": 19.99},
         {"product_id": "P002", "name": "Gadget", "price": 29.99}
@@ -190,6 +193,8 @@ python run_mapping.py
   ]
 }
 ```
+
+> **Note:** Use `table_name` (not `name`) — see `API_AND_FILE_INGESTION_GUIDE.md` for the full validation contract.
 
 ## Architecture
 
@@ -303,7 +308,13 @@ bucket-name/
 **Solution:** Check API URL and network connectivity
 
 **Problem:** Invalid JSON response  
-**Solution:** Ensure API returns the expected format (see example above)
+**Solution:** Ensure API returns the expected format with `table_name` (not `name`) — see `API_AND_FILE_INGESTION_GUIDE.md`
+
+**Problem:** Full dataset fetched every poll (no incremental filtering)  
+**Solution:** Confirm Redis is running (`docker ps | grep redis`) and that `REDIS_HOST`/`REDIS_PORT` are set correctly.  Also ensure your API endpoint filters by the `updated_since` query parameter.  If Redis is unavailable, Pulse falls back to full polls automatically — no data loss occurs.
+
+**Problem:** Duplicate rows after a re-deployment  
+**Solution:** Redis watermark is preserved across restarts by design.  If the watermark was lost (Redis was wiped), Pulse re-fetches the baseline and downstream Delta MERGE deduplicates by primary key — no action required.
 
 ### General Issues
 

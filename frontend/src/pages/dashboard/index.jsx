@@ -389,7 +389,8 @@ const Dashboard = () => {
 
     const handleBusinessChange = (e) => {
         setSelectedBusiness(e.value);
-        setBusinessIngestionType(e.option?.ingestion_type || null);
+        const business = businesses.find(b => b.business_id === e.value);
+        setBusinessIngestionType(business?.ingestion_type || null);
         navigate(`/analytics/${e.value}`);
     }
 
@@ -433,6 +434,7 @@ const Dashboard = () => {
 
         const status = contextPipelineStatus?.status;
         if (status === 'running') {
+            setStreamingError(false);
             setPipelineStatus('running');
         } else if (status === 'completed') {
             // Update immediately so the Knob is suppressed for any subsequent microbatch
@@ -447,15 +449,11 @@ const Dashboard = () => {
             statusTimeoutRef.current = setTimeout(() => setPipelineStatus('idle'), 3000);
         } else if (status === 'failed') {
             setPipelineStatus('failed');
-            // Only show the error banner when analytics are already displayed (subsequent batch)
+            // Show the error banner only when analytics are already displayed (subsequent batch).
+            // For the first batch, InlinePipelineProgress shows the full Knob error UI instead.
+            // The indicator stays red until the user manually retries — no auto-reset.
             if (pipelineCompletedBeforeRef.current) {
                 setStreamingError(true);
-                // Do NOT auto-reset; user must manually retry via the arrow button
-            } else {
-                // First batch: InlinePipelineProgress shows the full Knob error UI.
-                // Auto-reset the header indicator so it doesn't stay red indefinitely.
-                if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
-                statusTimeoutRef.current = setTimeout(() => setPipelineStatus('idle'), 5000);
             }
         }
     }, [contextPipelineStatus?.status, businessIngestionType]);
@@ -467,6 +465,67 @@ const Dashboard = () => {
             if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
         };
     }, []);
+
+    // Poll the streaming-health endpoint every 30 s to detect when the source DB
+    // or external API goes offline (connector_status: 'stopped' → gray indicator).
+    // Only active for db/api ingestion modes.  Never overrides an authoritative
+    // 'running' or 'failed' state that arrived via the pipeline WebSocket.
+    useEffect(() => {
+        const isStreamingMode = businessIngestionType === 'db' || businessIngestionType === 'api';
+        if (!businessId || !isStreamingMode) return;
+
+        const checkHealth = async () => {
+            try {
+                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+                // Run both checks in parallel: connector health + pipeline status.
+                const [healthResp, statusResp] = await Promise.allSettled([
+                    fetch(`${apiUrl}/pipeline/streaming-health?business_id=${businessId}`),
+                    axiosInstance.get('/pipeline/status', { params: { business_id: businessId } }),
+                ]);
+
+                // Determine whether there is an active scheduled-batch (or any) run.
+                const scheduledRunning =
+                    statusResp.status === 'fulfilled' &&
+                    statusResp.value?.data?.pipeline_status === 'running';
+
+                if (healthResp.status !== 'fulfilled' || !healthResp.value.ok) {
+                    // Health endpoint unreachable — still reflect scheduled-batch state.
+                    if (scheduledRunning) {
+                        setPipelineStatus(prev => (prev === 'failed' ? prev : 'running'));
+                    }
+                    return;
+                }
+
+                const data = await healthResp.value.json();
+                if (data.connector_status === 'unknown') return; // transient — no change
+
+                setPipelineStatus(prev => {
+                    // A running scheduled-batch (or batch_downstream) should show
+                    // the rotating spinner regardless of connector health.
+                    if (scheduledRunning) return 'running';
+                    // 'failed' is sticky only when nothing is actively running.
+                    if (prev === 'failed') return prev;
+                    // Connector offline overrides idle/success states.
+                    if (data.connector_status === 'stopped') return 'disconnected';
+                    // Keep WS-driven 'running' (from batch_downstream) — the WS
+                    // will transition it to idle/success when the DAG completes.
+                    if (prev === 'running') return prev;
+                    return 'idle';
+                });
+
+                if (scheduledRunning) {
+                    setStreamingError(false);
+                }
+            } catch {
+                // Silently ignore transient network errors.
+            }
+        };
+
+        checkHealth(); // immediate check on mount / business change
+        const intervalId = setInterval(checkHealth, 30_000);
+        return () => clearInterval(intervalId);
+    }, [businessId, businessIngestionType]);
     
     // Handle starting analysis
     const handleStartAnalysis = async () => {
@@ -571,19 +630,8 @@ const Dashboard = () => {
     }) => {
 
         const getStatusConfig = () => {
-            if (ingestionType === 'batch') {
-            return {
-                borderColor: 'border-purple-500',
-                dotColor: 'bg-purple-500',
-                glow: 'shadow-[0_0_5px_2px_rgba(168,85,247,0.7)]',
-                text: 'Batch',
-                showRefresh: false,
-                rotating: false,
-                disabled: false,
-                pulse: true
-            };
-            }
-
+            // Note: 'batch' mode is rendered separately in the JSX using an inline
+            // static purple tag — this component is only ever called for 'db'/'api'.
             const text = ingestionType === 'api' ? 'API' : 'Database';
 
             if (pipelineStatus === 'running') {
@@ -609,6 +657,19 @@ const Dashboard = () => {
                 rotating: false,
                 disabled: false,
                 pulse: true
+            };
+            }
+
+            if (pipelineStatus === 'disconnected') {
+            return {
+                borderColor: 'border-gray-400',
+                dotColor: 'bg-gray-400',
+                glow: 'shadow-[0_0_5px_2px_rgba(156,163,175,0.6)]',
+                text,
+                showRefresh: true,
+                rotating: false,
+                disabled: false,
+                pulse: false
             };
             }
 
@@ -934,7 +995,15 @@ const Dashboard = () => {
                             Dashboard
                         </Heading>
                         {/* Ingestion Status Indicator */}
-                        {businessId && businessIngestionType && (
+                        {/* Batch mode: always shows a static purple "Batch" tag — no pipeline state machine */}
+                        {businessId && businessIngestionType === 'batch' && (
+                            <div className="border-2 border-purple-500 rounded-lg px-3 py-2 flex items-center gap-2 transition-all duration-300">
+                                <div className="w-2.5 h-2.5 rounded-full bg-purple-500 shadow-[0_0_5px_2px_rgba(168,85,247,0.7)] animate-pulse transition-all duration-300" />
+                                <span className="text-sm font-medium text-gray-700">Batch</span>
+                            </div>
+                        )}
+                        {/* DB / API streaming modes: shows live pipeline state (running/failed/disconnected/idle) */}
+                        {businessId && (businessIngestionType === 'db' || businessIngestionType === 'api') && (
                             <IngestionStatusIndicator 
                                 ingestionType={businessIngestionType}
                                 pipelineStatus={pipelineStatus}
@@ -1091,8 +1160,9 @@ const Dashboard = () => {
                                 ingestionType={businessIngestionType}
                                 pipelineCompletedBefore={pipelineCompletedBefore || contextPipelineEverCompleted}
                             />
-                            {/* Error banner for streaming-mode subsequent-batch failures */}
-                            {streamingError && (
+                            {/* Error banner for streaming-mode subsequent-batch failures.
+                                Only shown when analytics are already visible (i.e. ever-completed). */}
+                            {(pipelineCompletedBefore || contextPipelineEverCompleted) && streamingError && (
                                 <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-300 rounded-lg flex items-center gap-3">
                                     <i className="pi pi-exclamation-circle text-red-500 text-lg flex-shrink-0" />
                                     <span className="text-red-700 text-sm font-medium">
@@ -1107,8 +1177,10 @@ const Dashboard = () => {
                                     </button>
                                 </div>
                             )}
-                            {/* Render appropriate analytics content based on route */}
-                            {renderAnalyticsContent()}
+                            {/* Analytics content: only rendered once the pipeline has ever
+                                completed.  Prevents analytics loaders from appearing while
+                                the first-ever batch is still running or has failed. */}
+                            {(pipelineCompletedBefore || contextPipelineEverCompleted) && renderAnalyticsContent()}
                         </CurrencyProvider>
                     ) : (
                         <div className="flex items-center justify-center min-h-[60vh]">

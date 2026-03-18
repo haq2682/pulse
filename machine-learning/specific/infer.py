@@ -16,12 +16,14 @@ from specific.inference.regression.infer_seasonal_trends import main as seasonal
 
 from specific.inference.clustering.infer_product_affinity import main as product_affinity
 from specific.inference.clustering.infer_product_lifecycle import main as product_lifecycle
-from specific.train import main as train_all
 
-def main(BUCKET_NAME, first_batch=False):
-    if first_batch:
-        train_all(BUCKET_NAME)
+def main(BUCKET_NAME):
+    """Run inference for all specific models.
 
+    Assumes specific models are already trained (e.g., by specific/train.py,
+    which runs as a dedicated step in batch_downstream_dag and
+    scheduled_batch_dag before this function is called).
+    """
     fulfillment_risk(BUCKET_NAME)
     product_bundling(BUCKET_NAME)
 

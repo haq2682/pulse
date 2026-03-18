@@ -15,6 +15,7 @@ This script orchestrates the complete data cleaning process including:
 """
 
 import argparse
+import re as _re
 from cleaning_config import create_spark_session, create_minio_client, get_bucket_name
 from schema import cast_dataframes
 from merge import merge_tables
@@ -46,6 +47,17 @@ from cleaning_utils import (
 )
 from incremental_cleaner import IncrementalCleaner
 from pyspark.sql.functions import regexp_extract, col, when
+
+
+def _batch_id_from_path(partition_path: str):
+    """
+    Extract the integer ``_batch_id`` value from a partition directory path.
+
+    Example: ``"mapped/orders/_batch_id=5/"`` → ``5``
+    Returns ``None`` if the path does not contain a ``_batch_id=N`` segment.
+    """
+    m = _re.search(r"_batch_id=(\d+)", partition_path)
+    return int(m.group(1)) if m else None
 
 
 def _expand_to_partition_paths(minio_client, bucket_name, file_paths):
@@ -120,8 +132,8 @@ def main(bucket_name=None, incremental=True, force_full=False):
     cleaner = None
     if incremental:
         print("\n📌 Step 1a: Initializing incremental cleaner...")
-        cleaner = IncrementalCleaner()
-        
+        cleaner = IncrementalCleaner(bucket_name=bucket_name)
+
         if force_full:
             print("⚠️  Force full mode: Resetting state table...")
             cleaner.reset_state()
@@ -174,10 +186,24 @@ def main(bucket_name=None, incremental=True, force_full=False):
             print("\n✅ No new files to process. Cleaning pipeline complete!")
             spark.stop()
             return
+
+        # Build {table_name → set(batch_id_int)} for partition-aware loading.
+        # Only includes the unprocessed _batch_id=N partitions, so the loader
+        # reads ONLY those rows instead of the full historical table.
+        new_batch_ids_by_table = {}
+        for table_path, parts in partitions_by_table.items():
+            new_parts = [p for p in parts if p in unprocessed_partitions]
+            if not new_parts:
+                continue
+            tname = table_path.rstrip("/").split("/")[-1].replace(".csv", "")
+            batch_ids = {_batch_id_from_path(p) for p in new_parts if _batch_id_from_path(p) is not None}
+            # None means no _batch_id segments found (e.g. CSV) → loader does full read
+            new_batch_ids_by_table[tname] = batch_ids if batch_ids else None
     else:
         file_paths_to_process = all_file_paths
         unprocessed_partitions = set()
         partitions_by_table = {}
+        new_batch_ids_by_table = None
     
     # Extract table names from file paths.
     # Paths can be either:
@@ -191,7 +217,8 @@ def main(bucket_name=None, incremental=True, force_full=False):
     print(f"   Processing {len(tables_to_process)} tables: {', '.join(tables_to_process)}")
 
     dataframes, processed_file_paths = load_data_from_minio(
-        spark, minio_client, bucket_name, tables_to_process, folder="mapped"
+        spark, minio_client, bucket_name, tables_to_process, folder="mapped",
+        new_batch_ids_by_table=new_batch_ids_by_table,
     )
     # print(f"✅ Loaded {len(dataframes)} tables")
 
@@ -221,9 +248,7 @@ def main(bucket_name=None, incremental=True, force_full=False):
     dataframes = merge_tables(dataframes, spark)
 
     # 5. Handle duplicates
-    print("\n📌 Step 5: Checking for duplicates...")
-    check_duplicates(dataframes)
-    print("\n📌 Step 5a: Removing duplicates...")
+    print("\n📌 Step 5: Removing duplicates...")
     dataframes = drop_duplicates(dataframes)
     print("✅ Duplicates removed")
 
@@ -232,9 +257,8 @@ def main(bucket_name=None, incremental=True, force_full=False):
     dataframes = drop_null_keys(dataframes)
     print("✅ Null keys handled")
 
-    # 7. Check null values
-    print("\n📌 Step 7: Checking null values...")
-    check_nulls(dataframes)
+    # 7. Check null values — skipped in pipeline (pure diagnostic)
+    # check_nulls(dataframes)
 
     # 8. Fill null values in non-numeric columns
     print("\n📌 Step 8: Filling null values in non-numeric columns...")
@@ -246,9 +270,8 @@ def main(bucket_name=None, incremental=True, force_full=False):
     dataframes = impute_all_numeric(dataframes)
     print("✅ Numeric values imputed")
 
-    # 10. Check nulls after imputation
-    print("\n📌 Step 10: Final null check...")
-    check_nulls(dataframes)
+    # 10. Check nulls after imputation — skipped in pipeline (pure diagnostic)
+    # check_nulls(dataframes)
 
     # 11. Remove outliers
     print("\n📌 Step 11: Removing outliers...")
@@ -277,21 +300,19 @@ def main(bucket_name=None, incremental=True, force_full=False):
     # 17. Clean mixed scripts and non-ASCII characters
     print("\n📌 Step 17: Cleaning mixed scripts and non-ASCII characters...")
     dataframes = clean_mixed_scripts(dataframes)
-    # 18. Final data validation
-    print("\n📌 Step 18: Running final data validation...")
-    dataframes = validate_all_cleaned_data(dataframes)
+    # 18. Final data validation — skipped in pipeline (pure diagnostic, multiple count() per column)
+    # dataframes = validate_all_cleaned_data(dataframes)
 
     # 19. Convert currency columns
     print("\n📌 Step 19: Converting currency columns...")
     dataframes = convert_currency_columns(dataframes, bucket_name)
 
-    # 20. Display summary
-    print("\n📌 Step 20: Generating summary...")
-    display_summary(dataframes)
+    # 20. Display summary — skipped in pipeline (triggers df.count() per table)
+    # display_summary(dataframes)
 
     # 21. Save cleaned data
     print("\n📌 Step 21: Saving cleaned data to MinIO...")
-    save_data_to_minio(dataframes, minio_client, bucket_name)
+    save_data_to_minio(dataframes, minio_client, bucket_name, incremental=incremental)
 
     # 21a. Mark files as processed if in incremental mode
     if incremental and cleaner:
@@ -299,8 +320,8 @@ def main(bucket_name=None, incremental=True, force_full=False):
         file_records = {}
         for table_name, file_path in processed_file_paths.items():
             if table_name in dataframes:
-                spark_df = dataframes[table_name]
-                record_count = spark_df.count()
+                # Skip the df.count() — purely informational metadata, not worth a Spark action
+                record_count = None
                 # Mark the specific _batch_id=N partition paths that were new (not the
                 # table-level directory) so the next arriving _batch_id is detected.
                 new_parts = [

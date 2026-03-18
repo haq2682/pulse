@@ -4,12 +4,11 @@ Trains multiple regression models to predict customer lifetime value
 """
 
 import os
+
 import sys
 import findspark
 from dotenv import load_dotenv
-
-findspark.init()
-
+from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from utils.multi_bucket_loader import (
@@ -19,6 +18,14 @@ from utils.multi_bucket_loader import (
     get_training_window,
     GENERAL_MODEL_BUCKET
 )
+
+# Import spark_utils FIRST to set up JARs before pyspark imports
+_ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
+if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT_VAR))
+
+from spark_utils import create_ml_spark_session
+
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
@@ -57,35 +64,15 @@ TARGET_COLUMN = "customer_lifetime_value"
 
 
 def create_spark_session():
-    """Initialize Spark session with MinIO configuration"""
-    return (
-        SparkSession.builder
-        .appName("CLV_Model_Training")
-        .master(os.getenv("SPARK_SERVER", "local[*]"))
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        )
-        .config("spark.dynamicAllocation.enabled", "true")
-        .config("spark.dynamicAllocation.minExecutors", "0")
-        .config("spark.dynamicAllocation.maxExecutors", "1000")
-        .config("spark.dynamicAllocation.initialExecutors", "1")
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        )
-        .config("inferSchema", "true")
-        .config("mergeSchema", "true")
-        .getOrCreate()
+    """Initialize Spark session"""
+    return create_ml_spark_session(
+        "CLV_Model_Training",
+        extra_configs={
+                    "spark.sql.shuffle.partitions": "8",
+                    "inferSchema": "true",
+                    "mergeSchema": "true"
+                },
     )
-
-
 def validate_dataset(spark, path):
     """Check if dataset exists and is readable"""
     try:

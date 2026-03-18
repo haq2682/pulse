@@ -42,12 +42,18 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis, ingestionType, pi
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [businessId]); // Only depend on businessId to prevent reconnection loops
-    
+
+    // Once the first batch has ever completed successfully, this overlay must
+    // never be shown again for any reason (subsequent microbatches, retries,
+    // failures).  The IngestionStatusIndicator in the header handles all
+    // subsequent state changes; the analytics views stay fully visible.
+    if (pipelineCompletedBefore) return null;
+
     // Get progress percentage
     const progress = pipelineStatus?.progress || 0;
     
     // Determine pipeline state
-    const businessLoading = !pipelineStatus && !errorMessage || pipelineStatus === 'loading';
+    const businessLoading = pipelineStatus === 'loading';
     const isRunning = pipelineStatus?.status === 'running';
     // const isCompleted = pipelineStatus?.status === 'completed';
     const isFailed = pipelineStatus?.status === 'failed';
@@ -56,12 +62,6 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis, ingestionType, pi
     // In streaming modes (db/api), the analytics remain visible while the pipeline
     // processes a new microbatch.  Only the header circular arrow should rotate — the
     // Knob/progress overlay must not block the dashboard.
-    const isStreamingMode = ingestionType === 'db' || ingestionType === 'api';
-
-    // Suppress the full-screen Knob only for SUBSEQUENT streaming batches
-    // (when the first pipeline has already completed and analytics are visible).
-    const suppressForStreamingSubsequent = isStreamingMode && pipelineCompletedBefore;
-    
     // Get status color
     const getStatusColor = () => {
         if (!pipelineStatus) return 'var(--color-g2)';
@@ -187,9 +187,6 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis, ingestionType, pi
     
     // Show pipeline in progress
     if (isRunning) {
-        // Subsequent streaming batches: analytics stay visible, only header arrow rotates.
-        if (suppressForStreamingSubsequent) return null;
-
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
                 <div className="text-center max-w-2xl">
@@ -295,9 +292,6 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis, ingestionType, pi
     
     // Show failed status with retry button
     if (isFailed) {
-        // Subsequent streaming batches: dashboard shows the error banner instead.
-        if (suppressForStreamingSubsequent) return null;
-
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
                 <div className="text-center max-w-2xl">

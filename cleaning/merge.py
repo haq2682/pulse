@@ -39,7 +39,7 @@ def merge_tables(dataframes, spark):
         dataframes["products"].createOrReplaceTempView("products")
 
         products = spark.sql("""
-        SELECT p.product_id, p.product_name, p.sku, cat.category_name, cat.sub_category,
+        SELECT p.product_id, p.product_name, p.sku, cat.category, cat.sub_category,
               p.brand, p.supplier_id, p.cost_price, p.sell_price, p.launch_date,
               p.weight, p.dimensions, p.color, p.size, p.material
         FROM products p

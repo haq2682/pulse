@@ -1,6 +1,15 @@
+import logging
 from sentence_transformers import SentenceTransformer, util
 import torch
 from pyspark.sql.functions import lit
+
+
+logger = logging.getLogger(__name__)
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    )
 
 # Load model globally to avoid reloading
 roberta = SentenceTransformer("all-MiniLM-L12-v2")
@@ -30,8 +39,11 @@ def roberta_similarity(df, missing_cols, extra_cols, mapped_cols, threshold=0.87
         best_match = extra_cols[best_idx]
 
         if best_score >= threshold:
-            print(
-                f"BERT Mapping: {best_match} -> {missing_col} (score={best_score:.2f})"
+            logger.info(
+                "BERT mapping | source=%s target=%s score=%.2f%%",
+                best_match,
+                missing_col,
+                best_score * 100,
             )
             mapped_cols[missing_col] = best_match
             missing_cols.remove(missing_col)

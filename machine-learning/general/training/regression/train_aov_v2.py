@@ -3,12 +3,11 @@ Average Order Value (AOV) Prediction - FIXED Training Script
 """
 
 import os
+
 import sys
 import findspark
 from dotenv import load_dotenv
-
-findspark.init()
-
+from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from utils.multi_bucket_loader import (
@@ -19,10 +18,19 @@ from utils.multi_bucket_loader import (
     GENERAL_MODEL_BUCKET
 )
 
+# Import spark_utils FIRST to set up JARs before pyspark imports
+_ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
+if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT_VAR))
+
+from spark_utils import create_ml_spark_session
+
+
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 from pyspark.ml.feature import VectorAssembler, StandardScaler, StringIndexer
+from pyspark.ml.functions import vector_to_array
 from pyspark.ml.regression import LinearRegression, RandomForestRegressor, GBTRegressor
 from pyspark.ml.evaluation import RegressionEvaluator
 from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
@@ -127,34 +135,14 @@ TARGET_COLUMN = "next_order_value"
 
 def create_spark_session():
     """Initialize Spark session"""
-    return (
-        SparkSession.builder
-        .appName("AOV_Prediction_Fixed_Training")
-        .master(os.getenv("SPARK_SERVER", "local[*]"))
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        )
-        .config("spark.dynamicAllocation.enabled", "true")
-        .config("spark.dynamicAllocation.minExecutors", "0")
-        .config("spark.dynamicAllocation.maxExecutors", "1000")
-        .config("spark.dynamicAllocation.initialExecutors", "1")
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        )
-        .config("inferSchema", "true")
-        .config("mergeSchema", "true")
-        .getOrCreate()
+    return create_ml_spark_session(
+        "AOV_Prediction_Fixed_Training",
+        extra_configs={
+                    "spark.sql.shuffle.partitions": "8",
+                    "inferSchema": "true",
+                    "mergeSchema": "true"
+                },
     )
-
-
 def validate_dataset(spark, path, name):
     """Check if dataset exists"""
     try:
@@ -224,10 +212,18 @@ def create_enhanced_features(customers_df, orders_df, order_items_df, products_d
     
     print(f"Filtered orders: {orders_filtered.count()} delivered orders")
     
-    # Join orders with order_items and products
+    # Join orders with order_items (bucket-scoped to prevent cross-tenant order_id collisions)
+    # and products (product catalog is treated as tenant-agnostic enrichment, no bucket constraint)
+    _has_bucket = "_source_bucket" in orders_filtered.columns
+    _oi_has_bucket = "_source_bucket" in order_items_df.columns
+
+    _orders_oi_cond = F.col("o.order_id") == F.col("oi.order_id")
+    if _has_bucket and _oi_has_bucket:
+        _orders_oi_cond = _orders_oi_cond & (F.col("o._source_bucket") == F.col("oi._source_bucket"))
+
     orders_with_items = orders_filtered.alias("o").join(
         order_items_df.alias("oi"),
-        F.col("o.order_id") == F.col("oi.order_id"),
+        _orders_oi_cond,
         "left"
     ).join(
         products_df.alias("p").select("product_id", "category", "sell_price"),
@@ -235,8 +231,12 @@ def create_enhanced_features(customers_df, orders_df, order_items_df, products_d
         "left"
     )
     
-    # Aggregate order-level metrics
-    order_agg = orders_with_items.groupBy("o.order_id").agg(
+    # Aggregate order-level metrics; include _source_bucket so it survives the groupBy
+    _groupby_cols = [F.col("o.order_id")]
+    if _has_bucket:
+        _groupby_cols.append(F.col("o._source_bucket"))
+
+    order_agg = orders_with_items.groupBy(*_groupby_cols).agg(
         F.first("o.customer_id").alias("customer_id"),
         F.first("o.order_placed_at").alias("order_placed_at"),
         F.first("o.total_amount").alias("total_amount"),
@@ -247,16 +247,25 @@ def create_enhanced_features(customers_df, orders_df, order_items_df, products_d
         F.avg("oi.product_price").alias("avg_product_price_order"),
         F.countDistinct("p.category").alias("unique_categories_in_order"),
         F.first("p.category").alias("primary_category_order")
-    ).select(
+    )
+
+    _select_cols = [
         "customer_id", "order_placed_at", "total_amount", "total_discount",
         "order_placed_month", "order_placed_day_of_week", "products_in_order",
-        "avg_product_price_order", "unique_categories_in_order", "primary_category_order"
-    )
+        "avg_product_price_order", "unique_categories_in_order", "primary_category_order",
+    ]
+    if _has_bucket:
+        _select_cols.append("_source_bucket")
+    order_agg = order_agg.select(*_select_cols)
     
     print(f"Aggregated order metrics: {order_agg.count()} orders")
     
-    # Create window for each customer
-    customer_window = Window.partitionBy("customer_id").orderBy("order_placed_at")
+    # Create window for each customer — partitioned by (customer_id, _source_bucket) so
+    # order sequences are never mixed across tenants that share numeric customer IDs.
+    _partition_cols = ["customer_id"]
+    if _has_bucket:
+        _partition_cols.append("_source_bucket")
+    customer_window = Window.partitionBy(*_partition_cols).orderBy("order_placed_at")
     
     # Add sequence and temporal features
     orders_with_seq = order_agg.withColumn(
@@ -303,12 +312,12 @@ def create_enhanced_features(customers_df, orders_df, order_items_df, products_d
     # FIXED: Rolling windows now use rowsBetween(-3, 0) to include current for stability
     # But for FEATURES, we still want to look backward to avoid leakage
     # The fix is about null handling, not including current in features
-    window_rolling_3 = Window.partitionBy("customer_id").orderBy("order_placed_at").rowsBetween(-3, -1)
-    window_rolling_6 = Window.partitionBy("customer_id").orderBy("order_placed_at").rowsBetween(-6, -1)
+    window_rolling_3 = Window.partitionBy(*_partition_cols).orderBy("order_placed_at").rowsBetween(-3, -1)
+    window_rolling_6 = Window.partitionBy(*_partition_cols).orderBy("order_placed_at").rowsBetween(-6, -1)
     
     # For early sequences, use a window that's more forgiving (includes current for calculation stability)
-    window_rolling_3_stable = Window.partitionBy("customer_id").orderBy("order_placed_at").rowsBetween(-2, 0)
-    window_rolling_6_stable = Window.partitionBy("customer_id").orderBy("order_placed_at").rowsBetween(-5, 0)
+    window_rolling_3_stable = Window.partitionBy(*_partition_cols).orderBy("order_placed_at").rowsBetween(-2, 0)
+    window_rolling_6_stable = Window.partitionBy(*_partition_cols).orderBy("order_placed_at").rowsBetween(-5, 0)
     
     orders_with_lags = orders_with_lags.withColumn(
         "aov_rolling_3_strict",
@@ -372,7 +381,7 @@ def create_enhanced_features(customers_df, orders_df, order_items_df, products_d
     # FIX #6: Better discount sensitivity - weighted by spend
     # =========================================================================
     # Window to calculate cumulative sums up to current row (excluding current)
-    window_cumsum = Window.partitionBy("customer_id").orderBy("order_placed_at").rowsBetween(Window.unboundedPreceding, -1)
+    window_cumsum = Window.partitionBy(*_partition_cols).orderBy("order_placed_at").rowsBetween(Window.unboundedPreceding, -1)
     
     orders_with_lags = orders_with_lags.withColumn(
         "cumsum_discount",
@@ -414,35 +423,45 @@ def create_enhanced_features(customers_df, orders_df, order_items_df, products_d
     
     print("Added temporal and pattern features")
     
-    # Join with customer data
-    customer_features = orders_with_lags.join(
-        customers_df.select(
-            "customer_id",
-            "total_orders",
-            "customer_tenure_days",
-            "total_items_purchased",
-            "avg_items_per_order",
-            "session_conversion_rate",
-            "cart_abandonment_rate",
-            "cancellation_rate",
-            "total_reviews_written",
-            "avg_review_rating",
-            "customer_activity_score",
-            "total_pages_viewed",
-            "total_products_viewed",
-            "total_sessions",
-            "wishlist_items_count",
-            "recency_score",
-            "frequency_score",
-            "monetary_score",
-            "avg_discount_per_order",
-            "customer_segment_label",
-            "preferred_payment_method",
-            "preferred_device_type"
-        ),
+    # Join with customer data — bucket-scoped to prevent cross-tenant customer_id collisions
+    _cust_select = [
         "customer_id",
-        "left"
-    )
+        "total_orders",
+        "customer_tenure_days",
+        "total_items_purchased",
+        "avg_items_per_order",
+        "session_conversion_rate",
+        "cart_abandonment_rate",
+        "cancellation_rate",
+        "total_reviews_written",
+        "avg_review_rating",
+        "customer_activity_score",
+        "total_pages_viewed",
+        "total_products_viewed",
+        "total_sessions",
+        "wishlist_items_count",
+        "recency_score",
+        "frequency_score",
+        "monetary_score",
+        "avg_discount_per_order",
+        "customer_segment_label",
+        "preferred_payment_method",
+        "preferred_device_type",
+    ]
+    if _has_bucket and "_source_bucket" in customers_df.columns:
+        _cust_select.append("_source_bucket")
+    cust_selected = customers_df.select(*_cust_select)
+
+    if _has_bucket and "_source_bucket" in cust_selected.columns:
+        cust_selected = cust_selected.withColumnRenamed("_source_bucket", "_bucket_cust")
+        customer_features = orders_with_lags.join(
+            cust_selected,
+            (orders_with_lags.customer_id == cust_selected.customer_id)
+            & (orders_with_lags._source_bucket == cust_selected._bucket_cust),
+            "left",
+        ).drop(cust_selected.customer_id).drop("_bucket_cust")
+    else:
+        customer_features = orders_with_lags.join(cust_selected, "customer_id", "left")
     
     # Filter: need at least 1 previous order AND valid next_order_value (not null)
     customer_features = customer_features.filter(
@@ -516,6 +535,11 @@ def create_enhanced_features(customers_df, orders_df, order_items_df, products_d
     })
     
     print(f"✓ Enhanced features created: {customer_features.count()} records")
+
+    # Drop _source_bucket — guided joins but is not a training feature
+    if "_source_bucket" in customer_features.columns:
+        customer_features = customer_features.drop("_source_bucket")
+
     return customer_features
 
 
@@ -527,10 +551,35 @@ def prepare_training_data(df, scale_features=True):
     """
     print("Preparing training data...")
     
-    # Filter valid records
+    def filter_invalid_feature_vectors(df_with_features):
+        """Drop rows where assembled feature vector contains NaN/Infinity."""
+        rows_before = df_with_features.count()
+
+        df_checked = df_with_features.withColumn(
+            "_features_array",
+            vector_to_array(F.col("features"))
+        )
+
+        df_filtered = df_checked.filter(
+            F.expr(
+                "NOT exists(_features_array, x -> NOT (x = x AND x > -1e308 AND x < 1e308))"
+            )
+        ).drop("_features_array")
+
+        rows_after = df_filtered.count()
+        dropped = rows_before - rows_after
+        if dropped > 0:
+            print(f"⚠ Dropped {dropped} rows with NaN/Infinity in feature vector")
+
+        return df_filtered
+
+    # Filter valid target records (exclude null/zero/NaN/Infinity)
     df_valid = df.filter(
         (F.col(TARGET_COLUMN).isNotNull()) &
-        (F.col(TARGET_COLUMN) > 0)
+        (F.col(TARGET_COLUMN) > 0) &
+        (F.col(TARGET_COLUMN) == F.col(TARGET_COLUMN)) &
+        (F.col(TARGET_COLUMN) > -1e308) &
+        (F.col(TARGET_COLUMN) < 1e308)
     )
     
     valid_count = df_valid.count()
@@ -571,7 +620,7 @@ def prepare_training_data(df, scale_features=True):
         assembler = VectorAssembler(
             inputCols=existing_features,
             outputCol="features_unscaled",
-            handleInvalid="keep"
+            handleInvalid="skip"
         )
         
         df_assembled = assembler.transform(df_valid)
@@ -592,6 +641,8 @@ def prepare_training_data(df, scale_features=True):
             "features",
             TARGET_COLUMN
         )
+
+        df_prepared = filter_invalid_feature_vectors(df_prepared)
         
         print(f"✓ Data prepared with scaling: {df_prepared.count()} records")
         return df_prepared, scaler_model, existing_features
@@ -600,7 +651,7 @@ def prepare_training_data(df, scale_features=True):
         assembler = VectorAssembler(
             inputCols=existing_features,
             outputCol="features",
-            handleInvalid="keep"
+            handleInvalid="skip"
         )
         
         df_assembled = assembler.transform(df_valid)
@@ -611,6 +662,8 @@ def prepare_training_data(df, scale_features=True):
             "features",
             TARGET_COLUMN
         )
+
+        df_prepared = filter_invalid_feature_vectors(df_prepared)
         
         print(f"✓ Data prepared WITHOUT scaling (for tree models): {df_prepared.count()} records")
         return df_prepared, None, existing_features
@@ -895,7 +948,8 @@ def main():
         spark,
         INPUT_RELATIVE_PATH,
         required_columns=REQUIRED_CUSTOMER_COLUMNS,
-        filter_nulls=True
+        filter_nulls=True,
+        keep_source_bucket=True,
     )
     
     if customers_df is None:
@@ -907,7 +961,8 @@ def main():
         spark,
         INPUT_ORDERS_RELATIVE_PATH,
         required_columns=REQUIRED_ORDER_COLUMNS,
-        filter_nulls=True
+        filter_nulls=True,
+        keep_source_bucket=True,
     )
     
     if orders_df is None:
@@ -919,7 +974,8 @@ def main():
         spark,
         INPUT_ORDER_ITEMS_RELATIVE_PATH,
         required_columns=["order_id", "product_id"],
-        filter_nulls=True
+        filter_nulls=True,
+        keep_source_bucket=True,
     )
     
     if order_items_df is None:
@@ -931,7 +987,8 @@ def main():
         spark,
         INPUT_PRODUCTS_RELATIVE_PATH,
         required_columns=["product_id", "category"],
-        filter_nulls=True
+        filter_nulls=True,
+        keep_source_bucket=True,
     )
     
     if products_df is None:

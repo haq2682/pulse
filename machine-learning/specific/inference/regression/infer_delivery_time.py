@@ -4,19 +4,29 @@ Predicts order delivery time in days
 """
 
 import os
+import sys
+
 import findspark
 from dotenv import load_dotenv
+from pathlib import Path
+# Import spark_utils FIRST to set up JARs before pyspark imports
+_ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
+if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT_VAR))
 
-findspark.init()
+from spark_utils import create_ml_spark_session
 
-from pyspark.sql import SparkSession
+
 from pyspark.sql import functions as F
-from pyspark.sql.window import Window
 from pyspark.sql.types import StringType
 from pyspark.ml.feature import VectorAssembler, StandardScaler, StringIndexer
-from pyspark.ml.regression import RandomForestRegressionModel
-from datetime import datetime, timedelta
-import uuid
+from pyspark.ml.regression import (
+    RandomForestRegressionModel,
+    GBTRegressionModel,
+    DecisionTreeRegressionModel,
+    LinearRegressionModel,
+)
+from datetime import datetime
 import json
 
 # Load environment variables
@@ -25,66 +35,99 @@ load_dotenv()
 
 # Feature set (must match training)
 NUMERIC_FEATURES = [
-    "total_quantity", "total_amount", "shipping_cost", "unique_products_ordered", "avg_product_price",
-    "order_placed_day_of_week", "order_placed_month", "order_placed_quarter", "order_placed_day_of_month",
+    "total_quantity", "total_amount", "shipping_cost", "subtotal", "tax_amount", "total_discount",
+    "discount_percentage", "total_product_price", "unique_products_ordered", "avg_product_price",
+    "order_placed_day_of_week", "order_placed_month", "order_placed_quarter", "order_placed_week_of_year", "order_placed_day_of_month",
     "is_weekend", "is_month_end", "is_holiday_season",
     "city_avg_delivery_days", "city_delivery_std", "state_avg_delivery_days",
     "country_avg_delivery_days", "location_delivery_consistency",
-    "shipping_tier_avg_delivery", "shipping_cost_to_amount_ratio",
-    "customer_total_orders", "customer_avg_delivery_days", "is_repeat_customer",
+    "shipping_tier_avg_delivery", "shipping_cost_to_amount_ratio", "order_value_per_item", "log_total_amount",
+    "customer_total_orders", "customer_avg_delivery_days", "customer_tenure_days", "customer_lifetime_value",
+    "customer_recency_days", "rfm_overall_score", "customer_monetary_per_order", "is_repeat_customer",
     "order_complexity_score", "order_size_tier",
-    "is_major_city", "is_capital_city",
+    "is_major_city", "is_capital_city", "location_shipping_interaction",
     "country_idx", "state_idx", "city_idx", "season_idx"
 ]
 
 
+def ensure_columns(df, defaults: dict):
+    """Ensure columns exist before fillna/feature assembly."""
+    out = df
+    for col_name, default_value in defaults.items():
+        if col_name not in out.columns:
+            out = out.withColumn(col_name, F.lit(default_value))
+    return out
+
+
 def create_spark_session():
     """Initialize Spark session"""
-    return (
-        SparkSession.builder
-        .appName("Delivery_Time_Inference")
-        .master(os.getenv("SPARK_SERVER", "local[*]"))
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        )
-        .config("spark.dynamicAllocation.enabled", "true")
-        .config("spark.dynamicAllocation.minExecutors", "0")
-        .config("spark.dynamicAllocation.maxExecutors", "1000")
-        .config("spark.dynamicAllocation.initialExecutors", "1")
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        )
-        .config("inferSchema", "true")
-        .config("mergeSchema", "true")
-        .getOrCreate()
+    os.environ.setdefault("SPARK_SERVER", os.getenv("ML_SPARK_MASTER", "local[2]"))
+    return create_ml_spark_session(
+        "Delivery_Time_Inference",
+        extra_configs={
+                    "spark.driver.memory": os.getenv("ML_SPARK_DRIVER_MEMORY", "4g"),
+                    "spark.driver.maxResultSize": os.getenv("ML_SPARK_DRIVER_MAX_RESULT_SIZE", "1g"),
+                    "spark.executor.instances": os.getenv("ML_SPARK_EXECUTOR_INSTANCES", "1"),
+                    "spark.executor.cores": os.getenv("ML_SPARK_EXECUTOR_CORES", "1"),
+                    "spark.executor.memory": os.getenv("ML_SPARK_EXECUTOR_MEMORY", "1536m"),
+                    "spark.executor.memoryOverhead": os.getenv("ML_SPARK_EXECUTOR_MEMORY_OVERHEAD", "768"),
+                    "spark.sql.shuffle.partitions": os.getenv("ML_SPARK_SHUFFLE_PARTITIONS", "4"),
+                    "spark.default.parallelism": os.getenv("ML_SPARK_DEFAULT_PARALLELISM", "4"),
+                    "spark.sql.adaptive.enabled": os.getenv("ML_SPARK_SQL_ADAPTIVE", "true"),
+                    "spark.sql.adaptive.coalescePartitions.enabled": os.getenv("ML_SPARK_SQL_COALESCE_PARTITIONS", "true"),
+                    "spark.sql.adaptive.skewJoin.enabled": os.getenv("ML_SPARK_SQL_SKEW_JOIN", "true"),
+                    "spark.network.timeout": os.getenv("ML_SPARK_NETWORK_TIMEOUT", "600s"),
+                    "spark.executor.heartbeatInterval": os.getenv("ML_SPARK_HEARTBEAT_INTERVAL", "60s"),
+                    "spark.shuffle.io.maxRetries": os.getenv("ML_SPARK_SHUFFLE_MAX_RETRIES", "10"),
+                    "spark.shuffle.io.retryWait": os.getenv("ML_SPARK_SHUFFLE_RETRY_WAIT", "10s"),
+                    "spark.task.maxFailures": os.getenv("ML_SPARK_TASK_MAX_FAILURES", "8"),
+                    "spark.stage.maxConsecutiveAttempts": os.getenv("ML_SPARK_STAGE_MAX_ATTEMPTS", "8"),
+                    "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
+                    "spark.kryoserializer.buffer.max": os.getenv("ML_SPARK_KRYO_BUFFER_MAX", "256m"),
+                    "inferSchema": "true",
+                    "mergeSchema": "true"
+                },
     )
+def load_model(model_base_path):
+    """Load best available trained model from delivery_time model directory."""
+    model_candidates = [
+        ("best_model", f"{model_base_path}/best_model"),
+        ("random_forest", f"{model_base_path}/random_forest"),
+        ("gbt_regressor", f"{model_base_path}/gbt_regressor"),
+        ("decision_tree", f"{model_base_path}/decision_tree"),
+        ("linear_regression", f"{model_base_path}/linear_regression"),
+    ]
+    loaders = [
+        RandomForestRegressionModel,
+        GBTRegressionModel,
+        DecisionTreeRegressionModel,
+        LinearRegressionModel,
+    ]
 
+    for model_name, model_path in model_candidates:
+        for loader in loaders:
+            try:
+                model = loader.load(model_path)
+                print(f"✓ Model loaded: {model_path} ({loader.__name__})")
+                return model, model_name
+            except Exception:
+                continue
 
-def load_model(MODEL_PATH):
-    """Load trained model"""
-    try:
-        model = RandomForestRegressionModel.load(MODEL_PATH)
-        print(f"✓ Model loaded: {MODEL_PATH}")
-        return model
-    except Exception as e:
-        print(f"✗ Failed to load model: {str(e)}")
-        return None
+    print("✗ Failed to load any delivery_time model")
+    return None, None
 
 
 def validate_dataset(spark, path, name):
     """Check if dataset exists"""
     try:
         df = spark.read.parquet(path)
-        record_count = df.count()
-        print(f"✓ {name} dataset found: {record_count} records")
+        should_count = os.getenv("ML_LOG_ROW_COUNTS", "false").lower() == "true"
+        if should_count:
+            record_count = df.count()
+            print(f"✓ {name} dataset found: {record_count} records")
+        else:
+            record_count = -1
+            print(f"✓ {name} dataset found")
         return df, record_count
     except Exception as e:
         print(f"✗ {name} dataset validation failed: {str(e)}")
@@ -180,10 +223,15 @@ def create_inference_features(orders_df, customers_df, city_stats_df, state_stat
         F.col("order_status").isin(["Processing", "Shipped", "Pending"])
     )
     
-    # If no such orders, use recent delivered orders for demo
-    if inference_orders.count() == 0:
+    # If no such orders, use a limited delivered sample for demo
+    if inference_orders.limit(1).count() == 0:
         print("⚠  No pending orders found, using recent delivered orders for demo")
-        inference_orders = orders_df.orderBy(F.desc("order_placed_at")).limit(1000)
+        inference_orders = orders_df.filter(F.col("order_status") == "Delivered").limit(1000)
+
+    max_inference_rows = int(os.getenv("DELIVERY_TIME_MAX_INFERENCE_ROWS", "200000"))
+    if max_inference_rows > 0:
+        inference_orders = inference_orders.limit(max_inference_rows)
+        print(f"✓ Applying inference row cap: {max_inference_rows}")
     
     # Join with customer locations
     order_features = inference_orders.join(
@@ -219,6 +267,40 @@ def create_inference_features(orders_df, customers_df, city_stats_df, state_stat
     # Join with shipping tier and customer statistics
     order_features = order_features.join(tier_stats_df, "shipping_tier", "left") \
         .join(customer_stats_df, "customer_id", "left")
+
+    optional_defaults = {
+        "subtotal": 0.0,
+        "tax_amount": 0.0,
+        "total_discount": 0.0,
+        "discount_percentage": 0.0,
+        "total_product_price": 0.0,
+        "order_placed_week_of_year": 1,
+        "customer_tenure_days": 0,
+        "customer_lifetime_value": 0.0,
+        "rfm_overall_score": 0.0,
+        "total_orders": 0,
+        "total_revenue": 0.0,
+        "days_since_last_purchase": 30,
+        "order_recency_days": 30,
+    }
+    order_features = ensure_columns(order_features, optional_defaults)
+
+    if "days_since_last_purchase" not in order_features.columns:
+        if "last_order_date" in order_features.columns and "order_placed_at" in order_features.columns:
+            order_features = order_features.withColumn(
+                "days_since_last_purchase",
+                F.greatest(
+                    F.datediff(F.to_date("order_placed_at"), F.to_date("last_order_date")),
+                    F.lit(0),
+                ),
+            )
+        elif "order_recency_days" in order_features.columns:
+            order_features = order_features.withColumn(
+                "days_since_last_purchase",
+                F.coalesce(F.col("order_recency_days"), F.lit(30)),
+            )
+        else:
+            order_features = order_features.withColumn("days_since_last_purchase", F.lit(30))
     
     # Create temporal features
     order_features = order_features.withColumn(
@@ -263,8 +345,27 @@ def create_inference_features(orders_df, customers_df, city_stats_df, state_stat
     ).withColumn(
         "is_capital_city",
         F.when(F.col("city_order_count") > 200, 1).otherwise(0)
+    ).withColumn(
+        "order_value_per_item",
+        F.when(F.col("total_quantity") > 0, F.col("total_amount") / F.col("total_quantity")).otherwise(0.0)
+    ).withColumn(
+        "log_total_amount",
+        F.log1p(F.greatest(F.coalesce(F.col("total_amount"), F.lit(0.0)), F.lit(0.0)))
+    ).withColumn(
+        "customer_recency_days",
+        F.coalesce(F.col("days_since_last_purchase"), F.col("order_recency_days"), F.lit(30))
+    ).withColumn(
+        "customer_monetary_per_order",
+        F.when(
+            F.coalesce(F.col("total_orders"), F.lit(0)) > 0,
+            F.coalesce(F.col("total_revenue"), F.lit(0.0)) / F.col("total_orders")
+        ).otherwise(0.0)
+    ).withColumn(
+        "location_shipping_interaction",
+        F.coalesce(F.col("country_avg_delivery_days"), F.lit(7.0)) *
+        F.coalesce(F.col("shipping_cost_to_amount_ratio"), F.lit(0.0))
     )
-    
+
     # Fill nulls
     order_features = order_features.fillna({
         "total_quantity": 1,
@@ -284,7 +385,16 @@ def create_inference_features(orders_df, customers_df, city_stats_df, state_stat
         "season": "Summer",
         "country": "Unknown",
         "state_province": "Unknown",
-        "city": "Unknown"
+        "city": "Unknown",
+        "customer_tenure_days": 0,
+        "customer_lifetime_value": 0,
+        "rfm_overall_score": 0,
+        "order_placed_week_of_year": 1,
+        "subtotal": 0,
+        "tax_amount": 0,
+        "total_discount": 0,
+        "discount_percentage": 0,
+        "total_product_price": 0,
     })
     
     # Filter valid orders
@@ -292,7 +402,10 @@ def create_inference_features(orders_df, customers_df, city_stats_df, state_stat
         F.col("order_id").isNotNull()
     )
     
-    print(f"✓ Inference features created: {order_features.count()} orders")
+    if os.getenv("ML_LOG_ROW_COUNTS", "false").lower() == "true":
+        print(f"✓ Inference features created: {order_features.count()} orders")
+    else:
+        print("✓ Inference features created")
     return order_features
 
 
@@ -321,13 +434,21 @@ def prepare_inference_data(df):
         "order_id", "order_placed_at", "country", "city",
         "total_amount", "shipping_cost", "features"
     )
-    
+
+    target_partitions = int(os.getenv("DELIVERY_TIME_INFER_PARTITIONS", "4"))
+    if target_partitions > 0:
+        df_prepared = df_prepared.repartition(target_partitions)
+
     print(f"✓ Data prepared and scaled")
     return df_prepared
 
 
-def generate_predictions(model, df):
+def generate_predictions(model, df, model_version):
     """Generate comprehensive delivery time predictions"""
+    scoring_partitions = int(os.getenv("DELIVERY_TIME_SCORE_PARTITIONS", "4"))
+    if scoring_partitions > 0 and scoring_partitions != df.rdd.getNumPartitions():
+        df = df.repartition(scoring_partitions)
+
     predictions_df = model.transform(df)
     
     # Ensure non-negative predictions
@@ -411,11 +532,10 @@ def generate_predictions(model, df):
         )
     )
     
-    prediction_id_udf = F.udf(lambda: str(uuid.uuid4()), StringType())
     current_timestamp = F.lit(datetime.now())
     
     output_df = predictions_df.select(
-        prediction_id_udf().alias("prediction_id"),
+        F.expr("uuid()").alias("prediction_id"),
         F.col("order_id"),
         current_timestamp.alias("prediction_date"),
         F.col("predicted_delivery_days"),
@@ -424,10 +544,13 @@ def generate_predictions(model, df):
         F.col("confidence_interval_upper"),
         F.col("factors_affecting_delivery"),
         F.col("confidence_score"),
-        F.lit("random_forest").alias("model_version")
+        F.lit(model_version).alias("model_version")
     )
     
-    print(f"✓ Generated {output_df.count()} predictions")
+    if os.getenv("ML_LOG_ROW_COUNTS", "false").lower() == "true":
+        print(f"✓ Generated {output_df.count()} predictions")
+    else:
+        print("✓ Generated predictions")
     return output_df
 
 
@@ -492,7 +615,7 @@ def main(BUCKET_NAME):
     INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
     INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
     OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/delivery_time/"
-    MODEL_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/delivery_time/random_forest"
+    MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/delivery_time"
     """Main inference pipeline"""
     print("\n" + "="*80)
     print("Delivery Time Prediction - Inference")
@@ -505,7 +628,7 @@ def main(BUCKET_NAME):
     # Load model
     print("Step 1: Load Model")
     print("-" * 80)
-    model = load_model(MODEL_PATH)
+    model, model_version = load_model(MODEL_BASE_PATH)
     
     if model is None:
         print("\n✗ Inference aborted: Model not found")
@@ -553,13 +676,12 @@ def main(BUCKET_NAME):
     # Generate predictions
     print("\nStep 8: Generate Predictions")
     print("-" * 80)
-    predictions_df = generate_predictions(model, df_prepared)
+    predictions_df = generate_predictions(model, df_prepared, model_version)
     
-    # Display samples
-    display_sample_predictions(predictions_df)
-    
-    # Display summary
-    display_summary_statistics(predictions_df)
+    enable_reports = os.getenv("DELIVERY_TIME_ENABLE_REPORTS", "false").lower() == "true"
+    if enable_reports:
+        display_sample_predictions(predictions_df)
+        display_summary_statistics(predictions_df)
     
     # Save predictions
     print("\nStep 9: Save Predictions")
@@ -577,5 +699,5 @@ def main(BUCKET_NAME):
 
 
 if __name__ == "__main__":
-    BUCKET_NAME = "pulse-bucket-1"
+    BUCKET_NAME = "afc4bd21-75ad-4da3-9fd7-4b0b540a1ccc"
     main(BUCKET_NAME)

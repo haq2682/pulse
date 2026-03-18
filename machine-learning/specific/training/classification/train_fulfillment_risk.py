@@ -1,5 +1,18 @@
 import os
+import sys
+import json
+from pathlib import Path
+
+# Import spark_utils FIRST to set up JARs before pyspark imports
+_ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
+if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT_VAR))
+
+from spark_utils import create_ml_spark_session
+
+
 from pyspark.sql import SparkSession
+from pyspark import StorageLevel
 from pyspark.sql.functions import (
     col, when, lit, count, sum as spark_sum, avg, max as spark_max,
     dayofweek, hour, month, rand, datediff, current_date, create_map
@@ -12,10 +25,6 @@ from pyspark.ml.classification import (
 from pyspark.ml.classification import OneVsRest
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from itertools import chain
-import findspark
-
-findspark.init()
-
 # ── FIX: Removed all randomly-simulated features from feature lists.
 #    Simulated columns (shipping_distance_km, weather_risk_score, etc.) are
 #    pure noise (rand() with fixed seeds) and actively hurt model accuracy.
@@ -61,6 +70,7 @@ NUMERICAL_FEATURES = [
     "customer_tenure_days",
     "rfm_overall_score",
     "customer_activity_score",
+    "order_age_days",
     # Temporal (real, derived from order_placed_at)
     "order_placed_day_of_week",
     "order_placed_hour",
@@ -77,9 +87,14 @@ NUMERICAL_FEATURES = [
     "fulfillment_complexity",
     "stock_health_combined",
     "customer_reliability_score",
+    "supplier_order_load",
+    "stock_pressure_index",
+    "seasonal_demand_index",
+    "customer_value_risk_interaction",
 ]
 
 CATEGORICAL_FEATURES = [
+    "order_status",
     "order_size_category",
     "season"
 ]
@@ -91,42 +106,150 @@ BOOLEAN_FEATURES = [
     "is_holiday_period",             # real: derived from order_placed_at
     "is_peak_shopping_season",       # real: derived from order_placed_at
     "is_repeat_customer",            # real: from agg_customers
+    "is_high_value_order",
 ]
 
 TARGET_COLUMN = "fulfillment_risk_class"  # 0=Low, 1=Medium, 2=High, 3=Critical
 
+REQUIRED_SOURCE_COLUMNS = {
+    "agg_orders": [
+        "order_id", "customer_id", "order_status", "order_placed_at",
+        "order_placed_day_of_week", "total_amount", "shipping_cost",
+        "discount_percentage", "order_size_category", "season",
+        "order_shipped_at", "order_delivered_at", "delivery_days_diff",
+    ],
+    "agg_order_items": ["order_id", "product_id", "quantity"],
+    "agg_products": [
+        "product_id", "supplier_id", "current_stock", "avg_rating",
+        "product_performance_score", "stockout_occurrences", "inventory_turnover_rate",
+    ],
+    "agg_inventory": [
+        "product_id", "reserved_quantity", "available_stock", "stock_coverage_days",
+        "reorder_point_breach", "stock_turnover_ratio",
+    ],
+    "agg_suppliers": [
+        "supplier_id", "supplier_reliability_score", "avg_restock_lead_time",
+        "stockout_rate", "supplier_performance_score", "supplier_rating",
+        "total_orders_fulfilled", "supplier_inventory_health_score",
+    ],
+    "agg_customers": [
+        "customer_id", "total_cancelled_orders", "total_orders", "cancellation_rate",
+        "avg_order_value", "customer_lifetime_value", "is_repeat_customer",
+        "customer_tenure_days", "rfm_overall_score", "customer_activity_score",
+    ],
+}
+
+
+def _missing_columns(df, required_columns):
+    existing = set(df.columns)
+    return [column for column in required_columns if column not in existing]
+
+
+def validate_required_source_columns(dataset_map):
+    missing_report = {}
+    for table_name, required_cols in REQUIRED_SOURCE_COLUMNS.items():
+        df = dataset_map.get(table_name)
+        if df is None:
+            missing_report[table_name] = required_cols
+            continue
+        missing = _missing_columns(df, required_cols)
+        if missing:
+            missing_report[table_name] = missing
+
+    if missing_report:
+        print("✗ Training skipped: required input columns are missing")
+        for table_name, cols in missing_report.items():
+            print(f"  - {table_name}: missing {cols}")
+        return False
+    return True
+
+
+def validate_feature_columns(df):
+    required = NUMERICAL_FEATURES + CATEGORICAL_FEATURES + BOOLEAN_FEATURES + [TARGET_COLUMN]
+    missing = _missing_columns(df, required)
+    if missing:
+        print("✗ Training skipped: engineered feature set is incomplete")
+        print(f"  Missing feature columns: {missing}")
+        return False
+    return True
+
+
+def save_best_model_manifest(spark, output_dir: str, best_metrics: dict):
+    manifest = {
+        "best_model": best_metrics["model_name"],
+        "best_f1": round(float(best_metrics["f1_score"]), 6),
+        "best_accuracy": round(float(best_metrics["accuracy"]), 6),
+        "numerical_features": NUMERICAL_FEATURES,
+        "categorical_features": CATEGORICAL_FEATURES,
+        "boolean_features": BOOLEAN_FEATURES,
+        "target_column": TARGET_COLUMN,
+    }
+    payload = json.dumps(manifest)
+    manifest_path = f"{output_dir}/_best_model_manifest"
+    spark.createDataFrame([(payload,)], ["value"]).coalesce(1).write.mode("overwrite").text(manifest_path)
+    print(f"✓ Saved best-model manifest: {manifest_path}")
+
+
+def _parse_enabled_models(raw_value):
+    model_aliases = {
+        "lr": "LogisticRegression",
+        "logistic": "LogisticRegression",
+        "logisticregression": "LogisticRegression",
+        "rf": "RandomForest",
+        "randomforest": "RandomForest",
+        "dt": "DecisionTree",
+        "decisiontree": "DecisionTree",
+        "gbt": "GBT",
+    }
+    selected = []
+    for part in (raw_value or "").split(","):
+        key = part.strip().lower().replace("_", "")
+        mapped = model_aliases.get(key)
+        if mapped and mapped not in selected:
+            selected.append(mapped)
+    return selected
+
 
 def create_spark_session():
-    return SparkSession.builder \
-        .appName("FulfillmentRiskTraining") \
-        .master(os.getenv("SPARK_SERVER", "local[*]")) \
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        ) \
-        .config("spark.dynamicAllocation.enabled", "true") \
-        .config("spark.dynamicAllocation.minExecutors", "0") \
-        .config("spark.dynamicAllocation.maxExecutors", "10") \
-        .config("spark.dynamicAllocation.initialExecutors", "2") \
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT")) \
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY")) \
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY")) \
-        .config("spark.hadoop.fs.s3a.path.style.access", "true") \
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false") \
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        ) \
-        .config("inferSchema", "true") \
-        .config("mergeSchema", "true") \
-        .getOrCreate()
-
-
+    """Initialize Spark session"""
+    os.environ.setdefault("SPARK_SERVER", os.getenv("ML_SPARK_MASTER", "local[2]"))
+    return create_ml_spark_session(
+        "FulfillmentRiskTraining",
+        extra_configs={
+            "inferSchema": "true",
+            "mergeSchema": "true",
+            # Use fixed executors for this job to prevent shuffle-file loss
+            # when dynamic allocation removes executors mid-training.
+            "spark.dynamicAllocation.enabled": "false",
+            "spark.driver.memory": os.getenv("ML_SPARK_DRIVER_MEMORY", "4g"),
+            "spark.driver.maxResultSize": os.getenv("ML_SPARK_DRIVER_MAX_RESULT_SIZE", "1g"),
+            "spark.executor.instances": os.getenv("ML_SPARK_EXECUTOR_INSTANCES", "1"),
+            "spark.executor.cores": os.getenv("ML_SPARK_EXECUTOR_CORES", "1"),
+            "spark.executor.memory": os.getenv("ML_SPARK_EXECUTOR_MEMORY", "1536m"),
+            "spark.executor.memoryOverhead": os.getenv("ML_SPARK_EXECUTOR_MEMORY_OVERHEAD", "768"),
+            "spark.sql.shuffle.partitions": os.getenv("ML_SPARK_SHUFFLE_PARTITIONS", "8"),
+            "spark.default.parallelism": os.getenv("ML_SPARK_DEFAULT_PARALLELISM", "4"),
+            "spark.sql.adaptive.enabled": os.getenv("ML_SPARK_SQL_ADAPTIVE", "true"),
+            "spark.sql.adaptive.coalescePartitions.enabled": os.getenv("ML_SPARK_SQL_COALESCE_PARTITIONS", "true"),
+            "spark.sql.adaptive.skewJoin.enabled": os.getenv("ML_SPARK_SQL_SKEW_JOIN", "true"),
+            "spark.network.timeout": os.getenv("ML_SPARK_NETWORK_TIMEOUT", "600s"),
+            "spark.executor.heartbeatInterval": os.getenv("ML_SPARK_HEARTBEAT_INTERVAL", "60s"),
+            # Shuffle resilience for intermittent executor loss / slow IO.
+            "spark.shuffle.io.maxRetries": os.getenv("ML_SPARK_SHUFFLE_MAX_RETRIES", "10"),
+            "spark.shuffle.io.retryWait": os.getenv("ML_SPARK_SHUFFLE_RETRY_WAIT", "10s"),
+            "spark.task.maxFailures": os.getenv("ML_SPARK_TASK_MAX_FAILURES", "8"),
+            "spark.stage.maxConsecutiveAttempts": os.getenv("ML_SPARK_STAGE_MAX_ATTEMPTS", "8"),
+            "spark.speculation": os.getenv("ML_SPARK_SPECULATION", "false"),
+        },
+    )
 def load_data(spark, path):
     try:
         df = spark.read.parquet(path)
-        print(f"✓ Loaded {df.count()} records from {path.split('/')[-1]}")
+        # Avoid eager full-table scans during startup unless explicitly enabled.
+        if os.getenv("ML_LOG_ROW_COUNTS", "false").lower() == "true":
+            print(f"✓ Loaded {df.count()} records from {path.split('/')[-1]}")
+        else:
+            print(f"✓ Loaded {path.split('/')[-1]}")
         return df
     except Exception as e:
         print(f"✗ Failed to load {path.split('/')[-1]}: {e}")
@@ -239,7 +362,10 @@ def join_all_tables(orders_df, order_items_df, products_df, inventory_df, suppli
 
     df = df.join(customer_info, on="customer_id", how="left")
 
-    print(f"✓ Joined all tables: {df.count()} orders with features")
+    if os.getenv("ML_LOG_ROW_COUNTS", "false").lower() == "true":
+        print(f"✓ Joined all tables: {df.count()} orders with features")
+    else:
+        print("✓ Joined all tables")
     return df
 
 
@@ -329,6 +455,30 @@ def engineer_features(df):
         "customer_reliability_score",
         col("rfm_overall_score") * (lit(1) - col("customer_cancellation_rate"))
     )
+    df = df.withColumn(
+        "order_age_days",
+        when(col("order_placed_at").isNotNull(), datediff(current_date(), col("order_placed_at"))).otherwise(lit(0))
+    )
+    df = df.withColumn(
+        "supplier_order_load",
+        col("avg_supplier_fulfilled_orders") / (col("avg_supplier_lead_time") + lit(1))
+    )
+    df = df.withColumn(
+        "stock_pressure_index",
+        col("total_quantity") / (col("avg_available_stock") + lit(1))
+    )
+    df = df.withColumn(
+        "seasonal_demand_index",
+        when(col("season").isin("Winter", "Fall", "Holiday"), lit(1.2)).otherwise(lit(1.0))
+    )
+    df = df.withColumn(
+        "customer_value_risk_interaction",
+        col("customer_lifetime_value") * (lit(1) - col("customer_reliability_score"))
+    )
+    df = df.withColumn(
+        "is_high_value_order",
+        when(col("total_amount") >= 200, lit(1)).otherwise(lit(0))
+    )
 
     fill_cols = [
         "shipping_cost", "discount_percentage",
@@ -341,6 +491,8 @@ def engineer_features(df):
         "customer_tenure_days", "rfm_overall_score", "customer_activity_score",
         "avg_supplier_performance_score", "avg_supplier_rating",
         "avg_supplier_fulfilled_orders", "avg_supplier_inventory_health",
+        "order_age_days", "supplier_order_load", "stock_pressure_index",
+        "seasonal_demand_index", "customer_value_risk_interaction",
         "stock_to_order_ratio", "low_stock_ratio", "out_of_stock_count",
         "order_value_per_item", "reserved_to_quantity_ratio",
         "supplier_risk_composite", "lead_time_quantity_interaction", "order_month",
@@ -374,15 +526,18 @@ def generate_risk_labels(df):
     )
 
     df_with_label = df_with_label.filter(col(TARGET_COLUMN).isNotNull())
+    df_with_label = df_with_label.persist(StorageLevel.MEMORY_AND_DISK)
 
     label_dist = df_with_label.groupBy(TARGET_COLUMN).count().orderBy(TARGET_COLUMN)
+    rows = label_dist.collect()
+
     print("Risk class distribution:")
-    label_dist.show()
+    for r in rows:
+        print(f"  class {int(r[TARGET_COLUMN])}: {int(r['count'])}")
 
     # ── FIX 2: Print baseline accuracy (majority-class classifier) ──────────
-    total_count = df_with_label.count()
-    rows = label_dist.collect()
     class_counts = {int(r[TARGET_COLUMN]): int(r["count"]) for r in rows}
+    total_count = sum(class_counts.values())
     majority_class = max(class_counts, key=class_counts.get)
     baseline_accuracy = class_counts[majority_class] / total_count
     print(f"⚖️  Baseline accuracy (always predict class {majority_class}): {baseline_accuracy:.4f}")
@@ -392,6 +547,10 @@ def generate_risk_labels(df):
         "order_shipped_at", "order_delivered_at", "delivery_days_diff",
         "distinct_suppliers", "supplier_count", "item_count"
     )
+
+    df_final = df_final.persist(StorageLevel.MEMORY_AND_DISK)
+    _ = df_final.count()
+    df_with_label.unpersist()
 
     return df_final, class_counts, total_count
 
@@ -478,17 +637,56 @@ def train_logistic_regression(train_df):
 
 
 def train_random_forest(train_df):
-    """FIX 3 applied: weightCol passed to RandomForest."""
+    """FIX 3 applied: weightCol passed to RandomForest with resilient fallback."""
     print("\n[2/4] Training Random Forest (weighted)...")
-    rf = RandomForestClassifier(
-        numTrees=300, maxDepth=15, seed=42,
-        weightCol="class_weight",
-        featureSubsetStrategy="sqrt",
-        subsamplingRate=0.8
-    )
-    model = rf.fit(train_df)
-    print("✓ Random Forest trained")
-    return model, "RandomForest"
+    rf_num_trees = int(os.getenv("FULFILLMENT_RISK_RF_TREES", "80"))
+    rf_max_depth = int(os.getenv("FULFILLMENT_RISK_RF_MAX_DEPTH", "10"))
+
+    candidate_configs = [
+        {
+            "numTrees": rf_num_trees,
+            "maxDepth": rf_max_depth,
+            "featureSubsetStrategy": "sqrt",
+            "subsamplingRate": 0.8,
+        },
+        {
+            "numTrees": max(120, rf_num_trees // 2),
+            "maxDepth": min(12, rf_max_depth),
+            "featureSubsetStrategy": "sqrt",
+            "subsamplingRate": 0.7,
+        },
+        {
+            "numTrees": 100,
+            "maxDepth": 10,
+            "featureSubsetStrategy": "onethird",
+            "subsamplingRate": 0.6,
+        },
+    ]
+
+    last_error = None
+    for idx, cfg in enumerate(candidate_configs, start=1):
+        try:
+            print(
+                f"   RF attempt {idx}/{len(candidate_configs)}: "
+                f"trees={cfg['numTrees']}, depth={cfg['maxDepth']}, "
+                f"subset={cfg['featureSubsetStrategy']}, subsample={cfg['subsamplingRate']}"
+            )
+            rf = RandomForestClassifier(
+                numTrees=cfg["numTrees"],
+                maxDepth=cfg["maxDepth"],
+                seed=42,
+                weightCol="class_weight",
+                featureSubsetStrategy=cfg["featureSubsetStrategy"],
+                subsamplingRate=cfg["subsamplingRate"],
+            )
+            model = rf.fit(train_df)
+            print("✓ Random Forest trained")
+            return model, "RandomForest"
+        except Exception as exc:
+            last_error = exc
+            print(f"   ⚠️  RF attempt {idx} failed: {exc}")
+
+    raise RuntimeError(f"RandomForest training failed after retries: {last_error}")
 
 
 def train_decision_tree(train_df):
@@ -506,8 +704,10 @@ def train_gbt(train_df):
     sequentially correcting residual errors.
     """
     print("\n[4/4] Training Gradient Boosted Trees (OneVsRest, multiclass)...")
+    gbt_max_iter = int(os.getenv("FULFILLMENT_RISK_GBT_MAX_ITER", "40"))
+    gbt_max_depth = int(os.getenv("FULFILLMENT_RISK_GBT_MAX_DEPTH", "5"))
     gbt = GBTClassifier(
-        maxIter=100, maxDepth=8, seed=42,
+        maxIter=gbt_max_iter, maxDepth=gbt_max_depth, seed=42,
         subsamplingRate=0.8, stepSize=0.1
     )
     ovr = OneVsRest(classifier=gbt)
@@ -517,7 +717,8 @@ def train_gbt(train_df):
 
 
 def evaluate_model(model, test_df, model_name):
-    predictions = model.transform(test_df)
+    predictions = model.transform(test_df).persist(StorageLevel.MEMORY_AND_DISK)
+    _ = predictions.count()
 
     mc_evaluator = MulticlassClassificationEvaluator(labelCol="label", predictionCol="prediction")
 
@@ -539,6 +740,8 @@ def evaluate_model(model, test_df, model_name):
     print(f"  Precision: {precision:.4f}")
     print(f"  Recall:    {recall:.4f}")
     print(f"  F1-Score:  {f1:.4f}")
+
+    predictions.unpersist()
 
     return metrics
 
@@ -636,12 +839,25 @@ def main(BUCKET_NAME):
         print("✗ Training stopped: failed to load all tables")
         return
 
+    if not validate_required_source_columns({
+        "agg_orders": orders_df,
+        "agg_order_items": order_items_df,
+        "agg_products": products_df,
+        "agg_inventory": inventory_df,
+        "agg_suppliers": suppliers_df,
+        "agg_customers": customers_df,
+    }):
+        return
+
     df = join_all_tables(orders_df, order_items_df, products_df, inventory_df, suppliers_df, customers_df)
     df = generate_simulated_features(df)   # kept for display; excluded from ML
     df = engineer_features(df)
 
     # FIX 1: No label noise — labels now purely reflect real delivery outcomes
     df, class_counts, total_count = generate_risk_labels(df)
+
+    if not validate_feature_columns(df):
+        return
 
     labeled_count = sum(class_counts.values())
     if labeled_count < MIN_LABELED_RECORDS:
@@ -654,22 +870,61 @@ def main(BUCKET_NAME):
     class_weights = compute_class_weights(class_counts, total_count, num_classes=4)
 
     train_df_raw, test_df_raw = df.randomSplit([0.8, 0.2], seed=42)
-    print(f"✓ Split: {train_df_raw.count()} train, {test_df_raw.count()} test")
+    train_df_raw = train_df_raw.persist(StorageLevel.MEMORY_AND_DISK)
+    test_df_raw = test_df_raw.persist(StorageLevel.MEMORY_AND_DISK)
+    train_count = train_df_raw.count()
+    test_count = test_df_raw.count()
+    print(f"✓ Split: {train_count} train, {test_count} test")
 
     # Add weight column to training set (test set is never weighted during eval)
-    train_df_raw = add_weight_column(train_df_raw, class_weights)
+    train_df_raw_unweighted = train_df_raw
+    train_df_raw = add_weight_column(train_df_raw_unweighted, class_weights).persist(StorageLevel.MEMORY_AND_DISK)
+    _ = train_df_raw.count()
+    train_df_raw_unweighted.unpersist()
 
     train_df, test_df, preprocessors = prepare_features(
         train_df_raw, test_df_raw, NUMERICAL_FEATURES, CATEGORICAL_FEATURES, BOOLEAN_FEATURES
     )
 
-    # Train all four models
-    models = [
-        train_logistic_regression(train_df),
-        train_random_forest(train_df),
-        train_decision_tree(train_df),
-        train_gbt(train_df),
-    ]
+    # Stabilize downstream model-training stages with bounded partition count.
+    target_partitions = int(os.getenv("FULFILLMENT_RISK_TRAIN_PARTITIONS", "4"))
+    if target_partitions > 0:
+        train_df = train_df.repartition(target_partitions)
+        test_df = test_df.repartition(max(2, target_partitions // 2))
+
+    train_df = train_df.persist(StorageLevel.MEMORY_AND_DISK)
+    test_df = test_df.persist(StorageLevel.MEMORY_AND_DISK)
+    _ = train_df.count()
+    _ = test_df.count()
+
+    enabled_models = _parse_enabled_models(
+        os.getenv("FULFILLMENT_RISK_MODELS", "LogisticRegression,RandomForest,DecisionTree,GBT")
+    )
+    if not enabled_models:
+        enabled_models = ["LogisticRegression", "RandomForest", "DecisionTree", "GBT"]
+
+    model_trainers = {
+        "LogisticRegression": train_logistic_regression,
+        "RandomForest": train_random_forest,
+        "DecisionTree": train_decision_tree,
+        "GBT": train_gbt,
+    }
+
+    models = []
+    failed_models = []
+    print(f"\n🧠 Models enabled: {', '.join(enabled_models)}")
+    for model_name in enabled_models:
+        trainer = model_trainers.get(model_name)
+        if trainer is None:
+            continue
+        try:
+            models.append(trainer(train_df))
+        except Exception as exc:
+            failed_models.append((model_name, str(exc)))
+            print(f"⚠️  Skipping {model_name} after failure: {exc}")
+
+    if not models:
+        raise RuntimeError("No model completed training successfully.")
 
     print("\n" + "=" * 70)
     print("Model Evaluation")
@@ -689,10 +944,22 @@ def main(BUCKET_NAME):
     for m in sorted(all_metrics, key=lambda x: x["f1_score"], reverse=True):
         print(f"{m['model_name']:25s} | F1: {m['f1_score']:.4f} | Acc: {m['accuracy']:.4f}")
 
+    if failed_models:
+        print("\n⚠️  Models that failed during this run:")
+        for name, error_text in failed_models:
+            print(f"  - {name}: {error_text}")
+
     best = max(all_metrics, key=lambda x: x["f1_score"])
+    save_best_model_manifest(spark, MODEL_OUTPUT_DIR, best)
     print(f"\n🏆 Best model: {best['model_name']} — update SELECTED_MODEL in inference script.")
     print("\n✓ Training completed")
     print(f"   Models saved to: {MODEL_OUTPUT_DIR}")
+
+    train_df.unpersist()
+    test_df.unpersist()
+    train_df_raw.unpersist()
+    test_df_raw.unpersist()
+    df.unpersist()
 
     spark.stop()
 

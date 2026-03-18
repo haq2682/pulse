@@ -1,10 +1,21 @@
 import os
+import sys
 import uuid
+import json
 from datetime import datetime, timedelta
+from pathlib import Path
+# Import spark_utils FIRST to set up JARs before pyspark imports
+_ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
+if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT_VAR))
+
+from spark_utils import create_ml_spark_session
+
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, lit, udf, current_timestamp, when, hour, month,
-    rand, count, sum as spark_sum, avg, max as spark_max
+    rand, count, sum as spark_sum, avg, max as spark_max, datediff, current_date
 )
 from pyspark.sql.types import StringType, DoubleType, IntegerType
 from pyspark.ml.feature import VectorAssembler, StringIndexerModel, StandardScalerModel
@@ -12,11 +23,6 @@ from pyspark.ml.classification import (
     LogisticRegressionModel, RandomForestClassificationModel,
     DecisionTreeClassificationModel, OneVsRestModel
 )
-import findspark
-
-findspark.init()
-
-
 # ── Feature lists must exactly match train_fulfillment_risk.py v2 ────────────
 
 NUMERICAL_FEATURES = [
@@ -52,6 +58,7 @@ NUMERICAL_FEATURES = [
     "customer_tenure_days",
     "rfm_overall_score",
     "customer_activity_score",
+    "order_age_days",
     "order_placed_day_of_week",
     "order_placed_hour",
     "order_month",
@@ -66,43 +73,130 @@ NUMERICAL_FEATURES = [
     "fulfillment_complexity",
     "stock_health_combined",
     "customer_reliability_score",
+    "supplier_order_load",
+    "stock_pressure_index",
+    "seasonal_demand_index",
+    "customer_value_risk_interaction",
 ]
 
-CATEGORICAL_FEATURES = ["order_size_category", "season"]
+CATEGORICAL_FEATURES = ["order_status", "order_size_category", "season"]
 
 BOOLEAN_FEATURES = [
     "multiple_suppliers_required",
     "is_holiday_period",
     "is_peak_shopping_season",
     "is_repeat_customer",
+    "is_high_value_order",
 ]
+
+REQUIRED_SOURCE_COLUMNS = {
+    "agg_orders": [
+        "order_id", "customer_id", "order_status", "order_placed_at",
+        "order_placed_day_of_week", "total_amount", "shipping_cost",
+        "discount_percentage", "order_size_category", "season",
+    ],
+    "agg_order_items": ["order_id", "product_id", "quantity"],
+    "agg_products": [
+        "product_id", "supplier_id", "current_stock", "avg_rating",
+        "product_performance_score", "stockout_occurrences", "inventory_turnover_rate",
+    ],
+    "agg_inventory": [
+        "product_id", "reserved_quantity", "available_stock", "stock_coverage_days",
+        "reorder_point_breach", "stock_turnover_ratio",
+    ],
+    "agg_suppliers": [
+        "supplier_id", "supplier_reliability_score", "avg_restock_lead_time",
+        "stockout_rate", "supplier_performance_score", "supplier_rating",
+        "total_orders_fulfilled", "supplier_inventory_health_score",
+    ],
+    "agg_customers": [
+        "customer_id", "total_cancelled_orders", "total_orders", "cancellation_rate",
+        "avg_order_value", "customer_lifetime_value", "is_repeat_customer",
+        "customer_tenure_days", "rfm_overall_score", "customer_activity_score",
+    ],
+}
+
+
+def _missing_columns(df, required_columns):
+    existing = set(df.columns)
+    return [column for column in required_columns if column not in existing]
+
+
+def validate_required_source_columns(dataset_map):
+    missing_report = {}
+    for table_name, required_cols in REQUIRED_SOURCE_COLUMNS.items():
+        df = dataset_map.get(table_name)
+        if df is None:
+            missing_report[table_name] = required_cols
+            continue
+        missing = _missing_columns(df, required_cols)
+        if missing:
+            missing_report[table_name] = missing
+
+    if missing_report:
+        print("✗ Inference skipped: required input columns are missing")
+        for table_name, cols in missing_report.items():
+            print(f"  - {table_name}: missing {cols}")
+        return False
+    return True
+
+
+def validate_feature_columns(df):
+    required = NUMERICAL_FEATURES + CATEGORICAL_FEATURES + BOOLEAN_FEATURES
+    missing = _missing_columns(df, required)
+    if missing:
+        print("✗ Inference skipped: engineered feature set is incomplete")
+        print(f"  Missing feature columns: {missing}")
+        return False
+    return True
+
+
+def hdfs_path_exists(spark, path: str) -> bool:
+    try:
+        jvm = spark._jvm
+        hadoop_conf = spark._jsc.hadoopConfiguration()
+        uri = jvm.java.net.URI.create(path)                          # ← derive URI from path
+        fs = jvm.org.apache.hadoop.fs.FileSystem.get(uri, hadoop_conf)  # ← URI-aware lookup
+        return fs.exists(jvm.org.apache.hadoop.fs.Path(path))
+    except Exception as e:
+        print(f"⚠️  hdfs_path_exists check failed for {path}: {e}")  # ← surface errors
+        return False
+
+
+def resolve_model_selection(spark, model_dir: str, preferred_model: str):
+    manifest_path = f"{model_dir}/_best_model_manifest"
+    if hdfs_path_exists(spark, manifest_path):
+        try:
+            row = spark.read.text(manifest_path).limit(1).collect()
+            if row and row[0]["value"]:
+                payload = json.loads(row[0]["value"])
+                best_model = payload.get("best_model")
+                if best_model:
+                    print(f"✓ Using best model from manifest: {best_model}")
+                    return best_model, payload
+        except Exception as exc:
+            print(f"⚠️  Could not parse best-model manifest, falling back: {exc}")
+
+    print(f"ℹ️  Falling back to preferred model: {preferred_model}")
+    return preferred_model, {}
 
 
 def create_spark_session():
-    return SparkSession.builder \
-        .appName("FulfillmentRiskInference") \
-        .master(os.getenv("SPARK_SERVER", "local[*]")) \
-        .config("spark.jars.packages", "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4") \
-        .config("spark.dynamicAllocation.enabled", "true") \
-        .config("spark.dynamicAllocation.minExecutors", "0") \
-        .config("spark.dynamicAllocation.maxExecutors", "10") \
-        .config("spark.dynamicAllocation.initialExecutors", "2") \
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT")) \
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY")) \
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY")) \
-        .config("spark.hadoop.fs.s3a.path.style.access", "true") \
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false") \
-        .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider") \
-        .config("inferSchema", "true") \
-        .config("mergeSchema", "true") \
-        .getOrCreate()
-
-
+    """Initialize Spark session"""
+    return create_ml_spark_session(
+        "FulfillmentRiskInference",
+        extra_configs={
+                    "inferSchema": "true",
+                    "mergeSchema": "true"
+                },
+    )
 def load_data(spark, path):
     try:
         df = spark.read.parquet(path)
-        print(f"✓ Loaded {df.count()} records from {path.split('/')[-1]}")
+        if os.getenv("ML_LOG_ROW_COUNTS", "false").lower() == "true":
+            print(f"✓ Loaded {df.count()} records from {path.split('/')[-1]}")
+        else:
+            print(f"✓ Loaded {path.split('/')[-1]}")
         return df
     except Exception as e:
         print(f"✗ Failed to load {path.split('/')[-1]}: {e}")
@@ -119,7 +213,7 @@ def join_all_tables(orders_df, order_items_df, products_df, inventory_df, suppli
     )
 
     orders_selected = orders_df.select(
-        "order_id", "customer_id", "order_placed_at", "order_placed_day_of_week",
+        "order_id", "customer_id", "order_status", "order_placed_at", "order_placed_day_of_week",
         "total_amount", "shipping_cost", "discount_percentage",
         "order_size_category", "season"
     )
@@ -213,7 +307,10 @@ def join_all_tables(orders_df, order_items_df, products_df, inventory_df, suppli
 
     df = df.join(customer_info, on="customer_id", how="left")
 
-    print(f"✓ Joined: {df.count()} orders")
+    if os.getenv("ML_LOG_ROW_COUNTS", "false").lower() == "true":
+        print(f"✓ Joined: {df.count()} orders")
+    else:
+        print("✓ Joined")
     return df
 
 
@@ -290,6 +387,30 @@ def engineer_features(df):
         "customer_reliability_score",
         col("rfm_overall_score") * (lit(1) - col("customer_cancellation_rate"))
     )
+    df = df.withColumn(
+        "order_age_days",
+        when(col("order_placed_at").isNotNull(), datediff(current_date(), col("order_placed_at"))).otherwise(lit(0))
+    )
+    df = df.withColumn(
+        "supplier_order_load",
+        col("avg_supplier_fulfilled_orders") / (col("avg_supplier_lead_time") + lit(1))
+    )
+    df = df.withColumn(
+        "stock_pressure_index",
+        col("total_quantity") / (col("avg_available_stock") + lit(1))
+    )
+    df = df.withColumn(
+        "seasonal_demand_index",
+        when(col("season").isin("Winter", "Fall", "Holiday"), lit(1.2)).otherwise(lit(1.0))
+    )
+    df = df.withColumn(
+        "customer_value_risk_interaction",
+        col("customer_lifetime_value") * (lit(1) - col("customer_reliability_score"))
+    )
+    df = df.withColumn(
+        "is_high_value_order",
+        when(col("total_amount") >= 200, lit(1)).otherwise(lit(0))
+    )
 
     fill_cols = [
         "shipping_cost", "discount_percentage",
@@ -302,6 +423,8 @@ def engineer_features(df):
         "customer_tenure_days", "rfm_overall_score", "customer_activity_score",
         "avg_supplier_performance_score", "avg_supplier_rating",
         "avg_supplier_fulfilled_orders", "avg_supplier_inventory_health",
+        "order_age_days", "supplier_order_load", "stock_pressure_index",
+        "seasonal_demand_index", "customer_value_risk_interaction",
         "stock_to_order_ratio", "low_stock_ratio", "out_of_stock_count",
         "order_value_per_item", "reserved_to_quantity_ratio",
         "supplier_risk_composite", "lead_time_quantity_interaction", "order_month",
@@ -321,6 +444,10 @@ def load_model_and_preprocessors(spark, model_dir, model_name):
     """
     try:
         model_path = f"{model_dir}/{model_name}"
+        model_metadata_path = f"{model_path}/metadata"
+        if not hdfs_path_exists(spark, model_metadata_path):
+            print(f"✗ Model artifact missing: {model_metadata_path}")
+            return None, None
 
         if model_name == "LogisticRegression":
             model = LogisticRegressionModel.load(model_path)
@@ -549,22 +676,23 @@ def main(BUCKET_NAME):
     OUTPUT_PATH      = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/fulfillment_risk_predictions"
     MODEL_INPUT_DIR  = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/fulfillment_risk"
 
-    # ⚠️  Set this to the model name that achieved the best F1 in training.
-    #     Options: "GBT" | "RandomForest" | "DecisionTree" | "LogisticRegression"
-    SELECTED_MODEL = "GBT"
-
-    MODEL_VERSION = f"{SELECTED_MODEL}_v2.0"
+    preferred_model = os.getenv("FULFILLMENT_RISK_MODEL", "GBT")
 
     print("=" * 70)
     print("Order Fulfillment Risk - Inference Pipeline v2")
     print("=" * 70)
-    print(f"Using model : {SELECTED_MODEL}")
-    print(f"Model ver.  : {MODEL_VERSION}")
+    print(f"Preferred model: {preferred_model}")
     print("=" * 70)
 
     spark = create_spark_session()
 
-    model, preprocessors = load_model_and_preprocessors(spark, MODEL_INPUT_DIR, SELECTED_MODEL)
+    selected_model, manifest = resolve_model_selection(spark, MODEL_INPUT_DIR, preferred_model)
+    model_version_suffix = manifest.get("best_f1", "unknown")
+    MODEL_VERSION = f"{selected_model}_v2.1_f1_{model_version_suffix}"
+    print(f"Using model    : {selected_model}")
+    print(f"Model ver.     : {MODEL_VERSION}")
+
+    model, preprocessors = load_model_and_preprocessors(spark, MODEL_INPUT_DIR, selected_model)
     if model is None:
         print("✗ Inference stopped: could not load model")
         return
@@ -581,13 +709,26 @@ def main(BUCKET_NAME):
         print("✗ Inference stopped: failed to load all tables")
         return
 
+    if not validate_required_source_columns({
+        "agg_orders": orders_df,
+        "agg_order_items": order_items_df,
+        "agg_products": products_df,
+        "agg_inventory": inventory_df,
+        "agg_suppliers": suppliers_df,
+        "agg_customers": customers_df,
+    }):
+        return
+
     df = join_all_tables(orders_df, order_items_df, products_df, inventory_df, suppliers_df, customers_df)
     df = generate_simulated_features(df)   # display columns only, not in ML
     df = engineer_features(df)
 
+    if not validate_feature_columns(df):
+        return
+
     df_prepared = prepare_features(df, preprocessors)
 
-    predictions_df = generate_predictions(spark, df_prepared, model, SELECTED_MODEL, MODEL_VERSION)
+    predictions_df = generate_predictions(spark, df_prepared, model, selected_model, MODEL_VERSION)
 
     print("\nSample predictions:")
     predictions_df.select(

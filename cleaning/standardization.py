@@ -84,16 +84,11 @@ def remove_outliers(dataframes, table_name, columns):
 
         print(f"  {column} - Keeping data between: {low_cutoff} and {high_cutoff}")
 
-        before_count = result_df.count()
-        
-        # Apply the filter
+        # Apply the outlier filter (no before/after count — pure logging overhead)
         result_df = result_df.filter(
             (F.col(column) >= low_cutoff) & (F.col(column) <= high_cutoff)
         )
-        
-        after_count = result_df.count()
-        removed = before_count - after_count
-        print(f"  Removed {removed} outlier rows based on {column}")
+        print(f"  Applied outlier filter on {column} [{low_cutoff}, {high_cutoff}]")
 
     dataframes[table_name] = result_df
     print(f"\n✅ Completed outlier removal for {table_name}")
@@ -306,38 +301,23 @@ def validate_dates_and_timestamps(dataframes):
             print(f"  🔍 Checking {col_name} ({col_type})...")
 
             if isinstance(col_type, DateType):
-                future_count = result_df.filter(col(col_name) > current_date()).count()
-
-                if future_count > 0:
-                    print(f"    ⚠�� Found {future_count} future dates in {col_name}")
-                    result_df = result_df.withColumn(
-                        col_name,
-                        when(col(col_name) > current_date(), current_date()).otherwise(
-                            col(col_name)
-                        ),
-                    )
-                    print(f"✅ Updated {future_count} future dates to current date")
-                else: 
-                    print(f"✅ No future dates found in {col_name}")
+                # Always apply clamp — no count guard (pure logging overhead)
+                result_df = result_df.withColumn(
+                    col_name,
+                    when(col(col_name) > current_date(), current_date()).otherwise(
+                        col(col_name)
+                    ),
+                )
+                print(f"  \u2705 Clamped future dates in {col_name}")
 
             elif isinstance(col_type, TimestampType):
-                future_count = result_df.filter(
-                    col(col_name) > current_timestamp()
-                ).count()
-
-                if future_count > 0:
-                    print(f"    ⚠️ Found {future_count} future timestamps in {col_name}")
-                    result_df = result_df.withColumn(
-                        col_name,
-                        when(
-                            col(col_name) > current_timestamp(), current_timestamp()
-                        ).otherwise(col(col_name)),
-                    )
-                    print(
-                        f"    ✅ Updated {future_count} future timestamps to current timestamp"
-                    )
-                else: 
-                    print(f"    ✅ No future timestamps found in {col_name}")
+                result_df = result_df.withColumn(
+                    col_name,
+                    when(
+                        col(col_name) > current_timestamp(), current_timestamp()
+                    ).otherwise(col(col_name)),
+                )
+                print(f"  \u2705 Clamped future timestamps in {col_name}")
 
         dataframes[table_name] = result_df
 
@@ -577,6 +557,8 @@ def detect_gibberish_patterns(dataframes):
     print("=" * 60)
     print("✅ PATTERN DETECTION COMPLETED")
     print("=" * 60)
+
+    return dataframes
 
 
 def convert_currency_columns(dataframes, bucket_name):

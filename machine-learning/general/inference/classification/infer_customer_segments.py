@@ -1,14 +1,11 @@
 import os
+
 import uuid
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, lit, udf, current_timestamp
 from pyspark.sql.types import StringType, DoubleType
 from pyspark.ml.feature import VectorAssembler, StringIndexerModel, StandardScalerModel
 from pyspark.ml.classification import LogisticRegressionModel, RandomForestClassificationModel
-import findspark
-
-findspark.init()
-
 # Feature columns (must match training) - NO RFM scores to prevent leakage
 NUMERICAL_FEATURES = [
     "days_since_last_order",
@@ -28,33 +25,25 @@ CATEGORICAL_FEATURES = [
 ]
 
 
+import sys
+from pathlib import Path
+
+_ML_ROOT = next(p for p in Path(__file__).resolve().parents if p.name == "machine-learning")
+if str(_ML_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT))
+
+from spark_utils import create_ml_spark_session
+
 def create_spark_session():
     """Initialize Spark session with MinIO configuration"""
-    return SparkSession.builder \
-        .appName("CustomerSegmentInference") \
-        .master(os.getenv("SPARK_SERVER", "local[*]")) \
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        ) \
-        .config("spark.dynamicAllocation.enabled", "true") \
-        .config("spark.dynamicAllocation.minExecutors", "0") \
-        .config("spark.dynamicAllocation.maxExecutors", "1000") \
-        .config("spark.dynamicAllocation.initialExecutors", "1") \
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT")) \
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY")) \
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY")) \
-        .config("spark.hadoop.fs.s3a.path.style.access", "true") \
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false") \
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        ) \
-        .config("inferSchema", "true") \
-        .config("mergeSchema", "true") \
-        .getOrCreate()
-
+    return create_ml_spark_session(
+        "CustomerSegmentInference",
+        extra_configs={
+            "spark.sql.shuffle.partitions": "8",
+            "inferSchema": "true",
+            "mergeSchema": "true",
+        },
+    )
 
 def load_data(spark, path):
     """Load data from MinIO"""

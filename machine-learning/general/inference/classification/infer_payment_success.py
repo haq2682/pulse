@@ -1,17 +1,14 @@
 import os
+
 import uuid
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, lit, udf, current_timestamp, when
 from pyspark.sql.types import StringType, DoubleType
 from pyspark.ml.feature import VectorAssembler, StringIndexerModel, StandardScalerModel
 from pyspark.ml.classification import (
-    LogisticRegressionModel, RandomForestClassificationModel, DecisionTreeClassificationModel,
+    RandomForestClassificationModel, DecisionTreeClassificationModel,
     MultilayerPerceptronClassificationModel
 )
-import findspark
-
-findspark.init()
-
 # Feature columns (must match training)
 NUMERICAL_FEATURES = [
     "total_amount",
@@ -32,33 +29,25 @@ CATEGORICAL_FEATURES = [
 ]
 
 
+import sys
+from pathlib import Path
+
+_ML_ROOT = next(p for p in Path(__file__).resolve().parents if p.name == "machine-learning")
+if str(_ML_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT))
+
+from spark_utils import create_ml_spark_session
+
 def create_spark_session():
     """Initialize Spark session with MinIO configuration"""
-    return SparkSession.builder \
-        .appName("PaymentSuccessInference") \
-        .master(os.getenv("SPARK_SERVER", "local[*]")) \
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        ) \
-        .config("spark.dynamicAllocation.enabled", "true") \
-        .config("spark.dynamicAllocation.minExecutors", "0") \
-        .config("spark.dynamicAllocation.maxExecutors", "1000") \
-        .config("spark.dynamicAllocation.initialExecutors", "1") \
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT")) \
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY")) \
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY")) \
-        .config("spark.hadoop.fs.s3a.path.style.access", "true") \
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false") \
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        ) \
-        .config("inferSchema", "true") \
-        .config("mergeSchema", "true") \
-        .getOrCreate()
-
+    return create_ml_spark_session(
+        "PaymentSuccessInference",
+        extra_configs={
+            "spark.sql.shuffle.partitions": "8",
+            "inferSchema": "true",
+            "mergeSchema": "true",
+        },
+    )
 
 def load_data(spark, path):
     """Load data from MinIO"""
@@ -114,9 +103,7 @@ def load_model_and_preprocessors(spark, model_dir, model_name):
         model_path = f"{model_dir}/{model_name}"
         
         # Load model
-        if model_name == "LogisticRegression":
-            model = LogisticRegressionModel.load(model_path)
-        elif model_name in ["RandomForest", "RandomForestOptimized"]:
+        if model_name == "RandomForestOptimized":
             model = RandomForestClassificationModel.load(model_path)
         elif model_name == "DecisionTree":
             model = DecisionTreeClassificationModel.load(model_path)
@@ -202,7 +189,7 @@ def prepare_features(df, numerical_features, categorical_features, preprocessors
 
 def extract_feature_importance(model, model_name):
     """Extract feature importance from model (only tree-based models support this)"""
-    if model_name in ["RandomForest", "RandomForestOptimized", "DecisionTree"]:
+    if model_name in ["RandomForestOptimized", "DecisionTree"]:
         importances = model.featureImportances.toArray()
         feature_names = NUMERICAL_FEATURES + CATEGORICAL_FEATURES
         feature_importance = {
@@ -297,7 +284,7 @@ def main(BUCKET_NAME):
     MODEL_INPUT_DIR = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/classification/models/payment_success"
 
     # ⚠️ MANUAL INTERVENTION REQUIRED: Select model to use for inference
-    # Available options: "LogisticRegression", "RandomForest", "RandomForestOptimized", "DecisionTree", "MultilayerPerceptron"
+    # Available options (must match training outputs): "RandomForestOptimized", "DecisionTree", "MultilayerPerceptron"
     SELECTED_MODEL = "RandomForestOptimized"  # <-- CHANGE THIS BASED ON TRAINING RESULTS
 
     MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"

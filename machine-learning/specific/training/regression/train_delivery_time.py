@@ -9,16 +9,30 @@ Target Calculation:
 """
 
 import os
+import sys
+
 import findspark
 from dotenv import load_dotenv
+from pathlib import Path
+# Import spark_utils FIRST to set up JARs before pyspark imports
+_ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
+if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT_VAR))
 
-findspark.init()
+from spark_utils import create_ml_spark_session
+
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
+from pyspark.storagelevel import StorageLevel
 from pyspark.ml.feature import VectorAssembler, StandardScaler, StringIndexer
-from pyspark.ml.regression import RandomForestRegressor, GBTRegressor
+from pyspark.ml.regression import (
+    RandomForestRegressor,
+    GBTRegressor,
+    DecisionTreeRegressor,
+    LinearRegression,
+)
 from pyspark.ml.evaluation import RegressionEvaluator
 from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
 from datetime import datetime
@@ -36,6 +50,11 @@ NUMERIC_FEATURES = [
     "total_quantity",
     "total_amount",
     "shipping_cost",
+    "subtotal",
+    "tax_amount",
+    "total_discount",
+    "discount_percentage",
+    "total_product_price",
     "unique_products_ordered",
     "avg_product_price",
     
@@ -43,6 +62,7 @@ NUMERIC_FEATURES = [
     "order_placed_day_of_week",
     "order_placed_month",
     "order_placed_quarter",
+    "order_placed_week_of_year",
     "order_placed_day_of_month",
     "is_weekend",
     "is_month_end",
@@ -58,10 +78,17 @@ NUMERIC_FEATURES = [
     # Shipping cost tier performance
     "shipping_tier_avg_delivery",
     "shipping_cost_to_amount_ratio",
+    "order_value_per_item",
+    "log_total_amount",
     
     # Customer history
     "customer_total_orders",
     "customer_avg_delivery_days",
+    "customer_tenure_days",
+    "customer_lifetime_value",
+    "customer_recency_days",
+    "rfm_overall_score",
+    "customer_monetary_per_order",
     "is_repeat_customer",
     
     # Order complexity
@@ -71,6 +98,7 @@ NUMERIC_FEATURES = [
     # Distance indicators (proxy)
     "is_major_city",
     "is_capital_city",
+    "location_shipping_interaction",
     
     # Categorical (indexed)
     "country_idx",
@@ -82,36 +110,43 @@ NUMERIC_FEATURES = [
 TARGET_COLUMN = "delivery_days_diff"
 
 
+def ensure_columns(df, defaults: dict):
+    """Ensure columns exist before fillna/feature assembly."""
+    out = df
+    for col_name, default_value in defaults.items():
+        if col_name not in out.columns:
+            out = out.withColumn(col_name, F.lit(default_value))
+    return out
+
+
 def create_spark_session():
     """Initialize Spark session"""
-    return (
-        SparkSession.builder
-        .appName("Delivery_Time_Training")
-        .master(os.getenv("SPARK_SERVER", "local[*]"))
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        )
-        .config("spark.dynamicAllocation.enabled", "true")
-        .config("spark.dynamicAllocation.minExecutors", "0")
-        .config("spark.dynamicAllocation.maxExecutors", "1000")
-        .config("spark.dynamicAllocation.initialExecutors", "1")
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        )
-        .config("inferSchema", "true")
-        .config("mergeSchema", "true")
-        .getOrCreate()
+    return create_ml_spark_session(
+        "Delivery_Time_Training",
+        extra_configs={
+                    "spark.driver.memory": os.getenv("ML_SPARK_DRIVER_MEMORY", "4g"),
+                    "spark.driver.maxResultSize": os.getenv("ML_SPARK_DRIVER_MAX_RESULT_SIZE", "1g"),
+                    "spark.executor.instances": os.getenv("ML_SPARK_EXECUTOR_INSTANCES", "1"),
+                    "spark.executor.cores": os.getenv("ML_SPARK_EXECUTOR_CORES", "1"),
+                    "spark.executor.memory": os.getenv("ML_SPARK_EXECUTOR_MEMORY", "1536m"),
+                    "spark.executor.memoryOverhead": os.getenv("ML_SPARK_EXECUTOR_MEMORY_OVERHEAD", "768"),
+                    "spark.sql.shuffle.partitions": os.getenv("ML_SPARK_SHUFFLE_PARTITIONS", "4"),
+                    "spark.default.parallelism": os.getenv("ML_SPARK_DEFAULT_PARALLELISM", "4"),
+                    "spark.sql.adaptive.enabled": os.getenv("ML_SPARK_SQL_ADAPTIVE", "true"),
+                    "spark.sql.adaptive.coalescePartitions.enabled": os.getenv("ML_SPARK_SQL_COALESCE_PARTITIONS", "true"),
+                    "spark.sql.adaptive.skewJoin.enabled": os.getenv("ML_SPARK_SQL_SKEW_JOIN", "true"),
+                    "spark.network.timeout": os.getenv("ML_SPARK_NETWORK_TIMEOUT", "600s"),
+                    "spark.executor.heartbeatInterval": os.getenv("ML_SPARK_HEARTBEAT_INTERVAL", "60s"),
+                    "spark.shuffle.io.maxRetries": os.getenv("ML_SPARK_SHUFFLE_MAX_RETRIES", "10"),
+                    "spark.shuffle.io.retryWait": os.getenv("ML_SPARK_SHUFFLE_RETRY_WAIT", "10s"),
+                    "spark.task.maxFailures": os.getenv("ML_SPARK_TASK_MAX_FAILURES", "8"),
+                    "spark.stage.maxConsecutiveAttempts": os.getenv("ML_SPARK_STAGE_MAX_ATTEMPTS", "8"),
+                    "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
+                    "spark.kryoserializer.buffer.max": os.getenv("ML_SPARK_KRYO_BUFFER_MAX", "256m"),
+                    "inferSchema": "true",
+                    "mergeSchema": "true"
+                },
     )
-
-
 def validate_dataset(spark, path, name):
     """Check if dataset exists"""
     try:
@@ -124,35 +159,43 @@ def validate_dataset(spark, path, name):
         return None, 0
 
 
-def validate_columns(df, required_columns, dataset_name, MAX_NULL_PERCENTAGE):
-    """Validate columns exist and are not entirely null"""
+def validate_columns(df, required_columns: list, dataset_name: str,
+                     max_null_pct: float = 95.0) -> bool:
+    """
+    OPTIMISED: single .agg() pass to count nulls for all required columns at
+    once instead of one query per column (was N+1 full Spark jobs, now 1).
+    """
     print(f"\nValidating columns for {dataset_name}...")
-    
-    existing_columns = set(df.columns)
-    missing_columns = [col for col in required_columns if col not in existing_columns]
-    
-    if missing_columns:
-        print(f"✗ Missing columns in {dataset_name}: {', '.join(missing_columns)}")
-        return False, missing_columns, []
-    
-    total_count = df.count()
-    null_columns = []
-    
+ 
+    missing = [c for c in required_columns if c not in df.columns]
+    if missing:
+        print(f"  ✗ Missing columns: {', '.join(missing)}")
+        return False
+ 
+    # --- single aggregation over all columns ---
+    agg_exprs = [F.count(F.when(F.col(c).isNull(), 1)).alias(c) for c in required_columns]
+    agg_exprs.insert(0, F.count("*").alias("__total__"))
+ 
+    counts = df.agg(*agg_exprs).collect()[0].asDict()
+    total  = counts["__total__"]
+    if total == 0:
+        print(f"  ✗ {dataset_name} is empty")
+        return False
+ 
+    failed = []
     for col in required_columns:
-        null_count = df.filter(F.col(col).isNull()).count()
-        null_pct = (null_count / total_count * 100) if total_count > 0 else 100
-        
-        if null_pct > MAX_NULL_PERCENTAGE:
-            print(f"✗ Column '{col}' is {null_pct:.1f}% null (threshold: {MAX_NULL_PERCENTAGE}%)")
-            null_columns.append(col)
-        elif null_pct > 50:
-            print(f"⚠  Column '{col}' is {null_pct:.1f}% null (may affect accuracy)")
-    
-    if null_columns:
-        return False, [], null_columns
-    
-    print(f"✓ All required columns validated for {dataset_name}")
-    return True, [], []
+        pct = counts[col] / total * 100
+        if pct > max_null_pct:
+            print(f"  ✗ '{col}' is {pct:.1f}% null (threshold {max_null_pct}%)")
+            failed.append(col)
+        elif pct > 50:
+            print(f"  ⚠  '{col}' is {pct:.1f}% null")
+ 
+    if failed:
+        return False
+ 
+    print(f"  ✓ All required columns validated")
+    return True
 
 
 def calculate_location_delivery_statistics(orders_df, customers_df):
@@ -318,6 +361,40 @@ def create_delivery_time_features(orders_df, customers_df, city_stats_df, state_
         "customer_id",
         "left"
     )
+
+    optional_defaults = {
+        "subtotal": 0.0,
+        "tax_amount": 0.0,
+        "total_discount": 0.0,
+        "discount_percentage": 0.0,
+        "total_product_price": 0.0,
+        "order_placed_week_of_year": 1,
+        "customer_tenure_days": 0,
+        "customer_lifetime_value": 0.0,
+        "rfm_overall_score": 0.0,
+        "total_orders": 0,
+        "total_revenue": 0.0,
+        "days_since_last_purchase": 30,
+        "order_recency_days": 30,
+    }
+    order_features = ensure_columns(order_features, optional_defaults)
+
+    if "days_since_last_purchase" not in order_features.columns:
+        if "last_order_date" in order_features.columns and "order_placed_at" in order_features.columns:
+            order_features = order_features.withColumn(
+                "days_since_last_purchase",
+                F.greatest(
+                    F.datediff(F.to_date("order_placed_at"), F.to_date("last_order_date")),
+                    F.lit(0),
+                ),
+            )
+        elif "order_recency_days" in order_features.columns:
+            order_features = order_features.withColumn(
+                "days_since_last_purchase",
+                F.coalesce(F.col("order_recency_days"), F.lit(30)),
+            )
+        else:
+            order_features = order_features.withColumn("days_since_last_purchase", F.lit(30))
     
     # Create temporal features
     order_features = order_features.withColumn(
@@ -348,6 +425,17 @@ def create_delivery_time_features(orders_df, customers_df, city_stats_df, state_
             F.col("shipping_cost") / F.col("total_amount")
         ).otherwise(0)
     )
+
+    order_features = order_features.withColumn(
+        "order_value_per_item",
+        F.when(
+            F.col("total_quantity") > 0,
+            F.col("total_amount") / F.col("total_quantity")
+        ).otherwise(0.0)
+    ).withColumn(
+        "log_total_amount",
+        F.log1p(F.greatest(F.coalesce(F.col("total_amount"), F.lit(0.0)), F.lit(0.0)))
+    )
     
     # Customer indicators
     order_features = order_features.withColumn(
@@ -356,6 +444,15 @@ def create_delivery_time_features(orders_df, customers_df, city_stats_df, state_
     ).withColumn(
         "customer_total_orders",
         F.coalesce(F.col("customer_order_count"), F.lit(1))
+    ).withColumn(
+        "customer_recency_days",
+        F.coalesce(F.col("days_since_last_purchase"), F.col("order_recency_days"), F.lit(30))
+    ).withColumn(
+        "customer_monetary_per_order",
+        F.when(
+            F.coalesce(F.col("total_orders"), F.lit(0)) > 0,
+            F.coalesce(F.col("total_revenue"), F.lit(0.0)) / F.col("total_orders")
+        ).otherwise(0.0)
     )
     
     # Order complexity
@@ -387,8 +484,12 @@ def create_delivery_time_features(orders_df, customers_df, city_stats_df, state_
     ).withColumn(
         "is_capital_city",
         F.when(F.col("city_order_count") > 200, 1).otherwise(0)
+    ).withColumn(
+        "location_shipping_interaction",
+        F.coalesce(F.col("country_avg_delivery_days"), F.lit(7.0)) *
+        F.coalesce(F.col("shipping_cost_to_amount_ratio"), F.lit(0.0))
     )
-    
+
     # Fill nulls with reasonable defaults
     order_features = order_features.fillna({
         "total_quantity": 1,
@@ -405,79 +506,80 @@ def create_delivery_time_features(orders_df, customers_df, city_stats_df, state_
         "country_avg_delivery_days": 7,  # Global average
         "shipping_tier_avg_delivery": 7,
         "customer_avg_delivery_days": 0,
-        "season": "Summer"
+        "season": "Summer",
+        "customer_tenure_days": 0,
+        "customer_lifetime_value": 0,
+        "rfm_overall_score": 0,
+        "order_placed_week_of_year": 1,
+        "subtotal": 0,
+        "tax_amount": 0,
+        "total_discount": 0,
+        "discount_percentage": 0,
+        "total_product_price": 0,
     })
     
     print(f"✓ Delivery time features created: {order_features.count()} orders")
     return order_features
 
 
-def prepare_training_data(df, MIN_RECORDS_THRESHOLD):
-    """Prepare data with encoding and scaling"""
+def prepare_training_data(df, min_records: int = 100):
+    """
+    Encode categoricals, assemble feature vector, scale.
+    OPTIMISED: removed two .count() calls; record check is deferred to after
+    the .persist() so Spark only triggers one action for the count.
+    """
     print("Preparing training data...")
-    
-    # Filter valid records
+ 
     df_valid = df.filter(
-        (F.col(TARGET_COLUMN).isNotNull()) &
+        F.col(TARGET_COLUMN).isNotNull() &
         (F.col(TARGET_COLUMN) > 0) &
-        (F.col(TARGET_COLUMN) < 100)  # Reasonable delivery time limit
+        (F.col(TARGET_COLUMN) < 100)
     )
-    
-    valid_count = df_valid.count()
-    print(f"Records with valid target: {valid_count}")
-    
-    if valid_count < MIN_RECORDS_THRESHOLD:
-        print(f"✗ Insufficient data: {valid_count} < {MIN_RECORDS_THRESHOLD}")
-        return None
-    
-    # Encode categorical features
-    country_indexer = StringIndexer(inputCol="country", outputCol="country_idx", handleInvalid="keep")
-    state_indexer = StringIndexer(inputCol="state_province", outputCol="state_idx", handleInvalid="keep")
-    city_indexer = StringIndexer(inputCol="city", outputCol="city_idx", handleInvalid="keep")
-    season_indexer = StringIndexer(inputCol="season", outputCol="season_idx", handleInvalid="keep")
-    
-    df_indexed = country_indexer.fit(df_valid).transform(df_valid)
-    df_indexed = state_indexer.fit(df_indexed).transform(df_indexed)
-    df_indexed = city_indexer.fit(df_indexed).transform(df_indexed)
-    df_indexed = season_indexer.fit(df_indexed).transform(df_indexed)
-    
-    # Filter features that exist
-    existing_features = [f for f in NUMERIC_FEATURES if f in df_indexed.columns]
-    missing_features = [f for f in NUMERIC_FEATURES if f not in df_indexed.columns]
-    
+ 
+    # Encode categoricals
+    for in_col, out_col in [
+        ("country", "country_idx"), ("state_province", "state_idx"),
+        ("city", "city_idx"), ("season", "season_idx"),
+    ]:
+        indexer = StringIndexer(inputCol=in_col, outputCol=out_col, handleInvalid="keep")
+        df_valid = indexer.fit(df_valid).transform(df_valid)
+ 
+    existing_features = [f for f in NUMERIC_FEATURES if f in df_valid.columns]
+    missing_features  = [f for f in NUMERIC_FEATURES if f not in df_valid.columns]
     if missing_features:
-        print(f"⚠  Skipping missing features: {', '.join(missing_features)}")
-    
-    print(f"Using {len(existing_features)} features for training")
-    
-    # Assemble features
+        print(f"  ⚠  Skipping missing features: {', '.join(missing_features)}")
+    print(f"  Using {len(existing_features)} features")
+ 
     assembler = VectorAssembler(
         inputCols=existing_features,
         outputCol="features_unscaled",
-        handleInvalid="skip"
+        handleInvalid="skip",
     )
-    
-    df_assembled = assembler.transform(df_indexed)
-    
-    # Scale features
-    scaler = StandardScaler(
-        inputCol="features_unscaled",
-        outputCol="features",
-        withStd=True,
-        withMean=False
-    )
-    
+    df_assembled = assembler.transform(df_valid)
+ 
+    scaler       = StandardScaler(inputCol="features_unscaled", outputCol="features",
+                                  withStd=True, withMean=False)
     scaler_model = scaler.fit(df_assembled)
-    df_scaled = scaler_model.transform(df_assembled)
-    
-    # Select final columns
+    df_scaled    = scaler_model.transform(df_assembled)
+ 
     df_prepared = df_scaled.select(
         "order_id",
         "features",
-        F.col(TARGET_COLUMN).alias("label")
+        F.col(TARGET_COLUMN).alias("label"),
     )
-    
-    print(f"✓ Data prepared: {df_prepared.count()} records")
+ 
+    # OPTIMISED: persist here so the count() below is the ONLY action that
+    # triggers materialisation, and the subsequent split reuses cached data.
+    df_prepared.persist(StorageLevel.MEMORY_AND_DISK)
+    valid_count = df_prepared.count()   # single action
+    print(f"  Records for training: {valid_count}")
+ 
+    if valid_count < min_records:
+        df_prepared.unpersist()
+        print(f"  ✗ Insufficient data: {valid_count} < {min_records}")
+        return None
+ 
+    print("  ✓ Data prepared")
     return df_prepared, scaler_model, existing_features
 
 
@@ -523,24 +625,127 @@ def train_random_forest(train_df, test_df, use_cv=False):
     return model, predictions, "random_forest"
 
 
+def train_models_and_select_best(train_df, test_df):
+    """Train multiple regressors and select the best by R², then RMSE."""
+    candidates = [
+        (
+            "random_forest",
+            RandomForestRegressor(
+                featuresCol="features",
+                labelCol="label",
+                numTrees=140,
+                maxDepth=12,
+                minInstancesPerNode=10,
+                seed=42,
+            ),
+        ),
+        (
+            "gbt_regressor",
+            GBTRegressor(
+                featuresCol="features",
+                labelCol="label",
+                maxIter=70,
+                maxDepth=5,
+                stepSize=0.1,
+                seed=42,
+            ),
+        ),
+        (
+            "decision_tree",
+            DecisionTreeRegressor(
+                featuresCol="features",
+                labelCol="label",
+                maxDepth=12,
+                minInstancesPerNode=40,
+                seed=42,
+            ),
+        ),
+        (
+            "linear_regression",
+            LinearRegression(
+                featuresCol="features",
+                labelCol="label",
+                regParam=0.05,
+                elasticNetParam=0.2,
+                maxIter=60,
+            ),
+        ),
+    ]
+
+    results = []
+    for model_name, estimator in candidates:
+        print("\n" + "=" * 60)
+        print(f"Training {model_name}")
+        print("=" * 60)
+
+        model = estimator.fit(train_df)
+        predictions = model.transform(test_df)
+        metrics = evaluate_model(predictions, model_name)
+        try:
+            predictions.unpersist()
+        except Exception:
+            pass
+        results.append({"model_name": model_name, "model": model, "metrics": metrics})
+
+    results.sort(key=lambda item: (-item["metrics"]["r2"], item["metrics"]["rmse"]))
+
+    print("\n" + "=" * 60)
+    print("Model Leaderboard")
+    print("=" * 60)
+    for rank, item in enumerate(results, 1):
+        m = item["metrics"]
+        print(
+            f"{rank}. {item['model_name']:<18} "
+            f"R²={m['r2']:.4f} RMSE={m['rmse']:.3f} MAE={m['mae']:.3f} MAPE={m['mape']:.2f}%"
+        )
+
+    best = results[0]
+    return best["model"], best["model_name"], best["metrics"], results
+
+
 def evaluate_model(predictions, model_name):
     """Evaluate model"""
     print(f"\nEvaluating {model_name}...")
-    
-    rmse_eval = RegressionEvaluator(labelCol="label", predictionCol="prediction", metricName="rmse")
-    mae_eval = RegressionEvaluator(labelCol="label", predictionCol="prediction", metricName="mae")
-    r2_eval = RegressionEvaluator(labelCol="label", predictionCol="prediction", metricName="r2")
-    
-    rmse = rmse_eval.evaluate(predictions)
-    mae = mae_eval.evaluate(predictions)
-    r2 = r2_eval.evaluate(predictions)
-    
-    mape_df = predictions.filter(F.col("label") > 0).withColumn(
-        "ape",
-        F.abs((F.col("label") - F.col("prediction")) / F.col("label")) * 100
+
+    clean = (
+        predictions
+        .select(F.col("label").cast("double"), F.col("prediction").cast("double"))
+        .filter(F.col("label").isNotNull() & F.col("prediction").isNotNull())
+        .filter(~F.isnan("label") & ~F.isnan("prediction"))
+        .withColumn("err", F.col("prediction") - F.col("label"))
+        .withColumn("abs_err", F.abs(F.col("err")))
+        .withColumn("sq_err", F.col("err") * F.col("err"))
+        .withColumn(
+            "ape",
+            F.when(F.col("label") > 0, (F.col("abs_err") / F.col("label")) * 100.0),
+        )
     )
-    mape = mape_df.agg(F.avg("ape")).collect()[0][0] if mape_df.count() > 0 else 0
-    
+
+    stats = clean.agg(
+        F.count("*").alias("n"),
+        F.sum("sq_err").alias("sse"),
+        F.avg("sq_err").alias("mse"),
+        F.avg("abs_err").alias("mae"),
+        F.avg("ape").alias("mape"),
+        F.sum("label").alias("sum_y"),
+        F.sum(F.col("label") * F.col("label")).alias("sum_y_sq"),
+    ).collect()[0]
+
+    n = int(stats["n"] or 0)
+    if n == 0:
+        raise RuntimeError(f"No valid prediction rows to evaluate for model '{model_name}'")
+
+    sse = float(stats["sse"] or 0.0)
+    mse = float(stats["mse"] or 0.0)
+    mae = float(stats["mae"] or 0.0)
+    mape = float(stats["mape"] or 0.0)
+    sum_y = float(stats["sum_y"] or 0.0)
+    sum_y_sq = float(stats["sum_y_sq"] or 0.0)
+    mean_y = sum_y / n
+    sst = max(sum_y_sq - n * mean_y * mean_y, 0.0)
+    r2 = 1.0 - (sse / sst) if sst > 0 else 0.0
+    rmse = mse ** 0.5
+
     metrics = {"model": model_name, "rmse": rmse, "mae": mae, "r2": r2, "mape": mape}
     
     print(f"  RMSE: {rmse:.2f} days")
@@ -594,8 +799,8 @@ def main(BUCKET_NAME):
     print("\nStep 2: Column Validation")
     print("-" * 60)
     
-    orders_valid, _, _ = validate_columns(orders_df, REQUIRED_ORDER_COLUMNS, "Orders", MAX_NULL_PERCENTAGE)
-    customers_valid, _, _ = validate_columns(customers_df, REQUIRED_CUSTOMER_COLUMNS, "Customers", MAX_NULL_PERCENTAGE)
+    orders_valid = validate_columns(orders_df, REQUIRED_ORDER_COLUMNS, "Orders", MAX_NULL_PERCENTAGE)
+    customers_valid = validate_columns(customers_df, REQUIRED_CUSTOMER_COLUMNS, "Customers", MAX_NULL_PERCENTAGE)
     
     if not (orders_valid and customers_valid):
         print("\n✗ Training aborted: Required columns missing or entirely null")
@@ -647,27 +852,40 @@ def main(BUCKET_NAME):
     print("\nStep 8: Train/Test Split")
     print("-" * 60)
     train_df, test_df = df_prepared.randomSplit([0.8, 0.2], seed=42)
+    train_df = train_df.persist(StorageLevel.MEMORY_AND_DISK)
+    test_df = test_df.persist(StorageLevel.MEMORY_AND_DISK)
     print(f"Training set: {train_df.count()} records")
     print(f"Test set: {test_df.count()} records")
     
     # Train model
     print("\nStep 9: Model Training")
     print("-" * 60)
-    
-    model, predictions, model_name = train_random_forest(train_df, test_df, USE_CROSS_VALIDATION)
-    metrics = evaluate_model(predictions, model_name)
-    save_model(model, model_name, MODEL_OUTPUT_PATH)
+
+    best_model, best_model_name, best_metrics, all_model_results = train_models_and_select_best(train_df, test_df)
+
+    print("\nStep 10: Persist Models")
+    print("-" * 60)
+    for item in all_model_results:
+        save_model(item["model"], item["model_name"], MODEL_OUTPUT_PATH)
+    save_model(best_model, "best_model", MODEL_OUTPUT_PATH)
     
     print("\n" + "="*60)
-    print(f"Best Model: {model_name} (R² = {metrics['r2']:.4f})")
+    print(f"Best Model: {best_model_name} (R² = {best_metrics['r2']:.4f})")
     print("="*60)
     
     print(f"\nEnd time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("✓ Training completed\n")
+
+    try:
+        train_df.unpersist()
+        test_df.unpersist()
+        df_prepared.unpersist()
+    except Exception:
+        pass
     
     spark.stop()
 
 
 if __name__ == "__main__":
-    BUCKET_NAME = "pulse-bucket-1"
+    BUCKET_NAME = "afc4bd21-75ad-4da3-9fd7-4b0b540a1ccc"
     main(BUCKET_NAME)

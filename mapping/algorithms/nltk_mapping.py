@@ -1,9 +1,18 @@
+import logging
 import re
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.metrics.distance import edit_distance
 from difflib import SequenceMatcher
 from pyspark.sql.functions import lit
+
+
+logger = logging.getLogger(__name__)
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    )
 
 # Download required NLTK data
 nltk.download("punkt", quiet=True)
@@ -110,7 +119,12 @@ def mapping_with_nltk(df, missing_cols, extra_cols, mapped_cols, threshold=0.87)
                 best_match = extra_col
 
         if best_match and best_score > threshold:
-            print(f"NLTK Mapping: {best_match} -> {missing_col}: {best_score:.2f}")
+            logger.info(
+                "NLTK mapping | source=%s target=%s score=%.2f%%",
+                best_match,
+                missing_col,
+                best_score * 100,
+            )
             mapped_cols[missing_col] = best_match
             missing_cols.remove(missing_col)
             extra_cols.remove(best_match)

@@ -14,6 +14,7 @@ from pyspark.sql import functions as F
 
 # Constants for General Model Training
 GENERAL_MODEL_BUCKET = "pulse-bucket-1"
+EXCLUDED_BUCKETS = {"pulse-test-bucket", "pulse-checkpoints"}
 
 def get_minio_buckets(spark: SparkSession, bucket_prefix: str = None) -> List[str]:
     """
@@ -57,6 +58,11 @@ def get_minio_buckets(spark: SparkSession, bucket_prefix: str = None) -> List[st
         
         for bucket in bucket_list:
             bucket_name = bucket.name
+
+            # Skip non-data buckets used for tests/checkpoints
+            if bucket_name in EXCLUDED_BUCKETS:
+                continue
+
             # Apply optional prefix filter
             if bucket_prefix is None or bucket_name.startswith(bucket_prefix):
                 buckets.append(bucket_name)
@@ -79,22 +85,27 @@ def load_data_from_all_buckets(
     relative_path: str,
     required_columns: List[str],
     filter_nulls: bool = True,
-    union_mode: str = "permissive"
+    union_mode: str = "permissive",
+    keep_source_bucket: bool = False,
 ) -> Tuple[Optional[DataFrame], int]:
     """
-    Load and aggregate data from all MinIO buckets.
-    
+    Load and aggregate data from all MinIO tenant buckets.
+
     Args:
         spark: SparkSession with MinIO configuration
         relative_path: Path relative to bucket root (e.g., "transformed/agg_customers.parquet")
         required_columns: List of columns that must have non-null values
         filter_nulls: If True, filter out rows where required_columns have null values
         union_mode: How to handle schema differences ("permissive" or "strict")
-    
+        keep_source_bucket: If True, retain the ``_source_bucket`` column in the returned
+            DataFrame so callers that perform multi-table joins can use it as a
+            composite join key to prevent cross-tenant ID collisions.  When False
+            (default) the column is dropped before returning.
+
     Returns:
         Tuple of (DataFrame with aggregated data, total record count)
     """
-    buckets = get_minio_buckets(spark)
+    buckets = [bucket for bucket in get_minio_buckets(spark) if bucket not in EXCLUDED_BUCKETS]
     
     print(f"📦 Loading data from {len(buckets)} bucket(s)...")
     print(f"   Buckets: {', '.join(buckets[:5])}{'...' if len(buckets) > 5 else ''}")
@@ -102,11 +113,14 @@ def load_data_from_all_buckets(
     all_dataframes = []
     total_loaded = 0
     
+    if not buckets:
+        print("   ✗ No tenant buckets available for training")
+        return None, 0
+
     for bucket in buckets:
         full_path = f"s3a://{bucket}/{relative_path}"
         try:
             df = spark.read.parquet(full_path)
-            df = df.cache()
             record_count = df.count()
             
             if record_count > 0:
@@ -156,13 +170,18 @@ def load_data_from_all_buckets(
                     combined_df = combined_df.select(common_cols).union(df.select(common_cols))
                 else:
                     raise e
-    
-    # Drop the source bucket column before returning (it was for debugging)
-    if "_source_bucket" in combined_df.columns:
+        # Unpersist individual bucket DFs now that union is complete
+        for df in all_dataframes:
+            df.unpersist()
+
+    # Retain or drop the _source_bucket column based on caller preference.
+    # Multi-table trainers set keep_source_bucket=True so they can include it in
+    # join conditions and prevent cross-tenant ID collisions.
+    if "_source_bucket" in combined_df.columns and not keep_source_bucket:
         combined_df = combined_df.drop("_source_bucket")
-    
+
     print(f"   📊 Total aggregated: {total_loaded} records")
-    
+
     return combined_df, total_loaded
 
 

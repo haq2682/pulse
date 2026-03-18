@@ -1,7 +1,16 @@
+import logging
 from nltk.corpus import wordnet
 from pyspark.sql.functions import lit
 import re
 from nltk.tokenize import word_tokenize
+
+
+logger = logging.getLogger(__name__)
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    )
 
 
 def preprocess_column_name(column):
@@ -95,7 +104,12 @@ def semantic_column_mapping(df, missing_cols, extra_cols, mapped_cols, threshold
                 best_score = similarity
                 best_match = extra_col
         if best_match:
-            print(f"Wordnet Mapping: {best_match} -> {missing_col}: {best_score:.2f}")
+            logger.info(
+                "WordNet mapping | source=%s target=%s score=%.2f%%",
+                best_match,
+                missing_col,
+                best_score * 100,
+            )
             mapped_cols[missing_col] = best_match
             missing_cols.remove(missing_col)
             extra_cols.remove(best_match)

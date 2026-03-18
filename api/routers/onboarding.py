@@ -18,6 +18,7 @@ import subprocess
 from datetime import datetime
 import asyncio
 import time
+import re
 
 redis = aioredis.from_url(
     f"redis://{os.getenv('REDIS_HOST', '10.5.0.11')}:{os.getenv('REDIS_PORT', '6379')}",
@@ -47,6 +48,179 @@ router = APIRouter(
 )
 
 logger = logging.getLogger("pulse")
+
+
+_QUALIFIED_REF_RE = re.compile(r'^\s*"(?P<table>[^"]+)"\s*\.\s*"(?P<column>[^"]+)"\s*$')
+_UNQUOTED_REF_RE = re.compile(r'^\s*(?P<table>[A-Za-z_][\w$]*)\s*\.\s*(?P<column>[A-Za-z_][\w$]*)\s*$')
+
+
+def _build_qualified_ref(table_name: str, column_name: str) -> str:
+    table = str(table_name or "").strip().strip('"')
+    column = str(column_name or "").strip().strip('"')
+    return f'"{table}"."{column}"' if table and column else ""
+
+
+def _parse_source_ref(raw_value, fallback_table: str = None):
+    if raw_value is None:
+        return None, None
+
+    if isinstance(raw_value, dict):
+        source_table = (
+            raw_value.get("table")
+            or raw_value.get("sourceTable")
+            or raw_value.get("source_table")
+        )
+        source_column = (
+            raw_value.get("originalColumn")
+            or raw_value.get("column")
+            or raw_value.get("value")
+            or raw_value.get("sourceColumn")
+            or raw_value.get("source_column")
+        )
+        return (
+            str(source_table).strip().strip('"') if source_table else None,
+            str(source_column).strip().strip('"') if source_column else None,
+        )
+
+    raw_str = str(raw_value).strip()
+    if not raw_str:
+        return None, None
+
+    qualified_match = _QUALIFIED_REF_RE.match(raw_str)
+    if qualified_match:
+        return (
+            qualified_match.group("table").strip(),
+            qualified_match.group("column").strip(),
+        )
+
+    unquoted_match = _UNQUOTED_REF_RE.match(raw_str)
+    if unquoted_match:
+        return (
+            unquoted_match.group("table").strip(),
+            unquoted_match.group("column").strip(),
+        )
+
+    return (fallback_table, raw_str.strip().strip('"'))
+
+
+def _build_extra_col_index(mapping_results_payload) -> dict:
+    payload = mapping_results_payload or {}
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except Exception:
+            payload = {}
+
+    index = {}
+    if not isinstance(payload, dict):
+        return index
+
+    for item in payload.get("extra_cols", []):
+        if not isinstance(item, dict):
+            continue
+        table = str(item.get("table") or "").strip()
+        column = str(item.get("column") or "").strip()
+        if not table or not column:
+            continue
+        index.setdefault(column, set()).add(table)
+    return index
+
+
+def _normalize_table_mappings(table_mappings_payload, extra_col_index=None):
+    if not isinstance(table_mappings_payload, dict):
+        return {}
+
+    normalized = {}
+    for target_table, table_map in table_mappings_payload.items():
+        target_table_str = str(target_table or "").strip()
+        if not target_table_str or not isinstance(table_map, dict):
+            continue
+
+        normalized[target_table_str] = {}
+        for canonical_col, raw_source_ref in table_map.items():
+            canonical_col_str = str(canonical_col or "").strip()
+            if not canonical_col_str:
+                continue
+
+            source_table, source_col = _parse_source_ref(raw_source_ref, fallback_table=target_table_str)
+            if not source_col:
+                continue
+
+            if not source_table and extra_col_index:
+                candidate_tables = sorted(list(extra_col_index.get(source_col, set())))
+                if len(candidate_tables) == 1:
+                    source_table = candidate_tables[0]
+
+            source_table = source_table or target_table_str
+            qualified_ref = _build_qualified_ref(source_table, source_col)
+            if qualified_ref:
+                normalized[target_table_str][canonical_col_str] = qualified_ref
+
+        if not normalized[target_table_str]:
+            normalized.pop(target_table_str, None)
+
+    return normalized
+
+
+_TABLE_JOIN_KEYS = {
+    "addresses": {"address_id"},
+    "customers": {"customer_id", "address_id"},
+    "suppliers": {"supplier_id"},
+    "categories": {"category_id"},
+    "products": {"product_id", "category_id", "supplier_id"},
+    "inventory": {"inventory_id", "product_id", "supplier_id"},
+    "wishlist": {"wishlist_id", "customer_id", "product_id"},
+    "shopping_cart": {"cart_id", "customer_id", "session_id"},
+    "cart_items": {"cart_item_id", "cart_id", "product_id"},
+    "orders": {"order_id", "customer_id"},
+    "order_items": {"order_item_id", "order_id", "product_id"},
+    "payments": {"payment_id", "order_id"},
+    "reviews": {"review_id", "product_id", "customer_id"},
+    "marketing_campaigns": {"campaign_id"},
+    "customer_sessions": {"session_id", "customer_id"},
+}
+
+
+def _find_invalid_cross_table_mappings(normalized_mappings: dict) -> list:
+    invalid = []
+    if not isinstance(normalized_mappings, dict):
+        return invalid
+
+    for target_table, table_map in normalized_mappings.items():
+        if not isinstance(table_map, dict):
+            continue
+
+        target_table_norm = str(target_table or "").strip().lower()
+        target_keys = _TABLE_JOIN_KEYS.get(target_table_norm, set())
+
+        for canonical_col, source_ref in table_map.items():
+            source_table, source_col = _parse_source_ref(source_ref, fallback_table=target_table_norm)
+            source_table_norm = str(source_table or "").strip().lower()
+            source_col_norm = str(source_col or "").strip()
+            if not source_col_norm:
+                continue
+
+            if not source_table_norm or source_table_norm == target_table_norm:
+                continue
+
+            source_keys = _TABLE_JOIN_KEYS.get(source_table_norm, set())
+            common_keys = sorted(list(target_keys & source_keys))
+
+            if not common_keys:
+                invalid.append(
+                    {
+                        "targetTable": target_table_norm,
+                        "targetColumn": str(canonical_col or "").strip(),
+                        "sourceTable": source_table_norm,
+                        "sourceColumn": source_col_norm,
+                        "reason": (
+                            f"No valid join key between '{target_table_norm}' and "
+                            f"'{source_table_norm}'."
+                        ),
+                    }
+                )
+
+    return invalid
 
 def _airflow_auth_header() -> str:
     """Return a Basic-auth header value for Airflow REST API calls."""
@@ -109,6 +283,7 @@ async def _trigger_api_streaming_dag(business_id: str, api_url: str) -> None:
     a second competing streaming job on the same Kafka consumer group.
     """
     import urllib.request
+    import urllib.error
     import json as _json
 
     # Idempotency guard — runs in threadpool to avoid blocking the event loop.
@@ -122,12 +297,16 @@ async def _trigger_api_streaming_dag(business_id: str, api_url: str) -> None:
     poll_interval = int(os.getenv("API_POLL_INTERVAL", "30"))
 
     url = f"{airflow_base}/api/v1/dags/api_streaming/dagRuns"
+    # Airflow Stable REST API accepts dag-run payload keys like dag_run_id,
+    # logical_date, note, and conf. It does NOT accept top-level "params"
+    # (that causes HTTP 400: {"params": ["Unknown field."]} on strict schemas).
+    # The DAG reads dag_run.conf already, so conf-only is sufficient.
     payload = _json.dumps({
         "conf": {
             "bucket":        business_id,
             "api_url":       api_url,
             "poll_interval": poll_interval,
-        }
+        },
     }).encode()
 
     req = urllib.request.Request(
@@ -141,8 +320,14 @@ async def _trigger_api_streaming_dag(business_id: str, api_url: str) -> None:
     )
 
     def _do_request():
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return resp.read()
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return resp.read()
+        except urllib.error.HTTPError as e:
+            body = e.read().decode(errors="replace")
+            raise RuntimeError(
+                f"Airflow api_streaming trigger failed with HTTP {e.code}: {body}"
+            ) from e
 
     await run_in_threadpool(_do_request)
 
@@ -157,6 +342,7 @@ async def _trigger_db_streaming_dag(business_id: str, db_uri: str, db_tables: st
     consumer group and MinIO checkpoint.
     """
     import urllib.request
+    import urllib.error
     import json as _json
 
     # Idempotency guard — runs in threadpool to avoid blocking the event loop.
@@ -169,12 +355,16 @@ async def _trigger_db_streaming_dag(business_id: str, db_uri: str, db_tables: st
     airflow_base = os.getenv("AIRFLOW_BASE_URL", "http://airflow-webserver:8080")
 
     url = f"{airflow_base}/api/v1/dags/db_streaming/dagRuns"
+    # Airflow Stable REST API accepts dag-run payload keys like dag_run_id,
+    # logical_date, note, and conf. It does NOT accept top-level "params"
+    # (that causes HTTP 400: {"params": ["Unknown field."]} on strict schemas).
+    # The DAG reads dag_run.conf already, so conf-only is sufficient.
     payload = _json.dumps({
         "conf": {
             "bucket":    business_id,
             "db_uri":    db_uri,
             "db_tables": db_tables,
-        }
+        },
     }).encode()
 
     req = urllib.request.Request(
@@ -188,8 +378,14 @@ async def _trigger_db_streaming_dag(business_id: str, db_uri: str, db_tables: st
     )
 
     def _do_request():
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return resp.read()
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return resp.read()
+        except urllib.error.HTTPError as e:
+            body = e.read().decode(errors="replace")
+            raise RuntimeError(
+                f"Airflow db_streaming trigger failed with HTTP {e.code}: {body}"
+            ) from e
 
     await run_in_threadpool(_do_request)
 
@@ -690,6 +886,7 @@ async def start_mapping(request: Request, db=Depends(get_db)):
             # polling once the user confirms their column mappings.
             initial_poll_duration = int(os.getenv("API_INITIAL_POLL_DURATION", "120"))
             cmd.extend(["--poll-duration", str(initial_poll_duration)])
+            cmd.append("--trigger-once")
 
         # Store connection details in the onboarding record so confirm-mapping
         # can retrieve them later to trigger the corresponding Airflow DAG.
@@ -1467,6 +1664,14 @@ async def save_manual_mappings(request: Request, db=Depends(get_db)):
             raise HTTPException(status_code=404, detail="Onboarding record not found")
         
         business_id = onboarding_record[0]
+
+        mapping_results_row = db.execute(
+            text("SELECT mapping_results FROM onboarding WHERE user_id = :user_id AND is_completed = false"),
+            {"user_id": user_id},
+        ).fetchone()
+        mapping_results_payload = mapping_results_row[0] if mapping_results_row else None
+        extra_col_index = _build_extra_col_index(mapping_results_payload)
+        normalized_manual_mappings = _normalize_table_mappings(manual_mappings, extra_col_index=extra_col_index)
         
         # Save manual mappings to database
         db.execute(
@@ -1476,7 +1681,7 @@ async def save_manual_mappings(request: Request, db=Depends(get_db)):
                 WHERE user_id = :user_id AND is_completed = false
             """),
             {
-                "manual_mappings": json.dumps(manual_mappings),
+                "manual_mappings": json.dumps(normalized_manual_mappings),
                 "user_id": user_id
             }
         )
@@ -1484,7 +1689,11 @@ async def save_manual_mappings(request: Request, db=Depends(get_db)):
         
         # Store in Redis for the mapping pipeline to use
         if business_id:
-            await redis.set(f"manual_mappings:{business_id}", json.dumps(manual_mappings), ex=MAPPING_PROCESS_TTL)
+            await redis.set(
+                f"manual_mappings:{business_id}",
+                json.dumps(normalized_manual_mappings),
+                ex=MAPPING_PROCESS_TTL,
+            )
         
         return {
             "status": 200,
@@ -1539,6 +1748,24 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
                 detail=f"Cannot apply manual mappings - initial mapping status is '{mapping_status}', must be 'completed'"
             )
         
+        mapping_results_row = db.execute(
+            text("SELECT mapping_results FROM onboarding WHERE user_id = :user_id AND is_completed = false"),
+            {"user_id": user_id},
+        ).fetchone()
+        mapping_results_payload = mapping_results_row[0] if mapping_results_row else None
+        extra_col_index = _build_extra_col_index(mapping_results_payload)
+        normalized_manual_mappings = _normalize_table_mappings(manual_mappings, extra_col_index=extra_col_index)
+
+        invalid_cross_table_mappings = _find_invalid_cross_table_mappings(normalized_manual_mappings)
+        if invalid_cross_table_mappings:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Invalid cross-table manual mappings. Please select a source column with a valid join path.",
+                    "invalidMappings": invalid_cross_table_mappings,
+                },
+            )
+
         # Save manual mappings to database first
         db.execute(
             text("""
@@ -1547,7 +1774,7 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
                 WHERE user_id = :user_id AND is_completed = false
             """),
             {
-                "manual_mappings": json.dumps(manual_mappings),
+                "manual_mappings": json.dumps(normalized_manual_mappings),
                 "user_id": user_id
             }
         )
@@ -1565,7 +1792,7 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
             "python3",
             script_path,
             "--bucket-name", business_id,
-            "--manual-mappings", json.dumps(manual_mappings)
+            "--manual-mappings", json.dumps(normalized_manual_mappings)
         ]
         
         # Run the script synchronously (it's fast since it just renames columns)
@@ -1669,7 +1896,8 @@ async def confirm_mapping(request: Request, db=Depends(get_db)):
         # Get the onboarding record
         onboarding = db.execute(
             text("""
-                SELECT business_id, mapping_status, current_step, ingestion_type, api_url, db_uri, db_tables
+                SELECT business_id, mapping_status, current_step, ingestion_type, api_url, db_uri, db_tables,
+                       manual_mappings, mapping_results, auto_mappings
                 FROM onboarding
                 WHERE user_id = :user_id AND is_completed = false
             """),
@@ -1680,7 +1908,41 @@ async def confirm_mapping(request: Request, db=Depends(get_db)):
         if not onboarding_record:
             raise HTTPException(status_code=404, detail="Onboarding record not found")
 
-        business_id, mapping_status, current_step, ingestion_type, stored_api_url, stored_db_uri, stored_db_tables = onboarding_record
+        (
+            business_id,
+            mapping_status,
+            current_step,
+            ingestion_type,
+            stored_api_url,
+            stored_db_uri,
+            stored_db_tables,
+            stored_manual_mappings,
+            stored_mapping_results,
+            stored_auto_mappings,
+        ) = onboarding_record
+        ingestion_type = (ingestion_type or "").strip().lower()
+
+        def _as_dict(payload):
+            if payload is None:
+                return None
+            if isinstance(payload, dict):
+                return payload
+            if isinstance(payload, str):
+                try:
+                    parsed = json.loads(payload)
+                    return parsed if isinstance(parsed, dict) else None
+                except Exception:
+                    return None
+            return None
+
+        if ingestion_type not in ("batch", "db", "api"):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid ingestion_type in onboarding record. "
+                    "Expected one of: batch, db, api."
+                ),
+            )
         
         # Verify mapping is completed
         if mapping_status != "completed":
@@ -1688,23 +1950,162 @@ async def confirm_mapping(request: Request, db=Depends(get_db)):
                 status_code=400, 
                 detail=f"Cannot confirm mapping - status is '{mapping_status}', must be 'completed'"
             )
-        
-        # Update onboarding to mark as complete
+
+        def _as_dict(payload):
+            if payload is None:
+                return None
+            if isinstance(payload, dict):
+                return payload
+            if isinstance(payload, str):
+                try:
+                    parsed = json.loads(payload)
+                    return parsed if isinstance(parsed, dict) else None
+                except Exception:
+                    return None
+            return None
+
+        # Resolve manual mappings BEFORE migration so the latest frontend
+        # selections are used when moving mapped-temp/ -> mapped/.
+        body_has_manual_mappings = "manualMappings" in body and isinstance(body.get("manualMappings"), dict)
+        body_manual_mappings = body.get("manualMappings") if body_has_manual_mappings else None
+
+        try:
+            redis_manual_mappings = None
+            redis_mm_str = await redis.get(f"manual_mappings:{business_id}")
+            if redis_mm_str:
+                redis_manual_mappings = _as_dict(redis_mm_str)
+        except Exception as _redis_mm_err:
+            print(f"Warning: could not read manual mappings from Redis in confirm-mapping: {_redis_mm_err}")
+            redis_manual_mappings = None
+
+        resolved_manual_mappings = (
+            body_manual_mappings
+            if body_has_manual_mappings
+            else redis_manual_mappings
+            if isinstance(redis_manual_mappings, dict)
+            else _as_dict(stored_manual_mappings)
+            if _as_dict(stored_manual_mappings) is not None
+            else {}
+        )
+
+        extra_col_index = _build_extra_col_index(stored_mapping_results)
+        normalized_manual_mappings = _normalize_table_mappings(
+            resolved_manual_mappings,
+            extra_col_index=extra_col_index,
+        )
+        normalized_auto_mappings = _normalize_table_mappings(
+            _as_dict(stored_auto_mappings) or {},
+            extra_col_index=extra_col_index,
+        )
+
+        combined_mappings = {
+            table_name: dict(table_mappings)
+            for table_name, table_mappings in normalized_auto_mappings.items()
+            if isinstance(table_name, str) and isinstance(table_mappings, dict)
+        }
+
+        for table_name, table_mappings in normalized_manual_mappings.items():
+            if table_name not in combined_mappings or not isinstance(combined_mappings[table_name], dict):
+                combined_mappings[table_name] = {}
+            combined_mappings[table_name].update(table_mappings)
+
+        try:
+            await redis.set(
+                f"manual_mappings:{business_id}",
+                json.dumps(normalized_manual_mappings),
+                ex=MAPPING_PROCESS_TTL,
+            )
+        except Exception as _redis_set_err:
+            print(f"Warning: could not persist manual mappings to Redis in confirm-mapping: {_redis_set_err}")
+
         db.execute(
             text("""
-                UPDATE onboarding 
-                SET is_completed = :is_completed,
-                    current_step = :current_step
+                UPDATE onboarding
+                SET manual_mappings = :manual_mappings,
+                    combined_mappings = :combined_mappings
                 WHERE user_id = :user_id AND is_completed = false
             """),
             {
-                "is_completed": True,
-                "current_step": "mapping",  # Keep on mapping step but mark as complete
-                "user_id": user_id
-            }
+                "manual_mappings": json.dumps(normalized_manual_mappings),
+                "combined_mappings": json.dumps(combined_mappings),
+                "user_id": user_id,
+            },
         )
         db.commit()
+
+        try:
+            await redis.set(
+                f"combined_mappings:{business_id}",
+                json.dumps(combined_mappings),
+                ex=MAPPING_PROCESS_TTL,
+            )
+        except Exception as _redis_set_combined_err:
+            print(f"Warning: could not persist combined mappings to Redis in confirm-mapping: {_redis_set_combined_err}")
         
+        # Safety guard: always clear the streaming_use_temp flag here so the
+        # Airflow continuous streaming job never routes subsequent micro-batches
+        # to mapped-temp, regardless of whether apply-manual-mappings was called
+        # before confirm-mapping or there was a partial failure in that endpoint.
+        try:
+            await redis.delete(f"streaming_use_temp:{business_id}")
+        except Exception as _redis_clear_err:
+            print(f"Warning: could not clear streaming_use_temp flag in confirm-mapping: {_redis_clear_err}")
+
+        # ── Guarantee mapped-temp/ → mapped/ migration ────────────────────────
+        # The apply-manual-mappings endpoint is only called from the frontend when
+        # the user filled in at least one manual mapping.  When the user had no
+        # missing columns (auto-mapped perfectly) or skipped all suggestions, the
+        # frontend calls confirm-mapping directly, skipping apply-manual-mappings.
+        # To ensure mapped/ always exists before the Airflow streaming job starts,
+        # we run apply_manual_mappings.py here unconditionally.  If it finds no
+        # files in mapped-temp/ (because apply-manual-mappings already migrated
+        # them), it exits non-zero with "No mapped files found" — that is treated
+        # as a non-fatal success (migration already done).
+        if ingestion_type in ("db", "api", "batch"):
+            try:
+                _script_path = "/app/mapping/apply_manual_mappings.py"
+                if os.path.exists(_script_path):
+                    _migration_result = await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: subprocess.run(
+                            [
+                                "python3", _script_path,
+                                "--bucket-name", business_id,
+                                "--manual-mappings", json.dumps(normalized_manual_mappings),
+                            ],
+                            cwd="/app/mapping",
+                            env=os.environ.copy(),
+                            capture_output=True,
+                            text=True,
+                            timeout=MANUAL_MAPPING_TIMEOUT_SECONDS,
+                        )
+                    )
+                    if _migration_result.returncode == 0:
+                        print(
+                            f"✅ confirm-mapping: mapped-temp/ → mapped/ migration done "
+                            f"for {business_id}"
+                        )
+                    else:
+                        # "No mapped files found" means apply-manual-mappings already
+                        # ran and cleaned up mapped-temp/ — treat as success.
+                        _err_tail = (_migration_result.stderr or "")[-400:]
+                        if "No mapped files found" in _err_tail or "No mapped files found" in (_migration_result.stdout or ""):
+                            print(
+                                f"ℹ️  confirm-mapping: mapped-temp/ already empty for "
+                                f"{business_id} (apply-manual-mappings ran earlier)"
+                            )
+                        else:
+                            print(
+                                f"⚠️  confirm-mapping: migration script exited "
+                                f"{_migration_result.returncode} for {business_id}: {_err_tail}"
+                            )
+            except Exception as _migration_err:
+                # Non-fatal — log but do not abort confirm-mapping.
+                print(
+                    f"⚠️  confirm-mapping: non-fatal migration error for {business_id}: "
+                    f"{_migration_err}"
+                )
+
         print(f"User {user_id} confirmed mapping for business {business_id}")
         
         # Trigger data processing pipeline
@@ -1726,42 +2127,112 @@ async def confirm_mapping(request: Request, db=Depends(get_db)):
             import traceback
             traceback.print_exc()
 
-        # For API mode: trigger the api_streaming Airflow DAG so the user's
-        # external API is polled continuously (with Airflow auto-restart on crash).
-        if ingestion_type == "api" and stored_api_url:
+        # For API mode: trigger api_streaming so continuous polling +
+        # StreamingNormalization starts under Airflow supervision.
+        warnings = []
+
+        if ingestion_type == "api":
+            api_url_for_trigger = (stored_api_url or body.get("apiUrl") or "").strip()
+            if not api_url_for_trigger:
+                raise HTTPException(
+                    status_code=400,
+                    detail="API onboarding is missing api_url. Re-run /onboarding/start-mapping in api mode before confirming.",
+                )
+
+            if api_url_for_trigger != (stored_api_url or ""):
+                db.execute(
+                    text("""
+                        UPDATE onboarding
+                        SET api_url = :api_url
+                        WHERE user_id = :user_id AND is_completed = false
+                    """),
+                    {"api_url": api_url_for_trigger, "user_id": user_id},
+                )
+                db.commit()
+
             try:
                 await _trigger_api_streaming_dag(
                     business_id=business_id,
-                    api_url=stored_api_url,
+                    api_url=api_url_for_trigger,
                 )
                 print(f"api_streaming DAG triggered for business {business_id}")
             except Exception as dag_error:
-                # Non-fatal: log and continue — the user's onboarding is complete.
-                print(f"Warning: Failed to trigger api_streaming DAG: {dag_error}")
-                import traceback
-                traceback.print_exc()
+                warning_message = f"Failed to trigger api_streaming DAG: {dag_error}"
+                print(f"⚠️  {warning_message}")
+                warnings.append(warning_message)
 
-        # For DB mode: trigger the db_streaming Airflow DAG so Debezium CDC
-        # streams continuously under Airflow supervision (with auto-restart).
-        if ingestion_type == "db" and stored_db_uri:
+        # For DB mode: trigger db_streaming so Debezium CDC +
+        # StreamingNormalization starts under Airflow supervision.
+        if ingestion_type == "db":
+            db_uri_for_trigger = (stored_db_uri or body.get("dbUri") or "").strip()
+            db_tables_for_trigger = (stored_db_tables or body.get("dbTables") or "")
+            if isinstance(db_tables_for_trigger, list):
+                db_tables_for_trigger = ",".join([str(t).strip() for t in db_tables_for_trigger if str(t).strip()])
+            else:
+                db_tables_for_trigger = str(db_tables_for_trigger or "").strip()
+
+            if not db_uri_for_trigger:
+                raise HTTPException(
+                    status_code=400,
+                    detail="DB onboarding is missing db_uri. Re-run /onboarding/start-mapping in db mode before confirming.",
+                )
+
+            if not db_tables_for_trigger:
+                raise HTTPException(
+                    status_code=400,
+                    detail="DB onboarding is missing db_tables. Re-run /onboarding/start-mapping in db mode before confirming.",
+                )
+
+            if db_uri_for_trigger != (stored_db_uri or "") or (db_tables_for_trigger or "") != (stored_db_tables or ""):
+                db.execute(
+                    text("""
+                        UPDATE onboarding
+                        SET db_uri = :db_uri, db_tables = :db_tables
+                        WHERE user_id = :user_id AND is_completed = false
+                    """),
+                    {
+                        "db_uri": db_uri_for_trigger,
+                        "db_tables": db_tables_for_trigger,
+                        "user_id": user_id,
+                    },
+                )
+                db.commit()
+
             try:
                 await _trigger_db_streaming_dag(
                     business_id=business_id,
-                    db_uri=stored_db_uri,
-                    db_tables=stored_db_tables or "",
+                    db_uri=db_uri_for_trigger,
+                    db_tables=db_tables_for_trigger,
                 )
                 print(f"db_streaming DAG triggered for business {business_id}")
             except Exception as dag_error:
-                # Non-fatal: log and continue — the user's onboarding is complete.
-                print(f"Warning: Failed to trigger db_streaming DAG: {dag_error}")
-                import traceback
-                traceback.print_exc()
+                warning_message = f"Failed to trigger db_streaming DAG: {dag_error}"
+                print(f"⚠️  {warning_message}")
+                warnings.append(warning_message)
+
+        # Mark onboarding complete only after streaming DAG trigger succeeded
+        # (or immediately for batch mode).
+        db.execute(
+            text("""
+                UPDATE onboarding
+                SET is_completed = :is_completed,
+                    current_step = :current_step
+                WHERE user_id = :user_id AND is_completed = false
+            """),
+            {
+                "is_completed": True,
+                "current_step": "mapping",
+                "user_id": user_id,
+            }
+        )
+        db.commit()
         
         return {
             "status": 200,
             "message": "Mapping confirmed and onboarding completed successfully",
             "is_completed": True,
-            "business_id": business_id
+            "business_id": business_id,
+            "warnings": warnings,
         }
     
     except HTTPException:

@@ -115,7 +115,6 @@ const ExecutiveOverview = () => {
         applyQuickFilter,
         resetFilters,
         clientFilter,
-        toISODate,
     } = useAnalyticsDateFilter();
 
     // ---- websocket ----
@@ -125,40 +124,111 @@ const ExecutiveOverview = () => {
     // Fetch
     // -----------------------------------------------------------------------
 
-    const buildUrl = useCallback(
-        (from, to) => {
-            const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-            const params = new URLSearchParams({
-                categories: ANALYTICS_CATEGORIES.join(','),
-            });
-            if (from) params.set('date_from', toISODate(from));
-            if (to)   params.set('date_to',   toISODate(to));
-            return `${base}/analytics/data/${businessId}?${params.toString()}`;
-        },
-        [businessId, toISODate]
-    );
-
     const fetchData = useCallback(
-        async (from, to) => {
+        async () => {
             if (!businessId) return;
             setLoading(true);
             try {
-                const res = await fetch(buildUrl(from, to));
+                const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+                const REQUEST_TIMEOUT_MS = 45000;
+                const EXEC_FILES = {
+                    kpis: [
+                        'business_health_daily',
+                        'business_health_weekly',
+                        'business_health_monthly',
+                        'clv_summary',
+                        'funnel_summary',
+                        'cart_abandon_summary',
+                        'customer_engagement_summary',
+                        'session_to_order_analysis',
+                    ],
+                    customer_analytics: [
+                        'cumulative_customers_daily',
+                        'new_customers_daily',
+                    ],
+                    product_analytics: [
+                        'best_selling_products',
+                    ],
+                    operations_analytics: [
+                        'processing_by_status',
+                        'ontime_delivery_by_country',
+                        'delivery_days_by_country',
+                    ],
+                    marketing_analytics: [
+                        'campaign_performance_summary',
+                    ],
+                };
+                const categoryEntries = await Promise.all(
+                    ANALYTICS_CATEGORIES.map(async (category) => {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+                        const emptyCategoryPayload = { category, analytics: {}, total_count: 0, file_errors: {} };
+                        try {
+                            const params = new URLSearchParams();
+                            const files = EXEC_FILES[category] || [];
+                            if (files.length) {
+                                params.set('files', files.join(','));
+                            }
+                            params.set('row_limit', '5000');
+                            const categoryRes = await fetch(
+                                `${base}/analytics/data/${businessId}/category/${category}?${params.toString()}`,
+                                {
+                                    credentials: 'include',
+                                    signal: controller.signal,
+                                }
+                            );
+                            if (!categoryRes.ok || categoryRes.status === 204) {
+                                return [category, emptyCategoryPayload];
+                            }
+                            const categoryText = await categoryRes.text();
+                            if (!categoryText || !categoryText.trim()) {
+                                return [category, emptyCategoryPayload];
+                            }
+                            try {
+                                const parsedCategory = JSON.parse(categoryText);
+                                const hasData =
+                                    parsedCategory &&
+                                    parsedCategory.analytics &&
+                                    Object.keys(parsedCategory.analytics).length > 0;
 
-                if (!res.ok) {
-                    toastRef.current?.show({
-                        severity: 'warn',
-                        summary: 'No Data',
-                        detail: 'Analytics data not available. Run the analytics pipeline first.',
-                        life: 5000,
-                    });
-                    setRawCategories(null);
-                    return;
-                }
+                                if (hasData) {
+                                    return [category, parsedCategory];
+                                }
 
-                const json = await res.json();
-                if (json.mode) setDataMode(json.mode);
-                setRawCategories(json.categories ?? {});
+                                const fallbackRes = await fetch(
+                                    `${base}/analytics/data/${businessId}/category/${category}?row_limit=5000`,
+                                    {
+                                        credentials: 'include',
+                                        signal: controller.signal,
+                                    }
+                                );
+                                if (!fallbackRes.ok || fallbackRes.status === 204) {
+                                    return [category, emptyCategoryPayload];
+                                }
+
+                                const fallbackText = await fallbackRes.text();
+                                if (!fallbackText || !fallbackText.trim()) {
+                                    return [category, emptyCategoryPayload];
+                                }
+
+                                try {
+                                    return [category, JSON.parse(fallbackText)];
+                                } catch {
+                                    return [category, emptyCategoryPayload];
+                                }
+                            } catch {
+                                return [category, emptyCategoryPayload];
+                            }
+                        } catch {
+                            return [category, emptyCategoryPayload];
+                        } finally {
+                            clearTimeout(timeoutId);
+                        }
+                    })
+                );
+
+                setDataMode('category_fetch');
+                setRawCategories(Object.fromEntries(categoryEntries));
             } catch (err) {
                 console.error('[ExecutiveOverview] Fetch error:', err);
                 toastRef.current?.show({
@@ -171,12 +241,12 @@ const ExecutiveOverview = () => {
                 setLoading(false);
             }
         },
-        [businessId, buildUrl]
+        [businessId]
     );
 
-    useEffect(() => { fetchData(null, null); }, [businessId]); // eslint-disable-line
+    useEffect(() => { fetchData(); }, [businessId]); // eslint-disable-line
 
-    useEffect(() => { fetchData(dateRange.from, dateRange.to); }, [dateRange]); // eslint-disable-line
+    useEffect(() => { fetchData(); }, [dateRange]); // eslint-disable-line
 
     useEffect(() => {
         if (lastUpdate?.files) {
@@ -186,7 +256,7 @@ const ExecutiveOverview = () => {
                 detail: `${lastUpdate.total_files} metric(s) updated`,
                 life: 3000,
             });
-            fetchData(dateRange.from, dateRange.to);
+            fetchData();
         }
     }, [lastUpdate]); // eslint-disable-line
 
@@ -467,7 +537,7 @@ const ExecutiveOverview = () => {
         );
     }
 
-    if (!hasData && !loading && pipelineStatus !== 'loading') {
+    if (!hasData && !loading && (pipelineStatus !== 'loading' && pipelineStatus?.status !== 'failed')) {
         return (
             <div className="p-6 min-h-[calc(100vh-120px)]">
                 <Toast ref={toastRef} />
@@ -493,6 +563,13 @@ const ExecutiveOverview = () => {
 
     const { kpis, revenueTrend, customerData, productData, operationsData, marketingData } =
         derived ?? {};
+
+    const pctAuto = (value, decimals = 2) => {
+        const numeric = Number(value ?? 0);
+        if (!Number.isFinite(numeric)) return fmt.pct(0, decimals);
+        const scaled = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+        return fmt.pct(scaled, decimals);
+    };
 
     return (
         <div className="p-6 bg-gray-50 min-h-[calc(100vh-120px)]">
@@ -568,7 +645,7 @@ const ExecutiveOverview = () => {
                             icon="pi-percentage"
                             iconBg="bg-red-50"
                             iconColor="text-red-500"
-                            value={fmt.pct(kpis.profitMargin)}
+                            value={pctAuto(kpis.profitMargin)}
                             label="Profit Margin"
                         />
                     )}
@@ -586,7 +663,7 @@ const ExecutiveOverview = () => {
                             icon="pi-chart-bar"
                             iconBg="bg-cyan-50"
                             iconColor="text-cyan-500"
-                            value={fmt.pct(kpis.conversionRate)}
+                            value={pctAuto(kpis.conversionRate)}
                             label={`Conversion Rate${isFiltered ? ' *' : ''}`}
                         />
                     )}
@@ -595,7 +672,7 @@ const ExecutiveOverview = () => {
                             icon="pi-shopping-bag"
                             iconBg="bg-rose-50"
                             iconColor="text-rose-500"
-                            value={fmt.pct(kpis.abandonmentRate)}
+                            value={pctAuto(kpis.abandonmentRate)}
                             label={`Cart Abandonment Rate${isFiltered ? ' *' : ''}`}
                         />
                     )}
@@ -604,7 +681,7 @@ const ExecutiveOverview = () => {
                             icon="pi-check-circle"
                             iconBg="bg-emerald-50"
                             iconColor="text-emerald-500"
-                            value={fmt.pct(kpis.purchaseRate)}
+                            value={pctAuto(kpis.purchaseRate)}
                             label={`Purchase Rate${isFiltered ? ' *' : ''}`}
                         />
                     )}
@@ -731,17 +808,17 @@ const ExecutiveOverview = () => {
                     rows={[
                         {
                             label: 'Overall Conversion Rate',
-                            value: fmt.pct(kpis?.conversionRate),
+                            value: pctAuto(kpis?.conversionRate),
                             show:  kpis?.conversionRate > 0,
                         },
                         {
                             label: 'View → Cart',
-                            value: fmt.pct(kpis?.viewToCartConversion),
+                            value: pctAuto(kpis?.viewToCartConversion),
                             show:  kpis?.viewToCartConversion > 0,
                         },
                         {
                             label: 'Cart → Order',
-                            value: fmt.pct(kpis?.cartToOrderConversion),
+                            value: pctAuto(kpis?.cartToOrderConversion),
                             show:  kpis?.cartToOrderConversion > 0,
                         },
                         {
@@ -778,12 +855,12 @@ const ExecutiveOverview = () => {
                         },
                         {
                             label: 'Abandonment Rate',
-                            value: fmt.pct(kpis?.abandonmentRate),
+                            value: pctAuto(kpis?.abandonmentRate),
                             show:  kpis?.abandonmentRate > 0,
                         },
                         {
                             label: 'Purchase Rate',
-                            value: fmt.pct(kpis?.purchaseRate),
+                            value: pctAuto(kpis?.purchaseRate),
                             show:  kpis?.purchaseRate > 0,
                         },
                     ]}
@@ -810,12 +887,12 @@ const ExecutiveOverview = () => {
                         },
                         {
                             label: 'Session Conversion Rate',
-                            value: fmt.pct(kpis?.avgSessionConversionRate),
+                            value: pctAuto(kpis?.avgSessionConversionRate),
                             show:  kpis?.avgSessionConversionRate > 0,
                         },
                         {
                             label: 'Session Cart Abandonment',
-                            value: fmt.pct(kpis?.avgCartAbandonmentRate),
+                            value: pctAuto(kpis?.avgCartAbandonmentRate),
                             show:  kpis?.avgCartAbandonmentRate > 0,
                         },
                     ]}

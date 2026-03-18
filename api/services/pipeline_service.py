@@ -1,412 +1,518 @@
 """
-Pipeline service for orchestrating data processing pipeline execution.
+Pipeline service – orchestrates data processing via the Airflow batch_downstream DAG.
 
-This service handles:
-- Starting and managing subprocess execution for cleaning, transformation, analysis, and ML
-- Real-time progress tracking and updates to PostgreSQL
-- WebSocket broadcasting of progress updates
-- Error handling and logging
-- Pipeline cancellation and cleanup
+Execution model
+---------------
+POST /pipeline/start  (or /pipeline/retry, /pipeline/trigger-streaming)
+  │  ├─ Insert pipeline_status row  (status = 'running')
+  ├─ Trigger Airflow REST API → batch_downstream dagRun
+  │    conf = {"bucket": business_id, "pipeline_id": pipeline_id}
+  ├─ Persist dag_run_id in the process_ids JSON column of pipeline_status
+  └─ Launch asyncio background task: _poll_airflow_status(…)
+       polls every _POLL_INTERVAL seconds
+       maps Airflow task states → current_step / progress %
+       broadcasts via WebSocket to InlinePipelineProgress component
+       exits when DAG state is terminal (success / failed)
+
+Crash recovery
+--------------
+recover_stuck_pipelines(db) is called from api/main.py on startup.
+It scans pipeline_status for status='running' rows and for each:
+  • dag_run_id present + DAG still active in Airflow  → restart polling task
+  • DAG already terminal                              → sync pipeline_status
+  • no dag_run_id (pre-Airflow asyncio row)           → mark failed instantly
 """
 
 import os
 import asyncio
-import subprocess
 import uuid
 import json
+import base64
+import urllib.request
+import urllib.error
+import urllib.parse
 import logging
-import signal
+import time
 from datetime import datetime
 from typing import Optional, Dict, Any
 from sqlalchemy import text
 
 logger = logging.getLogger("pulse.pipeline")
 
-# TTL (seconds) for the cross-container downstream pipeline lock stored in Redis.
-# Acts as a safety net if the pipeline process exits without releasing the lock.
-_DOWNSTREAM_LOCK_TTL_SECONDS = 7200  # 2 hours
+# ── Airflow REST config ────────────────────────────────────────────────────────
+_AIRFLOW_BASE  = os.getenv("AIRFLOW_BASE_URL",  "http://airflow-webserver:8080")
+_AIRFLOW_USER  = os.getenv("AIRFLOW_USERNAME",  "admin")
+_AIRFLOW_PASS  = os.getenv("AIRFLOW_PASSWORD",  "admin")
+_DAG_ID        = "batch_downstream"
+_POLL_INTERVAL = int(os.getenv("PIPELINE_POLL_INTERVAL", "15"))  # seconds
+
+# ── Airflow task-id → (description, progress_start %, progress_end %) ─────────
+_TASK_PROGRESS: Dict[str, tuple] = {
+    "clean":               ("Cleaning Data",               0,   25),
+    "transform":           ("Transforming & Aggregating", 25,   55),
+    "analyze":             ("Analyzing Data",             55,   85),
+    "ml_train":            ("Training ML Models",         85,   90),
+    "ml_infer":            ("Running ML Predictions",     90,  100),
+    "trigger_drift_check": ("Running ML Predictions",    100,  100),
+}
+
+_RUNNING_STATES = {"running", "queued", "up_for_retry", "restarting", "scheduled", "deferred"}
+_SUCCESS_STATES = {"success", "skipped"}
+_FAILURE_STATES = {"failed", "upstream_failed"}
+
+
+# ── Module-level helpers ───────────────────────────────────────────────────────
+
+def _airflow_headers() -> dict:
+    creds = base64.b64encode(
+        f"{_AIRFLOW_USER}:{_AIRFLOW_PASS}".encode()
+    ).decode()
+    return {"Authorization": f"Basic {creds}", "Content-Type": "application/json"}
+
+
+def _airflow_request(method: str, path: str, body: Optional[dict] = None):
+    """Synchronous Airflow REST API call.  Returns parsed JSON or raises."""
+    url = f"{_AIRFLOW_BASE}/api/v1/{path}"
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(
+        url, data=data, headers=_airflow_headers(), method=method
+    )
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return json.loads(r.read())
+
+
+def _airflow_cancel_dag_run(dag_id: str, dag_run_id: str) -> bool:
+    """
+    Best-effort hard cancel:
+      1) mark running/queued task instances as failed,
+      2) patch dagRun state to failed,
+      3) verify dagRun reaches terminal state.
+    Returns True only when Airflow confirms terminal state.
+    """
+    encoded_run_id = urllib.parse.quote(dag_run_id, safe="")
+    encoded_dag_id = urllib.parse.quote(dag_id, safe="")
+
+    try:
+        task_resp = _airflow_request(
+            "GET",
+            f"dags/{encoded_dag_id}/dagRuns/{encoded_run_id}/taskInstances",
+        )
+        for task in task_resp.get("task_instances", []):
+            task_state = (task.get("state") or "").lower()
+            if task_state not in _RUNNING_STATES:
+                continue
+
+            task_id = task.get("task_id")
+            if not task_id:
+                continue
+
+            encoded_task_id = urllib.parse.quote(task_id, safe="")
+            patch_path = (
+                f"dags/{encoded_dag_id}/dagRuns/{encoded_run_id}/"
+                f"taskInstances/{encoded_task_id}"
+            )
+
+            try:
+                _airflow_request("PATCH", patch_path, {"new_state": "failed"})
+            except Exception:
+                _airflow_request("PATCH", patch_path, {"state": "failed"})
+    except Exception as exc:
+        logger.warning("Could not patch task instances for dag_run %s: %s", dag_run_id, exc)
+
+    _airflow_request(
+        "PATCH",
+        f"dags/{encoded_dag_id}/dagRuns/{encoded_run_id}",
+        {"state": "failed"},
+    )
+
+    # Verify cancellation reached terminal state.
+    for _ in range(5):
+        dag_info = _airflow_request(
+            "GET",
+            f"dags/{encoded_dag_id}/dagRuns/{encoded_run_id}",
+        )
+        dag_state = (dag_info.get("state") or "").lower()
+        if dag_state not in _RUNNING_STATES:
+            return True
+        time.sleep(1)
+
+    return False
+
+
+def _interpret_state(dag_state: str, tasks: dict) -> tuple:
+    """
+    Map Airflow DAG + task states to (current_step: str, progress: int, failed_phase: str|None).
+    Walk tasks in pipeline order; the first non-success state determines the
+    description and progress to report.
+    """
+    last_step = "Cleaning Data"
+    last_progress = 0
+    for task_id, (desc, prog_start, prog_end) in _TASK_PROGRESS.items():
+        state = tasks.get(task_id)
+        if state in _FAILURE_STATES:
+            return desc, prog_start, task_id
+        if state in _SUCCESS_STATES:
+            last_step = desc
+            last_progress = prog_end
+        elif state in _RUNNING_STATES:
+            return desc, prog_start, None
+        # state is None (not yet scheduled) → continue walking
+    return last_step, last_progress, None
+
+
+def _mark_failed_sync(
+    db,
+    pipeline_id: str,
+    reason: str = "Pipeline interrupted (API restart). Please retry.",
+) -> None:
+    """Mark a pipeline_status row as failed synchronously (for startup recovery)."""
+    db.execute(
+        text("""
+            UPDATE pipeline_status
+            SET status        = 'failed',
+                current_step  = 'Pipeline interrupted',
+                error_message = :reason,
+                completed_at  = :now
+            WHERE pipeline_id = :pid
+        """),
+        {"reason": reason, "now": datetime.now(), "pid": pipeline_id},
+    )
+
+
+async def recover_stuck_pipelines(db) -> None:
+    """
+    Called on API startup.  For every pipeline_status row still in 'running':
+      1. dag_run_id + DAG still active in Airflow → restart polling background task
+      2. DAG already finished → sync pipeline_status to match (completed / failed)
+      3. No dag_run_id (pre-Airflow asyncio run) → mark as failed immediately
+    """
+    try:
+        rows = db.execute(
+            text("""
+                SELECT pipeline_id, business_id, process_ids
+                FROM pipeline_status
+                WHERE status = 'running'
+            """)
+        ).fetchall()
+    except Exception as exc:
+        logger.error("recover_stuck_pipelines: DB error: %s", exc)
+        return
+
+    if not rows:
+        return
+
+    logger.info("recover_stuck_pipelines: %d stuck pipeline(s) found", len(rows))
+
+    for pipeline_id, business_id, process_ids_json in rows:
+        dag_run_id = None
+        dag_id_hint = None
+        if process_ids_json:
+            try:
+                pids = json.loads(process_ids_json)
+                dag_run_id = pids.get("dag_run_id")
+                dag_id_hint = pids.get("dag_id")
+            except Exception:
+                pass
+
+        # Rows owned by the scheduled_batch DAG are managed entirely by the
+        # Airflow DAG itself (via _update_pipeline_status_for_bucket).  The
+        # API must not overwrite them on startup; the scheduled_batch will set
+        # the terminal status when it finishes.
+        if dag_id_hint == "scheduled_batch":
+            logger.info(
+                "  %s: owned by scheduled_batch DAG — leaving status unchanged",
+                pipeline_id,
+            )
+            continue
+
+        if not dag_run_id:
+            # Pre-Airflow asyncio pipeline — subprocess is definitely dead.
+            logger.info("  %s: no dag_run_id (old asyncio run) → marking failed", pipeline_id)
+            _mark_failed_sync(db, pipeline_id)
+            continue
+
+        # Ask Airflow for the current DAG run state.
+        try:
+            dag_info  = _airflow_request("GET", f"dags/{_DAG_ID}/dagRuns/{dag_run_id}")
+            dag_state = dag_info.get("state", "")
+        except Exception as exc:
+            logger.warning("  %s: cannot reach Airflow (%s) → marking failed", pipeline_id, exc)
+            _mark_failed_sync(db, pipeline_id)
+            continue
+
+        if dag_state == "success":
+            logger.info("  %s: DAG already succeeded → marking completed", pipeline_id)
+            db.execute(
+                text("""
+                    UPDATE pipeline_status
+                    SET status = 'completed', progress_percentage = 100,
+                        current_step = 'Pipeline completed successfully',
+                        completed_at = :now
+                    WHERE pipeline_id = :pid
+                """),
+                {"now": datetime.now(), "pid": pipeline_id},
+            )
+        elif dag_state == "failed":
+            logger.info("  %s: DAG already failed → marking failed", pipeline_id)
+            _mark_failed_sync(db, pipeline_id, "Pipeline failed. Please retry.")
+        elif dag_state in ("running", "queued"):
+            logger.info(
+                "  %s: DAG %s still '%s' → restarting poller",
+                pipeline_id, dag_run_id, dag_state,
+            )
+            from services.websocket_manager import WebSocketManager
+            svc = PipelineService(db, WebSocketManager())
+            asyncio.create_task(
+                svc._poll_airflow_status(pipeline_id, business_id, dag_run_id, db)
+            )
+        else:
+            logger.warning("  %s: DAG state '%s' → marking failed", pipeline_id, dag_state)
+            _mark_failed_sync(
+                db, pipeline_id,
+                f"Pipeline entered unexpected state '{dag_state}'. Please retry.",
+            )
+
+    db.commit()
+    logger.info("recover_stuck_pipelines: done")
 
 class PipelineService:
-    """Service for managing data processing pipeline execution."""
-    
-    # Pipeline phases with their scripts and progress weights
-    PIPELINE_PHASES = [
-        {
-            "name": "cleaning",
-            "script": "cleaning/cleaning.py",
-            "description": "Cleaning Data",
-            "weight": 25  # Progress percentage weight
-        },
-        {
-            "name": "transformation",
-            "script": "transformation/transformation.py",
-            "description": "Transforming & Aggregating Data",
-            "weight": 30
-        },
-        {
-            "name": "analysis",
-            "script": "analysis/analysis.py",
-            "description": "Analyzing Data",
-            "weight": 30
-        },
-        {
-            "name": "machine-learning",
-            "script": "machine-learning/infer_all.py",
-            "description": "Running ML Predictions",
-            "weight": 15
-        }
-    ]
-    
+    """Service for managing data processing pipeline execution via Airflow."""
+
     def __init__(self, db, websocket_manager=None):
         """
-        Initialize pipeline service.
-        
         Args:
-            db: Database connection (only used for initial operations)
-            websocket_manager: WebSocket manager for broadcasting updates (optional)
+            db: SQLAlchemy session (request-scoped; only used for the initial
+                INSERT.  Background tasks open their own connection via
+                get_db_connection().)
+            websocket_manager: WebSocketManager for real-time progress broadcast.
         """
         self.db = db
         self.websocket_manager = websocket_manager
-        
-        # Determine project root - handle both development and container environments
-        # In container: /app/services/pipeline_service.py -> /app
-        # In development: /path/to/pulse/api/services/pipeline_service.py -> /path/to/pulse
-        current_file = os.path.abspath(__file__)
-        
-        # Check if we're in the 'api/services' structure or just 'services'
-        if '/api/services/' in current_file or current_file.endswith('/api/services/pipeline_service.py'):
-            # Development structure: go up 3 levels (services -> api -> project_root)
-            self.project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
-        elif '/services/' in current_file or current_file.endswith('/services/pipeline_service.py'):
-            # Container structure: go up 2 levels (services -> app)
-            self.project_root = os.path.dirname(os.path.dirname(current_file))
-        else:
-            # Fallback: assume we're in the project root
-            self.project_root = os.path.dirname(current_file)
-        
-        logger.info("PipelineService initialized with project_root: %s", self.project_root)
     
-    async def start_pipeline(self, business_id: str, user_id: str, start_from_phase: Optional[str] = None) -> str:
+    # ──────────────────────────────────────────────────────────────────────────
+    # Public interface
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def start_pipeline(
+        self, business_id: str, user_id: str,
+        start_from_phase: Optional[str] = None,
+    ) -> str:
         """
-        Start the data processing pipeline for a business.
-        
-        Args:
-            business_id: The business ID (used as bucket name)
-            user_id: The user ID
-            start_from_phase: Optional phase name to start from (for resuming)
-            
-        Returns:
-            pipeline_id: The unique pipeline execution ID
+        Trigger the Airflow batch_downstream DAG for this business and start a
+        background polling task that pushes WebSocket progress updates.
+
+        start_from_phase is accepted for API compatibility but ignored — Airflow
+        runs each task from the beginning and retries each task up to 3× internally.
         """
         pipeline_id = str(uuid.uuid4())
-        
-        # Create pipeline status record using the request-scoped connection
+
+        # Insert initial status row.
         self.db.execute(
             text("""
-                INSERT INTO pipeline_status 
-                (pipeline_id, business_id, user_id, status, current_step, progress_percentage, started_at)
-                VALUES (:pipeline_id, :business_id, :user_id, :status, :current_step, :progress_percentage, :started_at)
+                INSERT INTO pipeline_status
+                (pipeline_id, business_id, user_id, status, current_step,
+                 progress_percentage, started_at)
+                VALUES (:pipeline_id, :business_id, :user_id, :status,
+                        :current_step, :progress_percentage, :started_at)
             """),
             {
-                "pipeline_id": pipeline_id,
-                "business_id": business_id,
-                "user_id": user_id,
-                "status": "running",
-                "current_step": "Initializing Pipeline",
+                "pipeline_id":         pipeline_id,
+                "business_id":         business_id,
+                "user_id":             user_id,
+                "status":              "running",
+                "current_step":        "Triggering Pipeline",
                 "progress_percentage": 0,
-                "started_at": datetime.now()
-            }
+                "started_at":          datetime.now(),
+            },
         )
         self.db.commit()
-        
-        # Broadcast initial status via WebSocket
+
+        # Broadcast immediately so the frontend shows the progress overlay
+        # before the first Airflow poll completes.
         await self._broadcast_progress(business_id, {
             "pipeline_id": pipeline_id,
-            "status": "running",
-            "current_step": "Initializing Pipeline",
-            "progress": 0
+            "status":       "running",
+            "current_step": "Triggering Pipeline",
+            "progress":     0,
         })
-        
-        # Start pipeline execution in background with a new database connection
-        asyncio.create_task(self._execute_pipeline_with_new_connection(pipeline_id, business_id, user_id, start_from_phase))
-        
+
+        # Fire-and-forget: trigger DAG + poll until terminal state.
+        # Opens its own DB connection so it survives the request lifecycle.
+        asyncio.create_task(
+            self._launch_and_poll(pipeline_id, business_id, user_id)
+        )
+
         return pipeline_id
     
-    async def _execute_pipeline_with_new_connection(self, pipeline_id: str, business_id: str, user_id: str, start_from_phase: Optional[str] = None):
+    # ──────────────────────────────────────────────────────────────────────────
+    # Internal: DAG trigger + polling loop
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def _launch_and_poll(
+        self, pipeline_id: str, business_id: str, user_id: str
+    ) -> None:
         """
-        Wrapper to execute pipeline with a new database connection.
-        This ensures the background task has its own connection that won't be closed by the request handler.
+        Opens a fresh DB connection, triggers the Airflow DAG, persists the
+        dag_run_id, then drives the polling loop until the DAG terminates.
         """
         from database import get_db_connection
-        import aioredis as _aioredis
-
-        logger.info("Creating new database connection for pipeline %s", pipeline_id)
-        # Create a new connection for this background task
-        db_connection = get_db_connection()
-        logger.debug("Database connection created: %s", db_connection)
-
-        # Acquire a cross-container Redis lock so the streaming inline downstream
-        # (downstream_runner.trigger_downstream) does not start a concurrent
-        # downstream run while this initial pipeline execution is in progress.
-        _redis_url = f"redis://{os.getenv('REDIS_HOST', '10.5.0.11')}:{os.getenv('REDIS_PORT', '6379')}"
-        _redis_client = _aioredis.from_url(_redis_url, decode_responses=True)
-        _lock_key = f"downstream_pipeline_lock:{business_id}"
+        db = get_db_connection()
+        loop = asyncio.get_event_loop()
         try:
-            await _redis_client.set(_lock_key, pipeline_id, ex=_DOWNSTREAM_LOCK_TTL_SECONDS)
-            logger.info("Downstream pipeline lock set for %s (pipeline %s)", business_id, pipeline_id)
-        except Exception as _redis_err:
-            logger.warning("Could not set downstream pipeline lock for %s: %s", business_id, _redis_err)
+            # ── 1. Trigger Airflow DAG ──────────────────────────────────────────────
+            try:
+                resp = await loop.run_in_executor(
+                    None,
+                    lambda: _airflow_request(
+                        "POST",
+                        f"dags/{_DAG_ID}/dagRuns",
+                        {
+                            "conf": {
+                                "bucket":      business_id,
+                                "pipeline_id": pipeline_id,
+                            },
+                            "note": (
+                                f"Triggered by Pulse API for business {business_id}"
+                            ),
+                        },
+                    ),
+                )
+                dag_run_id = resp["dag_run_id"]
+                logger.info(
+                    "Airflow DAG run %s created for pipeline %s / business %s",
+                    dag_run_id, pipeline_id, business_id,
+                )
+            except Exception as exc:
+                logger.error(
+                    "Failed to trigger Airflow DAG for %s: %s", business_id, exc
+                )
+                await self._update_progress(
+                    pipeline_id, business_id,
+                    status="failed",
+                    current_step="Failed to trigger pipeline",
+                    progress=0,
+                    error_message=f"Could not trigger the Airflow pipeline: {exc}",
+                    failed_phase="trigger",
+                    db_connection=db,
+                )
+                return
 
-        # Heartbeat: refresh the lock TTL every 1/3 of the TTL so it does not
-        # expire while a long-running pipeline is still executing.
-        _heartbeat_interval = _DOWNSTREAM_LOCK_TTL_SECONDS // 3
-        _heartbeat_running = True
+            # ── 2. Persist dag_run_id so cancel / recovery can find it ───────────
+            try:
+                db.execute(
+                    text("""
+                        UPDATE pipeline_status
+                        SET process_ids = :pids
+                        WHERE pipeline_id = :pid
+                    """),
+                    {
+                        "pids": json.dumps({"dag_run_id": dag_run_id, "dag_id": _DAG_ID}),
+                        "pid":  pipeline_id,
+                    },
+                )
+                db.commit()
+            except Exception as exc:
+                logger.warning(
+                    "Could not persist dag_run_id for %s: %s", pipeline_id, exc
+                )
 
-        async def _refresh_lock():
-            while _heartbeat_running:
-                await asyncio.sleep(_heartbeat_interval)
-                if not _heartbeat_running:
-                    break
-                try:
-                    # Only refresh if the key still belongs to this pipeline run
-                    current_val = await _redis_client.get(_lock_key)
-                    if current_val == pipeline_id:
-                        await _redis_client.expire(_lock_key, _DOWNSTREAM_LOCK_TTL_SECONDS)
-                        logger.debug("Downstream pipeline lock TTL refreshed for %s", business_id)
-                except Exception as _hb_err:
-                    logger.warning("Heartbeat refresh failed for %s: %s", business_id, _hb_err)
+            # ── 3. Poll until terminal ──────────────────────────────────────────────
+            await self._poll_airflow_status(pipeline_id, business_id, dag_run_id, db)
 
-        heartbeat_task = asyncio.create_task(_refresh_lock())
-
-        try:
-            # Execute the pipeline with the new connection
-            await self._execute_pipeline(pipeline_id, business_id, user_id, start_from_phase, db_connection)
-        except Exception as e:
-            logger.error("Error in pipeline execution: %s", e, exc_info=True)
+        except Exception as exc:
+            logger.error(
+                "_launch_and_poll unhandled error for %s: %s",
+                business_id, exc, exc_info=True,
+            )
         finally:
-            _heartbeat_running = False
-            heartbeat_task.cancel()
             try:
-                await heartbeat_task
-            except asyncio.CancelledError:
+                db.close()
+            except Exception:
                 pass
-            # Always close the connection when done
-            try:
-                db_connection.close()
-                logger.info("Pipeline %s database connection closed successfully", pipeline_id)
-            except Exception as e:
-                logger.error("Error closing database connection: %s", e, exc_info=True)
-            # Release the cross-container downstream lock
-            try:
-                await _redis_client.delete(_lock_key)
-                logger.info("Downstream pipeline lock released for %s", business_id)
-            except Exception as e:
-                logger.warning("Could not release downstream pipeline lock for %s: %s", business_id, e)
-            try:
-                await _redis_client.close()
-            except Exception as e:
-                logger.warning("Could not close Redis client for pipeline %s: %s", pipeline_id, e)
     
-    async def _execute_pipeline(self, pipeline_id: str, business_id: str, user_id: str, start_from_phase: Optional[str] = None, db_connection=None):
+    async def _poll_airflow_status(
+        self,
+        pipeline_id:  str,
+        business_id:  str,
+        dag_run_id:   str,
+        db_connection=None,
+    ) -> None:
         """
-        Execute the complete pipeline asynchronously.
-        
-        Args:
-            pipeline_id: Pipeline execution ID
-            business_id: Business ID (bucket name)
-            user_id: User ID
-            start_from_phase: Optional phase name to start from (for resuming)
+        Poll Airflow every _POLL_INTERVAL seconds until the DAG reaches a
+        terminal state, then update pipeline_status and broadcast WebSocket
+        events to the InlinePipelineProgress component.
         """
-        try:
-            cumulative_progress = 0
-            process_ids = {}
-            
-            # Determine starting point
-            start_index = 0
-            if start_from_phase:
-                for i, phase in enumerate(self.PIPELINE_PHASES):
-                    if phase["name"] == start_from_phase:
-                        start_index = i
-                        # Calculate cumulative progress up to this phase
-                        for j in range(i):
-                            cumulative_progress += self.PIPELINE_PHASES[j]["weight"]
-                        break
-                logger.info("Resuming pipeline from phase: %s (index %d)", start_from_phase, start_index)
-            
-            for i in range(start_index, len(self.PIPELINE_PHASES)):
-                phase = self.PIPELINE_PHASES[i]
-                phase_name = phase["name"]
-                
-                # Check if pipeline was cancelled
-                status = self._get_pipeline_status(pipeline_id, db_connection=db_connection)
-                if status == "cancelled":
-                    logger.info("Pipeline %s was cancelled before %s phase", pipeline_id, phase_name)
-                    return
-                
-                # Update status for this phase
+        loop = asyncio.get_event_loop()
+        while True:
+            await asyncio.sleep(_POLL_INTERVAL)
+
+            # Bail out if the user cancelled from the frontend.
+            current = self._get_pipeline_status(pipeline_id, db_connection)
+            if current == "cancelled":
+                return
+
+            # ── Fetch DAG run + task states ───────────────────────────────────────
+            try:
+                dag_info = await loop.run_in_executor(
+                    None,
+                    lambda: _airflow_request(
+                        "GET", f"dags/{_DAG_ID}/dagRuns/{dag_run_id}"
+                    ),
+                )
+                task_resp = await loop.run_in_executor(
+                    None,
+                    lambda: _airflow_request(
+                        "GET",
+                        f"dags/{_DAG_ID}/dagRuns/{dag_run_id}/taskInstances",
+                    ),
+                )
+            except Exception as exc:
+                logger.warning("Airflow poll error for %s: %s", dag_run_id, exc)
+                continue  # transient network error — retry next cycle
+
+            dag_state = dag_info.get("state", "")
+            tasks = {
+                ti["task_id"]: ti["state"]
+                for ti in task_resp.get("task_instances", [])
+            }
+            step, progress, failed_phase = _interpret_state(dag_state, tasks)
+
+            # ── Terminal: success ─────────────────────────────────────────────────
+            if dag_state == "success":
                 await self._update_progress(
                     pipeline_id, business_id,
-                    status="running",
-                    current_step=phase["description"],
-                    progress=cumulative_progress,
-                    db_connection=db_connection
+                    status="completed",
+                    current_step="Pipeline completed successfully",
+                    progress=100,
+                    completed=True,
+                    db_connection=db_connection,
                 )
-                
-                # Execute phase
-                logger.info("Starting %s phase for business %s", phase_name, business_id)
-                
-                success, process_id = await self._execute_phase(
-                    phase, business_id, pipeline_id
-                )
-                
-                if process_id:
-                    process_ids[phase_name] = process_id
-                
-                if not success:
-                    # Phase failed - store the failed phase name
-                    error_msg = f"Pipeline failed during {phase_name} phase"
-                    await self._update_progress(
-                        pipeline_id, business_id,
-                        status="failed",
-                        current_step=phase["description"],
-                        progress=cumulative_progress,
-                        error_message=error_msg,
-                        failed_phase=phase_name,
-                        process_ids=process_ids,
-                        db_connection=db_connection
-                    )
-                    return
-                
-                # Update cumulative progress
-                cumulative_progress += phase["weight"]
+                return
+
+            # ── Terminal: failed ─────────────────────────────────────────────────
+            if dag_state == "failed":
                 await self._update_progress(
                     pipeline_id, business_id,
-                    status="running",
-                    current_step=phase["description"],
-                    progress=min(cumulative_progress, 100),
-                    process_ids=process_ids,
-                    db_connection=db_connection
+                    status="failed",
+                    current_step=step,
+                    progress=progress,
+                    error_message=(
+                        f"Pipeline failed during {failed_phase} phase"
+                        if failed_phase else "Pipeline failed"
+                    ),
+                    failed_phase=failed_phase,
+                    db_connection=db_connection,
                 )
-            
-            # Pipeline completed successfully
+                return
+
+            # ── Still running — push incremental progress update ────────────────
             await self._update_progress(
                 pipeline_id, business_id,
-                status="completed",
-                current_step="Pipeline completed successfully",
-                progress=100,
-                completed=True,
-                process_ids=process_ids,
-                db_connection=db_connection
+                status="running",
+                current_step=step,
+                progress=progress,
+                db_connection=db_connection,
             )
-            
-            logger.info("Pipeline %s completed successfully!", pipeline_id)
-            
-        except Exception as e:
-            logger.error("Pipeline execution error: %s", e, exc_info=True)
-            
-            # Store error information
-            await self._update_progress(
-                pipeline_id, business_id,
-                status="failed",
-                current_step="Pipeline Error",
-                progress=cumulative_progress,
-                error_message="An unexpected error occurred while processing your data. Please retry.",
-                failed_phase=phase_name if 'phase_name' in locals() else None,
-                db_connection=db_connection
-            )
-    
-    async def _execute_phase(
-        self, phase: Dict[str, Any], business_id: str, pipeline_id: str
-    ) -> tuple[bool, Optional[int]]:
-        """
-        Execute a single phase of the pipeline.
-        
-        Args:
-            phase: Phase configuration dict
-            business_id: Business ID (bucket name)
-            pipeline_id: Pipeline execution ID
-            
-        Returns:
-            tuple: (success: bool, process_id: Optional[int])
-        """
-        script_path = os.path.join(self.project_root, phase["script"])
-        
-        # Check if script exists
-        if not os.path.exists(script_path):
-            logger.error("Script not found: %s", script_path)
-            return False, None
-        
-        # Build command
-        cmd = [
-            "python3",
-            script_path,
-            "--bucket-name", business_id
-        ]
-        
-        logger.info("Executing: %s", ' '.join(cmd))
-        
-        try:
-            # Set environment variable to track this as a pipeline process
-            env = os.environ.copy()
-            env['PIPELINE_ID'] = pipeline_id
-            env['PIPELINE_PHASE'] = phase['name']
-            
-            # Start subprocess with process group (allows terminating entire group including Spark)
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=self.project_root,
-                env=env,
-                start_new_session=True  # Create new process group for clean termination
-            )
-            
-            # Stream output in real-time
-            stdout_task = asyncio.create_task(
-                self._stream_output(process.stdout, f"[{phase['name']}] ", pipeline_id)
-            )
-            stderr_task = asyncio.create_task(
-                self._stream_output(process.stderr, f"[{phase['name']} ERROR] ", pipeline_id)
-            )
-            
-            # Wait for process to complete
-            return_code = await process.wait()
-            
-            # Wait for output streaming to complete
-            await asyncio.gather(stdout_task, stderr_task)
-            
-            if return_code == 0:
-                logger.info("%s phase completed successfully", phase['name'])
-                return True, process.pid
-            else:
-                logger.error("%s phase failed with return code %d", phase['name'], return_code)
-                return False, process.pid
-                
-        except Exception as e:
-            logger.error("Error executing %s phase: %s", phase['name'], e, exc_info=True)
-            return False, None
-    
-    async def _stream_output(self, stream, prefix: str, pipeline_id: str):
-        """
-        Stream subprocess output in real-time.
-        
-        Args:
-            stream: Subprocess stdout or stderr stream
-            prefix: Prefix for log lines
-            pipeline_id: Pipeline execution ID
-        """
-        try:
-            while True:
-                line = await stream.readline()
-                if not line:
-                    break
-                
-                decoded_line = line.decode('utf-8').rstrip()
-                if decoded_line:
-                    logger.info("%s%s", prefix, decoded_line)
-                    
-        except Exception as e:
-            logger.error("Error streaming output: %s", e, exc_info=True)
     
     async def _update_progress(
         self,
@@ -526,120 +632,81 @@ class PipelineService:
     
     async def cancel_pipeline(self, pipeline_id: str, business_id: str) -> bool:
         """
-        Cancel a running pipeline.
-        
-        Args:
-            pipeline_id: Pipeline execution ID
-            business_id: Business ID
-            
-        Returns:
-            True if cancelled successfully, False otherwise
+        Cancel a running pipeline by marking the Airflow DAG run as failed,
+        then updating pipeline_status to 'cancelled'.
         """
         try:
-            # Get process IDs before updating status
+            # Look up the Airflow dag_run_id stored during start_pipeline.
             result = self.db.execute(
                 text("SELECT process_ids FROM pipeline_status WHERE pipeline_id = :pipeline_id"),
-                {"pipeline_id": pipeline_id}
+                {"pipeline_id": pipeline_id},
             ).fetchone()
-            
-            process_ids_json = result[0] if result else None
-            
-            # Update status to cancelled
+            dag_run_id = None
+            dag_id = _DAG_ID
+            if result and result[0]:
+                try:
+                    process_ids = json.loads(result[0])
+                    dag_run_id = process_ids.get("dag_run_id")
+                    dag_id = process_ids.get("dag_id") or _DAG_ID
+                except Exception:
+                    pass
+
+            # Ask Airflow to abort the DAG run and require confirmation.
+            airflow_cancelled = True
+            if dag_run_id:
+                try:
+                    loop = asyncio.get_event_loop()
+                    airflow_cancelled = await loop.run_in_executor(
+                        None,
+                        lambda: _airflow_cancel_dag_run(dag_id, dag_run_id),
+                    )
+                    if airflow_cancelled:
+                        logger.info(
+                            "Cancelled Airflow DAG run %s for pipeline %s",
+                            dag_run_id, pipeline_id,
+                        )
+                    else:
+                        logger.error(
+                            "Airflow DAG run %s is still active after cancel attempt",
+                            dag_run_id,
+                        )
+                except Exception as exc:
+                    airflow_cancelled = False
+                    logger.warning(
+                        "Could not cancel Airflow DAG run %s: %s", dag_run_id, exc
+                    )
+
+            if not airflow_cancelled:
+                # Do NOT flip local status to cancelled unless Airflow actually stopped.
+                return False
+
+            # Update local status table.  The polling task will see 'cancelled'
+            # on its next wake-up and exit cleanly.
             self.db.execute(
                 text("""
-                    UPDATE pipeline_status 
-                    SET status = 'cancelled', 
+                    UPDATE pipeline_status
+                    SET status       = 'cancelled',
                         current_step = 'Pipeline cancelled by user',
                         completed_at = :completed_at
                     WHERE pipeline_id = :pipeline_id
                 """),
-                {
-                    "pipeline_id": pipeline_id,
-                    "completed_at": datetime.now()
-                }
+                {"pipeline_id": pipeline_id, "completed_at": datetime.now()},
             )
             self.db.commit()
-            
-            # Broadcast cancellation
+
             await self._broadcast_progress(business_id, {
                 "pipeline_id": pipeline_id,
-                "status": "cancelled",
+                "status":       "cancelled",
                 "current_step": "Pipeline cancelled by user",
-                "progress": 0
+                "progress":     0,
             })
-            
-            # Terminate running processes if we have process IDs
-            if process_ids_json:
-                try:
-                    process_ids = json.loads(process_ids_json)
-                    logger.info("Attempting to terminate processes: %s", process_ids)
-                    
-                    for phase_name, pid in process_ids.items():
-                        try:
-                            # Check if process exists before trying to kill it
-                            # Using signal 0 to check existence without killing
-                            os.kill(pid, 0)
-                            
-                            # Process exists, send SIGTERM to process group to terminate all child processes
-                            # This ensures Spark sessions and any subprocesses are also terminated
-                            try:
-                                os.killpg(os.getpgid(pid), signal.SIGTERM)
-                                logger.info("Sent SIGTERM to process group of %s (PID: %d)", phase_name, pid)
-                            except Exception:
-                                # Fallback to killing just the process if process group fails
-                                os.kill(pid, signal.SIGTERM)
-                                logger.info("Sent SIGTERM to %s process (PID: %d)", phase_name, pid)
-                            
-                            # Give processes 2 seconds to terminate gracefully
-                            await asyncio.sleep(2)
-                            
-                            # Force kill if still running
-                            try:
-                                os.kill(pid, 0)  # Check if still exists
-                                try:
-                                    os.killpg(os.getpgid(pid), signal.SIGKILL)
-                                    logger.warning("Force killed process group of %s (PID: %d)", phase_name, pid)
-                                except Exception:
-                                    os.kill(pid, signal.SIGKILL)
-                                    logger.warning("Force killed %s process (PID: %d)", phase_name, pid)
-                            except ProcessLookupError:
-                                # Process terminated gracefully
-                                logger.info("Process %d (%s) terminated successfully", pid, phase_name)
-                                
-                        except ProcessLookupError:
-                            # Process already terminated or doesn't exist
-                            logger.info("Process %d (%s) already terminated or does not exist", pid, phase_name)
-                        except PermissionError:
-                            # Don't have permission to terminate this process
-                            logger.warning("Permission denied to terminate process %d (%s)", pid, phase_name)
-                        except Exception as e:
-                            logger.error("Error terminating process %d (%s): %s", pid, phase_name, e, exc_info=True)
-                    
-                    # Additionally, try to kill any remaining Spark processes for this pipeline
-                    # This ensures we catch any Spark sessions that may have detached
-                    try:
-                        # Use subprocess to find and kill Spark processes related to this pipeline
-                        import subprocess as sp
-                        
-                        # Kill any java processes (Spark) associated with this pipeline
-                        sp.run(
-                            ['pkill', '-9', '-f', f'SparkSubmit.*{business_id}'],
-                            capture_output=True,
-                            timeout=5
-                        )
-                        logger.info("Killed any remaining Spark processes for business %s", business_id)
-                    except Exception as e:
-                        logger.warning("Could not kill remaining Spark processes: %s", e)
-                            
-                except Exception as e:
-                    logger.error("Error parsing or terminating processes: %s", e, exc_info=True)
-            
+
             return True
-            
-        except Exception as e:
-            logger.error("Error cancelling pipeline: %s", e, exc_info=True)
+
+        except Exception as exc:
+            logger.error("Error cancelling pipeline: %s", exc, exc_info=True)
             return False
-    
+
     async def cleanup_pipeline_data(self, business_id: str):
         """
         Clean up pipeline data from MinIO for a cancelled/failed pipeline.

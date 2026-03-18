@@ -1,9 +1,31 @@
 import os
-import findspark
+
+# ---------------------------------------------------------------------------
+# JAR paths — set PYSPARK_SUBMIT_ARGS BEFORE pyspark is imported so the JVM
+# starts with the correct driver classpath; no Ivy/Maven download needed.
+# ---------------------------------------------------------------------------
+_JARS_DIR = "/app/jars"
+_JARS_LIST = [
+    f"{_JARS_DIR}/hadoop-aws-3.3.4.jar",
+    f"{_JARS_DIR}/aws-java-sdk-bundle-1.12.262.jar",
+    f"{_JARS_DIR}/delta-spark_2.12-3.0.0.jar",
+    f"{_JARS_DIR}/delta-storage-3.0.0.jar",
+]
+_JARS_STR = ",".join(_JARS_LIST)
+_JARS_CP  = ":".join(_JARS_LIST)
+
+if "PYSPARK_SUBMIT_ARGS" not in os.environ:
+    os.environ["PYSPARK_SUBMIT_ARGS"] = (
+        f"--driver-class-path {_JARS_CP} --jars {_JARS_STR} pyspark-shell"
+    )
+
+if os.environ.get("SPARK_HOME"):
+    import findspark
+    findspark.init()
+
 from dotenv import load_dotenv, find_dotenv
 from pyspark.sql import SparkSession
 
-findspark.init()
 load_dotenv(find_dotenv())
 
 DB_HOST = os.getenv("POSTGRES_SERVER", "localhost")
@@ -43,20 +65,25 @@ def create_spark_session(app_name="Analysis"):
             builder
             .config("spark.dynamicAllocation.enabled", "true")
             .config("spark.dynamicAllocation.minExecutors", "0")
-            .config("spark.dynamicAllocation.maxExecutors", "8")
             .config("spark.dynamicAllocation.initialExecutors", "1")
         )
     else:
-        # Disable dynamic allocation for local mode
-        builder = builder.config("spark.dynamicAllocation.enabled", "false")
-    
+        builder = (
+            builder
+            .config("spark.dynamicAllocation.enabled", "false")
+            .config("spark.sql.shuffle.partitions", "4")
+        )
+
     # Apply common configurations
     spark = (
         builder
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        )
+        .config("spark.sql.adaptive.enabled", "true")
+        .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
+        .config("spark.sql.execution.arrow.pyspark.enabled", "true")
+        .config("spark.driver.maxResultSize", "2g")
+        .config("spark.jars", _JARS_STR)
+        .config("spark.driver.extraClassPath", _JARS_CP)
+        .config("spark.executor.extraClassPath", _JARS_CP)
         .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
         .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
         .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
@@ -69,6 +96,14 @@ def create_spark_session(app_name="Analysis"):
         )
         .config("inferSchema", "true")
         .config("mergeSchema", "true")
+        .config(
+            "spark.sql.extensions",
+            "io.delta.sql.DeltaSparkSessionExtension",
+        )
+        .config(
+            "spark.sql.catalog.spark_catalog",
+            "org.apache.spark.sql.delta.catalog.DeltaCatalog",
+        )
         .getOrCreate()
     )
     spark.sparkContext.setLogLevel("ERROR")

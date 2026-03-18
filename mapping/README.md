@@ -58,6 +58,8 @@ CONFIG = {
 python run_mapping.py
 ```
 
+**Incremental polling:** After the first (baseline) fetch, all subsequent polls append `?updated_since=<ISO8601>` to the API URL.  The watermark is persisted in Redis under `api_last_poll:{bucket_name}` and survives restarts.  Configure your API endpoint to honour `updated_since` by filtering records to those modified after the given timestamp — this avoids transferring the full dataset on every poll cycle.  If Redis is unavailable or the API ignores the parameter, Pulse falls back to full polls safely.
+
 ### Configuration Reference
 
 Edit the `CONFIG` dictionary in `run_mapping.py`:
@@ -93,8 +95,9 @@ CONFIG = {
 - **DB Mode**: Streaming pipeline with Change Data Capture (CDC)
   - Database → Kafka (via db_ingest_service.py) → PySpark Streaming (spark_streaming.py) → MinIO mapped folder
   
-- **API Mode**: Streaming pipeline with API polling
+- **API Mode**: Streaming pipeline with incremental API polling
   - API Endpoint → Kafka (via api_ingest_service.py) → PySpark Streaming (spark_streaming.py) → MinIO mapped folder
+  - Watermark `api_last_poll:{business_id}` stored in Redis; subsequent polls send `?updated_since=<ts>` so only new/modified records are transferred
 
 ---
 

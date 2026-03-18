@@ -3,15 +3,14 @@ Average Order Value (AOV) Prediction - FIXED Inference Script
 """
 
 import os
+
 import findspark
 from dotenv import load_dotenv
-
-findspark.init()
-
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 from pyspark.sql.types import StringType
+from pyspark.ml.functions import vector_to_array
 from pyspark.ml.feature import VectorAssembler, StandardScaler, StringIndexer, StandardScalerModel
 from pyspark.ml.regression import LinearRegressionModel, RandomForestRegressionModel, GBTRegressionModel
 from datetime import datetime
@@ -79,36 +78,29 @@ CATEGORICAL_FEATURES = [
     "preferred_device_type"
 ]
 
+# Must stay consistent with training output names
+MODELS_REQUIRING_SCALING = {"linear_regression"}
+
+
+import sys
+from pathlib import Path
+
+_ML_ROOT = next(p for p in Path(__file__).resolve().parents if p.name == "machine-learning")
+if str(_ML_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT))
+
+from spark_utils import create_ml_spark_session
 
 def create_spark_session():
     """Initialize Spark session"""
-    return (
-        SparkSession.builder
-        .appName("AOV_Prediction_Fixed_Inference")
-        .master(os.getenv("SPARK_SERVER", "local[*]"))
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        )
-        .config("spark.dynamicAllocation.enabled", "true")
-        .config("spark.dynamicAllocation.minExecutors", "0")
-        .config("spark.dynamicAllocation.maxExecutors", "1000")
-        .config("spark.dynamicAllocation.initialExecutors", "1")
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        )
-        .config("inferSchema", "true")
-        .config("mergeSchema", "true")
-        .getOrCreate()
+    return create_ml_spark_session(
+        "AOV_Prediction_Fixed_Inference",
+        extra_configs={
+            "spark.sql.shuffle.partitions": "8",
+            "inferSchema": "true",
+            "mergeSchema": "true",
+        },
     )
-
 
 def load_model(model_name, MODEL_BASE_PATH):
     """Load trained model from MinIO"""
@@ -140,7 +132,6 @@ def load_scaler(SCALER_PATH):
         return scaler_model
     except Exception as e:
         print(f"⚠ Scaler not found or failed to load: {str(e)}")
-        print("  Will fit new scaler on inference data (may differ from training)")
         return None
 
 
@@ -414,6 +405,26 @@ def prepare_inference_data(df, model_name, saved_scaler=None):
     
     FIX: Only scale for linear regression, skip for tree models
     """
+    def filter_invalid_feature_vectors(df_with_features):
+        """Drop rows where assembled feature vector contains NaN/Infinity."""
+        rows_before = df_with_features.count()
+        df_checked = df_with_features.withColumn(
+            "_features_array",
+            vector_to_array(F.col("features"))
+        )
+        df_filtered = df_checked.filter(
+            F.expr(
+                "NOT exists(_features_array, x -> NOT (x = x AND x > -1e308 AND x < 1e308))"
+            )
+        ).drop("_features_array")
+
+        rows_after = df_filtered.count()
+        dropped = rows_before - rows_after
+        if dropped > 0:
+            print(f"⚠ Dropped {dropped} records with NaN/Infinity in feature vector")
+
+        return df_filtered
+
     # Encode categorical
     indexed_cols = []
     
@@ -445,24 +456,18 @@ def prepare_inference_data(df, model_name, saved_scaler=None):
         assembler = VectorAssembler(
             inputCols=existing_features,
             outputCol="features_unscaled",
-            handleInvalid="keep"
+            handleInvalid="skip"
         )
         df_assembled = assembler.transform(df)
         
-        # Use saved scaler if available, otherwise fit new one
-        if saved_scaler is not None:
-            df_scaled = saved_scaler.transform(df_assembled)
-            print("  ✓ Using saved scaler from training")
-        else:
-            scaler = StandardScaler(
-                inputCol="features_unscaled",
-                outputCol="features",
-                withStd=True,
-                withMean=True
+        if saved_scaler is None:
+            raise RuntimeError(
+                "Saved scaler is required for linear_regression inference but was not found. "
+                "Run training for aov_v2 to generate scaler artifacts."
             )
-            scaler_model = scaler.fit(df_assembled)
-            df_scaled = scaler_model.transform(df_assembled)
-            print("  ⚠ Fitted new scaler on inference data")
+
+        df_scaled = saved_scaler.transform(df_assembled)
+        print("  ✓ Using saved scaler from training")
         
         df_prepared = df_scaled.select(
             "customer_id",
@@ -472,6 +477,7 @@ def prepare_inference_data(df, model_name, saved_scaler=None):
             "total_amount",  # Last order value for display
             "features"
         )
+        df_prepared = filter_invalid_feature_vectors(df_prepared)
     else:
         print(f"  Skipping scaling (not needed for {model_name})")
         
@@ -479,7 +485,7 @@ def prepare_inference_data(df, model_name, saved_scaler=None):
         assembler = VectorAssembler(
             inputCols=existing_features,
             outputCol="features",
-            handleInvalid="keep"
+            handleInvalid="skip"
         )
         df_assembled = assembler.transform(df)
         
@@ -491,6 +497,7 @@ def prepare_inference_data(df, model_name, saved_scaler=None):
             "total_amount",  # Last order value for display
             "features"
         )
+        df_prepared = filter_invalid_feature_vectors(df_prepared)
     
     print(f"✓ Data prepared: {df_prepared.count()} records")
     return df_prepared
@@ -591,14 +598,11 @@ def main(BUCKET_NAME):
     INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
     INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
     OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/aov_prediction/"
-    MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/aov_prediction/"
-    SCALER_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/aov_prediction/scaler"
+    MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/aov_v2/"
+    SCALER_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/aov_v2/scaler"
 
     # ⚠️ MANUAL CONFIGURATION REQUIRED:
     MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
-
-    # Models that require scaling (must match training)
-    MODELS_REQUIRING_SCALING = ["linear_regression"]
     """Main inference pipeline"""
     print("\n" + "="*60)
     print("AOV Prediction - FIXED Inference Pipeline")

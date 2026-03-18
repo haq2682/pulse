@@ -110,6 +110,11 @@ services:
       - "5000:5000"
     volumes:
       - ./jars/deps:/app/jars/
+      - ./cleaning:/app/cleaning
+      - ./transformation:/app/transformation
+      - ./analysis:/app/analysis
+      - ./machine-learning:/app/machine-learning
+      - ./mapping:/app/mapping
     networks:
       spark-network:
         ipv4_address: 10.5.0.2
@@ -441,6 +446,12 @@ services:
       - .env
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL}
+      - REDIS_HOST=${REDIS_HOST:-10.5.0.11}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
       - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-pulse_secret_key_change_me}
@@ -477,6 +488,8 @@ services:
       - .env
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
       - AIRFLOW__WEBSERVER__RATE_LIMIT_STORAGE_URL=redis://10.5.0.11:6379/0
       - AIRFLOW__WEBSERVER__RATE_LIMIT_ENABLED=True
@@ -494,11 +507,17 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DATABASE_NAME=${POSTGRES_DATABASE_NAME}
       - POSTGRES_SERVER=${POSTGRES_SERVER}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL}
       - REDIS_HOST=${REDIS_HOST:-10.5.0.11}
+      - REDIS_PORT=${REDIS_PORT:-6379}
       - DEBEZIUM_URL=http://10.5.0.10:8083
       - PIPELINE_PYTHON_CONTAINER=python
+      - PIPELINE_PYTHON_IMAGE=python-py310
+      - PIPELINE_SPARK_NETWORK=spark-network
+      - PULSE_APP_HOST_PATH=${PULSE_APP_HOST_PATH}
       - PYTHONPATH=/opt/airflow/utils:/opt/airflow/config
-      - _PIP_ADDITIONAL_REQUIREMENTS=minio scipy pandas numpy psycopg2-binary
+      - _PIP_ADDITIONAL_REQUIREMENTS=minio scipy pandas numpy psycopg2-binary apache-airflow-providers-docker docker
     ports:
       - "8090:8080"
     volumes:
@@ -525,6 +544,8 @@ services:
       - .env
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLt0jJgrg=}
       - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-pulse_secret_key_change_me}
@@ -535,15 +556,21 @@ services:
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
       - KAFKA_BOOTSTRAP=${KAFKA_BOOTSTRAP}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DATABASE_NAME=${POSTGRES_DATABASE_NAME}
       - POSTGRES_SERVER=${POSTGRES_SERVER}
       - REDIS_HOST=${REDIS_HOST:-10.5.0.11}
+      - REDIS_PORT=${REDIS_PORT:-6379}
       - DEBEZIUM_URL=http://10.5.0.10:8083
       - PIPELINE_PYTHON_CONTAINER=python
+      - PIPELINE_PYTHON_IMAGE=python-py310
+      - PIPELINE_SPARK_NETWORK=spark-network
+      - PULSE_APP_HOST_PATH=${PULSE_APP_HOST_PATH}
       - PYTHONPATH=/opt/airflow/utils:/opt/airflow/config
-      - _PIP_ADDITIONAL_REQUIREMENTS=minio scipy pandas numpy psycopg2-binary
+      - _PIP_ADDITIONAL_REQUIREMENTS=minio scipy pandas numpy psycopg2-binary apache-airflow-providers-docker docker
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/plugins:/opt/airflow/plugins
@@ -551,7 +578,7 @@ services:
       - ./airflow/config:/opt/airflow/config
       - airflow_logs:/opt/airflow/logs
       - /var/run/docker.sock:/var/run/docker.sock
-    command: scheduler
+    command: airflow scheduler
     networks:
       spark-network:
         ipv4_address: 10.5.0.18

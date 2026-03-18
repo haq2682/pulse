@@ -1,5 +1,15 @@
 import os
+
 import sys
+from pathlib import Path
+# Import spark_utils FIRST to set up JARs before pyspark imports
+_ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
+if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT_VAR))
+
+from spark_utils import create_ml_spark_session
+
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when
 from pyspark.ml.feature import VectorAssembler, StringIndexer, StandardScaler
@@ -8,10 +18,6 @@ from pyspark.ml.classification import (
     MultilayerPerceptronClassifier
 )
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
-import findspark
-
-findspark.init()
-
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from utils.multi_bucket_loader import (
@@ -55,33 +61,15 @@ TARGET_COLUMN = "payment_status"
 
 
 def create_spark_session():
-    """Initialize Spark session with MinIO configuration"""
-    return SparkSession.builder \
-        .appName("PaymentSuccessTraining") \
-        .master(os.getenv("SPARK_SERVER", "local[*]")) \
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        ) \
-        .config("spark.dynamicAllocation.enabled", "true") \
-        .config("spark.dynamicAllocation.minExecutors", "0") \
-        .config("spark.dynamicAllocation.maxExecutors", "1000") \
-        .config("spark.dynamicAllocation.initialExecutors", "1") \
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT")) \
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY")) \
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY")) \
-        .config("spark.hadoop.fs.s3a.path.style.access", "true") \
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false") \
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        ) \
-        .config("inferSchema", "true") \
-        .config("mergeSchema", "true") \
-        .getOrCreate()
-
-
+    """Initialize Spark session"""
+    return create_ml_spark_session(
+        "PaymentSuccessTraining",
+        extra_configs={
+                    "spark.sql.shuffle.partitions": "8",
+                    "inferSchema": "true",
+                    "mergeSchema": "true"
+                },
+    )
 def load_data(spark, path):
     """Load data from MinIO"""
     try:
@@ -160,9 +148,9 @@ def clean_target_labels(df):
     
     df_cleaned = df.withColumn(
         TARGET_COLUMN,
-        when(col(TARGET_COLUMN).isin("Completed", "Success", "Successful"), "Completed")
-        .when(col(TARGET_COLUMN).isin("Failed", "Failure", "Declined"), "Failed")
-        .when(col(TARGET_COLUMN).isin("Pending", "Processing"), "Pending")
+        when(col(TARGET_COLUMN).isin("Completed", "Success", "Successful"), "Completed") \
+        .when(col(TARGET_COLUMN).isin("Failed", "Failure", "Declined"), "Failed") \
+        .when(col(TARGET_COLUMN).isin("Pending", "Processing"), "Pending") \
         .otherwise(col(TARGET_COLUMN))
     )
     
@@ -251,24 +239,49 @@ def train_random_forest_optimized(train_df):
 
     print("\n[1/3] Training Optimized Random Forest (FAST MODE)...")
 
-    # Cache training data for performance
-    train_df.cache()
-    train_df.count()  # materialize cache
+    # Repartition + cache to reduce per-task memory pressure and improve stability
+    default_parallelism = max(1, train_df.sparkSession.sparkContext.defaultParallelism)
+    target_partitions = max(16, default_parallelism * 2)
+    train_prepared = train_df.repartition(target_partitions).cache()
+    train_prepared.count()  # materialize cache
 
-    rf = RandomForestClassifier(
-        numTrees=180,                 # Strong but not excessive
-        maxDepth=14,                  # Good balance: accuracy vs speed
-        minInstancesPerNode=2,        # Prevent overfitting
-        featureSubsetStrategy="sqrt", # Best general-purpose setting
-        subsamplingRate=0.8,          # Speed + generalization
-        seed=42,
-        maxBins=128                   # Reduce memory overhead
-    )
+    rf_configs = [
+        {
+            "numTrees": 120,
+            "maxDepth": 12,
+            "minInstancesPerNode": 2,
+            "featureSubsetStrategy": "sqrt",
+            "subsamplingRate": 0.8,
+            "maxBins": 64,
+        },
+        {
+            "numTrees": 60,
+            "maxDepth": 10,
+            "minInstancesPerNode": 4,
+            "featureSubsetStrategy": "sqrt",
+            "subsamplingRate": 0.7,
+            "maxBins": 32,
+        },
+    ]
 
-    model = rf.fit(train_df)
+    last_error = None
+    for idx, cfg in enumerate(rf_configs, start=1):
+        try:
+            print(
+                f"  Attempt {idx}/{len(rf_configs)} - "
+                f"numTrees={cfg['numTrees']}, maxDepth={cfg['maxDepth']}, maxBins={cfg['maxBins']}"
+            )
+            rf = RandomForestClassifier(seed=42, **cfg)
+            model = rf.fit(train_prepared)
+            print("✓ Optimized Random Forest trained (fast mode)")
+            train_prepared.unpersist()
+            return model, "RandomForestOptimized"
+        except Exception as exc:
+            last_error = exc
+            print(f"⚠️ RandomForest attempt {idx} failed: {exc}")
 
-    print("✓ Optimized Random Forest trained (fast mode)")
-    return model, "RandomForestOptimized"
+    train_prepared.unpersist()
+    raise RuntimeError(f"RandomForest training failed after fallback attempts: {last_error}")
 
 
 def train_decision_tree(train_df):

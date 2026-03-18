@@ -348,13 +348,14 @@ def impute_missing_values(dataframes, table, numeric_cols):
         return dataframes
     
     df = dataframes[table]
-    total_rows = df.count()
-    print(f"Total rows: {total_rows}")
-
-    # Get non-null counts for all columns at once
-    non_null_counts = df.select(
-        [F.count(F.col(c)).alias(c) for c in numeric_cols]
+    # Single Spark action: count total rows + non-null counts for all numeric cols at once
+    agg_result = df.agg(
+        F.count("*").alias("__total__"),
+        *[F.count(F.col(c)).alias(c) for c in numeric_cols]
     ).collect()[0]
+    total_rows = agg_result["__total__"]
+    print(f"Total rows: {total_rows}")
+    non_null_counts = agg_result
 
     valid_cols = []
     all_null_cols = []
@@ -543,17 +544,14 @@ def clean_text_columns(dataframes):
             and not any(pattern in field.name.lower() for pattern in skip_patterns)
         ]
 
-        for col_name in string_cols: 
-            gibberish_count = df.filter(is_gibberish_udf(col(col_name))).count()
-
-            if gibberish_count > 0:
-                df = df.withColumn(
-                    col_name,
-                    when(is_gibberish_udf(col(col_name)), F.lit(None)).otherwise(
-                        col(col_name)
-                    ),
-                )
-                print(f"  ✅ Fixed {gibberish_count} gibberish values in {col_name}")
+        df = df.cache()  # cache before UDF loop to prevent full re-evaluation per column
+        for col_name in string_cols:
+            df = df.withColumn(
+                col_name,
+                when(is_gibberish_udf(col(col_name)), F.lit(None)).otherwise(
+                    col(col_name)
+                ),
+            )
 
         dataframes[table_name] = df
 
@@ -613,25 +611,16 @@ def clean_numeric_strings(dataframes):
             if col_name.endswith("_id"):
                 continue
 
-            # Check if there are non-numeric values
-            non_numeric_count = df.filter(
-                ~col(col_name).cast("string").rlike("^-?[0-9]+$")
-            ).count()
+            # Always apply without count guard
+            default_value = 1 if "quantity" in col_name.lower() else 0
 
-            if non_numeric_count > 0:
-                # Determine default value based on column name
-                default_value = 1 if "quantity" in col_name.lower() else 0
-
-                df = df.withColumn(
-                    col_name,
-                    when(
-                        col(col_name).cast("string").rlike("^-?[0-9]+$"),
-                        col(col_name),
-                    ).otherwise(default_value),
-                )
-                print(
-                    f"  ✅ Cleaned {non_numeric_count} non-numeric values in {table_name}.{col_name}"
-                )
+            df = df.withColumn(
+                col_name,
+                when(
+                    col(col_name).cast("string").rlike("^-?[0-9]+$"),
+                    col(col_name),
+                ).otherwise(default_value),
+            )
 
         dataframes[table_name] = df
 
@@ -644,22 +633,14 @@ def clean_numeric_strings(dataframes):
         ]
 
         for col_name in decimal_cols:
-            # Check for non-numeric text values
-            non_numeric_count = df.filter(
-                ~col(col_name).cast("string").rlike("^-?[0-9]+(\\.[0-9]+)?$")
-            ).count()
-
-            if non_numeric_count > 0:
-                df = df.withColumn(
-                    col_name,
-                    when(
-                        col(col_name).cast("string").rlike("^-?[0-9]+(\\.[0-9]+)?$"),
-                        col(col_name),
-                    ).otherwise(0.0),
-                )
-                print(
-                    f"  ✅ Cleaned {non_numeric_count} non-numeric values in {table_name}.{col_name}"
-                )
+            # Always apply without count guard
+            df = df.withColumn(
+                col_name,
+                when(
+                    col(col_name).cast("string").rlike("^-?[0-9]+(\\.[0-9]+)?$"),
+                    col(col_name),
+                ).otherwise(0.0),
+            )
 
         dataframes[table_name] = df
 
@@ -671,20 +652,14 @@ def clean_numeric_strings(dataframes):
 
         for status_col in status_columns: 
             # Check if status column has numeric values like "0", "1"
-            numeric_status_count = df.filter(col(status_col).rlike("^[0-9]$")).count()
-
-            if numeric_status_count > 0:
-                # Convert common numeric codes to text
-                df = df.withColumn(
-                    status_col,
-                    when(col(status_col) == "1", "Active")
-                    .when(col(status_col) == "0", "Inactive")
-                    .when(col(status_col) == "2", "Pending")
-                    .otherwise(col(status_col)),
-                )
-                print(
-                    f"  ✅ Converted {numeric_status_count} numeric status codes in {table_name}.{status_col}"
-                )
+            # Always apply without count guard
+            df = df.withColumn(
+                status_col,
+                when(col(status_col) == "1", "Active")
+                .when(col(status_col) == "0", "Inactive")
+                .when(col(status_col) == "2", "Pending")
+                .otherwise(col(status_col)),
+            )
 
         dataframes[table_name] = df
 
@@ -829,39 +804,29 @@ def clean_mixed_scripts(dataframes):
 
         print(f"\n  🔧 Processing {table_name}...")
 
-        for col_name in text_cols: 
-            # Count non-ASCII before cleaning
-            non_ascii_count = df.filter(
-                col(col_name).rlike(".*[^\\x00-\\x7f].*")
-            ).count()
-
-            if non_ascii_count > 0:
-                # Determine replacement value based on column type
+        for col_name in text_cols:
+            # Determine replacement value based on column type
+            replacement_value = "Unknown"
+            if "name" in col_name.lower():
                 replacement_value = "Unknown"
-                if "name" in col_name.lower():
-                    replacement_value = "Unknown"
-                elif "title" in col_name.lower():
-                    replacement_value = "No Title"
-                elif "desc" in col_name.lower():
-                    replacement_value = "No description"
-                elif "city" in col_name.lower():
-                    replacement_value = "Unknown"
-                elif "state" in col_name.lower() or "province" in col_name.lower():
-                    replacement_value = "Unknown"
-                elif "country" in col_name.lower():
-                    replacement_value = "Unknown"
+            elif "title" in col_name.lower():
+                replacement_value = "No Title"
+            elif "desc" in col_name.lower():
+                replacement_value = "No description"
+            elif "city" in col_name.lower():
+                replacement_value = "Unknown"
+            elif "state" in col_name.lower() or "province" in col_name.lower():
+                replacement_value = "Unknown"
+            elif "country" in col_name.lower():
+                replacement_value = "Unknown"
 
-                # Replace non-ASCII characters
-                df = df.withColumn(
-                    col_name,
-                    when(
-                        col(col_name).rlike(".*[^\\x00-\\x7f].*"), replacement_value
-                    ).otherwise(col(col_name)),
-                )
-
-                print(
-                    f"    ✅ Cleaned {non_ascii_count} rows with non-ASCII in {col_name}"
-                )
+            # Replace non-ASCII characters (no count guard needed)
+            df = df.withColumn(
+                col_name,
+                when(
+                    col(col_name).rlike(".*[^\\x00-\\x7f].*"), replacement_value
+                ).otherwise(col(col_name)),
+            )
 
         dataframes[table_name] = df
 

@@ -8,12 +8,11 @@ Target Calculation:
 """
 
 import os
+
 import sys
 import findspark
 from dotenv import load_dotenv
-
-findspark.init()
-
+from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from utils.multi_bucket_loader import (
@@ -23,6 +22,14 @@ from utils.multi_bucket_loader import (
     get_training_window,
     GENERAL_MODEL_BUCKET
 )
+
+# Import spark_utils FIRST to set up JARs before pyspark imports
+_ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
+if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT_VAR))
+
+from spark_utils import create_ml_spark_session
+
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
@@ -104,34 +111,20 @@ TARGET_COLUMN = "conversion_value"
 
 def create_spark_session():
     """Initialize Spark session"""
-    return (
-        SparkSession.builder
-        .appName("Session_Conversion_Value_Training")
-        .master(os.getenv("SPARK_SERVER", "local[*]"))
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        )
-        .config("spark.dynamicAllocation.enabled", "true")
-        .config("spark.dynamicAllocation.minExecutors", "0")
-        .config("spark.dynamicAllocation.maxExecutors", "1000")
-        .config("spark.dynamicAllocation.initialExecutors", "1")
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT"))
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        )
-        .config("inferSchema", "true")
-        .config("mergeSchema", "true")
-        .getOrCreate()
+    return create_ml_spark_session(
+        "Session_Conversion_Value_Training",
+        extra_configs={
+                    "spark.sql.shuffle.partitions": os.getenv("ML_SPARK_SHUFFLE_PARTITIONS", "64"),
+                    "spark.default.parallelism": os.getenv("ML_SPARK_DEFAULT_PARALLELISM", "64"),
+                    "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
+                    "spark.kryoserializer.buffer.max": "256m",
+                    "spark.executor.memory": os.getenv("ML_SPARK_EXECUTOR_MEMORY", "4g"),
+                    "spark.executor.memoryOverhead": os.getenv("ML_SPARK_EXECUTOR_MEMORY_OVERHEAD", "1g"),
+                    "spark.driver.memory": os.getenv("ML_SPARK_DRIVER_MEMORY", "4g"),
+                    "inferSchema": "true",
+                    "mergeSchema": "true"
+                },
     )
-
-
 def validate_dataset(spark, path, name):
     """Check if dataset exists"""
     try:
@@ -357,9 +350,14 @@ def prepare_training_data(df):
         handleInvalid="keep"
     )
     
-    df_indexed = device_indexer.fit(df_valid).transform(df_valid)
-    df_indexed = referrer_indexer.fit(df_indexed).transform(df_indexed)
-    df_indexed = segment_indexer.fit(df_indexed).transform(df_indexed)
+    device_indexer_model = device_indexer.fit(df_valid)
+    df_indexed = device_indexer_model.transform(df_valid)
+
+    referrer_indexer_model = referrer_indexer.fit(df_indexed)
+    df_indexed = referrer_indexer_model.transform(df_indexed)
+
+    segment_indexer_model = segment_indexer.fit(df_indexed)
+    df_indexed = segment_indexer_model.transform(df_indexed)
     
     # Filter features that exist
     existing_features = [f for f in NUMERIC_FEATURES if f in df_indexed.columns]
@@ -399,7 +397,13 @@ def prepare_training_data(df):
     )
     
     print(f"✓ Data prepared: {df_prepared.count()} records")
-    return df_prepared, scaler_model, existing_features
+    preprocessors = {
+        "scaler": scaler_model,
+        "device_indexer": device_indexer_model,
+        "referrer_indexer": referrer_indexer_model,
+        "segment_indexer": segment_indexer_model,
+    }
+    return df_prepared, preprocessors, existing_features
 
 
 def train_linear_regression(train_df, test_df, use_cv=False):
@@ -563,6 +567,18 @@ def save_model(model, model_name):
     print(f"✓ Model saved: {model_path}")
 
 
+def save_preprocessors(preprocessors):
+    """Save shared preprocessing artifacts for inference parity with training."""
+    scaler_path = f"{MODEL_OUTPUT_DIR}/scaler"
+    preprocessors["scaler"].write().overwrite().save(scaler_path)
+
+    preprocessors["device_indexer"].write().overwrite().save(f"{MODEL_OUTPUT_DIR}/device_type_indexer")
+    preprocessors["referrer_indexer"].write().overwrite().save(f"{MODEL_OUTPUT_DIR}/referrer_source_indexer")
+    preprocessors["segment_indexer"].write().overwrite().save(f"{MODEL_OUTPUT_DIR}/customer_segment_indexer")
+
+    print(f"✓ Preprocessors saved under: {MODEL_OUTPUT_DIR}")
+
+
 def main():
     """Main training pipeline"""
     print("\n" + "="*60)
@@ -656,7 +672,10 @@ def main():
         spark.stop()
         return
     
-    df_prepared, scaler, feature_list = result
+    df_prepared, preprocessors, feature_list = result
+
+    # Save preprocessors once to keep inference in sync with training transformations
+    save_preprocessors(preprocessors)
     
     print(f"\n{'='*60}")
     print(f"Final Feature Set ({len(feature_list)} features):")
@@ -668,6 +687,8 @@ def main():
     print("\nStep 6: Train/Test Split")
     print("-" * 60)
     train_df, test_df = df_prepared.randomSplit([0.8, 0.2], seed=42)
+    train_df = train_df.cache()
+    test_df = test_df.cache()
     print(f"Training set: {train_df.count()} records")
     print(f"Test set: {test_df.count()} records")
     
@@ -712,6 +733,9 @@ def main():
     
     print(f"\nEnd time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("✓ Training completed\n")
+
+    train_df.unpersist()
+    test_df.unpersist()
     
     spark.stop()
 

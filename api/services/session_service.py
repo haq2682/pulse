@@ -19,7 +19,10 @@ class SessionService:
         self.redis = redis.Redis(
             host=settings.redis_host,
             port=settings.redis_port,
-            decode_responses=True  # so json.loads returns dict
+            decode_responses=True,  # so json.loads returns dict
+            socket_connect_timeout=3,
+            socket_timeout=3,
+            retry_on_timeout=True,
         )
         self.prefix = "session:"
         self.expire_seconds = settings.session_expire_minutes * 60  # typically 60*24
@@ -50,12 +53,16 @@ class SessionService:
             dict or None: session data if valid, else None
         """
         key = f"{self.prefix}{session_id}"
-        data = self.redis.get(key)
-        if not data:
+        try:
+            data = self.redis.get(key)
+            if not data:
+                return None
+            # refresh expiration (sliding session)
+            self.redis.expire(key, self.expire_seconds)
+            return json.loads(data)
+        except Exception:
+            # Fail closed on Redis/network issues instead of hanging callers.
             return None
-        # refresh expiration (sliding session)
-        self.redis.expire(key, self.expire_seconds)
-        return json.loads(data)
 
     def delete_session(self, session_id: str) -> bool:
         """

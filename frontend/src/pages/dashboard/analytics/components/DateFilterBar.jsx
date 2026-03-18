@@ -2,6 +2,7 @@ import React from 'react';
 import { Calendar } from 'primereact/calendar';
 import SecondaryButton from '@/components/global/Button/SecondaryButton';
 import { QUICK_FILTERS } from '@/hooks/useAnalyticsDateFilter';
+import { usePipelineProgress } from '@/context/PipelineProgressContext';
 
 /**
  * DateFilterBar
@@ -29,8 +30,8 @@ const DateFilterBar = ({
     dataMode,
     hidden = false,
 }) => {
-    if (hidden) return null;
-
+    const { pipelineStatus } = usePipelineProgress();
+    if (hidden || pipelineStatus === 'loading' || pipelineStatus?.status === 'failed') return null;
     return (
         <div className="mb-6 p-4 bg-white rounded-lg shadow-sm">
             <div className="flex flex-wrap items-center gap-3">

@@ -164,34 +164,81 @@ customers__customer_id,customers__name,orders__order_id,orders__amount
 
 Columns must follow the `table__column` naming convention.
 
-## 3. Usage Examples
+## 3. Incremental Polling (`updated_since`)
 
-### API Ingestion
+### How It Works
 
-**Setting up your API endpoint:**
+To avoid transferring the entire dataset on every polling cycle, Pulse appends an `updated_since` query parameter to each API request after the first one:
+
+```
+GET https://your-api.com/data?updated_since=2026-03-10T10:30:00Z
+```
+
+The timestamp is stored in **Redis** under the key `api_last_poll:{business_id}` and is updated after every successful poll.  On restart the service reads the same key so ingestion resumes from the checkpoint — no full re-fetch required.
+
+| Poll | `updated_since` sent | What the API should return |
+|------|----------------------|----------------------------|
+| 1st  | *(none — baseline)*  | All historical records     |
+| 2nd+ | previous poll start  | Only new / modified records |
+
+**Timestamp semantics:** The watermark records the *start* of the previous poll window (not the end).  This means any record written by the source system while the HTTP request was in-flight is captured by the overlapping window rather than silently dropped.
+
+### Redis Watermark Key
+
+| Key pattern | `api_last_poll:{business_id}` |
+|-------------|-------------------------------|
+| Value format | ISO 8601 UTC — `2026-03-10T10:30:00Z` |
+| No TTL | Persists across service restarts and idle periods |
+
+Environment variables that control the Redis connection:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REDIS_HOST` | `redis` | Redis hostname |
+| `REDIS_PORT` | `6379`  | Redis port    |
+
+### Graceful Degradation
+
+If Redis is unreachable the service logs a warning and falls back to a **full poll** every cycle (the original behaviour).  No data is lost — downstream Delta MERGE deduplicates by primary key.
+
+### API Contract
+
+Pulse sends `updated_since` as a standard URL query parameter.  Your API must honour it to gain the bandwidth reduction; if it ignores the parameter it simply returns all records and the pipeline continues working correctly.
+
+Common platform mappings:
+
+| Platform | Your API must map `updated_since` → |
+|----------|-------------------------------------|
+| Shopify  | `updated_at_min` |
+| WooCommerce | `modified_after` |
+| Custom   | Apply as a `WHERE updated_at >= ?` filter |
+
+### Usage Examples
+
+**Setting up your API endpoint with `updated_since` support:**
 
 ```python
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
+from datetime import datetime
 
 app = Flask(__name__)
 
 @app.route('/api/data')
 def get_data():
+    # Read optional watermark sent by Pulse
+    updated_since_str = request.args.get('updated_since')  # e.g. "2026-03-10T10:30:00Z"
+    updated_since = None
+    if updated_since_str:
+        updated_since = datetime.fromisoformat(updated_since_str.replace('Z', '+00:00'))
+
+    # Filter your data accordingly
+    customers = get_customers(updated_since=updated_since)  # your DB query
+    orders    = get_orders(updated_since=updated_since)
+
     return jsonify({
         "tables": [
-            {
-                "table_name": "customers",
-                "data": [
-                    {"customer_id": "1", "name": "Alice"},
-                    {"customer_id": "2", "name": "Bob"}
-                ]
-            },
-            {
-                "table_name": "orders",
-                "data": [
-                    {"order_id": "101", "customer_id": "1", "amount": 250}
-                ]
-            }
+            {"table_name": "customers", "data": customers},
+            {"table_name": "orders",    "data": orders},
         ]
     })
 ```
@@ -335,6 +382,22 @@ No changes required! The system will automatically detect:
 3. Ensure you're using `table_name` (not `name`)
 4. Ensure `tables` is an array with at least one table
 
+### Incremental polling not working (full fetch every cycle)
+
+**Symptom:** Logs show `"No prior watermark found — performing full fetch on first poll"` every restart, or `"Redis unavailable"`.
+
+**Checklist:**
+1. Confirm Redis is running: `docker ps | grep redis`
+2. Confirm `REDIS_HOST` / `REDIS_PORT` env vars match your setup
+3. Verify Redis key exists after first poll: `redis-cli GET api_last_poll:<business_id>`
+4. If the key is present but polling is still full, check that your API actually filters by `updated_since`
+
+### All data re-ingested after restart
+
+**Problem:** Redis key was deleted or Redis was wiped.
+
+**Solution:** This is handled gracefully — Pulse performs a baseline full fetch and re-writes the watermark.  Downstream Delta MERGE deduplicates by primary key so no duplicate rows appear in the warehouse.
+
 ### "No match found for [filename], skipping"
 
 **Problem:** The file name doesn't map to a canonical table name.
@@ -353,10 +416,11 @@ No changes required! The system will automatically detect:
 ## 7. Best Practices
 
 1. **For API ingestion:** Always use the validated format with `table_name` field
-2. **For file ingestion:** Use separate files per table when possible
-3. **For Excel files:** Name sheets after canonical table names
-4. **For JSON files:** Use the API format or nested structure for multi-table data
-5. **Testing:** Run validation tests after making changes to your data format
+2. **Implement `updated_since` filtering:** Filter records in your API by `updated_since` so Pulse only receives new/changed rows on subsequent polls
+3. **For file ingestion:** Use separate files per table when possible
+4. **For Excel files:** Name sheets after canonical table names
+5. **For JSON files:** Use the API format or nested structure for multi-table data
+6. **Testing:** Run validation tests after making changes to your data format
 
 ## 8. Technical Details
 

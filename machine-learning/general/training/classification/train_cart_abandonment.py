@@ -1,4 +1,5 @@
 import os
+
 import sys
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
@@ -15,10 +16,6 @@ from pyspark.ml.classification import (
 )
 from pyspark.ml.evaluation import BinaryClassificationEvaluator, MulticlassClassificationEvaluator
 from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
-import findspark
-
-findspark.init()
-
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from utils.multi_bucket_loader import (
@@ -60,35 +57,26 @@ CATEGORICAL_FEATURES = [
 TARGET_COLUMN = "will_abandon"
 
 
+import sys
+from pathlib import Path
+
+_ML_ROOT = next(p for p in Path(__file__).resolve().parents if p.name == "machine-learning")
+if str(_ML_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT))
+
+from spark_utils import create_ml_spark_session
+
 def create_spark_session():
     """Initialize Spark session with MinIO configuration"""
-    return SparkSession.builder \
-        .appName("CartAbandonmentTraining_Improved") \
-        .master(os.getenv("SPARK_SERVER", "local[*]")) \
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        ) \
-        .config("spark.dynamicAllocation.enabled", "true") \
-        .config("spark.dynamicAllocation.minExecutors", "0") \
-        .config("spark.dynamicAllocation.maxExecutors", "1000") \
-        .config("spark.dynamicAllocation.initialExecutors", "1") \
-        .config("spark.sql.shuffle.partitions", "200") \
-        .config("spark.default.parallelism", "200") \
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT")) \
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY")) \
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY")) \
-        .config("spark.hadoop.fs.s3a.path.style.access", "true") \
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false") \
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        ) \
-        .config("inferSchema", "true") \
-        .config("mergeSchema", "true") \
-        .getOrCreate()
-
+    return create_ml_spark_session(
+        "CartAbandonmentTraining_Improved",
+        extra_configs={
+            "spark.sql.shuffle.partitions": "200",
+            "spark.default.parallelism": "200",
+            "inferSchema": "true",
+            "mergeSchema": "true",
+        },
+    )
 
 def load_data(spark, path):
     """Load data from MinIO"""
@@ -253,8 +241,8 @@ def add_customer_history_features(df, customers_df=None, orders_df=None):
     if customers_df is not None:
         print("Using agg_customers table for customer features...")
         
-        # Select relevant columns from customers table based on actual schema
-        customer_features = customers_df.select(
+        # Select relevant columns; include _source_bucket for bucket-safe join
+        cust_cols = [
             "customer_id",
             "total_orders",
             "avg_order_value",
@@ -264,11 +252,22 @@ def add_customer_history_features(df, customers_df=None, orders_df=None):
             "customer_segment_label",
             "is_repeat_customer",
             "cart_abandonment_rate",
-            "session_conversion_rate"
-        )
-        
-        # Join with main dataframe
-        df = df.join(customer_features, on="customer_id", how="left")
+            "session_conversion_rate",
+        ]
+        if "_source_bucket" in customers_df.columns:
+            cust_cols.append("_source_bucket")
+        customer_features = customers_df.select(*cust_cols)
+
+        if "_source_bucket" in df.columns and "_source_bucket" in customer_features.columns:
+            customer_features = customer_features.withColumnRenamed("_source_bucket", "_bucket_cust")
+            df = df.join(
+                customer_features,
+                (df.customer_id == customer_features.customer_id)
+                & (df._source_bucket == customer_features._bucket_cust),
+                how="left",
+            ).drop(customer_features.customer_id).drop("_bucket_cust")
+        else:
+            df = df.join(customer_features, on="customer_id", how="left")
         
         # Create is_returning_customer from is_repeat_customer
         df = df.withColumn(
@@ -295,14 +294,25 @@ def add_customer_history_features(df, customers_df=None, orders_df=None):
         # Use correct column names from schema:
         # - total_amount (not order_total)
         # - order_placed_at (not order_date)
-        customer_stats = orders_df.groupBy("customer_id").agg(
+        customer_stats = orders_df.groupBy(
+            *(["customer_id"] + (["_source_bucket"] if "_source_bucket" in orders_df.columns else []))
+        ).agg(
             count("*").alias("total_orders_calc"),
             avg("total_amount").alias("avg_order_value_calc"),
             spark_max("order_placed_at").alias("last_order_date_calc"),
             spark_sum("total_amount").alias("lifetime_value_calc")
         )
-        
-        df = df.join(customer_stats, on="customer_id", how="left")
+
+        if "_source_bucket" in df.columns and "_source_bucket" in customer_stats.columns:
+            customer_stats = customer_stats.withColumnRenamed("_source_bucket", "_bucket_ord")
+            df = df.join(
+                customer_stats,
+                (df.customer_id == customer_stats.customer_id)
+                & (df._source_bucket == customer_stats._bucket_ord),
+                how="left",
+            ).drop(customer_stats.customer_id).drop("_bucket_ord")
+        else:
+            df = df.join(customer_stats, on="customer_id", how="left")
         
         # Days since last order
         df = df.withColumn(
@@ -680,7 +690,8 @@ def main():
         spark,
         INPUT_RELATIVE_PATH,
         required_columns=["cart_id", "cart_status", "customer_id", "session_id"],
-        filter_nulls=False
+        filter_nulls=False,
+        keep_source_bucket=True,
     )
     
     if cart_df is None:
@@ -703,19 +714,22 @@ def main():
         spark,
         INPUT_SESSIONS_PATH,
         required_columns=["session_id"],
-        filter_nulls=False
+        filter_nulls=False,
+        keep_source_bucket=True,
     )
     customers_df, _ = load_data_from_all_buckets(
         spark,
         INPUT_CUSTOMERS_PATH,
         required_columns=["customer_id"],
-        filter_nulls=False
+        filter_nulls=False,
+        keep_source_bucket=True,
     )
     orders_df, _ = load_data_from_all_buckets(
         spark,
         INPUT_ORDERS_PATH,
         required_columns=["order_id", "customer_id"],
-        filter_nulls=False
+        filter_nulls=False,
+        keep_source_bucket=True,
     )
     
     if sessions_df is None:
@@ -724,26 +738,42 @@ def main():
         return
     
     # ========== JOIN DATASETS ==========
-    # Select necessary columns from cart
-    cart_selected = cart_df.select(
+    # Select necessary columns from cart; carry _source_bucket for join safety
+    cart_cols = [
         "cart_id", "cart_status", "customer_id",
         "cart_items_count", "cart_total_value", "cart_avg_item_price",
-        "device_used", "session_id"
-    )
+        "device_used", "session_id",
+    ]
+    if "_source_bucket" in cart_df.columns:
+        cart_cols.append("_source_bucket")
+    cart_selected = cart_df.select(*cart_cols)
     
-    # Select necessary columns from sessions
-    sessions_selected = sessions_df.select(
+    # Select necessary columns from sessions; carry _source_bucket for join safety
+    sessions_cols = [
         col("session_id"),
         col("session_duration_minutes"),
         col("pages_viewed"),
         col("products_viewed"),
         col("pages_per_minute"),
         col("referrer_source"),
-        col("items_added_to_cart")
-    )
+        col("items_added_to_cart"),
+    ]
+    if "_source_bucket" in sessions_df.columns:
+        sessions_cols.append(col("_source_bucket"))
+    sessions_selected = sessions_df.select(*sessions_cols)
     
-    # Join
-    df = cart_selected.join(sessions_selected, on="session_id", how="left")
+    # Join cart with sessions — bucket-scoped to prevent cross-tenant session_id collisions
+    if "_source_bucket" in cart_selected.columns and "_source_bucket" in sessions_selected.columns:
+        cart_selected = cart_selected.withColumnRenamed("_source_bucket", "_bucket_cart")
+        sessions_selected = sessions_selected.withColumnRenamed("_source_bucket", "_bucket_sess")
+        df = cart_selected.join(
+            sessions_selected,
+            (cart_selected.session_id == sessions_selected.session_id)
+            & (cart_selected._bucket_cart == sessions_selected._bucket_sess),
+            how="left",
+        ).drop(sessions_selected.session_id).drop("_bucket_sess").withColumnRenamed("_bucket_cart", "_source_bucket")
+    else:
+        df = cart_selected.join(sessions_selected, on="session_id", how="left")
     print(f"✓ Joined datasets: {df.count()} records")
     
     # ========== GENERATE LABELS (FIXED) ==========
@@ -756,6 +786,10 @@ def main():
     df, cust_num_features, cust_cat_features = add_customer_history_features(
         df, customers_df, orders_df
     )
+
+    # Drop _source_bucket before ML — it guided joins but is not a training feature
+    if "_source_bucket" in df.columns:
+        df = df.drop("_source_bucket")
     
     # Combine all features
     all_numerical = NUMERICAL_FEATURES + new_num_features + cust_num_features

@@ -9,50 +9,133 @@ from utils.helpers import normalize_name
 
 def load_all_files_from_minio(minio_client, bucket_name, spark):
     """
-    Load all supported files from the 'ingested' folder in a MinIO bucket directly into Spark DataFrames.
-    
-    Handles multi-table files (Excel with multiple sheets, JSON with multiple tables).
+    Load all supported files from the 'ingested' folder in a MinIO bucket directly into
+    Spark DataFrames.
+
+    Two storage layouts are handled:
+
+    1. **Chunked Parquet directory** (``initial_load.py`` / DB-API mode):
+       ``ingested/{canonical_table}/chunk_NNNN.parquet``
+       The entire directory is read in one ``spark.read.parquet()`` call so Spark
+       handles all chunks as a single scan without building a deep union lineage
+       plan.  That plan explosion was causing TaskSetManager task failures for
+       large tables when chunks were read individually through pandas and unioned.
+
+    2. **Flat file** (user-uploaded batch mode):
+       ``ingested/orders.csv``, ``ingested/data.xlsx``, ``ingested/records.json``,
+       ``ingested/data.parquet`` (single file, no sub-directory).
+       These are read via the MinIO SDK → pandas → ``createDataFrame`` path, which
+       is fine for the small files users typically upload.
 
     Args:
         minio_client: MinIO client instance
-        bucket_name: Name of the bucket
-        spark: SparkSession instance
+        bucket_name:  Name of the MinIO bucket
+        spark:        Active SparkSession
 
     Returns:
-        Dictionary of {df_name: Spark DataFrame}
+        dict: ``{canonical_table_name: Spark DataFrame}``
     """
-    dataframes = {}
-    objects = minio_client.list_objects(bucket_name, prefix="ingested/", recursive=True)
+    import os as _os
+
+    dataframes   = {}
+    SUPPORTED    = {".csv", ".xlsx", ".xls", ".parquet", ".json"}
+
+    all_objects  = list(minio_client.list_objects(bucket_name, prefix="ingested/", recursive=True))
     print("Listing available files in the ingested folder...")
 
-    for obj in objects:
-        file_name = obj.object_name
-        print(f"Processing file: {file_name}")
+    # ── Pass 1: classify each object ─────────────────────────────────────────
+    # chunked_dirs : set of prefixes like "ingested/orders/"
+    # flat_objects  : list of objects that are direct children of ingested/
+    chunked_dirs  = set()
+    flat_objects  = []
 
-        if not any(file_name.endswith(ext) for ext in [".csv", ".xlsx", ".parquet", ".json"]):
-            print(f"Skipping {file_name} - unsupported format")
+    for obj in all_objects:
+        path = obj.object_name                     # e.g. "ingested/orders/chunk_0000.parquet"
+        rel  = path[len("ingested/"):]             # e.g. "orders/chunk_0000.parquet"
+        parts = rel.split("/")
+
+        if len(parts) == 2 and any(parts[1].endswith(ext) for ext in SUPPORTED):
+            # Exactly one sub-directory level → chunked layout
+            if parts[1].endswith(".parquet"):
+                chunked_dirs.add(f"ingested/{parts[0]}/")
+            else:
+                # Non-parquet file inside a sub-directory (unusual but possible)
+                flat_objects.append(obj)
+        elif len(parts) == 1 and any(parts[0].endswith(ext) for ext in SUPPORTED):
+            # Direct child of ingested/ → flat file
+            flat_objects.append(obj)
+        # Deeper nesting or unsupported extension → skip silently
+
+    # ── Pass 2a: read chunked parquet dirs via spark.read.parquet() ──────────
+    # Reading via Spark's native parquet reader (not pandas) avoids the
+    # union-lineage explosion that caused TaskSetManager task failures when large
+    # tables (8+ chunk files × 200k rows each) were unioned in the driver.
+    minio_ep = _os.getenv("MINIO_ENDPOINT", "minio:9000")
+    if "://" in minio_ep:
+        minio_ep = minio_ep.split("://", 1)[1]
+
+    for dir_prefix in sorted(chunked_dirs):
+        table_dir = dir_prefix[len("ingested/"):].rstrip("/")   # e.g. "orders"
+        norm_name = normalize_name(table_dir)
+        if norm_name is None:
+            print(f"  ⚠️  No canonical match for ingested dir '{table_dir}', skipping.")
             continue
 
+        # Read the whole directory with a single Spark scan; mergeSchema handles
+        # slight column differences across chunks (e.g. MongoDB flexible schema).
+        s3_path = f"s3a://{bucket_name}/ingested/{table_dir}"
+        print(f"  📂 {dir_prefix} → {norm_name} (spark.read.parquet)", flush=True)
         try:
-            base_name = os.path.splitext(os.path.basename(file_name))[0]
+            df = (
+                spark.read
+                .option("mergeSchema", "true")
+                .parquet(s3_path)
+            )
+            # Cast every column to string for consistency with the batch-upload path.
+            from pyspark.sql import functions as _F
+            from pyspark.sql.types import StringType as _ST
+            for col_name in df.columns:
+                df = df.withColumn(col_name, _F.col(col_name).cast(_ST()))
+            row_count = df.count()
+            dataframes[norm_name] = df
+            print(f"  ✅ Loaded {norm_name} ({row_count:,} rows from {dir_prefix})", flush=True)
+        except Exception as exc:
+            print(f"  ❌ Could not read {dir_prefix}: {exc}", flush=True)
+            traceback.print_exc()
+
+    # ── Pass 2b: read flat files via MinIO SDK → pandas → Spark ─────────────
+    # This is the original batch-upload path and remains unchanged so that
+    # user-uploaded CSV / Excel / JSON / single-Parquet files still work.
+    for obj in flat_objects:
+        file_name = obj.object_name
+        print(f"Processing file: {file_name}")
+        try:
+            base_name  = _os.path.splitext(_os.path.basename(file_name))[0]
             clean_name = re.sub(r"[^0-9a-zA-Z_]+", "_", base_name)
-            
+
             result = load_file_from_minio(minio_client, bucket_name, file_name, spark)
-            
-            # Check if result is a dict (multi-table file) or single DataFrame
+
             if isinstance(result, dict):
-                # Multi-table file (Excel with sheets or JSON with tables)
-                for table_name, spark_df in result.items():
-                    dataframes[table_name] = spark_df
-                    print(f"✅ Successfully loaded {file_name}:{table_name}")
+                # Multi-table file (Excel sheets / JSON multi-table)
+                for tname, sdf in result.items():
+                    dataframes[tname] = sdf
+                    print(f"✅ Successfully loaded {file_name}:{tname}")
             elif result is not None:
-                # Single table file
                 norm_name = normalize_name(clean_name)
                 if norm_name is None:
                     print(f"No match found for {base_name}, skipping.")
                     continue
-                dataframes[norm_name] = result
-                print(f"✅ Successfully loaded {file_name} as {norm_name}")
+                if norm_name in dataframes:
+                    # Flat file duplicates a chunked table (shouldn't happen in normal
+                    # usage, but handle gracefully with a union)
+                    dataframes[norm_name] = dataframes[norm_name].union(result)
+                    print(f"  ➕ Merged {file_name} into {norm_name}")
+                else:
+                    dataframes[norm_name] = result
+                    print(f"✅ Successfully loaded {file_name} as {norm_name}")
+        except Exception as exc:
+            print(f"Error processing {file_name}: {exc}")
+            traceback.print_exc()
 
         except Exception as e:
             print(f"Error processing {file_name}: {str(e)}")

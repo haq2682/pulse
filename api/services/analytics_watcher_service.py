@@ -9,6 +9,7 @@ import asyncio
 from typing import Dict, Set, Optional
 from datetime import datetime
 import logging
+import inspect
 from minio import Minio
 from minio.error import S3Error
 from services.websocket_manager import WebSocketManager
@@ -43,8 +44,29 @@ class AnalyticsWatcherService:
         
         # Polling interval in seconds
         self.poll_interval = 15  # Check every 15 seconds
+        self.cache_invalidator = None
         
         logger.info("AnalyticsWatcherService initialized")
+
+    def set_cache_invalidator(self, invalidator):
+        """
+        Register a callback invoked when analytics parquet files change.
+        Callback signature: invalidator(business_id: str)
+        """
+        self.cache_invalidator = invalidator
+
+    async def _invalidate_cache(self, business_id: str):
+        """Best-effort cache invalidation callback executor."""
+        invalidator = getattr(self, "cache_invalidator", None)
+        if not invalidator:
+            return
+        try:
+            result = invalidator(business_id)
+            if inspect.isawaitable(result):
+                await result
+            logger.info(f"Invalidated analytics cache for business {business_id}")
+        except Exception as e:
+            logger.warning(f"Failed to invalidate analytics cache for {business_id}: {e}")
     
     def start_monitoring(self, business_id: str):
         """
@@ -146,6 +168,7 @@ class AnalyticsWatcherService:
             
             # Broadcast updates if any changes
             if changed_files or new_files:
+                await self._invalidate_cache(business_id)
                 await self._broadcast_update(
                     business_id, 
                     changed_files + new_files,

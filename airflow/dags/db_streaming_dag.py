@@ -13,24 +13,13 @@ every INSERT/UPDATE/DELETE as a Kafka message (ecom.* topics).
   - Runs the 7-algorithm column-mapping pipeline on every micro-batch
   - Writes normalised Parquet files to MinIO  mapped/
 
-Inline downstream pipeline (``--enable-downstream``)
-------------------------------------------------------
-After each micro-batch is written to ``mapped/``, the downstream pipeline
-(cleaning → transformation → analysis → ML inference) is triggered
-**inline** in a background thread so the next micro-batch can start
-immediately.  A pending-flag drain loop in ``downstream_runner.py``
-guarantees that no accumulated micro-batch data is ever left unprocessed:
-if new CDC events arrive while a downstream run is in progress, a flag is
-set and the active run immediately re-runs after finishing (a "catch-up"
-run), picking up all data accumulated in ``mapped/`` since the previous run.
-
-The ``streaming_downstream`` Airflow DAG remains as an additional
-safety-net fallback (every 2 minutes), but correctness no longer depends
-on it.
+This DAG is responsible ONLY for ingestion + mapping (streaming layer).
+All downstream processing (cleaning → transformation → analysis → ML)
+runs separately in the ``scheduled_batch`` DAG every 10 minutes.
 
 When does this DAG run?
 -----------------------
-ONCE — triggered manually or by the frontend when the user submits their
+ONCE -- triggered manually or by the frontend when the user submits their
 database URI during onboarding (POST /onboarding/start-mapping, mode=db).
 
   Frontend  →  POST /api/v1/dags/db_streaming/dagRuns   (Airflow REST API)
@@ -40,7 +29,7 @@ database URI during onboarding (POST /onboarding/start-mapping, mode=db).
                    "db_tables": "orders,payments,inventory"
                  }
 
-Do NOT trigger this DAG multiple times for the same tenant — it would
+Do NOT trigger this DAG multiple times for the same tenant -- it would
 start a second competing streaming job for the same bucket.  The API
 layer (POST /onboarding/start-mapping) is responsible for checking
 whether a run is already active for a given business_id before firing.
@@ -53,7 +42,7 @@ be a no-op (if already running) or would start duplicate jobs.
 About "mapping runs only once"
 -------------------------------
 The Spark Structured Streaming job does run the mapping algorithm on
-EVERY micro-batch — but that is intentional (new CDC events need to be
+EVERY micro-batch -- but that is intentional (new CDC events need to be
 normalised).  What runs "only once" is the user interaction: the user
 reviews the mapping results and fixes any missing columns in the
 onboarding UI.  That approved mapping configuration is stored in Redis
@@ -72,7 +61,7 @@ If the Spark job or Debezium connection crashes:
 
 Spark Structured Streaming uses a MinIO-backed checkpoint
 (s3a://pulse-checkpoints/normalize-stream) so restarts pick up exactly
-where they left off — no duplicate or lost events.
+where they left off -- no duplicate or lost events.
 
 Override parameters (dag_run.conf)
 -----------------------------------
@@ -94,7 +83,7 @@ from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.models import Variable
-from airflow.operators.bash import BashOperator
+from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.operators.python import PythonOperator
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -105,6 +94,14 @@ from config.pipeline_config import (
     DEFAULT_DB_URI,
     DEFAULT_TASK_ARGS,
     PYTHON_CONTAINER,
+    PYTHON_IMAGE,
+    SPARK_NETWORK,
+    POSTGRES_SERVER,
+    POSTGRES_DB,
+    POSTGRES_USER,
+    POSTGRES_PASSWORD,
+    docker_pipeline_env,
+    docker_app_mounts,
 )
 
 BUCKET    = Variable.get("default_bucket", default_var=DEFAULT_BUCKET)
@@ -129,34 +126,138 @@ _streaming_defaults = dict(
     owner=DEFAULT_TASK_ARGS["owner"],
     depends_on_past=False,
     retries=9999,                          # restart on every crash
-    retry_exponential_backoff=False,       # constant delay — don't wait longer each time
+    retry_exponential_backoff=False,       # constant delay -- don't wait longer each time
     retry_delay=timedelta(minutes=1),      # wait 1 min before restarting
-    execution_timeout=None,                # NEVER timeout — this runs forever
+    execution_timeout=None,                # NEVER timeout -- this runs forever
     email_on_failure=False,
     email_on_retry=False,
 )
 
 
-def _docker_exec(script_path: str, extra_args: str = "") -> str:
-    return f"docker exec {PYTHON_CONTAINER} python3 /app/{script_path} {extra_args}"
 
 
 # ---------------------------------------------------------------------------
 # Connector health-check / deploy
 # ---------------------------------------------------------------------------
+def _resolve_runtime_db_conf(bucket: str, db_uri: str, db_tables: str):
+    """
+    Resolve runtime DB streaming config with business-specific onboarding values.
+
+    Priority:
+      1) Explicit dag_run.conf values (db_uri / db_tables) when provided
+      2) Latest completed onboarding row for the business
+      3) Airflow defaults / variables
+    """
+    resolved_uri = (db_uri or "").strip() if isinstance(db_uri, str) else ""
+    if isinstance(db_tables, list):
+        resolved_tables = ",".join([str(t).strip() for t in db_tables if str(t).strip()])
+    else:
+        resolved_tables = (db_tables or "").strip() if isinstance(db_tables, str) else ""
+
+    # If explicit values are already provided, keep them.
+    source = "dag_run_conf_or_airflow_defaults"
+    if resolved_uri and resolved_tables:
+        return bucket, resolved_uri, resolved_tables, source
+
+    try:
+        import psycopg2 as _psycopg2
+
+        conn = _psycopg2.connect(
+            host=POSTGRES_SERVER,
+            database=POSTGRES_DB,
+            user=POSTGRES_USER,
+            password=POSTGRES_PASSWORD,
+        )
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT db_uri, db_tables
+                    FROM onboarding
+                    WHERE business_id = %s
+                    ORDER BY is_completed DESC, updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+                    LIMIT 1
+                    """,
+                    (bucket,),
+                )
+                row = cur.fetchone()
+                if row:
+                    onboarding_uri = (row[0] or "").strip()
+                    onboarding_tables = (row[1] or "").strip()
+                    if not resolved_uri and onboarding_uri:
+                        resolved_uri = onboarding_uri
+                        source = "onboarding"
+                    if not resolved_tables and onboarding_tables:
+                        resolved_tables = onboarding_tables
+                        source = "onboarding"
+    except Exception as exc:
+        print(f"Warning: Could not resolve onboarding DB config for {bucket}: {exc}")
+
+    return bucket, resolved_uri, resolved_tables, source
+
+
 def check_or_deploy_debezium(**context):
     """
     Verify the Debezium connector for this tenant is deployed and RUNNING.
     If it is missing or in a failed state, redeploy it by calling
-    run_mapping.py with --trigger-once (which deploys the connector and
-    immediately returns without starting the streaming query).
-    """
-    import subprocess
+    run_mapping.py with --deploy-connector-only, which deploys (or updates)
+    the Debezium connector with snapshot.mode=no_data and exits immediately.
 
+    IMPORTANT: we must NOT use --trigger-once here because that flag now
+    triggers a full JDBC initial load → batch mapping pipeline.  The
+    health-check task should only ensure the connector is alive; it must
+    never re-snapshot the database.
+    """
+    
     conf      = context["dag_run"].conf or {}
-    bucket    = conf.get("bucket",    BUCKET)
-    db_uri    = conf.get("db_uri",    DB_URI)
-    db_tables = conf.get("db_tables", DB_TABLES)
+    bucket    = conf.get("bucket", BUCKET)
+
+    # IMPORTANT: pass only EXPLICIT dag_run.conf values into resolver.
+    # If we pass Airflow defaults here, onboarding lookup is skipped and
+    # stale default credentials/table lists may be used.
+    explicit_db_uri = conf.get("db_uri")
+    explicit_db_tables = conf.get("db_tables")
+
+    bucket, db_uri, db_tables, cfg_source = _resolve_runtime_db_conf(
+        bucket,
+        explicit_db_uri,
+        explicit_db_tables,
+    )
+
+    # Final fallback to Airflow variables only if neither conf nor onboarding
+    # provided values.
+    if not db_uri:
+        db_uri = DB_URI
+        cfg_source = "airflow_defaults"
+    if not db_tables:
+        db_tables = DB_TABLES
+        if cfg_source != "airflow_defaults":
+            cfg_source = f"{cfg_source}+airflow_defaults"
+
+    if not db_uri:
+        raise RuntimeError(
+            f"No db_uri provided for bucket '{bucket}'. Pass dag_run.conf.db_uri or ensure onboarding.db_uri exists."
+        )
+    if not db_tables:
+        raise RuntimeError(
+            f"No db_tables provided for bucket '{bucket}'. Pass dag_run.conf.db_tables or ensure onboarding.db_tables exists."
+        )
+
+    masked_db_uri = db_uri
+    if "@" in db_uri and "://" in db_uri:
+        scheme, rest = db_uri.split("://", 1)
+        if "@" in rest:
+            creds, host_part = rest.split("@", 1)
+            user = creds.split(":", 1)[0] if creds else ""
+            masked_db_uri = f"{scheme}://{user}:***@{host_part}"
+    print(f"Resolved db_streaming config source: {cfg_source}")
+    print(f"Resolved DB URI: {masked_db_uri}")
+    if isinstance(db_tables, str):
+        _tbl_list = [t.strip() for t in db_tables.split(",") if t.strip()]
+    else:
+        _tbl_list = [str(t).strip() for t in (db_tables or []) if str(t).strip()]
+    print(f"Resolved DB tables count: {len(_tbl_list)}")
+    print(f"Resolved DB tables: {_tbl_list}")
 
     connector_name = f"pulse-{bucket}-connector"
     status_url     = f"{DEBEZIUM_URL}/connectors/{connector_name}/status"
@@ -167,36 +268,61 @@ def check_or_deploy_debezium(**context):
             connector_state = status.get("connector", {}).get("state", "UNKNOWN")
 
             if connector_state == "RUNNING":
-                print(f"Connector '{connector_name}' is RUNNING — nothing to do.")
-                return
+                print(f"Connector '{connector_name}' is RUNNING -- nothing to do.")
+                return {
+                    "bucket": bucket,
+                    "db_uri": db_uri,
+                    "db_tables": db_tables,
+                }
 
-            print(f"Connector state is '{connector_state}' — redeploying.")
+            print(f"Connector state is '{connector_state}' -- redeploying.")
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
-            print(f"Connector '{connector_name}' not found — deploying for the first time.")
+            print(f"Connector '{connector_name}' not found -- deploying for the first time.")
         else:
             raise
     except Exception as exc:
-        print(f"Could not reach Debezium ({exc}) — proceeding to deploy.")
+        print(f"Could not reach Debezium ({exc}) -- proceeding to deploy.")
 
-    # Deploy: run_mapping --mode db --trigger-once only deploys the connector
-    # and then exits (availableNow trigger on zero Kafka messages → immediate exit).
-    cmd = [
-        "docker", "exec", PYTHON_CONTAINER,
-        "python", "/app/mapping/run_mapping.py",
+    # Deploy / verify with --deploy-connector-only so we get snapshot.mode=no_data.
+    # This ensures a connector restart NEVER triggers a full database re-snapshot.
+    # Use the Docker Python SDK (exec_run) instead of subprocess + docker CLI.
+    # This avoids the need for the CLI binary in the Airflow container.
+    import docker as _docker_sdk
+    import concurrent.futures as _futures
+
+    _client    = _docker_sdk.from_env()
+    _container = _client.containers.get(PYTHON_CONTAINER)
+    _cmd = [
+        "python3", "/app/mapping/run_mapping.py",
         "--mode", "db",
         "--business-id", bucket,
         "--db-uri",    db_uri,
         "--db-tables", db_tables,
-        "--trigger-once",
+        "--deploy-connector-only",   # deploy connector only -- NO JDBC re-load
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-    if result.returncode != 0:
+    with _futures.ThreadPoolExecutor(max_workers=1) as _pool:
+        _future = _pool.submit(
+            lambda: _container.exec_run(cmd=_cmd, demux=True, stream=False)
+        )
+        try:
+            _result = _future.result(timeout=120)
+        except _futures.TimeoutError:
+            raise RuntimeError("Debezium deploy timed out after 120 s.")
+    _stdout = (_result.output[0] or b"").decode("utf-8", errors="replace")
+    _stderr = (_result.output[1] or b"").decode("utf-8", errors="replace")
+    if _result.exit_code != 0:
         raise RuntimeError(
-            f"Debezium deploy failed (rc={result.returncode}).\n"
-            f"STDOUT: {result.stdout[-2000:]}\nSTDERR: {result.stderr[-2000:]}"
+            f"Debezium deploy failed (rc={_result.exit_code}).\n"
+            f"STDOUT: {_stdout[-2000:]}\nSTDERR: {_stderr[-2000:]}"
         )
     print("Debezium connector deployed successfully.")
+    return {
+        "bucket": bucket,
+        "db_uri": db_uri,
+        "db_tables": db_tables,
+    }
+
 
 
 # ---------------------------------------------------------------------------
@@ -208,7 +334,7 @@ with DAG(
         "Manages the continuous Debezium CDC → Spark Streaming → MinIO mapped/ pipeline. "
         "Triggered ONCE when the user connects their database. Auto-restarts on crash."
     ),
-    schedule_interval=None,      # USER-TRIGGERED — never runs on a schedule
+    schedule_interval=None,      # USER-TRIGGERED -- never runs on a schedule
     start_date=datetime(2024, 1, 1),
     catchup=False,
     max_active_runs=25,          # one perpetual run per active tenant; no hard cap needed
@@ -233,22 +359,29 @@ with DAG(
     # ── 2. Start the continuous mapping stream ────────────────────────────
     # This task runs FOREVER (until the Spark job crashes or is stopped).
     # On crash:  Airflow waits 1 min → restarts → Spark resumes from checkpoint.
-    # On DAG pause/cancellation: docker exec is terminated → streaming stops.
-    #
+    # On DAG pause/cancellation: DockerOperator stops the container → streaming stops.
+    # On crash: Airflow waits 1 min → restarts → Spark resumes from checkpoint.
     # NOTE: does NOT use --trigger-once here.  This is the 24/7 streaming job.
-    run_db_streaming = BashOperator(
+    run_db_streaming = DockerOperator(
         task_id="run_db_mapping_stream",
-        bash_command=_docker_exec(
-            "mapping/run_mapping.py",
-            (
-                "--mode db "
-                "--business-id {{ params.bucket }} "
-                "--db-uri {{ params.db_uri }} "
-                "--db-tables {{ params.db_tables }} "
-                "--enable-downstream"
-                # No --trigger-once: this must run indefinitely
-            ),
-        ),
+        image=PYTHON_IMAGE,
+        command=[
+            "python3", "/app/mapping/run_mapping.py",
+            "--mode", "db",
+            # dag_run.conf overrides; params are fallback for manual UI runs.
+            "--business-id", "{{ (ti.xcom_pull(task_ids='deploy_debezium_connector') or {}).get('bucket') or dag_run.conf.get('bucket') or params.bucket }}",
+            "--db-uri",      "{{ (ti.xcom_pull(task_ids='deploy_debezium_connector') or {}).get('db_uri') or dag_run.conf.get('db_uri') or params.db_uri }}",
+            "--db-tables",   "{{ (ti.xcom_pull(task_ids='deploy_debezium_connector') or {}).get('db_tables') or dag_run.conf.get('db_tables') or params.db_tables }}",
+            # No --trigger-once: this must run indefinitely.
+            # No --enable-downstream: downstream runs as a scheduled Airflow batch job.
+        ],
+        environment=docker_pipeline_env(),
+        network_mode=SPARK_NETWORK,
+        mounts=docker_app_mounts(),
+        auto_remove="force",
+        do_xcom_push=False,
+        mount_tmp_dir=False,
+        tty=True,
         **_streaming_defaults,
     )
 

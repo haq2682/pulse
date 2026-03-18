@@ -8,6 +8,7 @@ and moves the results to the mapped folder.
 import sys
 import os
 import json
+import re
 import pandas as pd
 from io import BytesIO, StringIO
 from minio import Minio
@@ -30,7 +31,35 @@ minio_client = Minio(
 )
 
 
-def load_ingested_files_cache(bucket_name: str):
+_QUALIFIED_REF_RE = re.compile(r'^\s*"(?P<table>[^"]+)"\s*\.\s*"(?P<column>[^"]+)"\s*$')
+_UNQUOTED_REF_RE = re.compile(r'^\s*(?P<table>[A-Za-z_][\w$]*)\s*\.\s*(?P<column>[A-Za-z_][\w$]*)\s*$')
+
+
+def _parse_source_reference(raw_value, default_table: str = None):
+    if raw_value is None:
+        return None, None, ""
+
+    raw_str = str(raw_value).strip()
+    if not raw_str:
+        return None, None, ""
+
+    match = _QUALIFIED_REF_RE.match(raw_str) or _UNQUOTED_REF_RE.match(raw_str)
+    if match:
+        source_table = match.group("table").strip().strip('"')
+        source_col = match.group("column").strip().strip('"')
+    else:
+        source_table = str(default_table or "").strip().strip('"') if default_table else None
+        source_col = raw_str.strip().strip('"')
+
+    if not source_col:
+        return None, None, ""
+
+    source_table = source_table or str(default_table or "").strip().strip('"')
+    qualified_ref = f'"{source_table}"."{source_col}"' if source_table else source_col
+    return source_table, source_col, qualified_ref
+
+
+def load_ingested_files_cache(bucket_name: str, required_tables=None):
     """
     Load all data files from the ingested folder and cache them.
     Supports CSV, JSON, Excel (.xlsx, .xls), and Parquet files.
@@ -47,71 +76,101 @@ def load_ingested_files_cache(bucket_name: str):
     
     ingested_cache = {}
     ingested_folder = "ingested/"
-    
+
     # Supported file extensions
     supported_extensions = ['.csv', '.json', '.xlsx', '.xls', '.parquet']
-    
+
     try:
-        objects = list(minio_client.list_objects(bucket_name, prefix=ingested_folder, recursive=False))
-        
+        # recursive=True so we find chunks written as
+        # ingested/{table}/chunk_NNNN.parquet by initial_load.py
+        objects = list(minio_client.list_objects(bucket_name, prefix=ingested_folder, recursive=True))
+
         # Filter for supported file types
-        data_objects = [obj for obj in objects 
-                       if any(obj.object_name.endswith(ext) for ext in supported_extensions)]
-        
+        data_objects = [
+            obj for obj in objects
+            if any(obj.object_name.endswith(ext) for ext in supported_extensions)
+        ]
+
+        # Accumulate parquet chunks by their parent directory name so that
+        # ingested/cart_items/chunk_0000.parquet + chunk_0001.parquet → "cart_items" entry
+        chunk_frames: dict = {}   # table_name -> list[pd.DataFrame]
+
         for obj in data_objects:
-            filename = obj.object_name.replace(ingested_folder, '')
-            
-            # Determine file extension and base name
+            # path relative to "ingested/" e.g. "cart_items/chunk_0000.parquet"
+            rel_path = obj.object_name[len(ingested_folder):]
+            parts = rel_path.split("/")
+
+            # Determine the logical table name:
+            # • Flat file (old upload layout): ingested/orders.csv  → parts = ["orders.csv"]
+            #   → base_name = "orders"
+            # • Chunked layout (initial_load.py): ingested/cart_items/chunk_0000.parquet
+            #   → parts = ["cart_items", "chunk_0000.parquet"]
+            #   → table_name = "cart_items"  (parent directory)
+            is_chunked = len(parts) == 2  # exactly one subdirectory level
+            filename = parts[-1]
+
             file_ext = None
             for ext in supported_extensions:
                 if filename.endswith(ext):
                     file_ext = ext
-                    base_name = filename.replace(ext, '')
                     break
-            
+            if file_ext is None:
+                continue
+
+            if is_chunked and file_ext == '.parquet':
+                table_name = parts[0]   # parent directory = canonical table name
+            else:
+                table_name = filename[: -len(file_ext)]  # flat file stem
+
+            if required_tables and table_name not in required_tables:
+                continue
+
             try:
                 response = minio_client.get_object(bucket_name, obj.object_name)
                 file_data = response.read()
                 response.close()
                 response.release_conn()
-                
-                # Handle different file types
+
                 if file_ext == '.csv':
                     df = pd.read_csv(StringIO(file_data.decode("utf-8")))
-                    ingested_cache[base_name] = df
-                    print(f"  Cached {base_name} from ingested/ ({len(df)} rows)")
-                
+                    ingested_cache[table_name] = df
+                    print(f"  Cached {table_name} from ingested/ ({len(df)} rows)")
+
                 elif file_ext == '.json':
                     df = pd.read_json(StringIO(file_data.decode("utf-8")))
-                    ingested_cache[base_name] = df
-                    print(f"  Cached {base_name} from ingested/ ({len(df)} rows)")
-                
+                    ingested_cache[table_name] = df
+                    print(f"  Cached {table_name} from ingested/ ({len(df)} rows)")
+
                 elif file_ext == '.parquet':
                     df = pd.read_parquet(BytesIO(file_data))
-                    ingested_cache[base_name] = df
-                    print(f"  Cached {base_name} from ingested/ ({len(df)} rows)")
-                
+                    # Accumulate chunks; we concat at the end to avoid O(n²) copies
+                    chunk_frames.setdefault(table_name, []).append(df)
+
                 elif file_ext in ['.xlsx', '.xls']:
-                    # Read all sheets from Excel file
                     excel_file = pd.ExcelFile(BytesIO(file_data), engine='openpyxl')
                     for sheet_name in excel_file.sheet_names:
                         df = pd.read_excel(excel_file, sheet_name=sheet_name)
-                        # Create table name as filename_sheetname
-                        table_name = f"{base_name}_{sheet_name}"
-                        ingested_cache[table_name] = df
-                        print(f"  Cached {table_name} from ingested/ ({len(df)} rows)")
-                
+                        tname = f"{table_name}_{sheet_name}"
+                        ingested_cache[tname] = df
+                        print(f"  Cached {tname} from ingested/ ({len(df)} rows)")
+
             except Exception as e:
                 print(f"  ⚠️  Warning: Could not load {obj.object_name}: {e}")
                 continue
-                
+
+        # Concat all parquet chunks per table
+        for table_name, frames in chunk_frames.items():
+            combined = pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
+            ingested_cache[table_name] = combined
+            print(f"  Cached {table_name} from ingested/ ({len(combined)} rows, {len(frames)} chunk(s))")
+
     except Exception as e:
         print(f"  ⚠️  Warning: Could not list ingested files: {e}")
-    
+
     return ingested_cache
 
 
-def find_column_in_ingested(column_name: str, ingested_cache: dict):
+def find_column_in_ingested(column_name: str, ingested_cache: dict, preferred_table: str = None):
     """
     Search for a column across all ingested files.
     
@@ -122,21 +181,31 @@ def find_column_in_ingested(column_name: str, ingested_cache: dict):
     Returns:
         tuple: (table_name, DataFrame) if found, else (None, None)
     """
+    if preferred_table and preferred_table in ingested_cache:
+        preferred_df = ingested_cache[preferred_table]
+        if column_name in preferred_df.columns:
+            return preferred_table, preferred_df
+
     for table_name, df in ingested_cache.items():
+        if table_name == preferred_table:
+            continue
         if column_name in df.columns:
             return table_name, df
     return None, None
 
 
-def _detect_streaming_parquet_tables(bucket_name: str, temp_folder: str) -> dict:
+def _detect_streaming_parquet_tables(bucket_name: str, temp_folder: str) -> tuple:
     """
     Detect tables stored as partitioned Parquet under mapped-temp/ (db/api streaming mode).
 
     Layout written by _write_spark_native:
         mapped-temp/{table_name}/_batch_id=0/part-*.parquet
+        mapped-temp/{table_name}/_extra_cols/part-*.parquet   (optional companion)
 
-    Returns a dict mapping table_name -> list of MinIO object keys for that table's
-    Parquet files.  Returns an empty dict if no Parquet files are found.
+    Returns a 2-tuple:
+        tables      : dict  table_name -> list of main Parquet object keys
+        extra_tables: dict  table_name -> list of _extra_cols Parquet object keys
+    Returns ({}, {}) if no Parquet files are found.
     """
     try:
         all_objects = list(
@@ -144,29 +213,56 @@ def _detect_streaming_parquet_tables(bucket_name: str, temp_folder: str) -> dict
         )
     except Exception as e:
         print(f"  ⚠️  Could not list {temp_folder}: {e}")
-        return {}
+        return {}, {}
 
     tables = {}
+    extra_tables = {}
     for obj in all_objects:
         if not obj.object_name.endswith(".parquet"):
             continue
-        # Strip "mapped-temp/" prefix → "table_name/_batch_id=0/part-xxxx.parquet"
+        # Strip "mapped-temp/" prefix → "table_name/...rest..."
         rel = obj.object_name[len(temp_folder):]
-        # First segment is the table name
         parts = rel.split("/", 1)
         if not parts:
             continue
         table_name = parts[0]
-        tables.setdefault(table_name, []).append(obj.object_name)
+        rest = parts[1] if len(parts) > 1 else ""
+        if rest.startswith("_extra_cols/"):
+            extra_tables.setdefault(table_name, []).append(obj.object_name)
+        else:
+            tables.setdefault(table_name, []).append(obj.object_name)
 
-    return tables
+    return tables, extra_tables
+
+
+def _common_join_keys(left_df: pd.DataFrame, right_df: pd.DataFrame) -> list[str]:
+    common = [
+        c for c in left_df.columns
+        if c in right_df.columns and c.endswith("_id") and c != "_ingested_at"
+    ]
+    return sorted(common)
 
 
 def _apply_mappings_to_df(df: pd.DataFrame, table_name: str, manual_mappings: dict,
-                           ingested_cache: dict, updated_results: dict) -> pd.DataFrame:
+                           ingested_cache: dict, updated_results: dict,
+                           is_streaming: bool = False,
+                           extra_source_df: "pd.DataFrame | None" = None) -> pd.DataFrame:
     """
     Apply manual column renames (and cross-table lookups) to a DataFrame in-place.
     Shared by both CSV and Parquet paths.
+
+    is_streaming : bool
+        Set to True for the streaming (db/api) Parquet path.
+        In streaming mode the DataFrame already has CANONICAL column names
+        (produced by Spark's mapping pipeline).  Missing/null canonical columns
+        appear as all-null placeholder columns.
+
+    extra_source_df : pd.DataFrame | None
+        The companion ``_extra_cols/`` Parquet written by ``_write_spark_native``
+        alongside the main ``_batch_id=0/`` Parquet.  It contains every column
+        from the original micro-batch (canonical + extra source columns) so we
+        can back-fill a null canonical slot from the raw source column the user
+        identified in the manual mappings UI.  Only present in streaming mode.
     """
     if table_name not in manual_mappings:
         return df
@@ -174,32 +270,111 @@ def _apply_mappings_to_df(df: pd.DataFrame, table_name: str, manual_mappings: di
     table_map = manual_mappings[table_name]
     print(f"  📝 Applying manual mappings for {table_name}...")
 
-    for canonical_col, source_col in table_map.items():
-        if source_col in df.columns:
-            df.rename(columns={source_col: canonical_col}, inplace=True)
-            print(f"     ✅ Mapped {source_col} → {canonical_col}")
-        else:
-            # Try cross-table lookup from ingested files
-            print(f"     🔍 '{source_col}' not found in {table_name} — searching ingested files...")
-            source_table, source_df = find_column_in_ingested(source_col, ingested_cache)
+    for canonical_col, source_ref in table_map.items():
+        source_table, source_col, qualified_ref = _parse_source_reference(source_ref, default_table=table_name)
+        if not source_col:
+            continue
 
-            if source_table is not None:
-                min_len = min(len(df), len(source_df))
-                df[canonical_col] = pd.NA
-                df.loc[:min_len - 1, canonical_col] = source_df[source_col].iloc[:min_len].values
+        if source_col in df.columns:
+            # Happy path: source column is directly present — rename it.
+            df.rename(columns={source_col: canonical_col}, inplace=True)
+            print(f"     ✅ Mapped {qualified_ref} → {canonical_col}")
+        elif f"__src__{source_col}" in df.columns:
+            # _write_spark_native embedded extra source columns under a __src__
+            # prefix in mapped-temp Parquet so we can back-fill them here.
+            df.rename(columns={f"__src__{source_col}": canonical_col}, inplace=True)
+            print(f"     ✅ Mapped {qualified_ref} → {canonical_col} (recovered from __src__ helper column)")
+        elif extra_source_df is not None and source_col in extra_source_df.columns:
+            # Source column is present in the _extra_cols companion Parquet that
+            # _write_spark_native wrote alongside the main batch Parquet.
+            # Use a primary-key join so row ordering doesn't matter.
+            # If no suitable key exists, treat as invalid mapping.
+            id_cols = [
+                c for c in extra_source_df.columns
+                if c.endswith("_id") and c in df.columns
+                and not extra_source_df[c].isna().all()
+            ]
+            if id_cols:
+                key_col = id_cols[0]
+                extra_subset = (
+                    extra_source_df[[key_col, source_col]]
+                    .drop_duplicates(subset=[key_col])
+                    .copy()
+                )
+                extra_subset.rename(columns={source_col: canonical_col}, inplace=True)
+                # Drop the all-null placeholder so the merged column fills it.
+                df.drop(columns=[canonical_col], inplace=True, errors="ignore")
+                df = pd.merge(df, extra_subset, on=key_col, how="left")
                 print(
-                    f"     ✅ Mapped {source_col} (from {source_table}) → {canonical_col} in {table_name}"
+                    f"     ✅ Mapped {qualified_ref} → {canonical_col} "
+                    f"(from _extra_cols companion, joined on '{key_col}')"
                 )
             else:
                 warning_msg = (
-                    f"Source column '{source_col}' not found in {table_name} "
+                    f"No valid join key to map '{qualified_ref}' into '{table_name}.{canonical_col}' "
+                    "from _extra_cols companion"
+                )
+                print(f"     ⚠️  {warning_msg}")
+                updated_results["failed_mappings"].append({
+                    "table": table_name,
+                    "canonical_column": canonical_col,
+                    "source_column": qualified_ref,
+                    "error": warning_msg,
+                    "stage": "join_validation",
+                })
+        elif is_streaming and canonical_col in df.columns:
+            # Streaming-mode fallback: canonical column exists but is all-null
+            # and the source column was not found in the companion Parquet either
+            # (e.g. the source column name had no match in extra_df for that batch).
+            # The continuous Airflow streaming job will populate it from batch 1+.
+            print(
+                f"     ℹ️  '{source_col}' not found in first-batch Parquet for {table_name} "
+                f"(canonical column '{canonical_col}' exists as null placeholder). "
+                f"Will be populated from source column '{source_col}' by the "
+                f"continuous streaming job for all subsequent batches."
+            )
+        else:
+            # Try cross-table lookup from ingested files (effective in batch mode).
+            print(f"     🔍 '{source_col}' not found in {table_name} — searching ingested files...")
+            source_table, source_df = find_column_in_ingested(source_col, ingested_cache, preferred_table=source_table)
+
+            if source_table is not None:
+                join_keys = _common_join_keys(df, source_df)
+                if join_keys:
+                    source_subset = (
+                        source_df[join_keys + [source_col]]
+                        .drop_duplicates(subset=join_keys)
+                        .copy()
+                    )
+                    source_subset.rename(columns={source_col: canonical_col}, inplace=True)
+                    df.drop(columns=[canonical_col], inplace=True, errors="ignore")
+                    df = pd.merge(df, source_subset, on=join_keys, how="left")
+                    print(
+                        f"     ✅ Mapped {qualified_ref} (from {source_table}) → {canonical_col} "
+                        f"in {table_name} via key join {join_keys}"
+                    )
+                else:
+                    warning_msg = (
+                        f"No valid join key between '{table_name}' and '{source_table}' for '{qualified_ref}'"
+                    )
+                    print(f"     ⚠️  {warning_msg}")
+                    updated_results["failed_mappings"].append({
+                        "table": table_name,
+                        "canonical_column": canonical_col,
+                        "source_column": qualified_ref,
+                        "error": warning_msg,
+                        "stage": "join_validation",
+                    })
+            else:
+                warning_msg = (
+                    f"Source column '{qualified_ref}' not found in {table_name} "
                     "or any ingested files"
                 )
                 print(f"     ⚠️  {warning_msg}")
                 updated_results["failed_mappings"].append({
                     "table": table_name,
                     "canonical_column": canonical_col,
-                    "source_column": source_col,
+                    "source_column": qualified_ref,
                     "error": warning_msg,
                     "stage": "column_mapping",
                 })
@@ -241,10 +416,25 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
         "failed_mappings": []
     }
 
+    required_source_tables = set()
+    for target_table, table_map in (manual_mappings or {}).items():
+        if not isinstance(table_map, dict):
+            continue
+        target = str(target_table or "").strip()
+        if not target:
+            continue
+        for _, source_ref in table_map.items():
+            source_table, source_col, _ = _parse_source_reference(source_ref, default_table=target)
+            if source_table and source_col and source_table != target:
+                required_source_tables.add(source_table)
+
     # Load ingested files for cross-table column lookup (batch mode uses these;
     # streaming mode may not have an ingested/ folder — that's fine).
     print("📂 Loading ingested files for cross-table column lookup...")
-    ingested_cache = load_ingested_files_cache(bucket_name)
+    ingested_cache = load_ingested_files_cache(
+        bucket_name,
+        required_tables=required_source_tables if required_source_tables else None,
+    )
     print(f"   Cached {len(ingested_cache)} ingested files\n")
 
     temp_folder = "mapped-temp/"
@@ -261,8 +451,9 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
 
     # Streaming mode: look for Parquet files one level deeper
     streaming_tables = {}
+    streaming_extra_tables = {}
     if not csv_objects:
-        streaming_tables = _detect_streaming_parquet_tables(bucket_name, temp_folder)
+        streaming_tables, streaming_extra_tables = _detect_streaming_parquet_tables(bucket_name, temp_folder)
 
     if not csv_objects and not streaming_tables:
         raise ValueError(
@@ -298,7 +489,8 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
                     continue
 
                 df = _apply_mappings_to_df(df, table_name, manual_mappings,
-                                            ingested_cache, updated_results)
+                                            ingested_cache, updated_results,
+                                            is_streaming=False)
 
                 try:
                     mapped_file_name = f"mapped/{table_name}.csv"
@@ -355,8 +547,37 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
                 df = pd.concat(frames, ignore_index=True)
                 print(f"  Loaded {len(df)} rows ({len(frames)} file(s))")
 
+                # Load the _extra_cols/ companion Parquet (written by _write_spark_native
+                # to preserve raw source columns that ended up in extra_df).
+                extra_source_df = None
+                extra_keys = streaming_extra_tables.get(table_name, [])
+                if extra_keys:
+                    extra_frames = []
+                    for ekey in extra_keys:
+                        try:
+                            resp = minio_client.get_object(bucket_name, ekey)
+                            edata = resp.read()
+                            resp.close()
+                            resp.release_conn()
+                            extra_frames.append(pd.read_parquet(BytesIO(edata)))
+                        except Exception as _ee:
+                            print(f"  ⚠️  Could not load extra_cols file {ekey}: {_ee}")
+                    if extra_frames:
+                        extra_source_df = pd.concat(extra_frames, ignore_index=True)
+                        print(f"  📊 Loaded {len(extra_source_df)} rows of extra source columns: "
+                              f"{list(extra_source_df.columns)}")
+
                 df = _apply_mappings_to_df(df, table_name, manual_mappings,
-                                            ingested_cache, updated_results)
+                                            ingested_cache, updated_results,
+                                            is_streaming=True,
+                                            extra_source_df=extra_source_df)
+
+                # Strip any legacy __src__* helper columns that may exist in older
+                # mapped-temp files (deprecated approach, kept for compatibility).
+                src_helper_cols = [c for c in df.columns if c.startswith("__src__")]
+                if src_helper_cols:
+                    df.drop(columns=src_helper_cols, inplace=True)
+                    print(f"  🧹 Stripped {len(src_helper_cols)} legacy helper column(s)")
 
                 # Preserve Spark-compatible column types so schema-merge succeeds when
                 # the next CDC micro-batch is appended by Spark to the same directory.
@@ -383,7 +604,9 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
                         content_type="application/octet-stream",
                     )
                     print(f"  ✅ Saved to {mapped_file_name} ({len(df)} rows)")
+                    # Schedule both main table files and _extra_cols files for cleanup.
                     successfully_processed_files.extend(parquet_keys)
+                    successfully_processed_files.extend(extra_keys)
                 except Exception as e:
                     error_msg = f"Error saving parquet for {table_name}: {e}"
                     print(f"  ⚠️  {error_msg}")

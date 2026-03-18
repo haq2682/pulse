@@ -28,7 +28,7 @@ except ImportError:
 from routers.auth import router as auth_router
 from routers.admin import router as admin_router
 from routers.onboarding import router as onboarding_router
-from routers.analytics import router as analytics_router
+from routers.analytics import router as analytics_router, analytics_service
 from routers.pipeline import router as pipeline_router
 from routers.xai import router as xai_router
 from routers.ingest import router as ingest_router
@@ -173,9 +173,25 @@ async def startup_event():
     
     # Initialize and set global analytics watcher
     watcher = AnalyticsWatcherService(minio_client, analytics_ws_manager)
+    watcher.set_cache_invalidator(lambda business_id: analytics_service.clear_cache(business_id))
     set_analytics_watcher(watcher)
     
     logger.info("Analytics Watcher Service initialized successfully")
+
+    # Recover any pipeline_status rows that were left in 'running' state by a
+    # previous API process that crashed or was restarted.
+    # For Airflow-backed pipelines: restarts the polling task if the DAG is
+    # still active; syncs the DB status otherwise.
+    # For legacy asyncio-backed rows (no dag_run_id): marks failed immediately.
+    logger.info("Running pipeline crash recovery...")
+    try:
+        from database import get_db_connection
+        from services.pipeline_service import recover_stuck_pipelines
+        _recovery_db = get_db_connection()
+        await recover_stuck_pipelines(_recovery_db)
+        _recovery_db.close()
+    except Exception as _exc:
+        logger.error("Pipeline crash recovery failed: %s", _exc, exc_info=True)
 
 
 @app.on_event("shutdown")

@@ -25,7 +25,7 @@ import json
 import hashlib
 import os
 import requests
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, unquote
 from typing import List, Dict, Any, Optional
 
 try:
@@ -162,8 +162,8 @@ def parse_db_uri(uri: str) -> Dict[str, Any]:
         "db_type": db_type,
         "host": parsed.hostname or "localhost",
         "port": parsed.port or default_port,
-        "user": parsed.username or "",
-        "password": parsed.password or "",
+        "user": unquote(parsed.username) if parsed.username else "",
+        "password": unquote(parsed.password) if parsed.password else "",
         "database": parsed.path.lstrip("/").split("?")[0] if parsed.path else "",
         "raw_uri": uri,
     }
@@ -614,6 +614,7 @@ class DebeziumConnectorManager:
         tables: List[str],
         connector_name: str = "pulse-cdc-connector",
         topic_prefix: str = "ecom",
+        snapshot_mode: str = "initial",
     ) -> Dict[str, Any]:
         """
         Auto-detect database type from URI and build the Debezium connector config.
@@ -623,6 +624,16 @@ class DebeziumConnectorManager:
             tables: List of table/collection names to capture
             connector_name: Unique name for the connector instance
             topic_prefix: Kafka topic prefix (topics: {prefix}.{schema}.{table})
+            snapshot_mode: Override for ``snapshot.mode`` in the connector config.
+                ``"initial"`` (default) — Debezium performs a full database
+                snapshot on first start then streams further changes.
+                ``"never"`` — Skip the snapshot entirely; stream changes that
+                arrive AFTER the connector is deployed.  Use this when the
+                initial data has already been loaded through a separate JDBC
+                bulk-ingest (run_jdbc_initial_load) so that Debezium only
+                captures *incremental* CDC events going forward.
+                ``"no_data"`` — Same as never; preferred on connector restarts
+                so a config update does not trigger a re-snapshot.
 
         Returns:
             Connector configuration dict ready for deploy_connector()
@@ -639,6 +650,30 @@ class DebeziumConnectorManager:
 
         config = builder(parsed, tables, topic_prefix, connector_name)
 
+        # Override snapshot.mode when the caller requests a non-default value.
+        # This is used by the initial-load path to deploy Debezium with
+        # snapshot.mode=no_data/never so it only captures WAL changes after
+        # deployment, avoiding a duplicate full-table snapshot on top of the
+        # JDBC/PyMongo bulk load.
+        #
+        # MongoDB's connector rejects "never" — its valid set is:
+        #   always, initial_only, configuration_based, when_needed,
+        #   initial, custom, no_data
+        # All other connectors accept both "never" and "no_data".
+        # Normalise: treat "never" and "no_data" as synonyms, using "no_data"
+        # for MongoDB and "never" for everything else so we stay compatible with
+        # older Debezium versions of the relational connectors.
+        _is_mongodb = "capture.mode" in config  # only MongoDB config has this key
+        if snapshot_mode in ("never", "no_data"):
+            effective_mode = "no_data" if _is_mongodb else "never"
+        else:
+            effective_mode = snapshot_mode
+
+        if effective_mode != "initial" and "snapshot.mode" in config:
+            config["snapshot.mode"] = effective_mode
+        elif effective_mode != "initial":
+            config.setdefault("snapshot.mode", effective_mode)
+
         print(f"  Detected database type: {db_type}")
         print(f"  Connector class: {config['connector.class']}")
         if parsed.get("host"):
@@ -646,6 +681,7 @@ class DebeziumConnectorManager:
         print(f"  Database: {parsed.get('database', 'N/A')}")
         print(f"  Tables: {tables}")
         print(f"  Topic prefix: {topic_prefix}")
+        print(f"  Snapshot mode: {config.get('snapshot.mode', 'N/A')}")
 
         return {"name": connector_name, "config": config}
 
@@ -707,13 +743,23 @@ class DebeziumConnectorManager:
             )
 
         # 4. Resume the connector.
-        resume_resp = requests.post(
+        # Kafka Connect deployments differ here: some expect PUT, some accept POST.
+        resume_resp = requests.put(
             f"{self.connect_url}/connectors/{connector_name}/resume",
             timeout=short,
         )
         if resume_resp.status_code not in (200, 202, 204):
-            print(f"  ⚠️  Could not resume connector after offset reset: {resume_resp.status_code}")
-            return False
+            if resume_resp.status_code in (404, 405):
+                resume_resp = requests.post(
+                    f"{self.connect_url}/connectors/{connector_name}/resume",
+                    timeout=short,
+                )
+            if resume_resp.status_code not in (200, 202, 204):
+                print(
+                    f"  ⚠️  Could not resume connector after offset reset: "
+                    f"{resume_resp.status_code} {resume_resp.text[:160]}"
+                )
+                return False
 
         _time.sleep(3)
         return True
@@ -829,13 +875,13 @@ class DebeziumConnectorManager:
                         f"Check Kafka Connect logs for details."
                     )
                     return False
-                # reset_offsets failed; return True anyway — the connector
-                # config is deployed even if tasks are stuck.
+                # Offset reset failed — keep deploy result as failure so caller
+                # can retry instead of running streaming with a broken connector.
                 print(
                     "  ⚠️  Offset reset did not succeed.  Connector config is "
                     "deployed but tasks may need manual intervention."
                 )
-                return True
+                return False
             # Timeout — connector may still be initialising.
             print(
                 f"  ⚠️  Could not confirm task state within 30s "

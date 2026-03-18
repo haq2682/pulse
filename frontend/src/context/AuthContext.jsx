@@ -32,8 +32,7 @@ export const AuthProvider = ({ children }) => {
                 setUser(null);
             }
         } catch (err) {
-            console.error('Auth check failed:', err);
-            setUser(null);
+            console.warn('Auth check failed, preserving current auth state:', err);
         } finally {
             setIsAppLoading(false); 
         }

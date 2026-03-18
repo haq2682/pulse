@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 
 # ---------------------------------------------------------------------------
 # JAR paths — set BEFORE pyspark is imported so the JVM gateway starts with
@@ -261,8 +262,10 @@ spark = (
     .config(
         "spark.sql.catalog.spark_catalog",
         "org.apache.spark.sql.delta.catalog.DeltaCatalog",
-    )
-    .getOrCreate()
+    )    # Write timestamps as MICROS (INT64) — universally readable by all Spark
+    # versions and downstream tools.  The default NANOS type causes
+    # "Illegal Parquet type: INT64 (TIMESTAMP(NANOS,true))" in older readers.
+    .config("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS")    .getOrCreate()
 )
 
 spark.sparkContext.setLogLevel("ERROR")
@@ -398,6 +401,28 @@ def normalize_dataframe(df, column_variants, mapped_cols):
     Returns:
         Tuple of (normalized_df, extra_df, extra_cols, missing_cols, mapped_cols)
     """
+    def _dedupe_dataframe_columns(input_df):
+        cols = list(input_df.columns)
+        seen = {}
+        renamed = []
+        changed = False
+        for name in cols:
+            count = seen.get(name, 0)
+            if count == 0:
+                renamed.append(name)
+            else:
+                renamed.append(f"{name}__dup{count}")
+                changed = True
+            seen[name] = count + 1
+
+        if changed:
+            print(f"  ℹ️  Detected duplicate columns; deduplicated names: {renamed}")
+            return input_df.toDF(*renamed)
+        return input_df
+
+    # Guard against upstream duplicate columns before any rename/select.
+    df = _dedupe_dataframe_columns(df)
+
     variant_to_standard = {
         v.lower(): std_col
         for std_col, variants in column_variants.items()
@@ -416,6 +441,10 @@ def normalize_dataframe(df, column_variants, mapped_cols):
 
     for old_col, new_col in zip(df.columns, new_columns):
         df = df.withColumnRenamed(old_col, new_col)
+
+    # Renaming variants can create collisions (e.g., user_id -> customer_id while
+    # customer_id already exists). Deduplicate again before downstream selects.
+    df = _dedupe_dataframe_columns(df)
 
     missing_cols = []
     for std_col in column_variants.keys():
@@ -514,6 +543,33 @@ def mapping(df, column_variants, mapped):
     return new_df, extra_df, extra_cols, missing_cols, mapped_cols
 
 
+_QUALIFIED_REF_RE = re.compile(r'^\s*"(?P<table>[^"]+)"\s*\.\s*"(?P<column>[^"]+)"\s*$')
+_UNQUOTED_REF_RE = re.compile(r'^\s*(?P<table>[A-Za-z_][\w$]*)\s*\.\s*(?P<column>[A-Za-z_][\w$]*)\s*$')
+
+
+def _parse_source_reference(raw_value, default_table: str = None):
+    if raw_value is None:
+        return None, None, ""
+
+    raw_str = str(raw_value).strip()
+    if not raw_str:
+        return None, None, ""
+
+    match = _QUALIFIED_REF_RE.match(raw_str) or _UNQUOTED_REF_RE.match(raw_str)
+    if match:
+        source_table = match.group("table").strip().strip('"')
+        source_col = match.group("column").strip().strip('"')
+    else:
+        source_table = str(default_table or "").strip().strip('"') if default_table else None
+        source_col = raw_str.strip().strip('"')
+
+    if not source_col:
+        return None, None, ""
+    source_table = source_table or str(default_table or "").strip().strip('"')
+    qualified = f'"{source_table}"."{source_col}"' if source_table else source_col
+    return source_table, source_col, qualified
+
+
 def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="batch", manual_mappings=None):
     """
     Unified processor for schema mapping.
@@ -560,7 +616,93 @@ def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="bat
 
     results = {}
 
-    # Iterate over incoming dataframes
+    resolved_entries = []
+    source_table_frames = {}
+
+    def _common_join_keys(left_df, right_df):
+        left_cols = set(left_df.columns)
+        right_cols = set(right_df.columns)
+        common = [
+            key for key in (left_cols & right_cols)
+            if str(key).endswith("_id") and str(key) != "_ingested_at"
+        ]
+        return sorted(common)
+
+    def _left_join_with_projected_source(dst_df, src_df, join_keys, source_col, src_alias):
+        """
+        Left-join source value into destination while avoiding ambiguous columns.
+        Keeps only destination columns plus one projected source alias.
+        """
+        dst_alias = "dst"
+        src_alias_name = "src"
+
+        src_projection = (
+            src_df
+            .select(*join_keys, col(source_col).alias(src_alias))
+            .dropDuplicates(join_keys)
+            .alias(src_alias_name)
+        )
+        dst_projection = dst_df.alias(dst_alias)
+
+        join_condition = None
+        for key in join_keys:
+            predicate = col(f"{dst_alias}.`{key}`") == col(f"{src_alias_name}.`{key}`")
+            join_condition = predicate if join_condition is None else (join_condition & predicate)
+
+        joined = dst_projection.join(src_projection, on=join_condition, how="left")
+        return joined.select(
+            col(f"{dst_alias}.*"),
+            col(f"{src_alias_name}.`{src_alias}`").alias(src_alias),
+        )
+
+    def _resolve_table_manual_mappings(table_name: str, canonical_cols: set):
+        """Return canonical -> source reference metadata with robust key/orientation handling."""
+        if not isinstance(manual_mappings, dict):
+            return {}
+
+        table_map = manual_mappings.get(table_name)
+        if not isinstance(table_map, dict):
+            for key, value in manual_mappings.items():
+                if not isinstance(value, dict):
+                    continue
+                canonical_key = map_table_name(str(key), threshold=80)
+                if canonical_key == table_name:
+                    table_map = value
+                    break
+
+        if not isinstance(table_map, dict):
+            return {}
+
+        resolved = {}
+        for left, right in table_map.items():
+            l = str(left).strip() if left is not None else ""
+            r = str(right).strip() if right is not None else ""
+            if not l or not r:
+                continue
+
+            # Preferred orientation in onboarding: canonical -> source.
+            if l in canonical_cols:
+                source_table, source_col, qualified_ref = _parse_source_reference(r, default_table=table_name)
+                if source_col:
+                    resolved[l] = {
+                        "source_table": source_table,
+                        "source_col": source_col,
+                        "qualified_ref": qualified_ref,
+                    }
+            # Backward compatibility: source -> canonical.
+            elif r in canonical_cols:
+                source_table, source_col, qualified_ref = _parse_source_reference(l, default_table=table_name)
+                if source_col:
+                    resolved[r] = {
+                        "source_table": source_table,
+                        "source_col": source_col,
+                        "qualified_ref": qualified_ref,
+                    }
+
+        return resolved
+
+    # Pass 1: resolve incoming dataframes to canonical-table entries so explicit
+    # source-table references can reuse other tables within the same micro-batch.
     for df_name, df in all_dataframes.items():
         print(f"\n{'='*50}")
         print(f"Incoming dataframe: {df_name}")
@@ -581,70 +723,141 @@ def process_all_dataframes(all_dataframes, columns_info, mapping_list, mode="bat
                 # If no canonical mapping found, skip this table
                 print(f"⚠️  Table '{table_name}' not found in canonical schema. Skipping...")
                 continue
+
+            resolved_entries.append((df_name, table_to_use, sub_df))
+            if table_to_use not in source_table_frames:
+                source_table_frames[table_to_use] = sub_df
+
+    for df_name, table_to_use, sub_df in resolved_entries:
             
-            mapping_dict = getattr(mapping_list, f"mapping_dict_{table_to_use}", None)
-            if not mapping_dict:
-                print(f"⚠️  No mapping dict found for canonical table '{table_to_use}'. Skipping...")
-                continue
+        mapping_dict = getattr(mapping_list, f"mapping_dict_{table_to_use}", None)
+        if not mapping_dict:
+            print(f"⚠️  No mapping dict found for canonical table '{table_to_use}'. Skipping...")
+            continue
 
-            mapped = {col: "" for t, col, _ in columns_info if t == table_to_use}
-            print(f"Processing → {table_to_use} with {len(mapped)} canonical columns")
+        mapped = {col: "" for t, col, _ in columns_info if t == table_to_use}
+        print(f"Processing → {table_to_use} with {len(mapped)} canonical columns")
 
-            final_df, extra_df, extra_cols, missing_cols, mapped_cols = mapping(
-                sub_df, mapping_dict, mapped
-            )
+        canonical_cols = set(mapped.keys())
+        table_manual_mappings = _resolve_table_manual_mappings(table_to_use, canonical_cols)
 
-            # Apply manual mappings if provided
-            if manual_mappings and table_to_use in manual_mappings:
-                print(f"\n📝 Applying manual mappings for {table_to_use}...")
-                table_manual_mappings = manual_mappings[table_to_use]
-                
-                for canonical_col, source_col in table_manual_mappings.items():
-                    if canonical_col in missing_cols:
-                        # Check if the source column exists in extra_cols or original dataframe
-                        if source_col in extra_cols or source_col in sub_df.columns:
-                            try:
-                                # Rename the source column to canonical column
-                                if source_col in final_df.columns:
-                                    # Column already in final_df (from extra_df)
-                                    final_df = final_df.withColumnRenamed(source_col, canonical_col)
-                                elif source_col in extra_df.columns:
-                                    # Column is in extra_df, add it to final_df
-                                    final_df = final_df.withColumn(canonical_col, extra_df[source_col])
-                                else:
-                                    # Column is in original dataframe
-                                    final_df = final_df.withColumn(canonical_col, sub_df[source_col])
-                                
-                                # Update lists - check existence before removing
-                                if canonical_col in missing_cols:
-                                    missing_cols.remove(canonical_col)
-                                if source_col in extra_cols:
-                                    extra_cols.remove(source_col)
-                                mapped_cols.append(canonical_col)
-                                
-                                print(f"   ✅ Mapped {source_col} → {canonical_col}")
-                            except Exception as map_error:
-                                print(f"   ⚠️  Could not map {source_col} → {canonical_col}: {map_error}")
-                        else:
-                            print(f"   ⚠️  Source column {source_col} not found for mapping to {canonical_col}")
-                
-                print(f"   After manual mapping: {len(missing_cols)} missing columns")
+        # Pre-apply manual mappings directly on incoming dataframe when source
+        # columns exist. This ensures the algorithm chain starts with user-
+        # confirmed mappings and avoids unnecessary fuzzy remapping.
+        if table_manual_mappings:
+            pre_applied = 0
+            for canonical_col, source_meta in table_manual_mappings.items():
+                source_table = source_meta.get("source_table") or table_to_use
+                source_col = source_meta.get("source_col")
+                if not source_col:
+                    continue
 
-            # Sanitize lists before putting them into results
-            results[f"{df_name}__{table_to_use}"] = {
-                "table_name": table_to_use,
-                "final_df": final_df,  # keep Spark DF
-                "extra_df": extra_df,  # keep Spark DF
-                "extra_cols": [safe_serialize(c) for c in extra_cols],
-                "missing_cols": [safe_serialize(c) for c in missing_cols],
-                "mapped_cols": [safe_serialize(c) for c in mapped_cols],
-            }
+                # Pre-apply only same-table mappings; cross-table mappings are
+                # applied later only for unresolved canonical fields to avoid
+                # expensive joins on every mapping candidate in streaming mode.
+                if source_table != table_to_use:
+                    continue
 
-            print(f"✅ Completed {df_name} → {table_to_use}")
-            print(f"   Missing cols: {missing_cols}")
-            print(f"   Extra cols: {extra_cols}")
-            print("   Preview:")
-            final_df.show(3)
+                if source_col in sub_df.columns and canonical_col not in sub_df.columns:
+                    sub_df = sub_df.withColumn(canonical_col, col(source_col))
+                    # Avoid duplicate canonical creation during normalization when
+                    # source variant would also be renamed to the same canonical name.
+                    if source_col != canonical_col and source_col in sub_df.columns:
+                        sub_df = sub_df.drop(source_col)
+                    pre_applied += 1
+            if pre_applied > 0:
+                print(f"\n📝 Pre-applied {pre_applied} manual mapping(s) for {table_to_use} before auto-mapping...")
+
+        final_df, extra_df, extra_cols, missing_cols, mapped_cols = mapping(
+            sub_df, mapping_dict, mapped
+        )
+
+        # Apply manual mappings if provided
+        if table_manual_mappings:
+            print(f"\n📝 Applying manual mappings for {table_to_use}...")
+            source_df_projection_cache = {}
+
+            for canonical_col, source_meta in table_manual_mappings.items():
+                if canonical_col not in missing_cols:
+                    continue
+
+                source_table = source_meta.get("source_table") or table_to_use
+                source_col = source_meta.get("source_col")
+                qualified_ref = source_meta.get("qualified_ref") or source_col
+                if not source_col:
+                    continue
+
+                source_df = sub_df if source_table == table_to_use else source_table_frames.get(source_table)
+
+                if source_col in final_df.columns:
+                    try:
+                        if source_col != canonical_col:
+                            final_df = final_df.withColumn(canonical_col, col(source_col))
+
+                        if canonical_col in missing_cols:
+                            missing_cols.remove(canonical_col)
+                        if source_col in extra_cols:
+                            extra_cols.remove(source_col)
+                        mapped_cols[canonical_col] = qualified_ref
+
+                        print(f"   ✅ Mapped {qualified_ref} → {canonical_col}")
+                    except Exception as map_error:
+                        print(f"   ⚠️  Could not map {qualified_ref} → {canonical_col}: {map_error}")
+                elif source_df is not None and source_col in source_df.columns:
+                    try:
+                        join_keys = _common_join_keys(final_df, source_df)
+                        if not join_keys:
+                            print(
+                                f"   ⚠️  Invalid cross-table mapping {qualified_ref} → {canonical_col}: "
+                                f"no valid join keys between '{table_to_use}' and '{source_table}'"
+                            )
+                            continue
+
+                        cache_key = (source_table or table_to_use, source_col, tuple(join_keys))
+                        if cache_key not in source_df_projection_cache:
+                            source_df_projection_cache[cache_key] = source_df
+
+                        src_alias = f"__src__{canonical_col}"
+                        final_df = _left_join_with_projected_source(
+                            dst_df=final_df,
+                            src_df=source_df_projection_cache[cache_key],
+                            join_keys=join_keys,
+                            source_col=source_col,
+                            src_alias=src_alias,
+                        ).withColumn(canonical_col, col(src_alias)).drop(src_alias)
+
+                        if canonical_col in missing_cols:
+                            missing_cols.remove(canonical_col)
+                        if source_col in extra_cols:
+                            extra_cols.remove(source_col)
+                        mapped_cols[canonical_col] = qualified_ref
+                        print(f"   ✅ Mapped {qualified_ref} → {canonical_col} (key-based cross-table join: {join_keys})")
+                    except Exception as map_error:
+                        print(f"   ⚠️  Could not map {qualified_ref} → {canonical_col} via key-based cross-table join: {map_error}")
+                else:
+                    print(f"   ℹ️  Skipping {qualified_ref} → {canonical_col} (source not found)")
+
+            print(f"   After manual mapping: {len(missing_cols)} missing columns")
+
+        # Sanitize lists before putting them into results
+        results[f"{df_name}__{table_to_use}"] = {
+            "table_name": table_to_use,
+            "final_df": final_df,  # keep Spark DF
+            "extra_df": extra_df,  # keep Spark DF
+            "extra_cols": [safe_serialize(c) for c in extra_cols],
+            "missing_cols": [safe_serialize(c) for c in missing_cols],
+            "mapped_cols": {
+                safe_serialize(k): safe_serialize(v)
+                for k, v in mapped_cols.items()
+                if v not in (None, "")
+            },
+        }
+
+        print(f"✅ Completed {df_name} → {table_to_use}")
+        print(f"   Missing cols: {missing_cols}")
+        print(f"   Extra cols: {extra_cols}")
+        print("   Preview:")
+        final_df.show(3)
 
     return results
 

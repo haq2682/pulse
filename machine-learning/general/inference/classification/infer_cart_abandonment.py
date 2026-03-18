@@ -1,4 +1,5 @@
 import os
+
 import uuid
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
@@ -11,10 +12,6 @@ from pyspark.ml.feature import VectorAssembler, StringIndexerModel, StandardScal
 from pyspark.ml.classification import (
     LogisticRegressionModel, RandomForestClassificationModel, GBTClassificationModel
 )
-import findspark
-
-findspark.init()
-
 # Base features (MUST match training - no time_in_cart_hours)
 NUMERICAL_FEATURES = [
     "cart_total_value",
@@ -33,32 +30,24 @@ CATEGORICAL_FEATURES = [
 ]
 
 
-def create_spark_session():
-    return SparkSession.builder \
-        .appName("CartAbandonmentInference") \
-        .master(os.getenv("SPARK_SERVER", "local[*]")) \
-        .config(
-            "spark.jars.packages",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.2.6,org.apache.hadoop:hadoop-aws:3.3.4",
-        ) \
-        .config("spark.dynamicAllocation.enabled", "true") \
-        .config("spark.dynamicAllocation.minExecutors", "0") \
-        .config("spark.dynamicAllocation.maxExecutors", "1000") \
-        .config("spark.dynamicAllocation.initialExecutors", "1") \
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT")) \
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY")) \
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY")) \
-        .config("spark.hadoop.fs.s3a.path.style.access", "true") \
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false") \
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        ) \
-        .config("inferSchema", "true") \
-        .config("mergeSchema", "true") \
-        .getOrCreate()
+import sys
+from pathlib import Path
 
+_ML_ROOT = next(p for p in Path(__file__).resolve().parents if p.name == "machine-learning")
+if str(_ML_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ML_ROOT))
+
+from spark_utils import create_ml_spark_session
+
+def create_spark_session():
+    return create_ml_spark_session(
+        "CartAbandonmentInference",
+        extra_configs={
+            "spark.sql.shuffle.partitions": "8",
+            "inferSchema": "true",
+            "mergeSchema": "true",
+        },
+    )
 
 def load_data(spark, path):
     try:
@@ -78,8 +67,8 @@ def engineer_features(df):
     df = df.withColumn("high_value_cart", when(col("cart_total_value") > 200, 1.0).otherwise(0.0))
     df = df.withColumn(
         "price_point_sensitivity",
-        when(col("cart_avg_item_price") < 20, lit("low"))
-        .when(col("cart_avg_item_price") < 100, lit("medium"))
+        when(col("cart_avg_item_price") < 20, lit("low")) \
+        .when(col("cart_avg_item_price") < 100, lit("medium")) \
         .otherwise(lit("high"))
     )
     df = df.withColumn("browsing_intensity", col("pages_per_minute") * col("session_duration_minutes"))
@@ -127,9 +116,9 @@ def add_customer_history_features(df, customers_df=None, orders_df=None):
         df = df.withColumn("days_since_last_order_calc", datediff(current_date(), col("last_order_date_calc")))
         df = df.withColumn(
             "customer_segment_calc",
-            when(col("total_orders_calc").isNull() | (col("total_orders_calc") == 0), lit("new"))
-            .when(col("total_orders_calc") <= 2, lit("occasional"))
-            .when(col("total_orders_calc") <= 5, lit("regular"))
+            when(col("total_orders_calc").isNull() | (col("total_orders_calc") == 0), lit("new")) \
+            .when(col("total_orders_calc") <= 2, lit("occasional")) \
+            .when(col("total_orders_calc") <= 5, lit("regular")) \
             .otherwise(lit("loyal"))
         )
         df = df.withColumn("is_returning_customer_calc", when(col("total_orders_calc") > 0, 1.0).otherwise(0.0))
