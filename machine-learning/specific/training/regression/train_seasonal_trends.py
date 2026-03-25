@@ -395,7 +395,7 @@ def time_based_split(df, train_ratio=0.8):
     split_point = int(total_count * train_ratio)
 
     # Add row number based on chronological order
-    window_spec = Window.orderBy("year_month")
+    window_spec = Window.partitionBy(F.lit(1)).orderBy("year_month")
     df_with_row = df.withColumn("_row_num", F.row_number().over(window_spec))
 
     train_df = df_with_row.filter(F.col("_row_num") <= split_point).drop("_row_num")

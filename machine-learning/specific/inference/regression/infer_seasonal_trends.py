@@ -277,7 +277,7 @@ def create_inference_features(monthly_df):
     })
 
     # Get most recent month for prediction
-    window_latest = Window.orderBy(F.desc("year_month"))
+    window_latest = Window.partitionBy(F.lit(1)).orderBy(F.desc("year_month"))
 
     df_latest = df.withColumn(
         "row_num",
