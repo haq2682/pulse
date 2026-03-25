@@ -9,6 +9,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from specific.model_registry import resolve_best_model
 
 
 from pyspark.sql import SparkSession
@@ -37,14 +38,15 @@ CATEGORICAL_FEATURES = [
     # NOTE: brands handled via FeatureHasher, not StringIndexer
 ]
 
+MODEL_CANDIDATES = ["LogisticRegression", "RandomForest", "DecisionTree", "MultilayerPerceptron"]
+
 
 def create_spark_session():
     """Initialize Spark session"""
     return create_ml_spark_session(
         "ProductBundlingInference",
         extra_configs={
-                    "inferSchema": "true",
-                    "mergeSchema": "true"
+                    "spark.sql.shuffle.partitions": "8"
                 },
     )
 def load_data(spark, path):
@@ -371,18 +373,24 @@ def main(BUCKET_NAME):
     OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/product_bundling_predictions"
     MODEL_INPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/product_bundling"
 
-    # ⚠️ MANUAL INTERVENTION REQUIRED: Select model to use for inference
-    # Available options: "LogisticRegression", "RandomForest", "DecisionTree", "MultilayerPerceptron"
-    SELECTED_MODEL = "RandomForest"  # <-- CHANGE THIS BASED ON TRAINING RESULTS
+    preferred_model = os.getenv("PRODUCT_BUNDLING_MODEL", "RandomForest")
 
-    MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
     print("=" * 60)
     print("Product Bundling Classification - Inference Pipeline")
     print("=" * 60)
-    print(f"Using model: {SELECTED_MODEL}")
+    print(f"Preferred model: {preferred_model}")
     print("=" * 60)
     
     spark = create_spark_session()
+
+    SELECTED_MODEL, model_source, _ = resolve_best_model(
+        spark,
+        MODEL_INPUT_DIR,
+        MODEL_CANDIDATES,
+        preferred_model=preferred_model,
+    )
+    MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
+    print(f"Selected model: {SELECTED_MODEL} (source: {model_source})")
     
     # Load model and preprocessors
     model, preprocessors = load_model_and_preprocessors(spark, MODEL_INPUT_DIR, SELECTED_MODEL)

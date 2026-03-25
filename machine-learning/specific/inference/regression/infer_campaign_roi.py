@@ -23,6 +23,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from specific.model_registry import resolve_best_model
 
 
 from pyspark.sql import SparkSession
@@ -50,18 +51,18 @@ NUMERIC_FEATURES = [
     "campaign_type_idx", "target_audience_idx", "campaign_status_idx",
 ]
 
+MODEL_CANDIDATES = ["campaign_revenue"]
+
 
 def create_spark_session():
     """Initialize Spark session"""
     return create_ml_spark_session(
         "Campaign_ROI_Inference",
         extra_configs={
-                    "spark.sql.shuffle.partitions": "8",
-                    "inferSchema": "true",
-                    "mergeSchema": "true"
+                    "spark.sql.shuffle.partitions": "8"
                 },
     )
-def load_model_artifacts(model_base_path):
+def load_model_artifacts(model_base_path, revenue_model_name="campaign_revenue"):
     """
     Load all artifacts saved during training:
     - RandomForest model
@@ -69,7 +70,7 @@ def load_model_artifacts(model_base_path):
     """
     try:
         revenue_model = RandomForestRegressionModel.load(
-            f"{model_base_path}campaign_revenue"
+            f"{model_base_path}{revenue_model_name}"
         )
         ct_indexer = StringIndexerModel.load(
             f"{model_base_path}indexer_campaign_type"
@@ -468,6 +469,7 @@ def main(BUCKET_NAME):
     INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
     OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/campaign_roi/"
     MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/campaign_roi/"
+    preferred_model = os.getenv("CAMPAIGN_ROI_MODEL", "campaign_revenue")
 
     print("\n" + "=" * 80)
     print("Campaign ROI Prediction - Inference (Revenue → ROI)")
@@ -477,11 +479,20 @@ def main(BUCKET_NAME):
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
 
+    selected_model, model_source, _ = resolve_best_model(
+        spark,
+        MODEL_BASE_PATH,
+        MODEL_CANDIDATES,
+        preferred_model=preferred_model,
+    )
+    print(f"Selected model: {selected_model} (source: {model_source})")
+
     # ── Step 1: Load all artifacts ───────────────────────────────────────
     print("Step 1: Load Model Artifacts")
     print("-" * 80)
     revenue_model, ct_indexer, aud_indexer, status_indexer = load_model_artifacts(
-        MODEL_BASE_PATH
+        MODEL_BASE_PATH,
+        revenue_model_name=selected_model,
     )
 
     if any(x is None for x in [revenue_model, ct_indexer, aud_indexer, status_indexer]):

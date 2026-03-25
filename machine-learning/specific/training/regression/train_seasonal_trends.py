@@ -14,6 +14,7 @@ Uses time-based train/test split to prevent temporal leakage.
 
 import os
 import sys
+import json
 
 import findspark
 from dotenv import load_dotenv
@@ -45,6 +46,8 @@ MODEL_NAME = "seasonal_trends"
 MIN_RECORDS = 12
 MAX_RECORDS = 1000
 USE_CROSS_VALIDATION = False
+SEASONAL_INDEX_MIN = 0.3
+SEASONAL_INDEX_MAX = 3.0
 
 # Feature columns for seasonal trend prediction
 # Uses fields from agg_monthly_aggregations schema
@@ -124,11 +127,33 @@ def create_spark_session():
     return create_ml_spark_session(
         "Seasonal_Trends_Training",
         extra_configs={
-                    "spark.sql.shuffle.partitions": "8",
-                    "inferSchema": "true",
-                    "mergeSchema": "true"
+                    "spark.sql.shuffle.partitions": "8"
                 },
     )
+
+
+def save_best_model_manifest(spark, model_output_dir, best_metrics, all_metrics):
+    """Persist best-model metadata so inference can auto-select the best model."""
+    manifest = {
+        "best_model": best_metrics["model"],
+        "best_r2": float(best_metrics["r2"]),
+        "metric": "r2",
+        "generated_at": datetime.now().isoformat(),
+        "model_scores": {
+            m["model"]: {
+                "r2": float(m["r2"]),
+                "rmse": float(m["rmse"]),
+                "mae": float(m["mae"]),
+                "mape": float(m["mape"]),
+            }
+            for m in all_metrics
+        },
+    }
+
+    manifest_payload = json.dumps(manifest)
+    manifest_path = f"{model_output_dir}/_best_model_manifest"
+    spark.createDataFrame([(manifest_payload,)], ["value"]).coalesce(1).write.mode("overwrite").text(manifest_path)
+    print(f"✓ Best-model manifest saved: {manifest_path}")
 def validate_dataset(spark, path, name):
     """Check if dataset exists and is readable"""
     try:
@@ -329,8 +354,25 @@ def prepare_training_data(df):
         print(f"✗ Insufficient training data: {valid_count} < {MIN_RECORDS}")
         return None
 
+    # Outlier treatment on target (winsorize via domain bounds)
+    raw_outlier_count = df_valid.filter(
+        (F.col(TARGET_COLUMN) < SEASONAL_INDEX_MIN) |
+        (F.col(TARGET_COLUMN) > SEASONAL_INDEX_MAX)
+    ).count()
+
+    if raw_outlier_count > 0:
+        print(
+            f"⚠️  Detected {raw_outlier_count} target outliers. "
+            f"Clamping {TARGET_COLUMN} to [{SEASONAL_INDEX_MIN}, {SEASONAL_INDEX_MAX}]"
+        )
+
+    df_capped = df_valid.withColumn(
+        TARGET_COLUMN,
+        F.greatest(F.lit(SEASONAL_INDEX_MIN), F.least(F.lit(SEASONAL_INDEX_MAX), F.col(TARGET_COLUMN)))
+    )
+
     # Fill missing values with 0
-    df_filled = df_valid.fillna(0, subset=FEATURE_COLUMNS)
+    df_filled = df_capped.fillna(0, subset=FEATURE_COLUMNS)
 
     # Select final columns (keep year_month for time-based splitting)
     df_prepared = df_filled.select(
@@ -558,6 +600,7 @@ def main(BUCKET_NAME):
     print(f"Model output: {MODEL_OUTPUT_DIR}")
     print(f"Cross-Validation: {'ENABLED' if USE_CROSS_VALIDATION else 'DISABLED'}")
     print(f"Split strategy: Time-based (chronological)")
+    print(f"Outlier handling: clamp {TARGET_COLUMN} to [{SEASONAL_INDEX_MIN}, {SEASONAL_INDEX_MAX}]")
     print("="*60 + "\n")
 
     spark = create_spark_session()
@@ -657,8 +700,9 @@ def main(BUCKET_NAME):
     print("\n" + "="*60)
     print(f"Best Model: {best['model']} (R² = {best['r2']:.4f})")
     print("="*60)
-    print("\n⚠️  MANUAL INTERVENTION REQUIRED:")
-    print("   Review model metrics and update MODEL_NAME in infer_seasonal_trends.py")
+
+    save_best_model_manifest(spark, MODEL_OUTPUT_DIR, best, models_results)
+    print(f"\n✓ Automatic model selection metadata updated for inference")
     print(f"   Available models: {', '.join([m['model'] for m in models_results])}")
 
     print(f"\nEnd time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -668,5 +712,5 @@ def main(BUCKET_NAME):
 
 
 if __name__ == "__main__":
-    BUCKET_NAME = "pulse-bucket-1"
+    BUCKET_NAME = "b3109946-7cac-4a78-9f50-f1bdb3bf4a53"
     main(BUCKET_NAME)

@@ -23,6 +23,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from specific.model_registry import save_best_model_manifest
 
 
 from pyspark.sql import SparkSession
@@ -570,10 +571,27 @@ def main(BUCKET_NAME):
         print("   gathering more data, or adding exogenous features.")
     print("="*60)
 
-    print("\n⚠️  MANUAL INTERVENTION REQUIRED:")
-    print("   Review metrics above and update MODEL_NAME in infer_revenue_forecast.py")
+    manifest_path = save_best_model_manifest(
+        spark,
+        MODEL_OUTPUT_DIR,
+        best_model=best["model"],
+        metric_name="r2",
+        metric_value=best["r2"],
+        model_scores={
+            m["model"]: {
+                "r2": float(m["r2"]),
+                "rmse": float(m["rmse"]),
+                "mae": float(m["mae"]),
+                "mape": float(m["mape"]),
+            }
+            for m in trained_results
+        },
+    )
+    print(f"✓ Best-model manifest saved: {manifest_path}")
+
+    print("\n✓ Inference will auto-select best model from manifest.")
     print(f"   Available models: {', '.join([m['model'] for m in trained_results])}")
-    print(f"   (naive_baseline is a reference — not a saveable Spark model)")
+    print("   (naive_baseline is a reference — not a saveable Spark model)")
 
     print(f"\nEnd time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("✓ Training completed\n")

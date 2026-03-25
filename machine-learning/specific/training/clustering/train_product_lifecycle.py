@@ -12,6 +12,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from specific.model_registry import save_best_model_manifest
 
 
 from pyspark.sql import SparkSession
@@ -275,6 +276,20 @@ def main(BUCKET):
         print(f"  Cluster {p['cluster_id']}: {p['stage']} ({p['count']})")
     
     save_model_and_metrics(spark, preprocess_model, best_model, profiles, stats, best_k, best_sil, MODEL_OUTPUT_PATH, LOCAL_METRICS_PATH, METRICS_OUTPUT_PATH, FEATURES)
+    manifest_path = save_best_model_manifest(
+        spark,
+        MODEL_OUTPUT_PATH,
+        best_model="product_lifecycle_pipeline",
+        metric_name="silhouette",
+        metric_value=float(best_sil),
+        model_scores={
+            "product_lifecycle_pipeline": {
+                "silhouette": float(best_sil),
+                "best_k": int(best_k),
+            }
+        },
+    )
+    print(f"Best-model manifest saved: {manifest_path}")
     
     df.unpersist()
     df_scaled.unpersist()

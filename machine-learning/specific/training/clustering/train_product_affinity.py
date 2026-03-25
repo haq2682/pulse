@@ -14,6 +14,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from specific.model_registry import save_best_model_manifest
 
 
 from pyspark.sql import SparkSession
@@ -371,6 +372,24 @@ def save_models(
     metrics_df = spark.createDataFrame([metrics_data])
     metrics_df.coalesce(1).write.mode("overwrite").json(f"{MODEL_OUTPUT_PATH}product_affinity_metrics.json")
     print("Saved metrics")
+
+    best_model_name = f"product_affinity_{best['type']}"
+    manifest_path = save_best_model_manifest(
+        spark,
+        MODEL_OUTPUT_PATH,
+        best_model=best_model_name,
+        metric_name="silhouette",
+        metric_value=float(best["silhouette"]),
+        model_scores={
+            f"product_affinity_{m['type']}_k{m['k']}": {
+                "silhouette": float(m["silhouette"]),
+                **({"wssse": float(m["wssse"])} if "wssse" in m else {}),
+                **({"log_likelihood": float(m["log_likelihood"])} if "log_likelihood" in m else {}),
+            }
+            for m in all_metrics
+        },
+    )
+    print(f"Saved best-model manifest: {manifest_path}")
 
 
 def main(BUCKET):

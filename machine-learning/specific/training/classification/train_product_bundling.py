@@ -8,6 +8,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from specific.model_registry import save_best_model_manifest
 
 
 from pyspark.sql import SparkSession
@@ -506,16 +507,33 @@ def main(BUCKET_NAME):
     print("=" * 60)
     for m in sorted(all_metrics, key=lambda x: x["f1_score"], reverse=True):
         print(f"{m['model_name']:25s} | F1: {m['f1_score']:.4f} | AUC: {m['auc']:.4f} | Acc: {m['accuracy']:.4f}")
+
+    best = max(all_metrics, key=lambda x: x["f1_score"])
+    manifest_path = save_best_model_manifest(
+        spark,
+        MODEL_OUTPUT_DIR,
+        best_model=best["model_name"],
+        metric_name="f1_score",
+        metric_value=best["f1_score"],
+        model_scores={
+            m["model_name"]: {
+                "f1_score": float(m["f1_score"]),
+                "auc": float(m["auc"]),
+                "accuracy": float(m["accuracy"]),
+                "precision": float(m["precision"]),
+                "recall": float(m["recall"]),
+            }
+            for m in all_metrics
+        },
+    )
+    print(f"✓ Best-model manifest saved: {manifest_path}")
     
     print("\n" + "=" * 60)
     print("✓ Training completed successfully")
     print("=" * 60)
-    print("\n⚠️  MANUAL INTERVENTION REQUIRED:")
-    print("   1. Review model metrics above")
-    print("   2. Select ONE model for inference based on F1-score or AUC")
-    print("   3. Update inference script to load selected model")
-    print("   4. Available models: LogisticRegression, RandomForest, DecisionTree, MultilayerPerceptron")
-    print(f"   5. Models saved to: {MODEL_OUTPUT_DIR}")
+    print("\n✓ Inference will auto-select best model from manifest.")
+    print("   Available models: LogisticRegression, RandomForest, DecisionTree, MultilayerPerceptron")
+    print(f"   Models saved to: {MODEL_OUTPUT_DIR}")
     
     spark.stop()
 

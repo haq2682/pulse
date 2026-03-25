@@ -21,6 +21,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from specific.model_registry import resolve_best_model
 
 
 from pyspark.sql import SparkSession
@@ -87,15 +88,17 @@ FEATURE_COLUMNS = [
     "yoy_orders_ratio",
 ]
 
+SEASONAL_INDEX_MIN = 0.3
+SEASONAL_INDEX_MAX = 3.0
+MODEL_CANDIDATES = ["linear_regression", "random_forest", "gbt"]
+
 
 def create_spark_session():
     """Initialize Spark session"""
     return create_ml_spark_session(
         "Seasonal_Trends_Inference",
         extra_configs={
-                    "spark.sql.shuffle.partitions": "8",
-                    "inferSchema": "true",
-                    "mergeSchema": "true"
+                    "spark.sql.shuffle.partitions": "8"
                 },
     )
 def load_model(model_name, MODEL_BASE_PATH):
@@ -335,7 +338,7 @@ def generate_predictions(model, df, model_name, FORECAST_HORIZON_DAYS):
     # Clamp seasonal index to reasonable range (0.3 - 3.0)
     output_df = predictions_df.withColumn(
         "predicted_seasonal_index",
-        F.greatest(F.lit(0.3), F.least(F.lit(3.0), F.col("prediction")))
+        F.greatest(F.lit(SEASONAL_INDEX_MIN), F.least(F.lit(SEASONAL_INDEX_MAX), F.col("prediction")))
     )
 
     # Classify season strength
@@ -411,8 +414,7 @@ def main(BUCKET_NAME):
     OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/seasonal_trends/"
     MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/seasonal_trends/"
 
-    # ⚠️ MANUAL CONFIGURATION REQUIRED:
-    MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
+    preferred_model = os.getenv("SEASONAL_TRENDS_MODEL", "linear_regression")
 
     FORECAST_HORIZON_DAYS = 30  # Forecasting next month
     """Main inference pipeline"""
@@ -421,10 +423,18 @@ def main(BUCKET_NAME):
     print("="*60)
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Bucket: {BUCKET_NAME}")
-    print(f"Model: {MODEL_NAME}\n")
+    print(f"Preferred model: {preferred_model}\n")
 
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
+
+    MODEL_NAME, model_source, _ = resolve_best_model(
+        spark,
+        MODEL_BASE_PATH,
+        MODEL_CANDIDATES,
+        preferred_model=preferred_model,
+    )
+    print(f"Selected model: {MODEL_NAME} (source: {model_source})")
 
     # Load model from business's own bucket
     print("Step 1: Load Model")

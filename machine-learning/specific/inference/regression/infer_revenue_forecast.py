@@ -20,6 +20,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from specific.model_registry import resolve_best_model
 
 
 from pyspark.sql import SparkSession
@@ -67,6 +68,7 @@ SCALED_MODELS   = {"linear_regression"}
 UNSCALED_MODELS = {"random_forest", "gbt"}
 # Lightweight baseline — no Spark model file needed
 BASELINE_MODELS = {"naive_baseline"}
+MODEL_CANDIDATES = ["linear_regression", "random_forest", "gbt"]
 
 
 def create_spark_session():
@@ -74,9 +76,7 @@ def create_spark_session():
     return create_ml_spark_session(
         "Revenue_Forecast_Inference",
         extra_configs={
-                    "spark.sql.shuffle.partitions": "8",
-                    "inferSchema": "true",
-                    "mergeSchema": "true"
+                    "spark.sql.shuffle.partitions": "8"
                 },
     )
 def load_model(model_name, MODEL_BASE_PATH):
@@ -329,10 +329,7 @@ def main(BUCKET_NAME):
     OUTPUT_PATH            = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/revenue_forecast/"
     MODEL_BASE_PATH        = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/revenue_forecast/"
 
-    # ⚠️ MANUAL CONFIGURATION REQUIRED:
-    # Set to whichever model had the best metrics during training.
-    # Options: "linear_regression", "random_forest", "gbt", "naive_baseline"
-    MODEL_NAME = "linear_regression"
+    preferred_model = os.getenv("REVENUE_FORECAST_MODEL", "linear_regression")
 
     FORECAST_HORIZON_DAYS = 30
 
@@ -341,11 +338,19 @@ def main(BUCKET_NAME):
     print("="*60)
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Bucket:     {BUCKET_NAME}")
-    print(f"Model:      {MODEL_NAME}")
-    print(f"Pipeline:   {'scaled (LR)' if MODEL_NAME in SCALED_MODELS else 'unscaled (tree/baseline)'}\n")
+    print(f"Preferred:  {preferred_model}")
 
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
+
+    MODEL_NAME, model_source, _ = resolve_best_model(
+        spark,
+        MODEL_BASE_PATH,
+        MODEL_CANDIDATES,
+        preferred_model=preferred_model,
+    )
+    print(f"Model:      {MODEL_NAME} (source: {model_source})")
+    print(f"Pipeline:   {'scaled (LR)' if MODEL_NAME in SCALED_MODELS else 'unscaled (tree/baseline)'}\n")
 
     # Step 1: Load model
     print("Step 1: Load Model")

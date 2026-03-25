@@ -37,6 +37,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from specific.model_registry import save_best_model_manifest
 
 
 from pyspark.sql import SparkSession
@@ -623,6 +624,22 @@ def main(BUCKET_NAME):
     save_artifacts(
         model, feature_list, ct_model, aud_model, status_model, MODEL_OUTPUT_PATH
     )
+    manifest_path = save_best_model_manifest(
+        spark,
+        MODEL_OUTPUT_PATH,
+        best_model="campaign_revenue",
+        metric_name="r2",
+        metric_value=metrics["r2"],
+        model_scores={
+            "campaign_revenue": {
+                "r2": float(metrics["r2"]),
+                "rmse": float(metrics["rmse"]),
+                "mae": float(metrics["mae"]),
+                "mape": float(metrics["mape"]),
+            }
+        },
+    )
+    print(f"✓ Best-model manifest saved: {manifest_path}")
 
     # ── Summary ──────────────────────────────────────────────────────────
     print("\n" + "=" * 60)

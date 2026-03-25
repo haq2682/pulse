@@ -12,6 +12,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from specific.model_registry import resolve_best_model
 
 
 from pyspark.sql import SparkSession
@@ -22,6 +23,7 @@ from pyspark.ml.linalg import DenseVector, SparseVector
 
 
 FEATURES = ["log_age", "log_sales_velocity", "log_revenue_velocity", "log_turnover"]
+MODEL_CANDIDATES = ["product_lifecycle_pipeline"]
 
 
 def create_spark():
@@ -30,8 +32,6 @@ def create_spark():
         "ProductLifecycleInfer",
         extra_configs={
             "spark.sql.shuffle.partitions": "8",
-            "inferSchema": "true",
-            "mergeSchema": "true",
         },
     )
 
@@ -76,8 +76,8 @@ def prepare_features(df):
     return df
 
 
-def load_model_and_profiles(MODEL_PATH, LOCAL_METRICS_PATH):
-    pipeline = PipelineModel.load(f"{MODEL_PATH}product_lifecycle_pipeline")
+def load_model_and_profiles(MODEL_PATH, LOCAL_METRICS_PATH, pipeline_model_name="product_lifecycle_pipeline"):
+    pipeline = PipelineModel.load(f"{MODEL_PATH}{pipeline_model_name}")
     
     profiles, stats = [], {}
     try:
@@ -204,7 +204,16 @@ def main(BUCKET):
     METRICS_PATH = f"s3a://{BUCKET}/machine-learning/clustering/metrics/"
     OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
     LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
+    preferred_model = os.getenv("PRODUCT_LIFECYCLE_MODEL", "product_lifecycle_pipeline")
     spark = create_spark()
+
+    selected_model, model_source, _ = resolve_best_model(
+        spark,
+        MODEL_PATH,
+        MODEL_CANDIDATES,
+        preferred_model=preferred_model,
+    )
+    print(f"Selected model: {selected_model} (source: {model_source})")
     
     df = load_data(spark, INPUT_PATH)
     df = prepare_features(df)
@@ -212,7 +221,11 @@ def main(BUCKET):
         spark.stop()
         return
     
-    pipeline, profiles, stats = load_model_and_profiles(MODEL_PATH, LOCAL_METRICS_PATH)
+    pipeline, profiles, stats = load_model_and_profiles(
+        MODEL_PATH,
+        LOCAL_METRICS_PATH,
+        pipeline_model_name=selected_model,
+    )
     if pipeline is None:
         print("Failed to load model")
         spark.stop()

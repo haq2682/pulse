@@ -15,6 +15,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from specific.model_registry import resolve_best_model
 
 
 from pyspark.sql import SparkSession
@@ -45,14 +46,14 @@ NUMERIC_FEATURES = [
     "category_idx", "brand_idx"
 ]
 
+MODEL_CANDIDATES = ["random_forest"]
+
 def create_spark_session():
     """Initialize Spark session"""
     return create_ml_spark_session(
         "Price_Optimization_Inference",
         extra_configs={
-                    "spark.sql.shuffle.partitions": "8",
-                    "inferSchema": "true",
-                    "mergeSchema": "true"
+                    "spark.sql.shuffle.partitions": "8"
                 },
     )
 def load_model(MODEL_PATH):
@@ -540,8 +541,9 @@ def main(BUCKET_NAME):
     INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
     INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
     OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/price_optimization/"
-    MODEL_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/price_optimization/random_forest"
+    MODEL_BASE_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/price_optimization"
     MIN_PRICE_POINTS = 2
+    preferred_model = os.getenv("PRICE_OPTIMIZATION_MODEL", "random_forest")
     """Main inference pipeline"""
     print("\n" + "="*80)
     print("Product Price Optimization - Inference")
@@ -550,6 +552,15 @@ def main(BUCKET_NAME):
     
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
+
+    selected_model, model_source, _ = resolve_best_model(
+        spark,
+        MODEL_BASE_PATH,
+        MODEL_CANDIDATES,
+        preferred_model=preferred_model,
+    )
+    MODEL_PATH = f"{MODEL_BASE_PATH}/{selected_model}"
+    print(f"Selected model: {selected_model} (source: {model_source})")
     
     # Load model
     print("Step 1: Load Model")
