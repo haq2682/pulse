@@ -14,7 +14,7 @@ from pyspark.sql import functions as F
 
 # Constants for General Model Training
 GENERAL_MODEL_BUCKET = "pulse-bucket-1"
-EXCLUDED_BUCKETS = {"pulse-test-bucket", "pulse-checkpoints"}
+EXCLUDED_BUCKETS = {"pulse-test-bucket", "pulse-checkpoints", "pulse-smoke-bucket"}
 
 def get_minio_buckets(spark: SparkSession, bucket_prefix: str = None) -> List[str]:
     """
