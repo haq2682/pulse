@@ -712,5 +712,5 @@ def main(BUCKET_NAME):
 
 
 if __name__ == "__main__":
-    BUCKET_NAME = "b3109946-7cac-4a78-9f50-f1bdb3bf4a53"
+    BUCKET_NAME = "pulse-bucket-1"
     main(BUCKET_NAME)
