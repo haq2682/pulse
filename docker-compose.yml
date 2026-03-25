@@ -314,54 +314,54 @@ services:
   #   docker exec -it cassandra cqlsh
   #   ALTER TABLE your_keyspace.orders WITH cdc = true;
   # ─────────────────────────────────────────────────────────────────────────
-  cassandra:
-    build:
-      context: .
-      dockerfile: .docker/cassandra/Dockerfile
-    container_name: cassandra
-    environment:
-      CASSANDRA_CLUSTER_NAME: pulse-cluster
-      CASSANDRA_DC: dc1
-      CASSANDRA_RACK: rack1
-      HEAP_NEWSIZE: 128M
-      MAX_HEAP_SIZE: 512M
-    ports:
-      - "9042:9042"
-    volumes:
-      - cassandra_data:/var/lib/cassandra
-    networks:
-      spark-network:
-        ipv4_address: 10.5.0.55
-    restart: always
-    logging:
-      driver: json-file
-      options:
-        max-size: "25m"
-        max-file: "3"
+  # cassandra:
+  #   build:
+  #     context: .
+  #     dockerfile: .docker/cassandra/Dockerfile
+  #   container_name: cassandra
+  #   environment:
+  #     CASSANDRA_CLUSTER_NAME: pulse-cluster
+  #     CASSANDRA_DC: dc1
+  #     CASSANDRA_RACK: rack1
+  #     HEAP_NEWSIZE: 128M
+  #     MAX_HEAP_SIZE: 512M
+  #   ports:
+  #     - "9042:9042"
+  #   volumes:
+  #     - cassandra_data:/var/lib/cassandra
+  #   networks:
+  #     spark-network:
+  #       ipv4_address: 10.5.0.55
+  #   restart: always
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: "25m"
+  #       max-file: "3"
 
   # ─────────────────────────────────────────────────────────────────────────
   # Debezium Server — Cassandra CDC connector (separate from the Kafka Connect
   # debezium service; the Cassandra connector reads commit log files directly
   # from the shared cassandra_data volume (read-only))
   # ─────────────────────────────────────────────────────────────────────────
-  debezium-cassandra:
-    image: quay.io/debezium/server:3.4
-    container_name: debezium-cassandra
-    depends_on:
-      - cassandra
-      - kafka
-    volumes:
-      - cassandra_data:/var/lib/cassandra:ro
-      - ./conf/debezium-cassandra.properties:/debezium/config/application.properties
-    networks:
-      spark-network:
-        ipv4_address: 10.5.0.56
-    restart: always
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+  # debezium-cassandra:
+  #   image: quay.io/debezium/server:3.4
+  #   container_name: debezium-cassandra
+  #   depends_on:
+  #     - cassandra
+  #     - kafka
+  #   volumes:
+  #     - cassandra_data:/var/lib/cassandra:ro
+  #     - ./conf/debezium-cassandra.properties:/debezium/config/application.properties
+  #   networks:
+  #     spark-network:
+  #       ipv4_address: 10.5.0.56
+  #   restart: always
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
 
   redis:
     image: redis:7-alpine
