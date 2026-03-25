@@ -17,6 +17,8 @@ from pyspark.sql.functions import (
     sum as spark_sum,
     avg as spark_avg,
     min as spark_min,
+    upper,
+    trim,
 )
 
 
@@ -42,13 +44,24 @@ def time_based_aggregations(dataframes):
         .withColumn(
             "year_week", expr("concat(order_year, '-W', lpad(order_week, 2, '0'))")
         )
+        .withColumn(
+            "normalized_order_status",
+            upper(trim(coalesce(col("order_status"), lit(""))))
+        )
+        .withColumn(
+            "is_finalized_order",
+            when(
+                col("normalized_order_status").isin("DELIVERED", "SHIPPED", "COMPLETED"),
+                lit(1)
+            ).otherwise(lit(0))
+        )
     )
     orders_with_items_time = orders_with_time.join(
         dataframes["order_items"].select("order_id", "quantity"), "order_id", "left"
     )
     customer_first_order = (
-        dataframes["orders"]
-        .filter(col("order_placed_at").isNotNull())
+        orders_with_time
+        .filter(col("is_finalized_order") == 1)
         .groupBy("customer_id")
         .agg(spark_min("order_placed_at").alias("first_order_date"))
     )
@@ -67,7 +80,28 @@ def time_based_aggregations(dataframes):
             when(col("is_new_customer") == 0, lit(1)).otherwise(lit(0)),
         )
     )
-    daily_agg = orders_with_customer_type.groupBy(
+
+    finalized_orders = orders_with_customer_type.filter(col("is_finalized_order") == 1)
+
+    orders_with_items_time_finalized = orders_with_items_time.join(
+        finalized_orders.select("order_id").dropDuplicates(["order_id"]),
+        "order_id",
+        "inner"
+    )
+
+    daily_customer_metrics = finalized_orders.select(
+        "order_date", "order_year", "order_month", "customer_id", "is_new_customer"
+    ).dropDuplicates(["order_date", "order_year", "order_month", "customer_id"]).groupBy(
+        "order_date", "order_year", "order_month"
+    ).agg(
+        countDistinct("customer_id").alias("total_customers"),
+        spark_sum("is_new_customer").alias("new_customers")
+    ).withColumn(
+        "returning_customers",
+        when(col("total_customers") >= col("new_customers"), col("total_customers") - col("new_customers")).otherwise(lit(0))
+    )
+
+    daily_agg = finalized_orders.groupBy(
         "order_date", "order_year", "order_month"
     ).agg(
         # Total revenue
@@ -79,12 +113,6 @@ def time_based_aggregations(dataframes):
         ).alias("total_revenue"),
         # Total orders
         countDistinct("order_id").alias("total_orders"),
-        # Total customers
-        countDistinct("customer_id").alias("total_customers"),
-        # New customers
-        spark_sum("is_new_customer").alias("new_customers"),
-        # Returning customers
-        spark_sum("is_returning_customer").alias("returning_customers"),
         # Average order value
         spark_avg(
             when(
@@ -93,7 +121,13 @@ def time_based_aggregations(dataframes):
             )
         ).alias("avg_order_value"),
     )
-    daily_units = orders_with_items_time.groupBy("order_date").agg(
+    daily_agg = daily_agg.join(
+        daily_customer_metrics,
+        ["order_date", "order_year", "order_month"],
+        "left"
+    )
+
+    daily_units = orders_with_items_time_finalized.groupBy("order_date").agg(
         spark_sum(
             when(col("quantity").isNotNull() & (col("quantity") > 0), col("quantity"))
         ).alias("total_units_sold")
@@ -151,7 +185,19 @@ def time_based_aggregations(dataframes):
     )
 
     dataframes["daily_aggregations"] = daily_agg
-    weekly_agg = orders_with_customer_type.groupBy(
+    weekly_customer_metrics = finalized_orders.select(
+        "year_week", "order_year", "order_week", "customer_id", "is_new_customer"
+    ).dropDuplicates(["year_week", "order_year", "order_week", "customer_id"]).groupBy(
+        "year_week", "order_year", "order_week"
+    ).agg(
+        countDistinct("customer_id").alias("total_customers"),
+        spark_sum("is_new_customer").alias("new_customers")
+    ).withColumn(
+        "returning_customers",
+        when(col("total_customers") >= col("new_customers"), col("total_customers") - col("new_customers")).otherwise(lit(0))
+    )
+
+    weekly_agg = finalized_orders.groupBy(
         "year_week", "order_year", "order_week"
     ).agg(
         spark_sum(
@@ -161,9 +207,6 @@ def time_based_aggregations(dataframes):
             )
         ).alias("total_revenue"),
         countDistinct("order_id").alias("total_orders"),
-        countDistinct("customer_id").alias("total_customers"),
-        spark_sum("is_new_customer").alias("new_customers"),
-        spark_sum("is_returning_customer").alias("returning_customers"),
         spark_avg(
             when(
                 col("total_amount").isNotNull() & (col("total_amount") > 0),
@@ -171,7 +214,13 @@ def time_based_aggregations(dataframes):
             )
         ).alias("avg_order_value"),
     )
-    weekly_units = orders_with_items_time.groupBy("year_week").agg(
+    weekly_agg = weekly_agg.join(
+        weekly_customer_metrics,
+        ["year_week", "order_year", "order_week"],
+        "left"
+    )
+
+    weekly_units = orders_with_items_time_finalized.groupBy("year_week").agg(
         spark_sum(
             when(col("quantity").isNotNull() & (col("quantity") > 0), col("quantity"))
         ).alias("total_units_sold")
@@ -233,7 +282,19 @@ def time_based_aggregations(dataframes):
 
     dataframes["weekly_aggregations"] = weekly_agg
 
-    monthly_agg = orders_with_customer_type.groupBy(
+    monthly_customer_metrics = finalized_orders.select(
+        "year_month", "order_year", "order_month", "customer_id", "is_new_customer"
+    ).dropDuplicates(["year_month", "order_year", "order_month", "customer_id"]).groupBy(
+        "year_month", "order_year", "order_month"
+    ).agg(
+        countDistinct("customer_id").alias("total_customers"),
+        spark_sum("is_new_customer").alias("new_customers")
+    ).withColumn(
+        "returning_customers",
+        when(col("total_customers") >= col("new_customers"), col("total_customers") - col("new_customers")).otherwise(lit(0))
+    )
+
+    monthly_agg = finalized_orders.groupBy(
         "year_month", "order_year", "order_month"
     ).agg(
         spark_sum(
@@ -243,9 +304,6 @@ def time_based_aggregations(dataframes):
             )
         ).alias("total_revenue"),
         countDistinct("order_id").alias("total_orders"),
-        countDistinct("customer_id").alias("total_customers"),
-        spark_sum("is_new_customer").alias("new_customers"),
-        spark_sum("is_returning_customer").alias("returning_customers"),
         spark_avg(
             when(
                 col("total_amount").isNotNull() & (col("total_amount") > 0),
@@ -253,7 +311,13 @@ def time_based_aggregations(dataframes):
             )
         ).alias("avg_order_value"),
     )
-    monthly_units = orders_with_items_time.groupBy("year_month").agg(
+    monthly_agg = monthly_agg.join(
+        monthly_customer_metrics,
+        ["year_month", "order_year", "order_month"],
+        "left"
+    )
+
+    monthly_units = orders_with_items_time_finalized.groupBy("year_month").agg(
         spark_sum(
             when(col("quantity").isNotNull() & (col("quantity") > 0), col("quantity"))
         ).alias("total_units_sold")
