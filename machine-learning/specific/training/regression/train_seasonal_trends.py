@@ -25,7 +25,6 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_training_metrics_plot
 
 
 from pyspark.sql import SparkSession
@@ -38,6 +37,11 @@ from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
 from pyspark.ml import Pipeline
 from datetime import datetime
 import math
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 # Load environment variables
 load_dotenv()
@@ -100,6 +104,71 @@ FEATURE_COLUMNS = [
 ]
 
 TARGET_COLUMN = "seasonal_index"
+PLOT_EXPORT_DIR = "/app/logs_for_report"
+MAX_SCATTER_POINTS = 300
+
+
+def _ensure_plot_dir(path: str) -> str:
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _sanitize_name(value: str) -> str:
+    return "".join(c if c.isalnum() or c in {"-", "_"} else "_" for c in value.lower())
+
+
+def _sample_indices(length: int, max_points: int):
+    if length <= max_points:
+        return list(range(length))
+    return np.linspace(0, length - 1, num=max_points, dtype=int).tolist()
+
+
+def export_model_training_plot(train_predictions_df, model_name: str, export_plots: bool, export_dir: str = PLOT_EXPORT_DIR):
+    """Export per-model training plot: actual dots + model fit line."""
+    if not export_plots:
+        return None
+
+    rows = (
+        train_predictions_df
+        .select("year_month", TARGET_COLUMN, "prediction")
+        .orderBy("year_month")
+        .collect()
+    )
+
+    if not rows:
+        print(f"⚠️  Plot export skipped for {model_name}: no training rows")
+        return None
+
+    x_vals = list(range(1, len(rows) + 1))
+    labels = [str(r["year_month"]) for r in rows]
+    actual = [float(r[TARGET_COLUMN]) for r in rows]
+    predicted = [float(r["prediction"]) for r in rows]
+    scatter_idx = _sample_indices(len(x_vals), MAX_SCATTER_POINTS)
+    scatter_x = [x_vals[i] for i in scatter_idx]
+    scatter_actual = [actual[i] for i in scatter_idx]
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.scatter(scatter_x, scatter_actual, s=34, alpha=0.70, edgecolor="black", linewidth=0.4, label="Sample data")
+    ax.plot(x_vals, predicted, color="black", linewidth=2.0, label="Prediction line")
+
+    ax.set_title(f"Seasonal Trends - {model_name}")
+    ax.set_xlabel("Training timeline (year_month)")
+    ax.set_ylabel("Seasonal index")
+    tick_step = max(1, len(x_vals) // 10)
+    tick_positions = x_vals[::tick_step]
+    tick_labels = labels[::tick_step]
+    ax.set_xticks(tick_positions)
+    ax.set_xticklabels(tick_labels, rotation=30, ha="right")
+    ax.legend(loc="best")
+    fig.tight_layout()
+
+    plot_dir = _ensure_plot_dir(export_dir)
+    file_name = f"{_sanitize_name(Path(__file__).stem)}-{_sanitize_name(model_name)}-training-fit.png"
+    output_path = os.path.join(plot_dir, file_name)
+    fig.savefig(output_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    print(f"✓ Exported training plot: {output_path}")
+    return output_path
 
 
 def create_feature_pipeline_stages():
@@ -675,16 +744,22 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     lr_model, lr_pred, lr_name = train_linear_regression(train_df, test_df, USE_CROSS_VALIDATION)
     lr_metrics = evaluate_model(lr_pred, lr_name)
     save_model(lr_model, lr_name, MODEL_OUTPUT_DIR)
+    lr_train_pred = lr_model.transform(train_df)
+    export_model_training_plot(lr_train_pred, lr_name, EXPORT_PLOTS)
     models_results.append(lr_metrics)
 
     rf_model, rf_pred, rf_name = train_random_forest(train_df, test_df, USE_CROSS_VALIDATION)
     rf_metrics = evaluate_model(rf_pred, rf_name)
     save_model(rf_model, rf_name, MODEL_OUTPUT_DIR)
+    rf_train_pred = rf_model.transform(train_df)
+    export_model_training_plot(rf_train_pred, rf_name, EXPORT_PLOTS)
     models_results.append(rf_metrics)
 
     gbt_model, gbt_pred, gbt_name = train_gbt(train_df, test_df, USE_CROSS_VALIDATION)
     gbt_metrics = evaluate_model(gbt_pred, gbt_name)
     save_model(gbt_model, gbt_name, MODEL_OUTPUT_DIR)
+    gbt_train_pred = gbt_model.transform(train_df)
+    export_model_training_plot(gbt_train_pred, gbt_name, EXPORT_PLOTS)
     models_results.append(gbt_metrics)
 
     # Model comparison
@@ -696,13 +771,6 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
 
     for m in models_results:
         print(f"{m['model']:<25} {m['rmse']:<15.4f} {m['mae']:<15.4f} {m['r2']:<10.4f} {m['mape']:<10.2f}%")
-
-    export_training_metrics_plot(
-        model_name=MODEL_NAME,
-        metrics=models_results,
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-    )
 
     best = max(models_results, key=lambda x: x['r2'])
     print("\n" + "="*60)
@@ -721,4 +789,4 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
 
 if __name__ == "__main__":
     BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME, EXPORT_PLOTS=False)
+    main(BUCKET_NAME, EXPORT_PLOTS=True)

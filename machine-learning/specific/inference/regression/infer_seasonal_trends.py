@@ -21,7 +21,6 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_inference_outputs_plot
 from specific.model_registry import resolve_best_model
 
 
@@ -35,6 +34,11 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import uuid
 import math
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 # Load environment variables
 load_dotenv()
@@ -92,6 +96,80 @@ FEATURE_COLUMNS = [
 SEASONAL_INDEX_MIN = 0.3
 SEASONAL_INDEX_MAX = 3.0
 MODEL_CANDIDATES = ["linear_regression", "random_forest", "gbt"]
+PLOT_EXPORT_DIR = "/app/logs_for_report"
+MAX_SCATTER_POINTS = 70
+
+
+def _ensure_plot_dir(path: str) -> str:
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _sanitize_name(value: str) -> str:
+    return "".join(c if c.isalnum() or c in {"-", "_"} else "_" for c in value.lower())
+
+
+def _sample_indices(length: int, max_points: int):
+    if length <= max_points:
+        return list(range(length))
+    return np.linspace(0, length - 1, num=max_points, dtype=int).tolist()
+
+
+def export_inference_forecast_plot(monthly_df, predictions_df, model_name: str, export_plots: bool, export_dir: str = PLOT_EXPORT_DIR):
+    """Export forecast plot: historical monthly revenue dots + next forecast point and connecting line."""
+    if not export_plots:
+        return None
+
+    history_rows = (
+        monthly_df
+        .select("year_month", "total_revenue")
+        .orderBy("year_month")
+        .collect()
+    )
+
+    pred_row = predictions_df.select("forecast_date", "estimated_revenue").limit(1).collect()
+
+    if not history_rows or not pred_row:
+        print("⚠️  Inference plot export skipped: insufficient data")
+        return None
+
+    x_hist = list(range(1, len(history_rows) + 1))
+    labels_hist = [str(r["year_month"]) for r in history_rows]
+    y_hist = [float(r["total_revenue"] or 0.0) for r in history_rows]
+    scatter_idx = _sample_indices(len(x_hist), MAX_SCATTER_POINTS)
+    scatter_x = [x_hist[i] for i in scatter_idx]
+    scatter_y = [y_hist[i] for i in scatter_idx]
+
+    forecast_label = str(pred_row[0]["forecast_date"])
+    forecast_value = float(pred_row[0]["estimated_revenue"])
+    x_forecast = len(x_hist) + 1
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.scatter(scatter_x, scatter_y, s=34, alpha=0.70, edgecolor="black", linewidth=0.4, label="Sample data")
+
+    if x_hist:
+        ax.plot([x_hist[-1], x_forecast], [y_hist[-1], forecast_value], color="black", linewidth=2.0, label="Prediction line")
+    ax.scatter([x_forecast], [forecast_value], color="red", s=60, zorder=3)
+
+    tick_labels = labels_hist + [forecast_label]
+    tick_positions = x_hist + [x_forecast]
+    tick_step = max(1, len(tick_positions) // 10)
+    ax.set_xticks(tick_positions[::tick_step])
+    ax.set_xticklabels(tick_labels[::tick_step], rotation=30, ha="right")
+    ax.set_xlabel("Timeline")
+    ax.set_ylabel("Revenue")
+    ax.set_title(f"Seasonal Trends Forecast - {model_name}")
+    ax.legend(loc="best")
+    fig.tight_layout()
+
+    plot_dir = _ensure_plot_dir(export_dir)
+    file_name = f"{_sanitize_name(Path(__file__).stem)}-{_sanitize_name(model_name)}-forecast-fit.png"
+    output_path = os.path.join(plot_dir, file_name)
+    fig.savefig(output_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+    print(f"✓ Exported inference forecast plot: {output_path}")
+    return output_path
 
 
 def create_spark_session():
@@ -476,22 +554,7 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     # Display prediction
     display_prediction(predictions_df)
 
-    export_inference_outputs_plot(
-        model_name="seasonal_trends",
-        predictions_df=predictions_df,
-        label_column="model_version",
-        numeric_columns=[
-            "predicted_seasonal_index",
-            "estimated_revenue",
-            "confidence_interval_lower",
-            "confidence_interval_upper",
-            "trend_factor",
-            "confidence_score",
-        ],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-        run_name=MODEL_NAME,
-    )
+    export_inference_forecast_plot(monthly_df, predictions_df, MODEL_NAME, EXPORT_PLOTS)
 
     # Save predictions
     print("\nStep 6: Save Predictions")
@@ -510,4 +573,4 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
 
 if __name__ == "__main__":
     BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME, EXPORT_PLOTS=False)
+    main(BUCKET_NAME, EXPORT_PLOTS=True)
