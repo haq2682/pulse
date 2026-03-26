@@ -28,6 +28,7 @@ from utils.multi_bucket_loader import (
     GENERAL_MODEL_BUCKET
 )
 from utils.plot_exporter import export_training_metrics_plot
+from general.model_registry import save_best_model_manifest
 
 # Configuration - General models output to pulse-bucket-1
 MODEL_NAME = "stock_status"
@@ -520,6 +521,17 @@ def main(EXPORT_PLOTS=False):
     print("=" * 60)
     for m in sorted(all_metrics, key=lambda x: x["f1_score"], reverse=True):
         print(f"{m['model_name']:25s} | F1: {m['f1_score']:.4f} | Acc: {m['accuracy']:.4f}")
+
+    best_model = max(all_metrics, key=lambda x: x["f1_score"])
+    manifest_path = save_best_model_manifest(
+        spark,
+        MODEL_OUTPUT_DIR,
+        best_model["model_name"],
+        "f1_score",
+        best_model["f1_score"],
+        {m["model_name"]: m["f1_score"] for m in all_metrics},
+    )
+    print(f"✓ Saved best model manifest to: {manifest_path}")
 
     export_training_metrics_plot(
         model_name=MODEL_NAME,

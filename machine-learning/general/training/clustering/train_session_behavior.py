@@ -16,6 +16,7 @@ from utils.multi_bucket_loader import (
     GENERAL_MODEL_BUCKET
 )
 from utils.plot_exporter import export_training_metrics_plot
+from general.model_registry import save_best_model_manifest
 
 # Import spark_utils FIRST to set up JARs before pyspark imports
 _ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
@@ -480,24 +481,37 @@ def save_enhanced_metrics(all_metrics, cluster_profiles, spark):
     """Save comprehensive training metrics"""
     os.makedirs(LOCAL_METRICS_PATH, exist_ok=True)
     
-    kmeans_metrics = [m for m in all_metrics if m["type"] == "kmeans"]
-    best_kmeans = max(kmeans_metrics, key=lambda x: x["silhouette"]) if kmeans_metrics else None
+    best_by_type = {}
+    for model_type in ["kmeans", "gmm", "bisecting_kmeans"]:
+        typed_metrics = [m for m in all_metrics if m["type"] == model_type]
+        if typed_metrics:
+            best_by_type[model_type] = max(typed_metrics, key=lambda x: x["silhouette"])
+    best_overall = max(all_metrics, key=lambda x: x["silhouette"]) if all_metrics else None
     
     metrics_data = {
         "training_date": datetime.now().isoformat(),
         "best_models": {
             "kmeans": {
-                "k": best_kmeans["k"],
-                "silhouette": best_kmeans["silhouette"],
-                "stability_ari": best_kmeans.get("stability_ari", 0),
-            } if best_kmeans else None,
+                "k": best_by_type["kmeans"]["k"],
+                "silhouette": best_by_type["kmeans"]["silhouette"],
+                "stability_ari": best_by_type["kmeans"].get("stability_ari", 0),
+            } if "kmeans" in best_by_type else None,
+            "gmm": {
+                "k": best_by_type["gmm"]["k"],
+                "silhouette": best_by_type["gmm"]["silhouette"],
+            } if "gmm" in best_by_type else None,
+            "bisecting_kmeans": {
+                "k": best_by_type["bisecting_kmeans"]["k"],
+                "silhouette": best_by_type["bisecting_kmeans"]["silhouette"],
+            } if "bisecting_kmeans" in best_by_type else None,
+            "selected": best_overall,
         },
         "all_models": all_metrics,
         "cluster_profiles": cluster_profiles,
         "features": NUMERIC_FEATURES,
         "production_readiness": {
             "best_silhouette": max(m["silhouette"] for m in all_metrics),
-            "stability_passed": best_kmeans.get("stability_ari", 0) > 0.7 if best_kmeans else False,
+            "stability_passed": best_by_type["kmeans"].get("stability_ari", 0) > 0.7 if "kmeans" in best_by_type else False,
             "personas_defined": len(cluster_profiles) > 0,
         }
     }
@@ -568,11 +582,46 @@ def main(EXPORT_PLOTS=False):
         script_name=Path(__file__).stem,
     )
 
-    # Profile best model
-    best_model = max(kmeans_models, key=lambda m: next(
-        met["silhouette"] for met in kmeans_metrics if met["k"] == m["k"]
-    ))
-    best_k = best_model["k"]
+    best_models_by_type = {}
+    if kmeans_metrics:
+        best_kmeans_metric = max(kmeans_metrics, key=lambda x: x["silhouette"])
+        best_models_by_type["kmeans"] = {
+            "metric": best_kmeans_metric,
+            "model": next(m for m in kmeans_models if m["k"] == best_kmeans_metric["k"]),
+            "artifact": "session_behavior_kmeans",
+        }
+    if gmm_metrics:
+        best_gmm_metric = max(gmm_metrics, key=lambda x: x["silhouette"])
+        best_models_by_type["gmm"] = {
+            "metric": best_gmm_metric,
+            "model": next(m for m in gmm_models if m["k"] == best_gmm_metric["k"]),
+            "artifact": "session_behavior_gmm",
+        }
+    if bkm_metrics:
+        best_bkm_metric = max(bkm_metrics, key=lambda x: x["silhouette"])
+        best_models_by_type["bisecting_kmeans"] = {
+            "metric": best_bkm_metric,
+            "model": next(m for m in bkm_models if m["k"] == best_bkm_metric["k"]),
+            "artifact": "session_behavior_bisecting_kmeans",
+        }
+
+    best_overall_metric = max(all_metrics, key=lambda x: x["silhouette"])
+    best_overall = best_models_by_type[best_overall_metric["type"]]
+    best_model = best_overall["model"]
+    best_k = best_overall_metric["k"]
+    best_model_scores = {
+        cfg["artifact"]: cfg["metric"]["silhouette"]
+        for cfg in best_models_by_type.values()
+    }
+    manifest_path = save_best_model_manifest(
+        spark,
+        MODEL_OUTPUT_DIR,
+        best_overall["artifact"],
+        "silhouette",
+        best_overall_metric["silhouette"],
+        best_model_scores,
+    )
+    print(f"Saved best model manifest to: {manifest_path}")
     
     predictions = best_model["model"].transform(df)
     predictions = predictions.withColumn("session_id", col("session_id"))
@@ -583,7 +632,14 @@ def main(EXPORT_PLOTS=False):
     print("\nSaving models...")
     scaler_model.write().overwrite().save(f"{MODEL_OUTPUT_DIR}/session_behavior_scaler")
     pca_model.write().overwrite().save(f"{MODEL_OUTPUT_DIR}/session_behavior_pca")
-    best_model["model"].write().overwrite().save(f"{MODEL_OUTPUT_DIR}/session_behavior_kmeans")
+    for model_type, cfg in best_models_by_type.items():
+        cfg["model"]["model"].write().overwrite().save(f"{MODEL_OUTPUT_DIR}/{cfg['artifact']}")
+        selected_k = cfg["metric"]["k"]
+        selected_silhouette = cfg["metric"]["silhouette"]
+        print(
+            f"Saved {cfg['artifact']} (best {model_type} with k={selected_k}, "
+            f"silhouette={selected_silhouette:.4f})"
+        )
     
     save_enhanced_metrics(all_metrics, cluster_profiles, spark)
 
@@ -591,12 +647,11 @@ def main(EXPORT_PLOTS=False):
     print("\n" + "="*80)
     print("TRAINING SUMMARY")
     print("="*80)
-    best_metric = max(all_metrics, key=lambda x: x["silhouette"])
-    print(f"Best Model: {best_metric['type']} k={best_metric['k']}")
-    print(f"Silhouette: {best_metric['silhouette']:.4f}")
+    print(f"Best Model: {best_overall_metric['type']} k={best_overall_metric['k']}")
+    print(f"Silhouette: {best_overall_metric['silhouette']:.4f}")
     
-    if "stability_ari" in best_metric:
-        print(f"Stability: {best_metric['stability_ari']:.4f}")
+    if "stability_ari" in best_overall_metric:
+        print(f"Stability: {best_overall_metric['stability_ari']:.4f}")
     
     print(f"\nBehavior Personas: {len(cluster_profiles)}")
     for profile in cluster_profiles:

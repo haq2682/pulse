@@ -16,6 +16,7 @@ from utils.multi_bucket_loader import (
     GENERAL_MODEL_BUCKET
 )
 from utils.plot_exporter import export_training_metrics_plot
+from general.model_registry import save_best_model_manifest
 
 # Import spark_utils FIRST to set up JARs before pyspark imports
 _ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
@@ -448,6 +449,19 @@ def main(EXPORT_PLOTS=False):
         return
 
     best = max(all_metrics, key=lambda x: x["silhouette"])
+    best_scores_by_type = {}
+    for metric in all_metrics:
+        model_type = metric["type"]
+        best_scores_by_type[model_type] = max(best_scores_by_type.get(model_type, float("-inf")), metric["silhouette"])
+    manifest_path = save_best_model_manifest(
+        spark,
+        MODEL_OUTPUT_DIR,
+        f"geographic_{best['type']}",
+        "silhouette",
+        best["silhouette"],
+        {f"geographic_{k}": v for k, v in best_scores_by_type.items()},
+    )
+    print(f"Saved best model manifest to: {manifest_path}")
     print(f"\n{'='*80}")
     print(f"Best: {best['type']} k={best['k']}, Silhouette={best['silhouette']:.4f}")
     print(f"{'='*80}")

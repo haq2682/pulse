@@ -48,6 +48,7 @@ if str(_ML_ROOT) not in sys.path:
 
 from spark_utils import create_ml_spark_session
 from general.utils.plot_exporter import export_inference_outputs_plot
+from general.model_registry import resolve_best_model
 
 def create_spark_session():
     """Initialize Spark session"""
@@ -363,14 +364,22 @@ def main(BUCKET, EXPORT_PLOTS=False):
     MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/"
     OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
 
-    # MANUAL SELECTION
-    SELECTED_MODEL_TYPE = "kmeans"  # Options: 'kmeans', 'gmm', 'bisecting_kmeans'
+    MODEL_CANDIDATES = ["geographic_kmeans", "geographic_gmm", "geographic_bisecting_kmeans"]
+    PREFERRED_MODEL = "geographic_kmeans"
     print("=" * 80)
     print("Geographic Sales Clustering - Inference")
-    print(f"Model: {SELECTED_MODEL_TYPE.upper()}")
     print("=" * 80)
 
     spark = create_spark_session()
+
+    selected_artifact, selection_source, _ = resolve_best_model(
+        spark,
+        MODEL_PATH,
+        MODEL_CANDIDATES,
+        preferred_model=PREFERRED_MODEL,
+    )
+    SELECTED_MODEL_TYPE = selected_artifact.replace("geographic_", "")
+    print(f"Model: {SELECTED_MODEL_TYPE.upper()} (source: {selection_source})")
 
     # Load data
     df = load_data(spark, INPUT_PATH)

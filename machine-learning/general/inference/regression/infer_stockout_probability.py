@@ -46,6 +46,7 @@ if str(_ML_ROOT) not in sys.path:
 
 from spark_utils import create_ml_spark_session
 from general.utils.plot_exporter import export_inference_outputs_plot
+from general.model_registry import resolve_best_model
 
 def create_spark_session():
     """Initialize Spark session"""
@@ -58,11 +59,11 @@ def create_spark_session():
         },
     )
 
-def load_models(MODEL_BASE_PATH):
+def load_models(MODEL_BASE_PATH, days_model_name, probability_model_name):
     """Load both trained models"""
     try:
-        days_model = RandomForestRegressionModel.load(f"{MODEL_BASE_PATH}days_until_stockout")
-        prob_model = RandomForestRegressionModel.load(f"{MODEL_BASE_PATH}stockout_probability")
+        days_model = RandomForestRegressionModel.load(f"{MODEL_BASE_PATH}{days_model_name}")
+        prob_model = RandomForestRegressionModel.load(f"{MODEL_BASE_PATH}{probability_model_name}")
         print(f"✓ Models loaded successfully")
         return days_model, prob_model
     except Exception as e:
@@ -398,7 +399,7 @@ def prepare_inference_data(df):
     return df_prepared
 
 
-def generate_predictions(days_model, prob_model, df, CRITICAL_DAYS_THRESHOLD, HIGH_RISK_THRESHOLD, MEDIUM_RISK_THRESHOLD):
+def generate_predictions(days_model, prob_model, df, CRITICAL_DAYS_THRESHOLD, HIGH_RISK_THRESHOLD, MEDIUM_RISK_THRESHOLD, model_version):
     """Generate comprehensive stockout predictions"""
     # Predict days until stockout
     df_with_days = days_model.transform(df).withColumnRenamed("prediction", "days_until_stockout")
@@ -511,7 +512,7 @@ def generate_predictions(days_model, prob_model, df, CRITICAL_DAYS_THRESHOLD, HI
         F.col("recommended_reorder_quantity"),
         F.col("urgency_score"),
         F.col("confidence_score"),
-        F.lit("random_forest").alias("model_version")
+        F.lit(model_version).alias("model_version")
     )
     
     print(f"✓ Generated {output_df.count()} predictions")
@@ -616,11 +617,42 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
+
+    days_candidates = ["days_until_stockout"]
+    probability_candidates = ["stockout_probability"]
+
+    selected_days_model, days_source, _ = resolve_best_model(
+        spark,
+        MODEL_BASE_PATH.rstrip("/"),
+        days_candidates,
+        preferred_model="days_until_stockout",
+        manifest_filename="_best_model_manifest_days",
+    )
+    if not selected_days_model:
+        selected_days_model = "days_until_stockout"
+
+    selected_probability_model, probability_source, _ = resolve_best_model(
+        spark,
+        MODEL_BASE_PATH.rstrip("/"),
+        probability_candidates,
+        preferred_model="stockout_probability",
+        manifest_filename="_best_model_manifest_probability",
+    )
+    if not selected_probability_model:
+        selected_probability_model = "stockout_probability"
+
+    model_version = f"{selected_days_model}|{selected_probability_model}"
+    print(f"Selected days model: {selected_days_model} (source: {days_source})")
+    print(f"Selected probability model: {selected_probability_model} (source: {probability_source})")
     
     # Load models
     print("Step 1: Load Models")
     print("-" * 80)
-    days_model, prob_model = load_models(MODEL_BASE_PATH)
+    days_model, prob_model = load_models(
+        MODEL_BASE_PATH,
+        selected_days_model,
+        selected_probability_model,
+    )
     
     if days_model is None or prob_model is None:
         print("\n✗ Inference aborted: Models not found")
@@ -660,19 +692,27 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     # Generate predictions
     print("\nStep 6: Generate Predictions")
     print("-" * 80)
-    predictions_df = generate_predictions(days_model, prob_model, df_prepared, CRITICAL_DAYS_THRESHOLD, HIGH_RISK_THRESHOLD, MEDIUM_RISK_THRESHOLD)
+    predictions_df = generate_predictions(
+        days_model,
+        prob_model,
+        df_prepared,
+        CRITICAL_DAYS_THRESHOLD,
+        HIGH_RISK_THRESHOLD,
+        MEDIUM_RISK_THRESHOLD,
+        model_version,
+    )
     
     # Display samples
     display_sample_predictions(predictions_df)
 
     export_inference_outputs_plot(
-        model_name="stockout_probability_random_forest",
+        model_name=f"stockout_probability_{model_version}",
         predictions_df=predictions_df,
         label_column="product_id",
         numeric_columns=["stockout_probability", "days_until_stockout", "current_days_of_supply", "recommended_reorder_quantity", "urgency_score", "confidence_score"],
         export_plots=EXPORT_PLOTS,
         script_name=Path(__file__).stem,
-        run_name="random_forest",
+        run_name=model_version,
     )
     
     # Display summary

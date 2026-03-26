@@ -44,6 +44,7 @@ if str(_ML_ROOT) not in sys.path:
 
 from spark_utils import create_ml_spark_session
 from general.utils.plot_exporter import export_inference_outputs_plot
+from general.model_registry import resolve_best_model
 
 def create_spark_session():
     """Initialize Spark session"""
@@ -456,8 +457,8 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/restock_quantity/"
     MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/restock_quantity/"
 
-    # ⚠️ MANUAL CONFIGURATION REQUIRED:
-    MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
+    MODEL_CANDIDATES = ["linear_regression", "random_forest", "gbt"]
+    PREFERRED_MODEL = "random_forest"
 
     # Configuration
     Z_SCORE_SAFETY_STOCK = 1.65  # 95% service level
@@ -468,10 +469,18 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     print("Inventory Restock Quantity Prediction - Inference")
     print("="*80)
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Model: {MODEL_NAME}\n")
+    print(f"Preferred model: {PREFERRED_MODEL}\n")
     
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
+
+    MODEL_NAME, selection_source, _ = resolve_best_model(
+        spark,
+        MODEL_BASE_PATH,
+        MODEL_CANDIDATES,
+        preferred_model=PREFERRED_MODEL,
+    )
+    print(f"Selected model: {MODEL_NAME} (source: {selection_source})")
     
     # Load model
     print("Step 1: Load Model")

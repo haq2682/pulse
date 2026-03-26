@@ -46,6 +46,7 @@ if str(_ML_ROOT) not in sys.path:
 
 from spark_utils import create_ml_spark_session
 from general.utils.plot_exporter import export_inference_outputs_plot
+from general.model_registry import resolve_best_model
 
 def create_spark_session():
     """Initialize Spark session"""
@@ -106,12 +107,12 @@ def prepare_features(df):
     return df
 
 
-def load_models_and_profiles(spark, MODEL_PATH):
+def load_models_and_profiles(spark, MODEL_PATH, selected_model):
     """Load models and business profiles from training"""
     try:
         scaler = StandardScalerModel.load(f"{MODEL_PATH}supplier_scaler")
         pca = PCAModel.load(f"{MODEL_PATH}supplier_pca")
-        model = KMeansModel.load(f"{MODEL_PATH}supplier_kmeans")
+        model = KMeansModel.load(f"{MODEL_PATH}{selected_model}")
         print("✅ Loaded models")
 
         # Load enhanced metrics with cluster profiles
@@ -321,7 +322,7 @@ def create_performance_metrics_json(df, cluster_profiles):
     return df
 
 
-def generate_predictions(spark, df, model, scaler, pca, cluster_profiles):
+def generate_predictions(spark, df, model, scaler, pca, cluster_profiles, model_version):
     """Generate predictions with full business context"""
     print("Generating predictions...")
 
@@ -364,7 +365,7 @@ def generate_predictions(spark, df, model, scaler, pca, cluster_profiles):
     predictions = predictions.withColumn(
         "clustering_id", concat_ws("_", col("supplier_id"), lit("current"))
     )
-    predictions = predictions.withColumn("model_version", lit("enhanced_kmeans"))
+    predictions = predictions.withColumn("model_version", lit(model_version))
 
     # Select output columns
     output_cols = [
@@ -436,21 +437,32 @@ def main(BUCKET, EXPORT_PLOTS=False):
 
     df = prepare_features(df)
 
-    model, scaler, pca, cluster_profiles, readiness = load_models_and_profiles(spark, MODEL_PATH)
+    model_candidates = ["supplier_kmeans"]
+    selected_model, selected_source, _ = resolve_best_model(
+        spark,
+        MODEL_PATH.rstrip("/"),
+        model_candidates,
+        preferred_model="supplier_kmeans",
+    )
+    if not selected_model:
+        selected_model = "supplier_kmeans"
+    print(f"Selected supplier clustering model: {selected_model} (source: {selected_source})")
+
+    model, scaler, pca, cluster_profiles, readiness = load_models_and_profiles(spark, MODEL_PATH, selected_model)
     if model is None:
         spark.stop()
         return
 
-    predictions = generate_predictions(spark, df, model, scaler, pca, cluster_profiles)
+    predictions = generate_predictions(spark, df, model, scaler, pca, cluster_profiles, selected_model)
 
     export_inference_outputs_plot(
-        model_name="supplier_performance_kmeans",
+        model_name=f"supplier_performance_{selected_model}",
         predictions_df=predictions,
         label_column="business_persona",
         numeric_columns=["confidence_score"],
         export_plots=EXPORT_PLOTS,
         script_name=Path(__file__).stem,
-        run_name="kmeans",
+        run_name=selected_model,
     )
 
     save_predictions_with_summary(predictions, f"{OUTPUT_PATH}supplier_clustering.parquet")

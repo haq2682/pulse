@@ -72,6 +72,7 @@ if str(_ML_ROOT) not in sys.path:
 
 from spark_utils import create_ml_spark_session
 from general.utils.plot_exporter import export_inference_outputs_plot
+from general.model_registry import resolve_best_model
 
 def create_spark_session():
     """Initialize Spark session"""
@@ -594,8 +595,8 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/safety_stock_adjusted/"
     MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/safety_stock_adjustment/"
     
-    # ⚠️ MANUAL CONFIGURATION:
-    MODEL_NAME = "random_forest"  # Options: "linear_regression", "random_forest", "gbt"
+    MODEL_CANDIDATES = ["linear_regression", "random_forest", "gbt"]
+    PREFERRED_MODEL = "random_forest"
     
     SERVICE_LEVELS = {0.90: 1.28, 0.95: 1.65, 0.99: 2.33}
     MIN_DEMAND_DAYS = 30
@@ -604,12 +605,20 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     print("Safety Stock Adjustment Factor - Inference")
     print("="*100)
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Model: {MODEL_NAME}")
+    print(f"Preferred model: {PREFERRED_MODEL}")
     print(f"Approach: Two-step (Formula → ML Adjustment → Final)")
     print("="*100 + "\n")
     
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
+
+    MODEL_NAME, selection_source, _ = resolve_best_model(
+        spark,
+        MODEL_BASE_PATH,
+        MODEL_CANDIDATES,
+        preferred_model=PREFERRED_MODEL,
+    )
+    print(f"Selected model: {MODEL_NAME} (source: {selection_source})")
     
     # Load model
     print("Step 1: Load Adjustment Factor Model")

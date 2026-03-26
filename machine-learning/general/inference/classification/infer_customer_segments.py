@@ -34,6 +34,7 @@ if str(_ML_ROOT) not in sys.path:
 
 from spark_utils import create_ml_spark_session
 from general.utils.plot_exporter import export_inference_outputs_plot
+from general.model_registry import resolve_best_model
 
 def create_spark_session():
     """Initialize Spark session with MinIO configuration"""
@@ -257,18 +258,23 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/classification/predictions/customer_segment_predictions"
     MODEL_INPUT_DIR = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/classification/models/customer_segments"
 
-    # ⚠️ MANUAL INTERVENTION REQUIRED: Select model to use for inference
-    # Available options: "LogisticRegression", "RandomForest"
-    SELECTED_MODEL = "RandomForest"  # <-- CHANGE THIS BASED ON TRAINING RESULTS
-
-    MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
+    MODEL_CANDIDATES = ["LogisticRegression", "RandomForest"]
+    PREFERRED_MODEL = "RandomForest"
     print("=" * 60)
     print("Customer Segment Classification - Inference Pipeline")
     print("=" * 60)
-    print(f"Using model: {SELECTED_MODEL}")
     print("=" * 60)
     
     spark = create_spark_session()
+
+    SELECTED_MODEL, selection_source, _ = resolve_best_model(
+        spark,
+        MODEL_INPUT_DIR,
+        MODEL_CANDIDATES,
+        preferred_model=PREFERRED_MODEL,
+    )
+    MODEL_VERSION = f"{SELECTED_MODEL}_v1.0"
+    print(f"Using model: {SELECTED_MODEL} (source: {selection_source})")
     
     # Load model and preprocessors
     model, preprocessors = load_model_and_preprocessors(spark, MODEL_INPUT_DIR, SELECTED_MODEL)

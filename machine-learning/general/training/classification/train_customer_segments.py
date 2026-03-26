@@ -25,6 +25,7 @@ from utils.multi_bucket_loader import (
     GENERAL_MODEL_BUCKET
 )
 from utils.plot_exporter import export_training_metrics_plot
+from general.model_registry import save_best_model_manifest
 
 # Configuration - General models output to pulse-bucket-1
 MODEL_NAME = "customer_segments"
@@ -452,6 +453,17 @@ def main(EXPORT_PLOTS=False):
     for m in sorted(all_metrics, key=lambda x: x["f1_score"], reverse=True):
         print(f"{m['model_name']:25s} | F1: {m['f1_score']:.4f} | Acc: {m['accuracy']:.4f}")
 
+    best_model = max(all_metrics, key=lambda x: x["f1_score"])
+    manifest_path = save_best_model_manifest(
+        spark,
+        MODEL_OUTPUT_DIR,
+        best_model["model_name"],
+        "f1_score",
+        best_model["f1_score"],
+        {m["model_name"]: m["f1_score"] for m in all_metrics},
+    )
+    print(f"✓ Saved best model manifest to: {manifest_path}")
+
     export_training_metrics_plot(
         model_name=MODEL_NAME,
         metrics=all_metrics,
@@ -462,12 +474,7 @@ def main(EXPORT_PLOTS=False):
     print("\n" + "=" * 60)
     print("✓ Training completed successfully")
     print("=" * 60)
-    print("\n⚠️  MANUAL INTERVENTION REQUIRED:")
-    print("   1. Review model metrics above")
-    print("   2. Select ONE model for inference based on F1-score or business needs")
-    print("   3. Update inference script to load selected model")
-    print("   4. Available models: LogisticRegression, RandomForest")
-    print(f"   5. Models saved to: {MODEL_OUTPUT_DIR}")
+    print("\n✓ Best model is now auto-selected in inference via manifest")
     
     spark.stop()
 

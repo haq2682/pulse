@@ -36,6 +36,7 @@ if str(_ML_ROOT) not in sys.path:
 
 from spark_utils import create_ml_spark_session
 from general.utils.plot_exporter import export_inference_outputs_plot
+from general.model_registry import resolve_best_model
 
 def create_spark_session():
     """Initialize Spark session with MinIO configuration"""
@@ -333,14 +334,21 @@ def main(BUCKET, EXPORT_PLOTS=False):
     MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/"
     OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
 
-    # MANUAL SELECTION: Choose which algorithm to use for inference
-    SELECTED_MODEL_TYPE = "kmeans"  # Options: 'kmeans' or 'gmm'
+    MODEL_CANDIDATES = ["kmeans", "gmm"]
+    PREFERRED_MODEL = "kmeans"
     print("=" * 80)
     print("Customer Segmentation Clustering - Inference")
-    print(f"Selected Model: {SELECTED_MODEL_TYPE.upper()}")
     print("=" * 80)
 
     spark = create_spark_session()
+
+    SELECTED_MODEL_TYPE, selection_source, _ = resolve_best_model(
+        spark,
+        MODEL_PATH,
+        MODEL_CANDIDATES,
+        preferred_model=PREFERRED_MODEL,
+    )
+    print(f"Selected Model: {SELECTED_MODEL_TYPE.upper()} (source: {selection_source})")
 
     # Load data
     df = load_data(spark, INPUT_PATH)

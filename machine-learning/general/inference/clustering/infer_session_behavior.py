@@ -7,11 +7,11 @@ import os
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
-    col, when, lit, coalesce, log1p, concat_ws, struct, to_json, array, udf
+    col, when, lit, coalesce, log1p, concat_ws, struct, to_json, array, udf, expr
 )
 from pyspark.sql.types import DoubleType
 from pyspark.ml.feature import VectorAssembler, StandardScalerModel, PCAModel, StringIndexer
-from pyspark.ml.clustering import KMeansModel
+from pyspark.ml.clustering import KMeansModel, GaussianMixtureModel, BisectingKMeansModel
 from datetime import datetime
 
 # Feature columns (must match training)
@@ -41,6 +41,7 @@ if str(_ML_ROOT) not in sys.path:
 
 from spark_utils import create_ml_spark_session
 from general.utils.plot_exporter import export_inference_outputs_plot
+from general.model_registry import resolve_best_model
 
 def create_spark_session():
     """Initialize Spark session"""
@@ -103,12 +104,20 @@ def prepare_features(df):
     return df
 
 
-def load_models_and_profiles(spark, MODEL_PATH):
+def load_models_and_profiles(spark, MODEL_PATH, selected_model):
     """Load models and behavior profiles from training"""
     try:
         scaler = StandardScalerModel.load(f"{MODEL_PATH}session_behavior_scaler")
         pca = PCAModel.load(f"{MODEL_PATH}session_behavior_pca")
-        model = KMeansModel.load(f"{MODEL_PATH}session_behavior_kmeans")
+        model_loaders = {
+            "session_behavior_kmeans": KMeansModel,
+            "session_behavior_gmm": GaussianMixtureModel,
+            "session_behavior_bisecting_kmeans": BisectingKMeansModel,
+        }
+        model_cls = model_loaders.get(selected_model)
+        if not model_cls:
+            raise ValueError(f"Unsupported selected model: {selected_model}")
+        model = model_cls.load(f"{MODEL_PATH}{selected_model}")
         print("✅ Loaded models")
 
         metrics_df = spark.read.json(f"{MODEL_PATH}session_behavior_metrics.json")
@@ -139,32 +148,40 @@ def load_models_and_profiles(spark, MODEL_PATH):
         return None, None, None, None, None
 
 
-def compute_confidence_scores(predictions_df, model):
+def compute_confidence_scores(predictions_df, model, selected_model):
     """Compute confidence scores based on distance to centroid"""
     print("Computing confidence scores...")
-    
-    centers = model.clusterCenters()
-    
-    def distance_to_center(features, prediction):
-        if features is None:
-            return 0.0
-        center = centers[prediction]
-        dist = float(sum((features[i] - center[i]) ** 2 for i in range(len(features))) ** 0.5)
-        return dist
-    
-    distance_udf = udf(distance_to_center, DoubleType())
-    predictions_df = predictions_df.withColumn(
-        "distance_to_center",
-        distance_udf(col("features"), col("prediction"))
-    )
-    
-    max_dist_row = predictions_df.agg({"distance_to_center": "max"}).collect()[0]
-    max_dist = max_dist_row[0] if max_dist_row[0] else 1.0
-    
-    predictions_df = predictions_df.withColumn(
-        "confidence_score",
-        lit(1.0) - (col("distance_to_center") / lit(max_dist))
-    )
+
+    if selected_model == "session_behavior_gmm":
+        predictions_df = predictions_df.withColumn(
+            "cluster_probability",
+            expr("vector_to_array(probability)[prediction]"),
+        )
+        predictions_df = predictions_df.withColumn("confidence_score", col("cluster_probability"))
+        predictions_df = predictions_df.withColumn("distance_to_center", lit(1.0) - col("cluster_probability"))
+    else:
+        centers = model.clusterCenters()
+
+        def distance_to_center(features, prediction):
+            if features is None:
+                return 0.0
+            center = centers[prediction]
+            dist = float(sum((features[i] - center[i]) ** 2 for i in range(len(features))) ** 0.5)
+            return dist
+
+        distance_udf = udf(distance_to_center, DoubleType())
+        predictions_df = predictions_df.withColumn(
+            "distance_to_center",
+            distance_udf(col("features"), col("prediction"))
+        )
+
+        max_dist_row = predictions_df.agg({"distance_to_center": "max"}).collect()[0]
+        max_dist = max_dist_row[0] if max_dist_row[0] else 1.0
+
+        predictions_df = predictions_df.withColumn(
+            "confidence_score",
+            lit(1.0) - (col("distance_to_center") / lit(max_dist))
+        )
     
     # Validation flags
     predictions_df = predictions_df.withColumn(
@@ -310,7 +327,7 @@ def create_engagement_recommendations(df):
     return df
 
 
-def generate_predictions(spark, df, model, scaler, pca, cluster_profiles):
+def generate_predictions(spark, df, model, scaler, pca, cluster_profiles, selected_model):
     """Generate predictions with full business context"""
     print("Generating predictions...")
 
@@ -333,7 +350,7 @@ def generate_predictions(spark, df, model, scaler, pca, cluster_profiles):
     predictions = model.transform(df_transformed)
     
     # Compute confidence scores
-    predictions = compute_confidence_scores(predictions, model)
+    predictions = compute_confidence_scores(predictions, model, selected_model)
 
     # Join back original values, keep distance_to_center
     predictions = predictions.select(
@@ -353,7 +370,7 @@ def generate_predictions(spark, df, model, scaler, pca, cluster_profiles):
     predictions = predictions.withColumn(
         "clustering_id", concat_ws("_", col("session_id"), lit("current"))
     )
-    predictions = predictions.withColumn("model_version", lit("enhanced_kmeans"))
+    predictions = predictions.withColumn("model_version", lit(selected_model))
     predictions = predictions.withColumn("cluster_centroid_distance", col("distance_to_center"))
 
     # Select output columns
@@ -422,21 +439,36 @@ def main(BUCKET, EXPORT_PLOTS=False):
 
     df = prepare_features(df)
 
-    model, scaler, pca, cluster_profiles, readiness = load_models_and_profiles(spark, MODEL_PATH)
+    model_candidates = [
+        "session_behavior_kmeans",
+        "session_behavior_gmm",
+        "session_behavior_bisecting_kmeans",
+    ]
+    selected_model, selected_source, _ = resolve_best_model(
+        spark,
+        MODEL_PATH.rstrip("/"),
+        model_candidates,
+        preferred_model="session_behavior_kmeans",
+    )
+    if not selected_model:
+        selected_model = "session_behavior_kmeans"
+    print(f"Selected session clustering model: {selected_model} (source: {selected_source})")
+
+    model, scaler, pca, cluster_profiles, readiness = load_models_and_profiles(spark, MODEL_PATH, selected_model)
     if model is None:
         spark.stop()
         return
 
-    predictions = generate_predictions(spark, df, model, scaler, pca, cluster_profiles)
+    predictions = generate_predictions(spark, df, model, scaler, pca, cluster_profiles, selected_model)
 
     export_inference_outputs_plot(
-        model_name="session_behavior_kmeans",
+        model_name=f"session_behavior_{selected_model}",
         predictions_df=predictions,
         label_column="behavior_type",
         numeric_columns=["cluster_centroid_distance", "confidence_score"],
         export_plots=EXPORT_PLOTS,
         script_name=Path(__file__).stem,
-        run_name="kmeans",
+        run_name=selected_model,
     )
 
     save_predictions_with_summary(predictions, f"{OUTPUT_PATH}session_behavior_clustering.parquet")

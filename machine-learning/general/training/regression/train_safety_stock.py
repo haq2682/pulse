@@ -17,6 +17,7 @@ from utils.multi_bucket_loader import (
     get_training_window,
 )
 from utils.plot_exporter import export_training_metrics_plot
+from general.model_registry import save_best_model_manifest
 
 # Import spark_utils FIRST to set up JARs before pyspark imports
 _ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
@@ -546,6 +547,15 @@ def main(EXPORT_PLOTS=False):
         save_model(model, metrics['model'])
     
     best = max([m for _, m in models_results], key=lambda x: x['r2'])
+    manifest_path = save_best_model_manifest(
+        spark,
+        MODEL_OUTPUT_DIR,
+        best["model"],
+        "r2",
+        best["r2"],
+        {metrics["model"]: metrics["r2"] for _, metrics in models_results},
+    )
+    print(f"✓ Saved best model manifest to: {manifest_path}")
     plot_metrics = [m for _, m in models_results]
     export_training_metrics_plot(
         model_name=MODEL_NAME,

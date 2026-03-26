@@ -18,6 +18,7 @@ from utils.multi_bucket_loader import (
     GENERAL_MODEL_BUCKET
 )
 from utils.plot_exporter import export_training_metrics_plot
+from general.model_registry import save_best_model_manifest
 
 # Import spark_utils FIRST to set up JARs before pyspark imports
 _ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
@@ -1104,6 +1105,15 @@ def main(EXPORT_PLOTS=False):
         print(f"{m['model']:<20} ${m['rmse']:<11.2f} ${m['mae']:<11.2f} {m['r2']:<10.4f} {m['mape']:<10.2f}% {m['smape']:<10.2f}%")
     
     best = max(models_results, key=lambda x: x['r2'])
+    manifest_path = save_best_model_manifest(
+        spark,
+        MODEL_OUTPUT_DIR,
+        best["model"],
+        "r2",
+        best["r2"],
+        {m["model"]: m["r2"] for m in models_results},
+    )
+    print(f"✓ Saved best model manifest to: {manifest_path}")
 
     export_training_metrics_plot(
         model_name=MODEL_NAME,
@@ -1115,9 +1125,7 @@ def main(EXPORT_PLOTS=False):
     print(f"Best Model: {best['model']} (R² = {best['r2']:.4f})")
     print("="*60)
     
-    print("\n⚠️  MANUAL INTERVENTION REQUIRED:")
-    print("   Update MODEL_NAME in infer_aov.py")
-    print(f"   Available: {', '.join([m['model'] for m in models_results])}")
+    print("\n✓ Best model is now auto-selected in inference via manifest")
     
     print(f"\nEnd time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("✓ Training completed\n")

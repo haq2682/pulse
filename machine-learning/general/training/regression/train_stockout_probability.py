@@ -30,6 +30,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from general.model_registry import save_best_model_manifest
 
 
 from pyspark.sql import SparkSession
@@ -879,6 +880,16 @@ def main(EXPORT_PLOTS=False):
     )
     metrics_days = evaluate_model(pred_days, "random_forest", "days_until_stockout")
     save_model(model_days, "days_until_stockout")
+    days_manifest_path = save_best_model_manifest(
+        spark,
+        MODEL_OUTPUT_DIR,
+        "days_until_stockout",
+        "r2",
+        metrics_days["r2"],
+        {"days_until_stockout": metrics_days["r2"]},
+        filename="_best_model_manifest_days",
+    )
+    print(f"✓ Saved days model manifest: {days_manifest_path}")
     
     # Step 7: Train model for PROBABILITY
     print("\n" + "="*60)
@@ -903,6 +914,16 @@ def main(EXPORT_PLOTS=False):
     )
     metrics_prob = evaluate_model(pred_prob, "random_forest", "stockout_probability")
     save_model(model_prob, "stockout_probability")
+    prob_manifest_path = save_best_model_manifest(
+        spark,
+        MODEL_OUTPUT_DIR,
+        "stockout_probability",
+        "r2",
+        metrics_prob["r2"],
+        {"stockout_probability": metrics_prob["r2"]},
+        filename="_best_model_manifest_probability",
+    )
+    print(f"✓ Saved probability model manifest: {prob_manifest_path}")
     
     # Summary
     print("\n" + "="*60)

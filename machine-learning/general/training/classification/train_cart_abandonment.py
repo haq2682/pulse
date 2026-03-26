@@ -66,6 +66,7 @@ if str(_ML_ROOT) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT))
 
 from spark_utils import create_ml_spark_session
+from general.model_registry import save_best_model_manifest
 
 def create_spark_session():
     """Initialize Spark session with MinIO configuration"""
@@ -843,6 +844,17 @@ def main(EXPORT_PLOTS=False):
     for m in sorted(all_metrics, key=lambda x: x["auc_roc"], reverse=True):
         status = "🎯 EXCELLENT" if m["auc_roc"] >= 0.85 else "✓ Good" if m["auc_roc"] >= 0.70 else "⚠️  Needs Work"
         print(f"{m['model_name']:25s} | AUC: {m['auc_roc']:.4f} | F1: {m['f1_score']:.4f} | {status}")
+
+    best_model = max(all_metrics, key=lambda x: x["auc_roc"])
+    manifest_path = save_best_model_manifest(
+        spark,
+        MODEL_OUTPUT_DIR,
+        best_model["model_name"],
+        "auc_roc",
+        best_model["auc_roc"],
+        {m["model_name"]: m["auc_roc"] for m in all_metrics},
+    )
+    print(f"✓ Saved best model manifest to: {manifest_path}")
 
     export_training_metrics_plot(
         model_name=MODEL_NAME,

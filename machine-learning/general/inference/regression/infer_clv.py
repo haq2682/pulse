@@ -43,6 +43,7 @@ if str(_ML_ROOT) not in sys.path:
 
 from spark_utils import create_ml_spark_session
 from general.utils.plot_exporter import export_inference_outputs_plot
+from general.model_registry import resolve_best_model
 
 def create_spark_session():
     """Initialize Spark session with MinIO configuration"""
@@ -200,10 +201,8 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/clv_predictions/"
     MODEL_BASE_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/regression/models/clv/"
 
-    # ⚠️ MANUAL CONFIGURATION REQUIRED:
-    # Set MODEL_NAME to one of: "linear_regression", "random_forest", "gbt"
-    # Based on training results, select the best performing model
-    MODEL_NAME = "random_forest"  # <-- UPDATE THIS AFTER TRAINING
+    MODEL_CANDIDATES = ["linear_regression", "random_forest", "gbt"]
+    PREFERRED_MODEL = "random_forest"
 
     PREDICTION_HORIZON_DAYS = 365  # Predict CLV for next 1 year
     """Main inference pipeline"""
@@ -211,11 +210,19 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     print("CLV Prediction Model Inference")
     print("="*60)
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Model: {MODEL_NAME}\n")
+    print(f"Preferred model: {PREFERRED_MODEL}\n")
     
     # Initialize Spark
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
+
+    MODEL_NAME, selection_source, _ = resolve_best_model(
+        spark,
+        MODEL_BASE_PATH,
+        MODEL_CANDIDATES,
+        preferred_model=PREFERRED_MODEL,
+    )
+    print(f"Selected model: {MODEL_NAME} (source: {selection_source})")
     
     # Step 1: Load model
     print("Step 1: Load Model")
