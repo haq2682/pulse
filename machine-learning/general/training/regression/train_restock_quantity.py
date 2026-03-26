@@ -18,6 +18,7 @@ from utils.multi_bucket_loader import (
     get_training_window,
     GENERAL_MODEL_BUCKET
 )
+from utils.plot_exporter import export_training_metrics_plot
 
 # Import spark_utils FIRST to set up JARs before pyspark imports
 _ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
@@ -662,7 +663,7 @@ def save_model(model, model_name):
     print(f"✓ Model saved: {model_path}")
 
 
-def main():
+def main(EXPORT_PLOTS=False):
     """Main training pipeline"""
     print("\n" + "="*60)
     print("Inventory Restock Quantity - General Model Training")
@@ -832,6 +833,13 @@ def main():
         print(f"{m['model']:<25} {m['rmse']:<15.2f} {m['mae']:<15.2f} {m['r2']:<10.4f} {m['mape']:<10.2f}%")
     
     best = max(models_results, key=lambda x: x['r2'])
+
+    export_training_metrics_plot(
+        model_name=MODEL_NAME,
+        metrics=models_results,
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+    )
     print("\n" + "="*60)
     print(f"Best Model: {best['model']} (R² = {best['r2']:.4f})")
     print("="*60)
@@ -846,4 +854,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(EXPORT_PLOTS=False)

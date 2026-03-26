@@ -37,6 +37,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_training_metrics_plot
 from specific.model_registry import save_best_model_manifest
 
 
@@ -526,7 +527,7 @@ def save_artifacts(
     print(f"✓ Feature list saved: {features_path}")
 
 
-def main(BUCKET_NAME):
+def main(BUCKET_NAME, EXPORT_PLOTS=False):
     INPUT_CAMPAIGNS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_marketing_campaigns.parquet"
     INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
     MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/campaign_roi/"
@@ -618,6 +619,13 @@ def main(BUCKET_NAME):
     )
     metrics = evaluate_model(predictions)
 
+    export_training_metrics_plot(
+        model_name="campaign_roi",
+        metrics=[{**metrics, "model": "campaign_revenue"}],
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+    )
+
     # ── Step 6: Save all artifacts ───────────────────────────────────────
     print("\nStep 6: Save Model Artifacts")
     print("-" * 60)
@@ -660,4 +668,4 @@ def main(BUCKET_NAME):
 
 if __name__ == "__main__":
     BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME)
+    main(BUCKET_NAME, EXPORT_PLOTS=False)

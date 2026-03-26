@@ -45,6 +45,7 @@ if str(_ML_ROOT) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_inference_outputs_plot
 
 def create_spark_session():
     """Initialize Spark session"""
@@ -592,7 +593,7 @@ def display_summary_statistics(df):
     print("="*80)
 
 
-def main(BUCKET_NAME):
+def main(BUCKET_NAME, EXPORT_PLOTS=False):
     GENERAL_BUCKET_NAME = "pulse-bucket-1"
     INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
     INPUT_INVENTORY_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
@@ -663,6 +664,16 @@ def main(BUCKET_NAME):
     
     # Display samples
     display_sample_predictions(predictions_df)
+
+    export_inference_outputs_plot(
+        model_name="stockout_probability_random_forest",
+        predictions_df=predictions_df,
+        label_column="product_id",
+        numeric_columns=["stockout_probability", "days_until_stockout", "current_days_of_supply", "recommended_reorder_quantity", "urgency_score", "confidence_score"],
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+        run_name="random_forest",
+    )
     
     # Display summary
     display_summary_statistics(predictions_df)
@@ -684,4 +695,4 @@ def main(BUCKET_NAME):
 
 if __name__ == "__main__":
     BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME)
+    main(BUCKET_NAME, EXPORT_PLOTS=False)

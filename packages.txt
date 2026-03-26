@@ -50,3 +50,4 @@ pyarrow
 hdbscan
 scikit-learn
 scikit-learn-extra
+matplotlib

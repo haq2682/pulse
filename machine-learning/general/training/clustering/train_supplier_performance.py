@@ -15,6 +15,7 @@ from utils.multi_bucket_loader import (
     get_training_window,
     GENERAL_MODEL_BUCKET
 )
+from utils.plot_exporter import export_training_metrics_plot
 
 # Import spark_utils FIRST to set up JARs before pyspark imports
 _ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
@@ -443,7 +444,7 @@ def save_enhanced_metrics(all_metrics, cluster_profiles, spark):
     print(f"✅ Saved enhanced metrics to MinIO")
 
 
-def main():
+def main(EXPORT_PLOTS=False):
     print("="*80)
     print("ENHANCED Supplier Performance Clustering - Training")
     print("="*80)
@@ -495,6 +496,13 @@ def main():
     # Combine metrics
     all_metrics = kmeans_metrics
 
+    export_training_metrics_plot(
+        model_name=MODEL_NAME,
+        metrics=all_metrics,
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+    )
+
     # Profile best model
     best_model = max(kmeans_models, key=lambda m: next(
         met["silhouette"] for met in kmeans_metrics if met["k"] == m["k"]
@@ -535,4 +543,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(EXPORT_PLOTS=False)

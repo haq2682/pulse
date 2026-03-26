@@ -9,6 +9,7 @@ pyarrow
 hdbscan
 scikit-learn
 scikit-learn-extra
+matplotlib
 ray[rllib]
 gymnasium
 pydantic>=2.0.0

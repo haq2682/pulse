@@ -8,6 +8,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_training_metrics_plot
 from specific.model_registry import save_best_model_manifest
 
 
@@ -409,7 +410,7 @@ def save_models(model, preprocessors, output_dir, model_name):
     print(f"✓ Saved {model_name} and preprocessors to {model_path}")
 
 
-def main(BUCKET_NAME):
+def main(BUCKET_NAME, EXPORT_PLOTS=False):
     INPUT_PATH_AFFINITY = f"s3a://{BUCKET_NAME}/transformed/agg_product_affinity.parquet"
     INPUT_PATH_PRODUCTS = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
     MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/classification/models/product_bundling"
@@ -508,6 +509,13 @@ def main(BUCKET_NAME):
     for m in sorted(all_metrics, key=lambda x: x["f1_score"], reverse=True):
         print(f"{m['model_name']:25s} | F1: {m['f1_score']:.4f} | AUC: {m['auc']:.4f} | Acc: {m['accuracy']:.4f}")
 
+    export_training_metrics_plot(
+        model_name="product_bundling",
+        metrics=all_metrics,
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+    )
+
     best = max(all_metrics, key=lambda x: x["f1_score"])
     manifest_path = save_best_model_manifest(
         spark,
@@ -540,4 +548,4 @@ def main(BUCKET_NAME):
 
 if __name__ == "__main__":
     BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME)
+    main(BUCKET_NAME, EXPORT_PLOTS=False)

@@ -29,6 +29,7 @@ from utils.multi_bucket_loader import (
     get_training_window,
     GENERAL_MODEL_BUCKET
 )
+from utils.plot_exporter import export_training_metrics_plot
 
 # Configuration - General models output to pulse-bucket-1
 MODEL_NAME = "customer_churn"
@@ -233,7 +234,7 @@ def save_model(model, indexer_model, output_dir, model_name):
     print(f"✓ Saved {model_name} to {model_path}")
 
 
-def main():
+def main(EXPORT_PLOTS=False):
     print("=" * 60)
     print("Customer Churn Prediction - General Model Training Pipeline")
     print("=" * 60)
@@ -320,6 +321,13 @@ def main():
     print("=" * 60)
     for m in sorted(all_metrics, key=lambda x: x["f1_score"], reverse=True):
         print(f"{m['model_name']:25s} | F1: {m['f1_score']:.4f} | Acc: {m['accuracy']:.4f}")
+
+    export_training_metrics_plot(
+        model_name=MODEL_NAME,
+        metrics=all_metrics,
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+    )
     
     print("\n" + "=" * 60)
     print("✓ Training completed successfully")
@@ -335,4 +343,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(EXPORT_PLOTS=False)

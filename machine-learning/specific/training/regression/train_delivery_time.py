@@ -20,6 +20,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_training_metrics_plot
 
 
 from pyspark.sql import SparkSession
@@ -763,7 +764,7 @@ def save_model(model, model_name, MODEL_OUTPUT_PATH):
     print(f"✓ Model saved: {model_path}")
 
 
-def main(BUCKET_NAME):
+def main(BUCKET_NAME, EXPORT_PLOTS=False):
     INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
     INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
     MODEL_OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/delivery_time/"
@@ -863,6 +864,14 @@ def main(BUCKET_NAME):
 
     best_model, best_model_name, best_metrics, all_model_results = train_models_and_select_best(train_df, test_df)
 
+    plot_metrics = [{**item["metrics"], "model": item["model_name"]} for item in all_model_results]
+    export_training_metrics_plot(
+        model_name="delivery_time",
+        metrics=plot_metrics,
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+    )
+
     print("\nStep 10: Persist Models")
     print("-" * 60)
     for item in all_model_results:
@@ -888,4 +897,4 @@ def main(BUCKET_NAME):
 
 if __name__ == "__main__":
     BUCKET_NAME = "afc4bd21-75ad-4da3-9fd7-4b0b540a1ccc"
-    main(BUCKET_NAME)
+    main(BUCKET_NAME, EXPORT_PLOTS=False)

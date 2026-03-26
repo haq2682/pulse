@@ -16,6 +16,7 @@ from utils.multi_bucket_loader import (
     get_general_model_output_path,
     get_training_window,
 )
+from utils.plot_exporter import export_training_metrics_plot
 
 # Import spark_utils FIRST to set up JARs before pyspark imports
 _ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
@@ -483,7 +484,7 @@ def evaluate_model(predictions, model_name):
     return {"model": model_name, "adj_rmse": rmse, "adj_mae": mae, "r2": r2, "final_rmse": final_rmse, "final_mae": final_mae}
 
 
-def main():
+def main(EXPORT_PLOTS=False):
     """Main training pipeline"""
     print("\n" + "="*60)
     print("Safety Stock ADJUSTMENT FACTOR Model - RECOMMENDED")
@@ -545,6 +546,13 @@ def main():
         save_model(model, metrics['model'])
     
     best = max([m for _, m in models_results], key=lambda x: x['r2'])
+    plot_metrics = [m for _, m in models_results]
+    export_training_metrics_plot(
+        model_name=MODEL_NAME,
+        metrics=plot_metrics,
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+    )
     print(f"\nBest Model: {best['model']} (R² = {best['r2']:.4f})")
     print("\n✓ NO DATA LEAKAGE - Model learns business adjustments")
     print("  Realistic R² (0.60-0.80) indicates genuine learning")
@@ -562,4 +570,4 @@ def save_model(model, model_name):
 
 
 if __name__ == "__main__":
-    main()
+    main(EXPORT_PLOTS=False)

@@ -20,6 +20,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_training_metrics_plot
 from specific.model_registry import save_best_model_manifest
 
 
@@ -639,7 +640,7 @@ def save_model(model, model_name, MODEL_OUTPUT_PATH):
     print(f"✓ Model saved: {model_path}")
 
 
-def main(BUCKET_NAME):
+def main(BUCKET_NAME, EXPORT_PLOTS=False):
     INPUT_PRODUCTS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
     INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
     INPUT_ORDER_ITEMS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
@@ -733,6 +734,14 @@ def main(BUCKET_NAME):
     
     model, predictions, model_name = train_random_forest(train_df, test_df, USE_CROSS_VALIDATION)
     metrics = evaluate_model(predictions, model_name)
+
+    export_training_metrics_plot(
+        model_name="price_optimization",
+        metrics=[metrics],
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+    )
+
     save_model(model, model_name, MODEL_OUTPUT_PATH)
     manifest_path = save_best_model_manifest(
         spark,
@@ -763,4 +772,4 @@ def main(BUCKET_NAME):
 
 if __name__ == "__main__":
     BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME)
+    main(BUCKET_NAME, EXPORT_PLOTS=False)

@@ -71,6 +71,7 @@ if str(_ML_ROOT) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_inference_outputs_plot
 
 def create_spark_session():
     """Initialize Spark session"""
@@ -580,7 +581,7 @@ def display_summary_statistics(df):
     print("="*100)
 
 
-def main(BUCKET_NAME):
+def main(BUCKET_NAME, EXPORT_PLOTS=False):
     """Main inference pipeline"""
     
     # Configuration
@@ -657,6 +658,16 @@ def main(BUCKET_NAME):
     
     # Display samples
     display_sample_predictions(predictions_df)
+
+    export_inference_outputs_plot(
+        model_name=f"safety_stock_{MODEL_NAME}",
+        predictions_df=predictions_df,
+        label_column="product_id",
+        numeric_columns=["theoretical_safety_stock", "adjustment_factor", "required_safety_stock_units", "minimum_stock_level", "reorder_point", "service_level_target", "expected_stockout_probability", "confidence_score"],
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+        run_name=MODEL_NAME,
+    )
     
     # Display summary
     display_summary_statistics(predictions_df)
@@ -679,4 +690,4 @@ def main(BUCKET_NAME):
 
 if __name__ == "__main__":
     BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME)
+    main(BUCKET_NAME, EXPORT_PLOTS=False)

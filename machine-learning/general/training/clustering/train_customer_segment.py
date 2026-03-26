@@ -15,6 +15,7 @@ from utils.multi_bucket_loader import (
     get_training_window,
     GENERAL_MODEL_BUCKET
 )
+from utils.plot_exporter import export_training_metrics_plot
 
 # Import spark_utils FIRST to set up JARs before pyspark imports
 _ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
@@ -297,7 +298,7 @@ def save_models_and_metrics(kmeans_models, kmeans_metrics, gmm_models, gmm_metri
     print(f"\nAll models saved to MinIO bucket: {GENERAL_MODEL_BUCKET}")
 
 
-def main():
+def main(EXPORT_PLOTS=False):
     print("=" * 80)
     print("Customer Segmentation Clustering - Training")
     print("=" * 80)
@@ -341,6 +342,13 @@ def main():
     # Combine all metrics for comparison
     all_metrics = kmeans_metrics + gmm_metrics
 
+    export_training_metrics_plot(
+        model_name=MODEL_NAME,
+        metrics=all_metrics,
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+    )
+
     # Display best overall model
     best_overall = max(all_metrics, key=lambda x: x["silhouette"])
     print(f"\n{'='*80}")
@@ -365,4 +373,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(EXPORT_PLOTS=False)

@@ -12,6 +12,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_training_metrics_plot
 from specific.model_registry import save_best_model_manifest
 
 
@@ -211,7 +212,7 @@ def save_model_and_metrics(spark, preprocess_model, kmeans_model, profiles, stat
         print(f"S3 warning: {e}")
 
 
-def main(BUCKET):
+def main(BUCKET, EXPORT_PLOTS=False):
     INPUT_PATH = f"s3a://{BUCKET}/transformed/"
     MODEL_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
     METRICS_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/metrics/"
@@ -274,6 +275,13 @@ def main(BUCKET):
     print(f"\nBest: k={best_k}, silhouette={best_sil:.4f}")
     for p in profiles:
         print(f"  Cluster {p['cluster_id']}: {p['stage']} ({p['count']})")
+
+    export_training_metrics_plot(
+        model_name="product_lifecycle",
+        metrics=[{"model": "kmeans", "k": best_k, "silhouette": best_sil}],
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+    )
     
     save_model_and_metrics(spark, preprocess_model, best_model, profiles, stats, best_k, best_sil, MODEL_OUTPUT_PATH, LOCAL_METRICS_PATH, METRICS_OUTPUT_PATH, FEATURES)
     manifest_path = save_best_model_manifest(
@@ -298,4 +306,4 @@ def main(BUCKET):
 
 if __name__ == "__main__":
     BUCKET = "pulse-bucket-1"
-    main(BUCKET)
+    main(BUCKET, EXPORT_PLOTS=False)

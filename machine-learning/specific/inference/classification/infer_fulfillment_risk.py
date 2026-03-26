@@ -10,6 +10,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_inference_outputs_plot
 
 
 from pyspark.sql import SparkSession
@@ -666,7 +667,7 @@ def save_predictions(df, output_path):
         return False
 
 
-def main(BUCKET_NAME):
+def main(BUCKET_NAME, EXPORT_PLOTS=False):
     INPUT_PATH_ORDERS      = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
     INPUT_PATH_ORDER_ITEMS = f"s3a://{BUCKET_NAME}/transformed/agg_order_items.parquet"
     INPUT_PATH_PRODUCTS    = f"s3a://{BUCKET_NAME}/transformed/agg_products.parquet"
@@ -730,6 +731,16 @@ def main(BUCKET_NAME):
 
     predictions_df = generate_predictions(spark, df_prepared, model, selected_model, MODEL_VERSION)
 
+    export_inference_outputs_plot(
+        model_name=f"fulfillment_risk_{selected_model}",
+        predictions_df=predictions_df,
+        label_column="predicted_risk_label",
+        numeric_columns=["delay_probability", "expected_delay_days", "confidence_score"],
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+        run_name=selected_model,
+    )
+
     print("\nSample predictions:")
     predictions_df.select(
         "order_id", "predicted_risk_label", "delay_probability",
@@ -748,4 +759,4 @@ def main(BUCKET_NAME):
 
 if __name__ == "__main__":
     BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME)
+    main(BUCKET_NAME, EXPORT_PLOTS=False)

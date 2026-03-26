@@ -20,6 +20,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_inference_outputs_plot
 from specific.model_registry import resolve_best_model
 
 
@@ -324,7 +325,7 @@ def display_prediction(df):
     print(f"Model Version:        {row['model_version']}")
 
 
-def main(BUCKET_NAME):
+def main(BUCKET_NAME, EXPORT_PLOTS=False):
     INPUT_MONTHLY_AGG_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_monthly_aggregations.parquet"
     OUTPUT_PATH            = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/revenue_forecast/"
     MODEL_BASE_PATH        = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/revenue_forecast/"
@@ -389,6 +390,23 @@ def main(BUCKET_NAME):
 
     display_prediction(predictions_df)
 
+    export_inference_outputs_plot(
+        model_name="revenue_forecast",
+        predictions_df=predictions_df,
+        label_column="model_version",
+        numeric_columns=[
+            "predicted_revenue",
+            "predicted_orders",
+            "confidence_interval_lower",
+            "confidence_interval_upper",
+            "trend_factor",
+            "confidence_score",
+        ],
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+        run_name=MODEL_NAME,
+    )
+
     # Step 6: Persist predictions
     print("\nStep 6: Save Predictions")
     print("-" * 60)
@@ -404,4 +422,4 @@ def main(BUCKET_NAME):
 
 if __name__ == "__main__":
     BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME)
+    main(BUCKET_NAME, EXPORT_PLOTS=False)

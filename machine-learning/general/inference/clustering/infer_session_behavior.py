@@ -40,6 +40,7 @@ if str(_ML_ROOT) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_inference_outputs_plot
 
 def create_spark_session():
     """Initialize Spark session"""
@@ -403,7 +404,7 @@ def save_predictions_with_summary(predictions, output_path):
     print(f"{'='*80}\n")
 
 
-def main(BUCKET):
+def main(BUCKET, EXPORT_PLOTS=False):
     GENERAL_BUCKET_NAME = "pulse-bucket-1"
     INPUT_PATH = f"s3a://{BUCKET}/transformed/"
     MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/"
@@ -428,6 +429,16 @@ def main(BUCKET):
 
     predictions = generate_predictions(spark, df, model, scaler, pca, cluster_profiles)
 
+    export_inference_outputs_plot(
+        model_name="session_behavior_kmeans",
+        predictions_df=predictions,
+        label_column="behavior_type",
+        numeric_columns=["cluster_centroid_distance", "confidence_score"],
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+        run_name="kmeans",
+    )
+
     save_predictions_with_summary(predictions, f"{OUTPUT_PATH}session_behavior_clustering.parquet")
 
     print("✅ Enhanced inference completed successfully!")
@@ -436,4 +447,4 @@ def main(BUCKET):
 
 if __name__ == "__main__":
     BUCKET = "pulse-bucket-1"
-    main(BUCKET)
+    main(BUCKET, EXPORT_PLOTS=False)

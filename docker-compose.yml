@@ -115,6 +115,7 @@ services:
       - ./analysis:/app/analysis
       - ./machine-learning:/app/machine-learning
       - ./mapping:/app/mapping
+      - ~/Desktop/temp/logs_for_report:/app/logs_for_report # Remove this for production
     networks:
       spark-network:
         ipv4_address: 10.5.0.2

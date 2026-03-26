@@ -15,6 +15,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_inference_outputs_plot
 
 
 from pyspark.sql import functions as F
@@ -611,7 +612,7 @@ def display_summary_statistics(df):
     print("="*80)
 
 
-def main(BUCKET_NAME):
+def main(BUCKET_NAME, EXPORT_PLOTS=False):
     INPUT_ORDERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_orders.parquet"
     INPUT_CUSTOMERS_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
     OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/delivery_time/"
@@ -682,6 +683,21 @@ def main(BUCKET_NAME):
     if enable_reports:
         display_sample_predictions(predictions_df)
         display_summary_statistics(predictions_df)
+
+    export_inference_outputs_plot(
+        model_name="delivery_time",
+        predictions_df=predictions_df,
+        label_column="model_version",
+        numeric_columns=[
+            "predicted_delivery_days",
+            "confidence_interval_lower",
+            "confidence_interval_upper",
+            "confidence_score",
+        ],
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+        run_name=model_version,
+    )
     
     # Save predictions
     print("\nStep 9: Save Predictions")
@@ -700,4 +716,4 @@ def main(BUCKET_NAME):
 
 if __name__ == "__main__":
     BUCKET_NAME = "afc4bd21-75ad-4da3-9fd7-4b0b540a1ccc"
-    main(BUCKET_NAME)
+    main(BUCKET_NAME, EXPORT_PLOTS=False)

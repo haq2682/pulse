@@ -15,6 +15,7 @@ from utils.multi_bucket_loader import (
     get_training_window,
     GENERAL_MODEL_BUCKET
 )
+from utils.plot_exporter import export_training_metrics_plot
 
 # Import spark_utils FIRST to set up JARs before pyspark imports
 _ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
@@ -380,7 +381,7 @@ def save_models(
     print("Saved metrics")
 
 
-def main():
+def main(EXPORT_PLOTS=False):
     print("=" * 80)
     print("Geographic Sales Clustering - Training")
     print("=" * 80)
@@ -434,6 +435,13 @@ def main():
 
     all_metrics = kmeans_metrics + gmm_metrics + bkm_metrics
 
+    export_training_metrics_plot(
+        model_name=MODEL_NAME,
+        metrics=all_metrics,
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+    )
+
     if not all_metrics:
         print("⚠️  Training skipped - No valid models")
         spark.stop()
@@ -463,4 +471,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(EXPORT_PLOTS=False)

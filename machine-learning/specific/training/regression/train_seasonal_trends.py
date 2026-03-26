@@ -25,6 +25,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_training_metrics_plot
 
 
 from pyspark.sql import SparkSession
@@ -586,7 +587,7 @@ def save_model(model, model_name, MODEL_OUTPUT_DIR):
     print(f"✓ Model saved: {model_path}")
 
 
-def main(BUCKET_NAME):
+def main(BUCKET_NAME, EXPORT_PLOTS=False):
     """Main training pipeline"""
     INPUT_MONTHLY_AGG_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_monthly_aggregations.parquet"
     MODEL_OUTPUT_DIR = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/seasonal_trends"
@@ -696,6 +697,13 @@ def main(BUCKET_NAME):
     for m in models_results:
         print(f"{m['model']:<25} {m['rmse']:<15.4f} {m['mae']:<15.4f} {m['r2']:<10.4f} {m['mape']:<10.2f}%")
 
+    export_training_metrics_plot(
+        model_name=MODEL_NAME,
+        metrics=models_results,
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+    )
+
     best = max(models_results, key=lambda x: x['r2'])
     print("\n" + "="*60)
     print(f"Best Model: {best['model']} (R² = {best['r2']:.4f})")
@@ -713,4 +721,4 @@ def main(BUCKET_NAME):
 
 if __name__ == "__main__":
     BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME)
+    main(BUCKET_NAME, EXPORT_PLOTS=False)

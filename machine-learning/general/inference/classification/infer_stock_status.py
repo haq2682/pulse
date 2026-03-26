@@ -33,6 +33,7 @@ if str(_ML_ROOT) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_inference_outputs_plot
 
 def create_spark_session():
     """Initialize Spark session"""
@@ -236,7 +237,7 @@ def save_predictions(df, output_path):
         return False
 
 
-def main(BUCKET_NAME):
+def main(BUCKET_NAME, EXPORT_PLOTS=False):
     GENERAL_BUCKET_NAME = "pulse-bucket-1"
     INPUT_PATH_INVENTORY_HEALTH = f"s3a://{BUCKET_NAME}/transformed/agg_product_inventory_health.parquet"
     INPUT_PATH_INVENTORY = f"s3a://{BUCKET_NAME}/transformed/agg_inventory.parquet"
@@ -287,6 +288,16 @@ def main(BUCKET_NAME):
     
     # Generate predictions
     predictions_df = generate_predictions(spark, df_prepared, model, preprocessors, SELECTED_MODEL, MODEL_VERSION)
+
+    export_inference_outputs_plot(
+        model_name=f"stock_status_{SELECTED_MODEL}",
+        predictions_df=predictions_df,
+        label_column="predicted_status",
+        numeric_columns=["days_until_stockout", "confidence_score"],
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+        run_name=SELECTED_MODEL,
+    )
     
     # Show sample
     print("\nSample predictions:")
@@ -308,4 +319,4 @@ def main(BUCKET_NAME):
 
 if __name__ == "__main__":
     BUCKET_NAME='pulse-bucket-1'
-    main(BUCKET_NAME)
+    main(BUCKET_NAME, EXPORT_PLOTS=False)

@@ -38,6 +38,7 @@ if str(_ML_ROOT) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_inference_outputs_plot
 
 def create_spark_session():
     return create_ml_spark_session(
@@ -202,7 +203,7 @@ def generate_predictions(spark, df, model, MODEL_VERSION):
     return output_df
 
 
-def main(BUCKET_NAME):
+def main(BUCKET_NAME, EXPORT_PLOTS=False):
     GENERAL_BUCKET_NAME = "pulse-bucket-1"
     INPUT_PATH_CART = f"s3a://{BUCKET_NAME}/transformed/agg_cart_abandonment_analysis.parquet"
     INPUT_PATH_SESSIONS = f"s3a://{BUCKET_NAME}/transformed/agg_customer_sessions.parquet"
@@ -255,6 +256,15 @@ def main(BUCKET_NAME):
     print("\nSample predictions:")
     predictions_df.select("cart_id", "predicted_status", "abandonment_probability", "abandonment_risk_score").show(5, truncate=False)
     
+    export_inference_outputs_plot(
+        model_name=f"cart_abandonment_{SELECTED_MODEL}",
+        predictions_df=predictions_df,
+        label_column="predicted_status",
+        numeric_columns=["abandonment_probability", "abandonment_risk_score", "confidence_score"],
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+        run_name=SELECTED_MODEL,
+    )
     predictions_df.write.mode("overwrite").parquet(OUTPUT_PATH)
     print(f"✓ Saved to {OUTPUT_PATH}")
     
@@ -263,4 +273,4 @@ def main(BUCKET_NAME):
 
 if __name__ == "__main__":
     BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME)
+    main(BUCKET_NAME, EXPORT_PLOTS=False)

@@ -42,6 +42,7 @@ if str(_ML_ROOT) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_inference_outputs_plot
 
 def create_spark_session():
     """Initialize Spark session with MinIO configuration"""
@@ -193,7 +194,7 @@ def display_sample_predictions(df, n=5):
         )
 
 
-def main(BUCKET_NAME):
+def main(BUCKET_NAME, EXPORT_PLOTS=False):
     GENERAL_BUCKET_NAME = "pulse-bucket-1"
     INPUT_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_customers.parquet"
     OUTPUT_PATH = f"s3a://{BUCKET_NAME}/machine-learning/regression/predictions/clv_predictions/"
@@ -259,6 +260,16 @@ def main(BUCKET_NAME):
     
     # Step 6: Display samples
     display_sample_predictions(predictions_df)
+
+    export_inference_outputs_plot(
+        model_name=f"clv_{MODEL_NAME}",
+        predictions_df=predictions_df,
+        label_column="customer_id",
+        numeric_columns=["predicted_clv", "confidence_interval_lower", "confidence_interval_upper", "confidence_score"],
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+        run_name=MODEL_NAME,
+    )
     
     # Step 7: Save predictions
     print("\nStep 6: Save Predictions")
@@ -277,4 +288,4 @@ def main(BUCKET_NAME):
 
 if __name__ == "__main__":
     BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME)
+    main(BUCKET_NAME, EXPORT_PLOTS=False)

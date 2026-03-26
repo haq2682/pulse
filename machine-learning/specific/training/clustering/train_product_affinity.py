@@ -14,6 +14,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_training_metrics_plot
 from specific.model_registry import save_best_model_manifest
 
 
@@ -392,7 +393,7 @@ def save_models(
     print(f"Saved best-model manifest: {manifest_path}")
 
 
-def main(BUCKET):
+def main(BUCKET, EXPORT_PLOTS=False):
     INPUT_PATH = f"s3a://{BUCKET}/transformed/"
     MODEL_OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/models/"
     LOCAL_METRICS_PATH = "/tmp/clustering_metrics/"
@@ -449,6 +450,13 @@ def main(BUCKET):
 
     all_metrics = kmeans_metrics + gmm_metrics + bkm_metrics
 
+    export_training_metrics_plot(
+        model_name="product_affinity",
+        metrics=all_metrics,
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+    )
+
     if not all_metrics:
         print("ERROR: No valid models")
         spark.stop()
@@ -472,4 +480,4 @@ def main(BUCKET):
 
 if __name__ == "__main__":
     BUCKET = "pulse-bucket-1"
-    main(BUCKET)
+    main(BUCKET, EXPORT_PLOTS=False)

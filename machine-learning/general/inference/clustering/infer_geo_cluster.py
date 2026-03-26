@@ -47,6 +47,7 @@ if str(_ML_ROOT) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_inference_outputs_plot
 
 def create_spark_session():
     """Initialize Spark session"""
@@ -356,7 +357,7 @@ def save_predictions(predictions, output_path):
     print(f"Saved {predictions.count()} predictions")
 
 
-def main(BUCKET):
+def main(BUCKET, EXPORT_PLOTS=False):
     GENERAL_BUCKET_NAME = "pulse-bucket-1"
     INPUT_PATH = f"s3a://{BUCKET}/transformed/"
     MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/"
@@ -389,6 +390,16 @@ def main(BUCKET):
     # Generate predictions
     predictions = generate_predictions(spark, df, model, scaler, pca, k, SELECTED_MODEL_TYPE)
 
+    export_inference_outputs_plot(
+        model_name=f"geo_cluster_{SELECTED_MODEL_TYPE}",
+        predictions_df=predictions,
+        label_column="market_segment",
+        numeric_columns=["cluster_centroid_distance", "expansion_opportunity_score"],
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+        run_name=f"{SELECTED_MODEL_TYPE}_k{k}",
+    )
+
     # Save
     save_predictions(predictions, f"{OUTPUT_PATH}geographic_clustering.parquet")
 
@@ -398,4 +409,4 @@ def main(BUCKET):
 
 if __name__ == "__main__":
     BUCKET= 'pulse-bucket-1'
-    main(BUCKET)
+    main(BUCKET, EXPORT_PLOTS=False)

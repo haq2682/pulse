@@ -23,6 +23,7 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
+from general.utils.plot_exporter import export_training_metrics_plot
 from specific.model_registry import save_best_model_manifest
 
 
@@ -439,7 +440,7 @@ def save_model(model, model_name, MODEL_OUTPUT_DIR):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def main(BUCKET_NAME):
+def main(BUCKET_NAME, EXPORT_PLOTS=False):
     INPUT_MONTHLY_AGG_PATH = f"s3a://{BUCKET_NAME}/transformed/agg_monthly_aggregations.parquet"
     MODEL_OUTPUT_DIR       = f"s3a://{BUCKET_NAME}/machine-learning/regression/models/revenue_forecast"
 
@@ -557,6 +558,13 @@ def main(BUCKET_NAME):
     for m in models_results:
         print(f"{m['model']:<25} {m['rmse']:<15.2f} {m['mae']:<15.2f} {m['r2']:<10.4f} {m['mape']:<10.2f}%")
 
+    export_training_metrics_plot(
+        model_name=MODEL_NAME,
+        metrics=models_results,
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+    )
+
     # Exclude naive baseline from auto-selection (it has no saveable model)
     trained_results = [m for m in models_results if m["model"] != "naive_baseline"]
     best = max(trained_results, key=lambda x: x["r2"])
@@ -601,4 +609,4 @@ def main(BUCKET_NAME):
 
 if __name__ == "__main__":
     BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME)
+    main(BUCKET_NAME, EXPORT_PLOTS=False)

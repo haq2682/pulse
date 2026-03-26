@@ -25,6 +25,7 @@ from utils.multi_bucket_loader import (
     get_training_window,
     GENERAL_MODEL_BUCKET
 )
+from utils.plot_exporter import export_training_metrics_plot
 
 # Configuration - General models output to pulse-bucket-1
 MODEL_NAME = "cart_abandonment"
@@ -669,7 +670,7 @@ def save_models(model, preprocessors, output_dir, model_name):
         print(f"⚠️  Failed to save {model_name}: {e}")
 
 
-def main():
+def main(EXPORT_PLOTS=False):
     print("=" * 80)
     print("Cart Abandonment Risk - IMPROVED Training Pipeline")
     print("=" * 80)
@@ -842,6 +843,13 @@ def main():
     for m in sorted(all_metrics, key=lambda x: x["auc_roc"], reverse=True):
         status = "🎯 EXCELLENT" if m["auc_roc"] >= 0.85 else "✓ Good" if m["auc_roc"] >= 0.70 else "⚠️  Needs Work"
         print(f"{m['model_name']:25s} | AUC: {m['auc_roc']:.4f} | F1: {m['f1_score']:.4f} | {status}")
+
+    export_training_metrics_plot(
+        model_name=MODEL_NAME,
+        metrics=all_metrics,
+        export_plots=EXPORT_PLOTS,
+        script_name=Path(__file__).stem,
+    )
     
     print("\n✓ Training completed")
     print(f"Models saved to: {MODEL_OUTPUT_DIR}")
@@ -850,4 +858,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(EXPORT_PLOTS=False)
