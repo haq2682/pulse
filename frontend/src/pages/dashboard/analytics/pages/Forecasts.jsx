@@ -179,7 +179,8 @@ export default function Forecasts() {
 
     const buildUrl = useCallback(() => {
         const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        return `${base}/analytics/forecasts/${businessId}?row_limit=500`;
+        const rowLimit = Number(import.meta.env.VITE_FORECASTS_ROW_LIMIT || 500);
+        return `${base}/analytics/forecasts/${businessId}?row_limit=${Number.isFinite(rowLimit) && rowLimit > 0 ? rowLimit : 500}`;
     }, [businessId]);
 
     const fetchData = useCallback(async () => {
@@ -402,11 +403,31 @@ export default function Forecasts() {
     const criticalStockout = stockoutRows ? [...stockoutRows].filter((r) => ['Critical', 'High'].includes(r.stockout_risk_level)).sort((a, b) => (+(b.stockout_probability ?? 0)) - (+(a.stockout_probability ?? 0))).slice(0, 20) : [];
 
     // ── Demand Forecast ───────────────────────────────────────────────────────
-    const topDemand = demandRows ? [...demandRows].sort((a, b) => (+(b.predicted_demand_units ?? 0)) - (+(a.predicted_demand_units ?? 0))).slice(0, 12) : [];
+    const demandProbability = (row) => {
+        const pHigh = Number(row?.high_demand_probability);
+        if (Number.isFinite(pHigh)) return Math.max(0, Math.min(1, pHigh));
+
+        const confidence = Number(row?.confidence_score);
+        if (Number.isFinite(confidence)) return Math.max(0, Math.min(1, confidence));
+
+        return 0;
+    };
+
+    const demandClassDist = demandRows ? distDoughnutData(countBy(demandRows, 'predicted_demand_class')) : null;
+    const topDemand = demandRows ? [...demandRows].sort((a, b) => demandProbability(b) - demandProbability(a)).slice(0, 12) : [];
     const demandBarData = topDemand.length > 0 ? {
         labels: topDemand.map((r) => String(r.product_id ?? '').slice(0, 12)),
-        datasets: [{ label: 'Predicted Units', data: topDemand.map((r) => +(r.predicted_demand_units ?? 0)), backgroundColor: PALETTE[4] }],
+        datasets: [{ label: 'P(High Demand)', data: topDemand.map((r) => demandProbability(r)), backgroundColor: PALETTE[4] }],
     } : null;
+    const demandSummary = getSummaryStats('demand_forecast') ?? {};
+    const demandUniqueProducts = demandSummary.unique_products ?? (demandRows?.length ?? 0);
+    const demandMinHorizon = +(demandSummary.min_forecast_horizon_days ?? 0);
+    const demandMaxHorizon = +(demandSummary.max_forecast_horizon_days ?? 0);
+    const demandHorizonText = demandMinHorizon > 0
+        ? (demandMaxHorizon > 0 && demandMaxHorizon !== demandMinHorizon
+            ? `${demandMinHorizon}-${demandMaxHorizon} days`
+            : `${demandMinHorizon} days`)
+        : '—';
 
     // ── Price Optimization ────────────────────────────────────────────────────
     const topPriceGap = priceRows ? [...priceRows].sort((a, b) => Math.abs(+(b.optimal_price ?? 0) - +(b.current_price ?? 0)) - Math.abs(+(a.optimal_price ?? 0) - +(a.current_price ?? 0))).slice(0, 10) : [];
@@ -786,13 +807,41 @@ export default function Forecasts() {
                 {/* Demand Forecast + Price Optimization */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-4">
-                        <InferenceHeader label="Product Demand Forecast" modelType={demandRows ? 'directory' : null} description="Predicted demand units with seasonality and trend factors." count={getRowCount('demand_forecast') ?? demandRows?.length} />
-                        {demandBarData ? (
-                            <ChartWrapper title="Top 12 Products — Predicted Demand">
-                                <div style={{ height: 280 }}>
-                                    <Bar data={demandBarData} options={barOpts()} />
-                                </div>
-                            </ChartWrapper>
+                        <InferenceHeader label="Product Demand Forecast" modelType={demandRows ? 'directory' : null} description={`Binary demand classification (high vs not_high) with confidence scores. Forecast horizon: ${demandHorizonText}. Products: ${fmt.number(demandUniqueProducts)}.`} count={getRowCount('demand_forecast') ?? demandRows?.length} />
+                        {demandRows ? (
+                            <div className="grid grid-cols-1 gap-6">
+                                {demandMinHorizon > 0 && demandMinHorizon < 30 ? (
+                                    <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                        Warning: minimum demand forecast horizon is {demandMinHorizon} days; expected deployment target is at least 30 days.
+                                    </div>
+                                ) : null}
+                                {demandClassDist ? (
+                                    <ChartWrapper title="Demand Class Distribution">
+                                        <div style={{ height: 240 }}>
+                                            <Doughnut data={demandClassDist} options={doughnutOpts()} />
+                                        </div>
+                                    </ChartWrapper>
+                                ) : null}
+                                {demandBarData ? (
+                                    <ChartWrapper title="Top 12 Products — High Demand Probability">
+                                        <div style={{ height: 260 }}>
+                                            <Bar data={demandBarData} options={barOpts()} />
+                                        </div>
+                                    </ChartWrapper>
+                                ) : null}
+                                <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                                    <div className="p-6">
+                                        <h3 className="text-base font-semibold text-gray-900 mb-3 pb-2 border-b border-gray-200">Demand Forecast Samples</h3>
+                                        <DataTable value={[...demandRows].sort((a, b) => demandProbability(b) - demandProbability(a)).slice(0, 20)} rows={10} className="p-datatable-sm" stripedRows>
+                                            <Column field="product_id" header="Product ID" />
+                                            <Column field="predicted_demand_class" header="Class" />
+                                            <Column field="high_demand_probability" header="P(High)" body={(r) => fmt.probToPct(demandProbability(r))} sortable />
+                                            <Column field="forecast_horizon_days" header="Horizon (days)" sortable />
+                                            <Column field="forecast_date" header="Forecast Date" body={(r) => String(r.forecast_date ?? '').slice(0, 10)} />
+                                        </DataTable>
+                                    </div>
+                                </Card>
+                            </div>
                         ) : <NoInferenceNotice label="Demand Forecast" />}
                     </div>
                     <div className="space-y-4">

@@ -4,6 +4,13 @@ Generates geographic market segments and performance analysis
 """
 
 import os
+import sys
+import matplotlib
+from pathlib import Path
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.spatial import ConvexHull
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
@@ -39,8 +46,141 @@ NUMERIC_FEATURES = [
 ]
 
 
-import sys
-from pathlib import Path
+# ---------------------------------------------------------------------------
+# Plot configuration — same conventions as training and churn scripts
+# ---------------------------------------------------------------------------
+PLOT_EXPORT_DIR    = "/app/logs_for_report"
+MIN_PLOT_RECORDS   = 20
+MAX_PLOT_RECORDS   = 50000
+MAX_SCATTER_POINTS = 50000
+
+CLUSTER_COLORS = [
+    "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+    "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
+]
+
+
+def _ensure_plot_dir(path):
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _sanitize_name(value):
+    return "".join(c if c.isalnum() or c in {"-", "_"} else "_" for c in value.lower())
+
+
+def _sample_indices(length, max_points):
+    if length <= max_points:
+        return list(range(length))
+    return np.linspace(0, length - 1, num=max_points, dtype=int).tolist()
+
+
+def export_cluster_scatter_plot(
+    predictions_df,
+    model_type,
+    k,
+    export_plots,
+    export_dir=PLOT_EXPORT_DIR,
+    script_stem=None,
+):
+    """
+    Export a PCA-space scatter plot with convex-hull cluster boundaries
+    for inference predictions.
+
+    Parameters
+    ----------
+    predictions_df : Spark DataFrame
+        Must contain "features" (PCA vector — first 2 components used)
+        and "prediction" (integer cluster label).
+        Call this BEFORE the final output-column select() in
+        generate_predictions so "features" is still present.
+    model_type : str  e.g. "kmeans", "gmm", "bisecting_kmeans"
+    k          : int  number of clusters used
+    export_plots : bool  — no-op when False
+    export_dir : str
+    script_stem : str  base name for the output file
+    """
+    if not export_plots:
+        return None
+
+    rows = (
+        predictions_df
+        .select("prediction", "features")
+        .limit(MAX_PLOT_RECORDS)
+        .collect()
+    )
+
+    if len(rows) < MIN_PLOT_RECORDS:
+        print(f"⚠️  Cluster plot skipped ({model_type} k={k}): "
+              f"only {len(rows)} rows (< {MIN_PLOT_RECORDS})")
+        return None
+
+    idx         = _sample_indices(len(rows), MAX_SCATTER_POINTS)
+    cluster_ids = [rows[i]["prediction"] for i in idx]
+    x_vals      = [float(rows[i]["features"][0]) for i in idx]   # PC1
+    y_vals      = [float(rows[i]["features"][1]) for i in idx]   # PC2
+
+    unique_clusters = sorted(set(cluster_ids))
+    color_map = {
+        cid: CLUSTER_COLORS[j % len(CLUSTER_COLORS)]
+        for j, cid in enumerate(unique_clusters)
+    }
+
+    fig, ax = plt.subplots(figsize=(12, 8))
+
+    for cid in unique_clusters:
+        color = color_map[cid]
+        mask  = [i for i, c in enumerate(cluster_ids) if c == cid]
+        cx    = [x_vals[i] for i in mask]
+        cy    = [y_vals[i] for i in mask]
+        pts   = np.column_stack([cx, cy])
+
+        # Convex hull boundary — filled + solid border
+        if len(pts) >= 3:
+            try:
+                hull       = ConvexHull(pts)
+                hull_verts = np.append(
+                    pts[hull.vertices], [pts[hull.vertices[0]]], axis=0
+                )
+                ax.fill(
+                    hull_verts[:, 0], hull_verts[:, 1],
+                    alpha=0.15, color=color, zorder=1,
+                )
+                ax.plot(
+                    hull_verts[:, 0], hull_verts[:, 1],
+                    color=color, linewidth=1.8, alpha=0.85, zorder=2,
+                )
+            except Exception:
+                pass
+
+        ax.scatter(
+            cx, cy,
+            s=40, alpha=0.75, color=color,
+            edgecolor="white", linewidth=0.3,
+            label=f"Cluster {cid} (n={len(cx)})",
+            zorder=3,
+        )
+
+    ax.set_title(
+        f"Geographic Clustering Forecast — {model_type.upper()} k={k}\n"
+        f"(PCA projection: PC1 vs PC2)"
+    )
+    ax.set_xlabel("Principal Component 1")
+    ax.set_ylabel("Principal Component 2")
+    ax.legend(loc="best", title="Cluster", framealpha=0.8)
+    fig.tight_layout()
+
+    stem = script_stem or _sanitize_name(Path(__file__).stem)
+    out  = os.path.join(
+        _ensure_plot_dir(export_dir),
+        f"{stem}-{_sanitize_name(model_type)}-k{k}-cluster-scatter.png",
+    )
+    fig.savefig(out, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    print(f"✓ Exported cluster scatter plot: {out}")
+    return out
+
+
 
 _ML_ROOT = next(p for p in Path(__file__).resolve().parents if p.name == "machine-learning")
 if str(_ML_ROOT) not in sys.path:
@@ -267,7 +407,7 @@ def calculate_expansion_scores(df):
     return df
 
 
-def generate_predictions(spark, df, model, scaler, pca, k, SELECTED_MODEL_TYPE):
+def generate_predictions(spark, df, model, scaler, pca, k, SELECTED_MODEL_TYPE, export_plots=False):
     """Apply model and generate predictions"""
     print("Generating predictions...")
 
@@ -333,6 +473,18 @@ def generate_predictions(spark, df, model, scaler, pca, k, SELECTED_MODEL_TYPE):
         "segment_characteristics", char_expr.otherwise(lit("{}"))
     )
 
+    # Export cluster scatter plot while "features" (PCA vector) and
+    # "prediction" are still both present on the DataFrame — before the
+    # final select() drops them.
+    export_cluster_scatter_plot(
+        predictions,
+        model_type=SELECTED_MODEL_TYPE,
+        k=k,
+        export_plots=export_plots,
+        export_dir=PLOT_EXPORT_DIR,
+        script_stem=_sanitize_name(Path(__file__).stem),
+    )
+
     # Select output columns
     output_cols = [
         "clustering_id",
@@ -361,7 +513,7 @@ def save_predictions(predictions, output_path):
 def main(BUCKET, EXPORT_PLOTS=False):
     GENERAL_BUCKET_NAME = "pulse-bucket-1"
     INPUT_PATH = f"s3a://{BUCKET}/transformed/"
-    MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/"
+    MODEL_PATH = f"s3a://{GENERAL_BUCKET_NAME}/machine-learning/clustering/models/geo_cluster/"
     OUTPUT_PATH = f"s3a://{BUCKET}/machine-learning/clustering/predictions/"
 
     MODEL_CANDIDATES = ["geographic_kmeans", "geographic_gmm", "geographic_bisecting_kmeans"]
@@ -397,7 +549,7 @@ def main(BUCKET, EXPORT_PLOTS=False):
         return
 
     # Generate predictions
-    predictions = generate_predictions(spark, df, model, scaler, pca, k, SELECTED_MODEL_TYPE)
+    predictions = generate_predictions(spark, df, model, scaler, pca, k, SELECTED_MODEL_TYPE, export_plots=EXPORT_PLOTS)
 
     export_inference_outputs_plot(
         model_name=f"geo_cluster_{SELECTED_MODEL_TYPE}",
@@ -418,4 +570,4 @@ def main(BUCKET, EXPORT_PLOTS=False):
 
 if __name__ == "__main__":
     BUCKET= 'pulse-bucket-1'
-    main(BUCKET, EXPORT_PLOTS=False)
+    main(BUCKET, EXPORT_PLOTS=True)

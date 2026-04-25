@@ -115,19 +115,49 @@ def _sample_indices(length: int, max_points: int):
     return np.linspace(0, length - 1, num=max_points, dtype=int).tolist()
 
 
+def _linear_trend_values(x_values, y_values, anchor_x=None, anchor_y=None):
+    if not x_values or not y_values:
+        return []
+    if len(x_values) == 1:
+        return [float(y_values[0]) for _ in x_values]
+
+    slope, intercept = np.polyfit(np.array(x_values, dtype=float), np.array(y_values, dtype=float), 1)
+    if anchor_x is not None and anchor_y is not None:
+        intercept = float(anchor_y) - (slope * float(anchor_x))
+    return [(slope * float(x)) + intercept for x in x_values]
+
+
 def export_inference_forecast_plot(monthly_df, predictions_df, model_name: str, export_plots: bool, export_dir: str = PLOT_EXPORT_DIR):
-    """Export forecast plot: historical monthly revenue dots + next forecast point and connecting line."""
+    """Export forecast plot: historical seasonal index dots + next forecast point and lines."""
     if not export_plots:
         return None
 
+    monthly_with_partition = monthly_df.withColumn("partition_key", F.lit(1)).orderBy("year_month")
+    window_spec = Window.partitionBy("partition_key").orderBy("year_month")
+    window_rolling_12m = Window.partitionBy("partition_key").orderBy("year_month").rowsBetween(-12, -1)
+
     history_rows = (
-        monthly_df
-        .select("year_month", "total_revenue")
+        monthly_with_partition
+        .withColumn("revenue_rolling_12m", F.avg("total_revenue").over(window_rolling_12m))
+        .withColumn("revenue_lag_12m", F.lag("total_revenue", 12).over(window_spec))
+        .withColumn(
+            "seasonal_index",
+            F.when(
+                (F.col("revenue_rolling_12m").isNotNull()) & (F.col("revenue_rolling_12m") > 0),
+                F.col("total_revenue") / F.col("revenue_rolling_12m")
+            ).otherwise(None)
+        )
+        .filter(
+            (F.col("revenue_rolling_12m").isNotNull()) &
+            (F.col("revenue_lag_12m").isNotNull()) &
+            (F.col("seasonal_index").isNotNull())
+        )
+        .select("year_month", "seasonal_index")
         .orderBy("year_month")
         .collect()
     )
 
-    pred_row = predictions_df.select("forecast_date", "estimated_revenue").limit(1).collect()
+    pred_row = predictions_df.select("forecast_date", "predicted_seasonal_index").limit(1).collect()
 
     if not history_rows or not pred_row:
         print("⚠️  Inference plot export skipped: insufficient data")
@@ -135,29 +165,36 @@ def export_inference_forecast_plot(monthly_df, predictions_df, model_name: str, 
 
     x_hist = list(range(1, len(history_rows) + 1))
     labels_hist = [str(r["year_month"]) for r in history_rows]
-    y_hist = [float(r["total_revenue"] or 0.0) for r in history_rows]
+    y_hist = [float(r["seasonal_index"] or 0.0) for r in history_rows]
     scatter_idx = _sample_indices(len(x_hist), MAX_SCATTER_POINTS)
     scatter_x = [x_hist[i] for i in scatter_idx]
     scatter_y = [y_hist[i] for i in scatter_idx]
 
     forecast_label = str(pred_row[0]["forecast_date"])
-    forecast_value = float(pred_row[0]["estimated_revenue"])
+    forecast_value = float(pred_row[0]["predicted_seasonal_index"])
     x_forecast = len(x_hist) + 1
+    tick_positions = x_hist + [x_forecast]
+    linear_fit_y = _linear_trend_values(
+        tick_positions,
+        y_hist + [forecast_value],
+        anchor_x=x_forecast,
+        anchor_y=forecast_value,
+    )
 
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.scatter(scatter_x, scatter_y, s=34, alpha=0.70, edgecolor="black", linewidth=0.4, label="Sample data")
 
     if x_hist:
         ax.plot([x_hist[-1], x_forecast], [y_hist[-1], forecast_value], color="black", linewidth=2.0, label="Prediction line")
+    ax.plot(tick_positions, linear_fit_y, color="red", linewidth=2.0, label="Linear prediction line")
     ax.scatter([x_forecast], [forecast_value], color="red", s=60, zorder=3)
 
     tick_labels = labels_hist + [forecast_label]
-    tick_positions = x_hist + [x_forecast]
     tick_step = max(1, len(tick_positions) // 10)
     ax.set_xticks(tick_positions[::tick_step])
     ax.set_xticklabels(tick_labels[::tick_step], rotation=30, ha="right")
     ax.set_xlabel("Timeline")
-    ax.set_ylabel("Revenue")
+    ax.set_ylabel("Seasonal index")
     ax.set_title(f"Seasonal Trends Forecast - {model_name}")
     ax.legend(loc="best")
     fig.tight_layout()

@@ -58,6 +58,7 @@ analytics_service = AnalyticsService()
 
 # Forecasting service
 forecasting_service = ForecastingService()
+DEFAULT_FORECAST_ROW_LIMIT = int(os.getenv("FORECASTS_ROW_LIMIT", "500"))
 
 @router.get("/get-businesses")
 async def get_businesses(userId: str, db=Depends(get_db)):
@@ -605,7 +606,7 @@ async def list_exports(business_id: str, user_id: str = Query(...), db=Depends(g
 async def get_all_forecasts(
     business_id: str,
     groups: str = Query(None, description="Comma-separated list of inference groups to fetch"),
-    row_limit: int = Query(500, ge=1, le=10000, description="Maximum rows per inference (default 500)"),
+    row_limit: int = Query(DEFAULT_FORECAST_ROW_LIMIT, ge=1, le=10000, description="Maximum rows per inference"),
 ):
     """
     Fetch all available ML inference results for a business.
@@ -643,7 +644,7 @@ async def get_all_forecasts(
 async def get_single_forecast(
     business_id: str,
     inference_name: str,
-    row_limit: int = Query(500, ge=1, le=10000, description="Maximum rows to return (default 500)"),
+    row_limit: int = Query(DEFAULT_FORECAST_ROW_LIMIT, ge=1, le=10000, description="Maximum rows to return"),
 ):
     """
     Fetch a single ML inference result for a business.

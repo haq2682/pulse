@@ -181,7 +181,7 @@ ML_INFERENCE_CATALOG: Dict[str, str] = {
     "stockout_probability":          "machine-learning/regression/predictions/stockout_probability/",
     "campaign_roi":                  "machine-learning/regression/predictions/campaign_roi/",
     "delivery_time":                 "machine-learning/regression/predictions/delivery_time/",
-    "demand_forecast":               "machine-learning/regression/predictions/demand_forecast/",
+    "demand_forecast":               "machine-learning/classification/predictions/demand_forecast/",
     "price_optimization":            "machine-learning/regression/predictions/price_optimization/",
     "revenue_forecast":              "machine-learning/regression/predictions/revenue_forecast/",
     "seasonal_trends":               "machine-learning/regression/predictions/seasonal_trends/",

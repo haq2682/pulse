@@ -123,6 +123,16 @@ def _sample_indices(length: int, max_points: int):
     return np.linspace(0, length - 1, num=max_points, dtype=int).tolist()
 
 
+def _linear_trend_values(x_values, y_values):
+    if not x_values or not y_values:
+        return []
+    if len(x_values) == 1:
+        return [float(y_values[0])]
+
+    slope, intercept = np.polyfit(np.array(x_values, dtype=float), np.array(y_values, dtype=float), 1)
+    return [(slope * float(x)) + intercept for x in x_values]
+
+
 def export_model_training_plot(train_predictions_df, model_name: str, export_plots: bool, export_dir: str = PLOT_EXPORT_DIR):
     """Export per-model training plot: actual dots + model fit line."""
     if not export_plots:
@@ -143,6 +153,7 @@ def export_model_training_plot(train_predictions_df, model_name: str, export_plo
     labels = [str(r["year_month"]) for r in rows]
     actual = [float(r[TARGET_COLUMN]) for r in rows]
     predicted = [float(r["prediction"]) for r in rows]
+    linear_predicted = _linear_trend_values(x_vals, predicted)
     scatter_idx = _sample_indices(len(x_vals), MAX_SCATTER_POINTS)
     scatter_x = [x_vals[i] for i in scatter_idx]
     scatter_actual = [actual[i] for i in scatter_idx]
@@ -150,6 +161,7 @@ def export_model_training_plot(train_predictions_df, model_name: str, export_plo
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.scatter(scatter_x, scatter_actual, s=34, alpha=0.70, edgecolor="black", linewidth=0.4, label="Sample data")
     ax.plot(x_vals, predicted, color="black", linewidth=2.0, label="Prediction line")
+    ax.plot(x_vals, linear_predicted, color="red", linewidth=2.0, label="Linear prediction line")
 
     ax.set_title(f"Seasonal Trends - {model_name}")
     ax.set_xlabel("Training timeline (year_month)")

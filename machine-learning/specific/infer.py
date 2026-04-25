@@ -6,10 +6,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from specific.inference.classification.infer_fulfillment_risk import main as fulfillment_risk
 from specific.inference.classification.infer_product_bundling import main as product_bundling
+from specific.inference.classification.infer_demand_forecast import main as demand_forecast
 
 from specific.inference.regression.infer_campaign_roi import main as campaign_roi
 from specific.inference.regression.infer_delivery_time import main as delivery_time
-from specific.inference.regression.infer_demand_forecast import main as demand_forecast
 from specific.inference.regression.infer_price_optimization import main as price_optimization
 from specific.inference.regression.infer_revenue_forecast import main as revenue_forecast
 from specific.inference.regression.infer_seasonal_trends import main as seasonal_trends

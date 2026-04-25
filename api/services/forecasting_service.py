@@ -191,10 +191,10 @@ class ForecastingService:
         },
         "demand_forecast": {
             "label": "Product Demand Forecast",
-            "path": "machine-learning/regression/predictions/demand_forecast/",
+            "path": "machine-learning/classification/predictions/demand_forecast/",
             "path_type": "directory",
-            "group": "specific_regression",
-            "description": "Forecasts product demand units with seasonality and trend adjustments.",
+            "group": "specific_classification",
+            "description": "Classifies product demand as high vs not_high with confidence scores.",
         },
         "price_optimization": {
             "label": "Price Optimization",
@@ -336,6 +336,24 @@ class ForecastingService:
                         "High", case=False, na=False
                     ) | (df["predicted_risk_label"] == "Critical Risk")
                     stats["high_risk_count"] = int(mask.sum())
+
+            elif inference_name == "demand_forecast":
+                if "product_id" in df.columns:
+                    stats["unique_products"] = int(df["product_id"].nunique())
+
+                if "forecast_horizon_days" in df.columns:
+                    horizon_series = pd.to_numeric(
+                        df["forecast_horizon_days"], errors="coerce"
+                    ).dropna()
+                    if len(horizon_series) > 0:
+                        stats["min_forecast_horizon_days"] = int(horizon_series.min())
+                        stats["max_forecast_horizon_days"] = int(horizon_series.max())
+
+                if "forecast_date" in df.columns:
+                    forecast_dates = pd.to_datetime(df["forecast_date"], errors="coerce").dropna()
+                    if len(forecast_dates) > 0:
+                        stats["forecast_date_min"] = forecast_dates.min().date().isoformat()
+                        stats["forecast_date_max"] = forecast_dates.max().date().isoformat()
 
         except Exception as exc:  # pragma: no cover
             # Non-fatal — summary stats are best-effort
@@ -541,7 +559,7 @@ class ForecastingService:
 
     def clear_cache(self, business_id: Optional[str] = None) -> None:
         if business_id:
-            keys = [k for k in self._cache if k.startswith(f"{business_id}:")]
+            keys = [k for k in self._cache if k.startswith(f"{business_id}|")]
             for k in keys:
                 del self._cache[k]
         else:

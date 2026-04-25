@@ -35,6 +35,11 @@ from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.regression import LinearRegression, RandomForestRegressor, GBTRegressor
 from pyspark.ml.evaluation import RegressionEvaluator
 from datetime import datetime
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 # Load environment variables
 load_dotenv()
@@ -63,6 +68,83 @@ FEATURE_COLUMNS = [
 ]
 
 TARGET_COLUMN = "customer_lifetime_value"
+TARGET_LOG_COLUMN = "log_customer_lifetime_value"
+USE_LOG_TARGET = True
+GBT_MAX_ITER = int(os.getenv("CLV_GBT_MAX_ITER", "120"))
+GBT_MAX_DEPTH = int(os.getenv("CLV_GBT_MAX_DEPTH", "7"))
+GBT_STEP_SIZE = float(os.getenv("CLV_GBT_STEP_SIZE", "0.05"))
+LEAKAGE_CORR_WARN_THRESHOLD = float(os.getenv("CLV_LEAKAGE_CORR_WARN_THRESHOLD", "0.95"))
+PLOT_EXPORT_DIR = "/app/logs_for_report"
+MAX_SCATTER_POINTS = 300
+
+
+def _ensure_plot_dir(path: str) -> str:
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _sanitize_name(value: str) -> str:
+    return "".join(c if c.isalnum() or c in {"-", "_"} else "_" for c in value.lower())
+
+
+def _sample_indices(length: int, max_points: int):
+    if length <= max_points:
+        return list(range(length))
+    return np.linspace(0, length - 1, num=max_points, dtype=int).tolist()
+
+
+def _linear_trend_values(x_values, y_values):
+    if not x_values or not y_values:
+        return []
+    if len(x_values) == 1:
+        return [float(y_values[0])]
+
+    slope, intercept = np.polyfit(np.array(x_values, dtype=float), np.array(y_values, dtype=float), 1)
+    return [(slope * float(x)) + intercept for x in x_values]
+
+
+def export_model_training_plot(train_predictions_df, model_name: str, export_plots: bool, export_dir: str = PLOT_EXPORT_DIR):
+    """Export per-model CLV training plot: sampled actual dots + prediction line + linear prediction line."""
+    if not export_plots:
+        return None
+
+    rows = (
+        train_predictions_df
+        .select(TARGET_COLUMN, "prediction_clv")
+        .orderBy("prediction_clv")
+        .collect()
+    )
+
+    if not rows:
+        print(f"⚠️  Plot export skipped for {model_name}: no training rows")
+        return None
+
+    x_vals = list(range(1, len(rows) + 1))
+    actual = [float(r[TARGET_COLUMN]) for r in rows]
+    predicted = [float(r["prediction_clv"]) for r in rows]
+    linear_predicted = _linear_trend_values(x_vals, predicted)
+    scatter_idx = _sample_indices(len(x_vals), MAX_SCATTER_POINTS)
+    scatter_x = [x_vals[i] for i in scatter_idx]
+    scatter_actual = [actual[i] for i in scatter_idx]
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.scatter(scatter_x, scatter_actual, s=34, alpha=0.70, edgecolor="black", linewidth=0.4, label="Sample data")
+    ax.plot(x_vals, predicted, color="black", linewidth=2.0, label="Prediction line")
+    ax.plot(x_vals, linear_predicted, color="red", linewidth=2.0, label="Linear prediction line")
+
+    ax.set_title(f"CLV - {model_name}")
+    ax.set_xlabel("Training records (sorted by actual CLV)")
+    ax.set_ylabel("Predicted CLV")
+    ax.legend(loc="best")
+    fig.tight_layout()
+
+    plot_dir = _ensure_plot_dir(export_dir)
+    file_name = f"{_sanitize_name(Path(__file__).stem)}-{_sanitize_name(model_name)}-training-fit.png"
+    output_path = os.path.join(plot_dir, file_name)
+    fig.savefig(output_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    print(f"✓ Exported training plot: {output_path}")
+    return output_path
 
 
 def create_spark_session():
@@ -111,6 +193,47 @@ def validate_columns(df, required_columns):
     return True
 
 
+def check_monetary_score_leakage(df):
+    """Run lightweight leakage diagnostics for monetary_score against target."""
+    if "monetary_score" not in df.columns or TARGET_COLUMN not in df.columns:
+        print("ℹ️  Leakage check skipped: required columns unavailable")
+        return
+
+    corr_df = (
+        df.select(
+            F.col("monetary_score").cast("double").alias("monetary_score"),
+            F.col(TARGET_COLUMN).cast("double").alias(TARGET_COLUMN),
+        )
+        .filter(F.col("monetary_score").isNotNull() & F.col(TARGET_COLUMN).isNotNull())
+    )
+
+    pair_count = corr_df.count()
+    if pair_count < 2:
+        print("ℹ️  Leakage check skipped: insufficient rows for correlation")
+        return
+
+    corr_val = corr_df.stat.corr("monetary_score", TARGET_COLUMN)
+    if corr_val is None:
+        print("ℹ️  Leakage check skipped: correlation unavailable")
+        return
+
+    print(f"Monetary score correlation with CLV: {corr_val:.4f}")
+    if abs(corr_val) >= LEAKAGE_CORR_WARN_THRESHOLD:
+        print(
+            "⚠️  Potential leakage risk detected: monetary_score is highly correlated with CLV. "
+            "Verify this feature is computed only from information available at prediction time."
+        )
+
+
+def _with_output_scale_prediction(predictions_df):
+    if USE_LOG_TARGET:
+        return predictions_df.withColumn(
+            "prediction_clv",
+            F.greatest(F.lit(0.0), F.exp(F.col("prediction")) - F.lit(1.0)),
+        )
+    return predictions_df.withColumn("prediction_clv", F.col("prediction"))
+
+
 def prepare_training_data(df):
     """
     Prepare data for training:
@@ -141,7 +264,12 @@ def prepare_training_data(df):
         handleInvalid="keep"
     )
     
-    df_prepared = assembler.transform(df_filled).select("features", TARGET_COLUMN)
+    df_with_target = df_filled.withColumn(
+        TARGET_LOG_COLUMN,
+        F.log1p(F.col(TARGET_COLUMN)) if USE_LOG_TARGET else F.col(TARGET_COLUMN),
+    )
+
+    df_prepared = assembler.transform(df_with_target).select("features", TARGET_COLUMN, TARGET_LOG_COLUMN)
     
     print(f"✓ Data prepared: {df_prepared.count()} records ready for training")
     return df_prepared
@@ -155,7 +283,7 @@ def train_linear_regression(train_df, test_df):
     
     lr = LinearRegression(
         featuresCol="features",
-        labelCol=TARGET_COLUMN,
+        labelCol=TARGET_LOG_COLUMN,
         maxIter=100,
         regParam=0.01,
         elasticNetParam=0.5
@@ -175,7 +303,7 @@ def train_random_forest(train_df, test_df):
     
     rf = RandomForestRegressor(
         featuresCol="features",
-        labelCol=TARGET_COLUMN,
+        labelCol=TARGET_LOG_COLUMN,
         numTrees=100,
         maxDepth=10,
         seed=42
@@ -195,9 +323,10 @@ def train_gbt(train_df, test_df):
     
     gbt = GBTRegressor(
         featuresCol="features",
-        labelCol=TARGET_COLUMN,
-        maxIter=50,
-        maxDepth=5,
+        labelCol=TARGET_LOG_COLUMN,
+        maxIter=GBT_MAX_ITER,
+        maxDepth=GBT_MAX_DEPTH,
+        stepSize=GBT_STEP_SIZE,
         seed=42
     )
     
@@ -210,35 +339,40 @@ def train_gbt(train_df, test_df):
 def evaluate_model(predictions, model_name):
     """Evaluate regression model using multiple metrics"""
     print(f"\nEvaluating {model_name}...")
+
+    predictions_eval = _with_output_scale_prediction(predictions)
     
     # RMSE
     rmse_evaluator = RegressionEvaluator(
         labelCol=TARGET_COLUMN,
-        predictionCol="prediction",
+        predictionCol="prediction_clv",
         metricName="rmse"
     )
-    rmse = rmse_evaluator.evaluate(predictions)
+    rmse = rmse_evaluator.evaluate(predictions_eval)
     
     # MAE
     mae_evaluator = RegressionEvaluator(
         labelCol=TARGET_COLUMN,
-        predictionCol="prediction",
+        predictionCol="prediction_clv",
         metricName="mae"
     )
-    mae = mae_evaluator.evaluate(predictions)
+    mae = mae_evaluator.evaluate(predictions_eval)
     
     # R2
     r2_evaluator = RegressionEvaluator(
         labelCol=TARGET_COLUMN,
-        predictionCol="prediction",
+        predictionCol="prediction_clv",
         metricName="r2"
     )
-    r2 = r2_evaluator.evaluate(predictions)
+    r2 = r2_evaluator.evaluate(predictions_eval)
     
     # MAPE (custom calculation)
-    mape_df = predictions.withColumn(
+    mape_df = predictions_eval.withColumn(
         "ape",
-        F.abs((F.col(TARGET_COLUMN) - F.col("prediction")) / F.col(TARGET_COLUMN)) * 100
+        F.when(
+            F.col(TARGET_COLUMN) > 0,
+            F.abs((F.col(TARGET_COLUMN) - F.col("prediction_clv")) / F.col(TARGET_COLUMN)) * 100,
+        ).otherwise(None)
     )
     mape = mape_df.agg(F.avg("ape")).collect()[0][0]
     
@@ -275,6 +409,8 @@ def main(EXPORT_PLOTS=False):
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Training window: {MIN_RECORDS} - {MAX_RECORDS} records")
     print(f"Model output: {MODEL_OUTPUT_DIR}")
+    print(f"Target transform: {'log1p(CLV)' if USE_LOG_TARGET else 'none'}")
+    print(f"GBT config: maxIter={GBT_MAX_ITER}, maxDepth={GBT_MAX_DEPTH}, stepSize={GBT_STEP_SIZE}")
     print("="*60 + "\n")
     
     # Initialize Spark
@@ -317,6 +453,11 @@ def main(EXPORT_PLOTS=False):
         print("⚠️  Training skipped due to required columns missing or invalid")
         spark.stop()
         return
+
+    # Step 3.1: Leakage diagnostics
+    print("\nStep 3.1: Leakage Diagnostics")
+    print("-" * 60)
+    check_monetary_score_leakage(df)
     
     # Step 4: Prepare training data
     print("\nStep 4: Data Preparation")
@@ -348,18 +489,21 @@ def main(EXPORT_PLOTS=False):
     lr_model, lr_predictions, lr_name = train_linear_regression(train_df, test_df)
     lr_metrics = evaluate_model(lr_predictions, lr_name)
     save_model(lr_model, lr_name)
+    export_model_training_plot(_with_output_scale_prediction(lr_model.transform(train_df)), lr_name, EXPORT_PLOTS)
     models_results.append(lr_metrics)
     
     # Train Random Forest
     rf_model, rf_predictions, rf_name = train_random_forest(train_df, test_df)
     rf_metrics = evaluate_model(rf_predictions, rf_name)
     save_model(rf_model, rf_name)
+    export_model_training_plot(_with_output_scale_prediction(rf_model.transform(train_df)), rf_name, EXPORT_PLOTS)
     models_results.append(rf_metrics)
     
     # Train GBT
     gbt_model, gbt_predictions, gbt_name = train_gbt(train_df, test_df)
     gbt_metrics = evaluate_model(gbt_predictions, gbt_name)
     save_model(gbt_model, gbt_name)
+    export_model_training_plot(_with_output_scale_prediction(gbt_model.transform(train_df)), gbt_name, EXPORT_PLOTS)
     models_results.append(gbt_metrics)
     
     # Step 6: Model Comparison
@@ -408,4 +552,4 @@ def main(EXPORT_PLOTS=False):
 
 
 if __name__ == "__main__":
-    main(EXPORT_PLOTS=False)
+    main(EXPORT_PLOTS=True)

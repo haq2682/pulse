@@ -14,6 +14,11 @@ from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.regression import LinearRegressionModel, RandomForestRegressionModel, GBTRegressionModel
 from datetime import datetime
 import uuid
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 # Load environment variables
 load_dotenv()
@@ -32,6 +37,9 @@ FEATURE_COLUMNS = [
     "frequency_score",
     "monetary_score"
 ]
+USE_LOG_TARGET = True
+PLOT_EXPORT_DIR = "/app/logs_for_report"
+MAX_SCATTER_POINTS = 300
 
 
 import sys
@@ -44,6 +52,74 @@ if str(_ML_ROOT) not in sys.path:
 from spark_utils import create_ml_spark_session
 from general.utils.plot_exporter import export_inference_outputs_plot
 from general.model_registry import resolve_best_model
+
+
+def _ensure_plot_dir(path: str) -> str:
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _sanitize_name(value: str) -> str:
+    return "".join(c if c.isalnum() or c in {"-", "_"} else "_" for c in value.lower())
+
+
+def _sample_indices(length: int, max_points: int):
+    if length <= max_points:
+        return list(range(length))
+    return np.linspace(0, length - 1, num=max_points, dtype=int).tolist()
+
+
+def _linear_trend_values(x_values, y_values):
+    if not x_values or not y_values:
+        return []
+    if len(x_values) == 1:
+        return [float(y_values[0])]
+
+    slope, intercept = np.polyfit(np.array(x_values, dtype=float), np.array(y_values, dtype=float), 1)
+    return [(slope * float(x)) + intercept for x in x_values]
+
+
+def export_inference_prediction_plot(predictions_df, model_name: str, export_plots: bool, export_dir: str = PLOT_EXPORT_DIR):
+    """Export CLV inference plot: sampled predicted dots + prediction line + linear prediction line."""
+    if not export_plots:
+        return None
+
+    rows = (
+        predictions_df
+        .select("predicted_clv")
+        .orderBy("predicted_clv")
+        .collect()
+    )
+
+    if not rows:
+        print("⚠️  Inference plot export skipped: no prediction rows")
+        return None
+
+    x_vals = list(range(1, len(rows) + 1))
+    predicted = [float(r["predicted_clv"] or 0.0) for r in rows]
+    linear_predicted = _linear_trend_values(x_vals, predicted)
+    scatter_idx = _sample_indices(len(x_vals), MAX_SCATTER_POINTS)
+    scatter_x = [x_vals[i] for i in scatter_idx]
+    scatter_y = [predicted[i] for i in scatter_idx]
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.scatter(scatter_x, scatter_y, s=34, alpha=0.70, edgecolor="black", linewidth=0.4, label="Sample data")
+    ax.plot(x_vals, predicted, color="black", linewidth=2.0, label="Prediction line")
+    ax.plot(x_vals, linear_predicted, color="red", linewidth=2.0, label="Linear prediction line")
+
+    ax.set_title(f"CLV Forecast - {model_name}")
+    ax.set_xlabel("Inference records (sorted by predicted CLV)")
+    ax.set_ylabel("Predicted CLV")
+    ax.legend(loc="best")
+    fig.tight_layout()
+
+    plot_dir = _ensure_plot_dir(export_dir)
+    file_name = f"{_sanitize_name(Path(__file__).stem)}-{_sanitize_name(model_name)}-forecast-fit.png"
+    output_path = os.path.join(plot_dir, file_name)
+    fig.savefig(output_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    print(f"✓ Exported inference plot: {output_path}")
+    return output_path
 
 def create_spark_session():
     """Initialize Spark session with MinIO configuration"""
@@ -144,17 +220,23 @@ def generate_predictions(model, df, model_name, PREDICTION_HORIZON_DAYS):
     
     # Get current timestamp
     current_timestamp = F.lit(datetime.now())
+
+    predicted_clv_expr = (
+        F.greatest(F.lit(0.0), F.exp(F.col("prediction")) - F.lit(1.0))
+        if USE_LOG_TARGET
+        else F.col("prediction")
+    )
     
     # Format output according to ml_clv_predictions schema
     output_df = predictions_df.select(
         prediction_id_udf().alias("prediction_id"),
         F.col("customer_id"),
         current_timestamp.alias("prediction_date"),
-        F.col("prediction").alias("predicted_clv"),
+        predicted_clv_expr.alias("predicted_clv"),
         F.lit(PREDICTION_HORIZON_DAYS).alias("prediction_horizon_days"),
         # Calculate confidence intervals (±20% of prediction as example)
-        (F.col("prediction") * 0.8).alias("confidence_interval_lower"),
-        (F.col("prediction") * 1.2).alias("confidence_interval_upper"),
+        (predicted_clv_expr * 0.8).alias("confidence_interval_lower"),
+        (predicted_clv_expr * 1.2).alias("confidence_interval_upper"),
         F.lit(0.85).alias("confidence_score"),  # Placeholder confidence score
         F.lit(model_name).alias("model_version")
     )
@@ -277,6 +359,7 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
         script_name=Path(__file__).stem,
         run_name=MODEL_NAME,
     )
+    export_inference_prediction_plot(predictions_df, MODEL_NAME, EXPORT_PLOTS)
     
     # Step 7: Save predictions
     print("\nStep 6: Save Predictions")
@@ -295,4 +378,4 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
 
 if __name__ == "__main__":
     BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME, EXPORT_PLOTS=False)
+    main(BUCKET_NAME, EXPORT_PLOTS=True)

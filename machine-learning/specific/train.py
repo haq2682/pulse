@@ -7,10 +7,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from specific.training.classification.train_fulfillment_risk import main as fulfillment_risk
 from specific.training.classification.train_product_bundling import main as product_bundling
+from specific.training.classification.train_demand_forecast import main as demand_forecast
 
 from specific.training.regression.train_campaign_roi import main as campaign_roi
 from specific.training.regression.train_delivery_time import main as delivery_time
-from specific.training.regression.train_demand_forecast import main as demand_forecast
 from specific.training.regression.train_price_optimization import main as price_optimization
 from specific.training.regression.train_revenue_forecast import main as revenue_forecast
 from specific.training.regression.train_seasonal_trends import main as seasonal_trends
