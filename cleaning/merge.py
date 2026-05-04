@@ -38,14 +38,31 @@ def merge_tables(dataframes, spark):
         dataframes["categories"].createOrReplaceTempView("categories")
         dataframes["products"].createOrReplaceTempView("products")
 
-        products = spark.sql("""
-        SELECT p.product_id, p.product_name, p.sku, cat.category, cat.sub_category,
-              p.brand, p.supplier_id, p.cost_price, p.sell_price, p.launch_date,
-              p.weight, p.dimensions, p.color, p.size, p.material
+        # Build dynamic column list for products based on available columns
+        products_columns = dataframes["products"].columns
+        
+        # Define all possible product columns to select (in order)
+        all_product_cols = [
+            "product_id", "product_name", "sku", "brand", 
+            "supplier_id", "cost_price", "sell_price", "launch_date",
+            "weight", "dimensions", "color", "size", "material"
+        ]
+        
+        # Filter to only include columns that exist
+        available_cols = [col for col in all_product_cols if col in products_columns]
+        
+        # Build SELECT clause for products columns
+        p_select = ", ".join([f"p.{col}" for col in available_cols])
+        
+        # Build the SQL query with dynamic columns
+        products_query = f"""
+        SELECT {p_select}, cat.category, cat.sub_category
         FROM products p
         LEFT JOIN categories cat
               ON p.category_id = cat.category_id
-        """)
+        """
+        
+        products = spark.sql(products_query)
         dataframes["products"] = products
         print("Merged categories into products.")
         dataframes.pop("categories", None)

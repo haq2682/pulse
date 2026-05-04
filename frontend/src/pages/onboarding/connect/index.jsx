@@ -27,7 +27,8 @@ const Connect = () => {
     const pathname = location.pathname;
     const [databaseUri, setDatabaseUri] = useState('');
     const [apiEndpoint, setApiEndpoint] = useState('');
-    const [businessId, setBusinessId] = useState('');
+    // const [businessId, setBusinessId] = useState('');
+    const businessIdRef = useRef('');
     const { user } = useAuth();
     const [uploadedFiles, setUploadedFiles] = useState([]);
     const [uploadProgress, setUploadProgress] = useState({});
@@ -207,7 +208,7 @@ const Connect = () => {
                     // ✅ Send metadata as HTTP headers
                     'X-File-Id': fileId,
                     'X-User-Id': user.user_id,
-                    'X-Business-Id': businessId
+                    'X-Business-Id': businessIdRef.current
                 },
                 baseURL: '',
                 withCredentials: false,
@@ -468,7 +469,8 @@ const Connect = () => {
             const response = await axiosInstance.get('/onboarding/get-data-type', { params: { userId: user.user_id } });
             if (response.status === 200) {
                 setIngestionType(response.data.dataType);
-                setBusinessId(response.data.businessId || '');
+                // setBusinessId(response.data.businessId || '');
+                businessIdRef.current = response.data.businessId || '';
             }
         }
         catch (e) {
