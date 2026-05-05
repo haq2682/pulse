@@ -31,7 +31,6 @@ from utils.multi_bucket_loader import (
     get_general_model_output_path,
     get_training_window,
 )
-from utils.plot_exporter import export_training_metrics_plot
 from general.model_registry import save_best_model_manifest
 
 # ---------------------------------------------------------------------------
@@ -554,13 +553,6 @@ def main(EXPORT_PLOTS=False):
     )
     print(f"✓ Best model manifest: {manifest_path}")
 
-    export_training_metrics_plot(
-        model_name=MODEL_NAME,
-        metrics=all_metrics,
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-    )
-
     print("\n" + "=" * 60)
     print("✓ Training completed successfully")
     print("=" * 60)
@@ -568,4 +560,4 @@ def main(EXPORT_PLOTS=False):
 
 
 if __name__ == "__main__":
-    main(EXPORT_PLOTS=True)
+    main(EXPORT_PLOTS=False)

@@ -71,7 +71,6 @@ if str(_ML_ROOT) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_inference_outputs_plot
 from general.model_registry import resolve_best_model
 
 def create_spark_session():
@@ -268,17 +267,26 @@ def create_inference_features(products_df, inventory_df, suppliers_df, demand_st
     revenue_quartiles = product_features.approxQuantile("total_revenue", [0.25, 0.5, 0.75], 0.01)
     stockout_quartiles = product_features.approxQuantile("stockout_frequency", [0.25, 0.5, 0.75], 0.01)
     
+    # Safely access quartiles with defaults for small datasets
+    revenue_q3 = revenue_quartiles[2] if len(revenue_quartiles) > 2 else float('inf')
+    revenue_q2 = revenue_quartiles[1] if len(revenue_quartiles) > 1 else 0
+    revenue_q1 = revenue_quartiles[0] if len(revenue_quartiles) > 0 else -float('inf')
+    
+    stockout_q3 = stockout_quartiles[2] if len(stockout_quartiles) > 2 else float('inf')
+    stockout_q2 = stockout_quartiles[1] if len(stockout_quartiles) > 1 else 0
+    stockout_q1 = stockout_quartiles[0] if len(stockout_quartiles) > 0 else -float('inf')
+    
     product_features = product_features.withColumn(
         "revenue_score",
-        F.when(F.col("total_revenue") >= revenue_quartiles[2], F.lit(100))
-        .when(F.col("total_revenue") >= revenue_quartiles[1], F.lit(75))
-        .when(F.col("total_revenue") >= revenue_quartiles[0], F.lit(50))
+        F.when(F.col("total_revenue") >= revenue_q3, F.lit(100))
+        .when(F.col("total_revenue") >= revenue_q2, F.lit(75))
+        .when(F.col("total_revenue") >= revenue_q1, F.lit(50))
         .otherwise(F.lit(25))
     ).withColumn(
         "stockout_score",
-        F.when(F.col("stockout_frequency") >= stockout_quartiles[2], F.lit(100))
-        .when(F.col("stockout_frequency") >= stockout_quartiles[1], F.lit(75))
-        .when(F.col("stockout_frequency") >= stockout_quartiles[0], F.lit(50))
+        F.when(F.col("stockout_frequency") >= stockout_q3, F.lit(100))
+        .when(F.col("stockout_frequency") >= stockout_q2, F.lit(75))
+        .when(F.col("stockout_frequency") >= stockout_q1, F.lit(50))
         .otherwise(F.lit(25))
     ).withColumn(
         "product_criticality_score", (F.col("revenue_score") * 0.5 + F.col("stockout_score") * 0.5)
@@ -655,6 +663,13 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     print("-" * 100)
     df_features = create_inference_features(products_df, inventory_df, suppliers_df, demand_stats, SERVICE_LEVELS)
     
+    feature_count = df_features.count()
+    if feature_count == 0:
+        print(f"\n⚠ SKIP: Feature engineering produced 0 products. Inference cannot proceed.")
+        print(f"Possible causes: No delivered orders OR insufficient demand history OR no products in inventory.")
+        spark.stop()
+        return
+    
     # Prepare data
     print("\nStep 5: Data Preparation & Scaling")
     print("-" * 100)
@@ -668,16 +683,6 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     # Display samples
     display_sample_predictions(predictions_df)
 
-    export_inference_outputs_plot(
-        model_name=f"safety_stock_{MODEL_NAME}",
-        predictions_df=predictions_df,
-        label_column="product_id",
-        numeric_columns=["theoretical_safety_stock", "adjustment_factor", "required_safety_stock_units", "minimum_stock_level", "reorder_point", "service_level_target", "expected_stockout_probability", "confidence_score"],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-        run_name=MODEL_NAME,
-    )
-    
     # Display summary
     display_summary_statistics(predictions_df)
     

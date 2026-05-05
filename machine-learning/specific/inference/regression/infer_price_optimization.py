@@ -15,7 +15,6 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_inference_outputs_plot
 from specific.model_registry import resolve_best_model
 
 
@@ -601,6 +600,12 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     print("-" * 80)
     df_features = create_inference_features(products_df, pricing_data, category_stats, brand_stats)
     
+    feature_count = df_features.count()
+    if feature_count == 0:
+        print(f"\n⚠ SKIP: Feature engineering produced 0 records. Inference cannot proceed.")
+        spark.stop()
+        return
+    
     # Prepare data
     print("\nStep 6: Data Preparation & Encoding")
     print("-" * 80)
@@ -617,22 +622,6 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     # Display summary
     display_summary_statistics(predictions_df)
 
-    export_inference_outputs_plot(
-        model_name="price_optimization",
-        predictions_df=predictions_df,
-        label_column="model_version",
-        numeric_columns=[
-            "optimal_price",
-            "expected_revenue_at_optimal",
-            "expected_units_at_optimal",
-            "price_elasticity",
-            "confidence_score",
-        ],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-        run_name=selected_model,
-    )
-    
     # Save predictions
     print("\nStep 8: Save Predictions")
     print("-" * 80)

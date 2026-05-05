@@ -45,7 +45,6 @@ if str(_ML_ROOT) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_inference_outputs_plot
 from general.model_registry import resolve_best_model
 
 def create_spark_session():
@@ -454,16 +453,6 @@ def main(BUCKET, EXPORT_PLOTS=False):
         return
 
     predictions = generate_predictions(spark, df, model, scaler, pca, cluster_profiles, selected_model)
-
-    export_inference_outputs_plot(
-        model_name=f"supplier_performance_{selected_model}",
-        predictions_df=predictions,
-        label_column="business_persona",
-        numeric_columns=["confidence_score"],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-        run_name=selected_model,
-    )
 
     save_predictions_with_summary(predictions, f"{OUTPUT_PATH}supplier_clustering.parquet")
 

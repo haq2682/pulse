@@ -20,7 +20,6 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_training_metrics_plot
 from specific.model_registry import save_best_model_manifest
 
 
@@ -734,13 +733,6 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     
     model, predictions, model_name = train_random_forest(train_df, test_df, USE_CROSS_VALIDATION)
     metrics = evaluate_model(predictions, model_name)
-
-    export_training_metrics_plot(
-        model_name="price_optimization",
-        metrics=[metrics],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-    )
 
     save_model(model, model_name, MODEL_OUTPUT_PATH)
     manifest_path = save_best_model_manifest(

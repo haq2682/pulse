@@ -27,7 +27,6 @@ from utils.multi_bucket_loader import (
     get_training_window,
     GENERAL_MODEL_BUCKET
 )
-from utils.plot_exporter import export_training_metrics_plot
 from general.model_registry import save_best_model_manifest
 
 # Configuration - General models output to pulse-bucket-1
@@ -533,13 +532,6 @@ def main(EXPORT_PLOTS=False):
     )
     print(f"✓ Saved best model manifest to: {manifest_path}")
 
-    export_training_metrics_plot(
-        model_name=MODEL_NAME,
-        metrics=all_metrics,
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-    )
-    
     print("\n✓ Training completed")
     print(f"Models saved to: {MODEL_OUTPUT_DIR}")
     

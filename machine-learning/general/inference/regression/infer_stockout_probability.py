@@ -45,7 +45,6 @@ if str(_ML_ROOT) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_inference_outputs_plot
 from general.model_registry import resolve_best_model
 
 def create_spark_session():
@@ -684,6 +683,13 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     print("-" * 80)
     df_features = create_inference_features(products_df, inventory_df, suppliers_df, demand_stats)
     
+    feature_count = df_features.count()
+    if feature_count == 0:
+        print(f"\n⚠ SKIP: Feature engineering produced 0 products. Inference cannot proceed.")
+        print(f"Possible causes: No delivered orders OR insufficient demand history OR no products in inventory.")
+        spark.stop()
+        return
+    
     # Prepare data
     print("\nStep 5: Data Preparation & Encoding")
     print("-" * 80)
@@ -705,16 +711,6 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     # Display samples
     display_sample_predictions(predictions_df)
 
-    export_inference_outputs_plot(
-        model_name=f"stockout_probability_{model_version}",
-        predictions_df=predictions_df,
-        label_column="product_id",
-        numeric_columns=["stockout_probability", "days_until_stockout", "current_days_of_supply", "recommended_reorder_quantity", "urgency_score", "confidence_score"],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-        run_name=model_version,
-    )
-    
     # Display summary
     display_summary_statistics(predictions_df)
     

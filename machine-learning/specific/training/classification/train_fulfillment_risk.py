@@ -9,7 +9,6 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_training_metrics_plot
 
 
 from pyspark.sql import SparkSession
@@ -944,13 +943,6 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     print("=" * 70)
     for m in sorted(all_metrics, key=lambda x: x["f1_score"], reverse=True):
         print(f"{m['model_name']:25s} | F1: {m['f1_score']:.4f} | Acc: {m['accuracy']:.4f}")
-
-    export_training_metrics_plot(
-        model_name="fulfillment_risk",
-        metrics=all_metrics,
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-    )
 
     if failed_models:
         print("\n⚠️  Models that failed during this run:")

@@ -43,7 +43,6 @@ if str(_ML_ROOT) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_inference_outputs_plot
 from general.model_registry import resolve_best_model
 
 def create_spark_session():
@@ -207,7 +206,7 @@ def create_inference_features(products_df, inventory_df, suppliers_df, demand_st
         "left"
     )
     
-    # Join with demand metrics
+    # Join with demand metrics (INNER to ensure complete feature sets)
     product_features = product_inventory.join(
         demand_stats_df,
         "product_id",
@@ -265,10 +264,18 @@ def create_inference_features(products_df, inventory_df, suppliers_df, demand_st
         "inventory_turnover_ratio": 0,
         "stockout_frequency": 0,
         "total_revenue": 0,
-        "stock_status": "Unknown"
+        "stock_status": "Unknown",
+        "avg_daily_demand": 0,
+        "demand_std_dev": 0.1,
+        "demand_volatility": 0,
+        "max_daily_demand": 0,
+        "demand_trend": 0,
+        "days_with_demand": 0
     })
     
-    print(f"✓ Inference features created: {product_features.count()} products")
+    feature_count = product_features.count()
+    print(f"✓ Inference features created: {feature_count} products")
+    
     return product_features
 
 
@@ -290,6 +297,10 @@ def prepare_inference_data(df):
     df_indexed = stock_status_indexer.fit(df_indexed).transform(df_indexed)
     
     existing_features = [f for f in NUMERIC_FEATURES if f in df_indexed.columns]
+    
+    if not existing_features:
+        print("⚠ WARNING: No numeric features found for assembly.")
+        return df_indexed
     
     assembler = VectorAssembler(
         inputCols=existing_features,
@@ -517,6 +528,13 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     print("-" * 80)
     df_features = create_inference_features(products_df, inventory_df, suppliers_df, demand_stats, Z_SCORE_SAFETY_STOCK)
     
+    feature_count = df_features.count()
+    if feature_count == 0:
+        print(f"\n⚠ SKIP: Feature engineering produced 0 products. Inference cannot proceed.")
+        print(f"Possible causes: No delivered orders OR insufficient demand history OR no products in inventory.")
+        spark.stop()
+        return
+    
     # Prepare data
     print("\nStep 5: Data Preparation & Encoding")
     print("-" * 80)
@@ -530,16 +548,6 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     # Display samples
     display_sample_predictions(predictions_df)
 
-    export_inference_outputs_plot(
-        model_name=f"restock_quantity_{MODEL_NAME}",
-        predictions_df=predictions_df,
-        label_column="product_id",
-        numeric_columns=["recommended_restock_quantity", "expected_demand_next_30_days", "optimal_order_point", "safety_stock_level", "estimated_cost", "confidence_score"],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-        run_name=MODEL_NAME,
-    )
-    
     # Display summary
     display_summary_statistics(predictions_df)
     

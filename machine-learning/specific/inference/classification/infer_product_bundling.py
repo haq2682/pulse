@@ -9,7 +9,6 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_inference_outputs_plot
 from specific.model_registry import resolve_best_model
 
 
@@ -416,6 +415,12 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     # Engineer features
     df = engineer_features(df)
     
+    feature_count = df.count()
+    if feature_count == 0:
+        print(f"\n⚠ SKIP: Feature engineering produced 0 records. Inference cannot proceed.")
+        spark.stop()
+        return
+    
     # Validate dataset
     required_cols = ["product_a_id", "product_b_id"] + NUMERICAL_FEATURES + CATEGORICAL_FEATURES
     is_valid, message = validate_dataset(df, required_cols)
@@ -431,16 +436,6 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     # Generate predictions
     predictions_df = generate_predictions(spark, df_prepared, model, preprocessors, SELECTED_MODEL, MODEL_VERSION)
 
-    export_inference_outputs_plot(
-        model_name=f"product_bundling_{SELECTED_MODEL}",
-        predictions_df=predictions_df,
-        label_column="bundle_category",
-        numeric_columns=["affinity_score", "lift", "confidence_score"],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-        run_name=SELECTED_MODEL,
-    )
-    
     # Show sample predictions
     print("\nSample predictions:")
     predictions_df.select(

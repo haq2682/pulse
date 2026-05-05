@@ -14,7 +14,6 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_training_metrics_plot
 from specific.model_registry import save_best_model_manifest
 
 
@@ -449,13 +448,6 @@ def main(BUCKET, EXPORT_PLOTS=False):
     bkm_models, bkm_metrics = train_bisecting_kmeans(df, "features", k_values)
 
     all_metrics = kmeans_metrics + gmm_metrics + bkm_metrics
-
-    export_training_metrics_plot(
-        model_name="product_affinity",
-        metrics=all_metrics,
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-    )
 
     if not all_metrics:
         print("ERROR: No valid models")

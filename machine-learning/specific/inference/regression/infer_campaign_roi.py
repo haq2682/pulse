@@ -23,7 +23,6 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_inference_outputs_plot
 from specific.model_registry import resolve_best_model
 
 
@@ -521,8 +520,12 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     # ── Step 4: Feature engineering ──────────────────────────────────────
     print("\nStep 4: Feature Engineering")
     print("-" * 80)
-    df_features = create_inference_features(campaigns_df, historical_stats)
-
+    df_features = create_inference_features(campaigns_df, historical_stats)    
+    feature_count = df_features.count()
+    if feature_count == 0:
+        print(f"\n⚠ SKIP: Feature engineering produced 0 records. Inference cannot proceed.")
+        spark.stop()
+        return
     # ── Step 5: Prepare data with SAVED indexers ─────────────────────────
     print("\nStep 5: Data Preparation (saved indexers, no scaling)")
     print("-" * 80)
@@ -537,24 +540,6 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
 
     display_sample_predictions(predictions_df)
     display_summary_statistics(predictions_df)
-
-    export_inference_outputs_plot(
-        model_name="campaign_roi",
-        predictions_df=predictions_df,
-        label_column="model_version",
-        numeric_columns=[
-            "predicted_roi",
-            "predicted_revenue",
-            "predicted_conversions",
-            "predicted_ctr",
-            "confidence_interval_lower",
-            "confidence_interval_upper",
-            "confidence_score",
-        ],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-        run_name=selected_model,
-    )
 
     # ── Step 7: Save predictions ─────────────────────────────────────────
     print("\nStep 7: Save Predictions")

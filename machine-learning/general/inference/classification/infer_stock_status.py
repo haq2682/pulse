@@ -33,7 +33,6 @@ if str(_ML_ROOT) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_inference_outputs_plot
 from general.model_registry import resolve_best_model
 
 def create_spark_session():
@@ -296,16 +295,6 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     # Generate predictions
     predictions_df = generate_predictions(spark, df_prepared, model, preprocessors, SELECTED_MODEL, MODEL_VERSION)
 
-    export_inference_outputs_plot(
-        model_name=f"stock_status_{SELECTED_MODEL}",
-        predictions_df=predictions_df,
-        label_column="predicted_status",
-        numeric_columns=["days_until_stockout", "confidence_score"],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-        run_name=SELECTED_MODEL,
-    )
-    
     # Show sample
     print("\nSample predictions:")
     predictions_df.select(

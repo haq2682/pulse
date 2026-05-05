@@ -35,7 +35,6 @@ if str(_ML_ROOT) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_inference_outputs_plot
 from general.model_registry import resolve_best_model
 
 def create_spark_session():
@@ -380,16 +379,6 @@ def main(BUCKET, EXPORT_PLOTS=False):
 
     # Generate final predictions with customer-level labels
     predictions = generate_predictions(spark, df, model, scaler, model_type, k)
-
-    export_inference_outputs_plot(
-        model_name=f"customer_segment_{model_type}",
-        predictions_df=predictions,
-        label_column="customer_label",
-        numeric_columns=["cluster_centroid_distance", "recency_score", "frequency_score", "monetary_score"],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-        run_name=f"{model_type}_k{k}",
-    )
 
     # Save predictions
     output_path = f"{OUTPUT_PATH}customer_segmentation.parquet"

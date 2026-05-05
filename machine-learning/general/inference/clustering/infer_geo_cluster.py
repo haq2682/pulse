@@ -187,7 +187,6 @@ if str(_ML_ROOT) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_inference_outputs_plot
 from general.model_registry import resolve_best_model
 
 def create_spark_session():
@@ -551,16 +550,6 @@ def main(BUCKET, EXPORT_PLOTS=False):
     # Generate predictions
     predictions = generate_predictions(spark, df, model, scaler, pca, k, SELECTED_MODEL_TYPE, export_plots=EXPORT_PLOTS)
 
-    export_inference_outputs_plot(
-        model_name=f"geo_cluster_{SELECTED_MODEL_TYPE}",
-        predictions_df=predictions,
-        label_column="market_segment",
-        numeric_columns=["cluster_centroid_distance", "expansion_opportunity_score"],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-        run_name=f"{SELECTED_MODEL_TYPE}_k{k}",
-    )
-
     # Save
     save_predictions(predictions, f"{OUTPUT_PATH}geographic_clustering.parquet")
 
@@ -570,4 +559,4 @@ def main(BUCKET, EXPORT_PLOTS=False):
 
 if __name__ == "__main__":
     BUCKET= 'pulse-bucket-1'
-    main(BUCKET, EXPORT_PLOTS=True)
+    main(BUCKET, EXPORT_PLOTS=False)

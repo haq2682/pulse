@@ -18,6 +18,58 @@ from pyspark.sql.types import (
 )
 
 
+def _non_null_counts(df, columns):
+    """Return a ``{column: non_null_row_count}`` mapping for the given columns."""
+    if not columns:
+        return {}
+
+    counts_row = df.agg(
+        *[F.count(F.when(F.col(c).isNotNull(), 1)).alias(c) for c in columns]
+    ).collect()[0]
+    return {c: counts_row[c] for c in columns}
+
+
+def _safe_fill_defaults(df, defaults, table_name):
+    """
+    Filter ``defaults`` to only columns that exist and contain at least one non-null value.
+
+    Spark ``fillna`` raises an AnalysisException if the mapping contains a column that is
+    not present in the DataFrame. Columns that are entirely NULL are skipped as well so
+    the pipeline can continue without inventing values for empty fields.
+    """
+    existing_defaults = {c: v for c, v in defaults.items() if c in df.columns}
+    missing_defaults = [c for c in defaults if c not in df.columns]
+
+    if missing_defaults:
+        print(
+            f"⚠️ Skipping missing columns in '{table_name}' null fill: {missing_defaults}"
+        )
+
+    if not existing_defaults:
+        print(f"⚠️ No matching nullable columns found in '{table_name}' for fillna")
+        return {}
+
+    counts = _non_null_counts(df, list(existing_defaults.keys()))
+    usable_defaults = {}
+    all_null_columns = []
+
+    for col_name, default_value in existing_defaults.items():
+        if counts.get(col_name, 0) == 0:
+            all_null_columns.append(col_name)
+            continue
+        usable_defaults[col_name] = default_value
+
+    if all_null_columns:
+        print(
+            f"⚠️ Skipping all-NULL columns in '{table_name}' null fill: {all_null_columns}"
+        )
+
+    if not usable_defaults:
+        print(f"⚠️ No eligible non-null columns found in '{table_name}' for fillna")
+
+    return usable_defaults
+
+
 def check_duplicates(dataframes):
     """
     Check for duplicate rows in all DataFrames.
@@ -181,148 +233,163 @@ def fill_null_values(dataframes):
         dict: Updated dictionary with filled values
     """
     if "customers" in dataframes.keys() and dataframes["customers"] is not None:
-        dataframes["customers"] = dataframes["customers"].fillna(
-            {
-                "gender": "",
-                "account_status": "",
-                "city": "",
-                "state_province": "",
-                "postal_code": "00000",
-                "country": "",
-                "date_of_birth": "1900-01-01",
-                "account_created_at": "1900-01-01",
-                "last_login_date": "1900-01-01",
-                "is_active": "false",
-            }
-        )
+        defaults = {
+            "gender": "",
+            "account_status": "",
+            "city": "",
+            "state_province": "",
+            "postal_code": "00000",
+            "country": "",
+            "date_of_birth": "1900-01-01",
+            "account_created_at": "1900-01-01",
+            "last_login_date": "1900-01-01",
+            "is_active": "false",
+        }
+        safe_defaults = _safe_fill_defaults(dataframes["customers"], defaults, "customers")
+        if safe_defaults:
+            dataframes["customers"] = dataframes["customers"].fillna(safe_defaults)
     else:
         print("⚠️ Customers DataFrame is missing or None.")
 
     if "suppliers" in dataframes.keys() and dataframes["suppliers"] is not None:
-        dataframes["suppliers"] = dataframes["suppliers"].fillna(
-            {
-                "supplier_rating": 0.0,
-                "supplier_status": "",
-                "is_preferred":  "false",
-                "is_verified": "false",
-                "contract_start_date": "1900-01-01",
-                "contract_end_date": "1900-01-01",
-                "city": "",
-                "state":  "",
-                "zip_code": "00000",
-                "country": "",
-            }
-        )
+        defaults = {
+            "supplier_rating": 0.0,
+            "supplier_status": "",
+            "is_preferred":  "false",
+            "is_verified": "false",
+            "contract_start_date": "1900-01-01",
+            "contract_end_date": "1900-01-01",
+            "city": "",
+            "state":  "",
+            "zip_code": "00000",
+            "country": "",
+        }
+        safe_defaults = _safe_fill_defaults(dataframes["suppliers"], defaults, "suppliers")
+        if safe_defaults:
+            dataframes["suppliers"] = dataframes["suppliers"].fillna(safe_defaults)
     else:
         print("⚠️ Suppliers DataFrame is missing or None.")
 
     if "products" in dataframes.keys() and dataframes["products"] is not None:
-        dataframes["products"] = dataframes["products"].fillna(
-            {
-                "product_name": "",
-                "sku": "",
-                "category": "",
-                "sub_category": "",
-                "brand": "",
-                "launch_date": "1900-01-01",
-                "weight": "0.0",
-                "dimensions": "",
-                "color": "",
-                "size": "",
-                "material": "",
-            }
-        )
+        defaults = {
+            "product_name": "",
+            "sku": "",
+            "category": "",
+            "sub_category": "",
+            "brand": "",
+            "launch_date": "1900-01-01",
+            "weight": "0.0",
+            "dimensions": "",
+            "color": "",
+            "size": "",
+            "material": "",
+        }
+        safe_defaults = _safe_fill_defaults(dataframes["products"], defaults, "products")
+        if safe_defaults:
+            dataframes["products"] = dataframes["products"].fillna(safe_defaults)
     else:
         print("⚠️ Products DataFrame is missing or None.")
 
     if "inventory" in dataframes.keys() and dataframes["inventory"] is not None:
-        dataframes["inventory"] = dataframes["inventory"].fillna(
-            {"last_restocked_date": "1900-01-01"}
-        )
+        defaults = {"last_restocked_date": "1900-01-01"}
+        safe_defaults = _safe_fill_defaults(dataframes["inventory"], defaults, "inventory")
+        if safe_defaults:
+            dataframes["inventory"] = dataframes["inventory"].fillna(safe_defaults)
     else:
         print("⚠️ Inventory DataFrame is missing or None.")
 
     if "shopping_cart" in dataframes.keys() and dataframes["shopping_cart"] is not None:
-        dataframes["shopping_cart"] = dataframes["shopping_cart"].fillna(
-            {
-                "cart_status": "",
-                "created_at": "1900-01-01",
-                "updated_at": "1900-01-01",
-            }
-        )
+        defaults = {
+            "cart_status": "",
+            "created_at": "1900-01-01",
+            "updated_at": "1900-01-01",
+        }
+        safe_defaults = _safe_fill_defaults(dataframes["shopping_cart"], defaults, "shopping_cart")
+        if safe_defaults:
+            dataframes["shopping_cart"] = dataframes["shopping_cart"].fillna(safe_defaults)
     else:
         print("⚠️ Shopping_cart DataFrame is missing or None.")
 
     if "cart_items" in dataframes.keys() and dataframes["cart_items"] is not None:
-        dataframes["cart_items"] = dataframes["cart_items"].fillna(
-            {
-                "item_status": "",
-                "added_at": "1900-01-01",
-                "updated_at": "1900-01-01",
-            }
-        )
+        defaults = {
+            "item_status": "",
+            "added_at": "1900-01-01",
+            "updated_at": "1900-01-01",
+        }
+        safe_defaults = _safe_fill_defaults(dataframes["cart_items"], defaults, "cart_items")
+        if safe_defaults:
+            dataframes["cart_items"] = dataframes["cart_items"].fillna(safe_defaults)
     else:
         print("⚠️ Cart_items DataFrame is missing or None.")
 
     if "orders" in dataframes.keys() and dataframes["orders"] is not None:
-        dataframes["orders"] = dataframes["orders"].fillna(
-            {
-                "order_status": "",
-                "currency": "",
-                "order_placed_at": "1900-01-01",
-            }
-        )
+        defaults = {
+            "order_status": "",
+            "currency": "",
+            "order_placed_at": "1900-01-01",
+        }
+        safe_defaults = _safe_fill_defaults(dataframes["orders"], defaults, "orders")
+        if safe_defaults:
+            dataframes["orders"] = dataframes["orders"].fillna(safe_defaults)
     else:
         print("⚠️ Orders DataFrame is missing or None.")
 
     if "payments" in dataframes.keys() and dataframes["payments"] is not None:
-        dataframes["payments"] = dataframes["payments"].fillna(
-            {
-                "payment_method": "",
-                "payment_provider": "",
-                "payment_status": "",
-                "transaction_id": "",
-                "payment_date": "1900-01-01",
-            }
-        )
+        defaults = {
+            "payment_method": "",
+            "payment_provider": "",
+            "payment_status": "",
+            "transaction_id": "",
+            "payment_date": "1900-01-01",
+        }
+        safe_defaults = _safe_fill_defaults(dataframes["payments"], defaults, "payments")
+        if safe_defaults:
+            dataframes["payments"] = dataframes["payments"].fillna(safe_defaults)
     else:
         print("⚠️ Payments DataFrame is missing or None.")
 
     if "reviews" in dataframes.keys() and dataframes["reviews"] is not None:
-        dataframes["reviews"] = dataframes["reviews"].fillna(
-            {
-                "review_title": "",
-                "review_desc": "",
-                "review_date": "1900-01-01",
-            }
-        )
+        defaults = {
+            "review_title": "",
+            "review_desc": "",
+            "review_date": "1900-01-01",
+        }
+        safe_defaults = _safe_fill_defaults(dataframes["reviews"], defaults, "reviews")
+        if safe_defaults:
+            dataframes["reviews"] = dataframes["reviews"].fillna(safe_defaults)
     else:
         print("⚠️ Reviews DataFrame is missing or None.")
 
     if "marketing_campaigns" in dataframes.keys() and dataframes["marketing_campaigns"] is not None:
-        dataframes["marketing_campaigns"] = dataframes["marketing_campaigns"].fillna(
-            {
-                "campaign_name": "",
-                "campaign_type": "",
-                "start_date": "1900-01-01",
-                "target_audience": "",
-                "campaign_status": "",
-            }
+        defaults = {
+            "campaign_name": "",
+            "campaign_type": "",
+            "start_date": "1900-01-01",
+            "target_audience": "",
+            "campaign_status": "",
+        }
+        safe_defaults = _safe_fill_defaults(
+            dataframes["marketing_campaigns"], defaults, "marketing_campaigns"
         )
+        if safe_defaults:
+            dataframes["marketing_campaigns"] = dataframes["marketing_campaigns"].fillna(safe_defaults)
     else:
         print("⚠️ Marketing_campaigns DataFrame is missing or None.")
 
     if "customer_sessions" in dataframes.keys() and dataframes["customer_sessions"] is not None:
-        dataframes["customer_sessions"] = dataframes["customer_sessions"].fillna(
-            {
-                "session_start":  "1900-01-01",
-                "session_end": "1900-01-01",
-                "device_type": "",
-                "referrer_source": "",
-                "conversion_flag": "false",
-                "cart_abandonment_flag": "false",
-            }
+        defaults = {
+            "session_start":  "1900-01-01",
+            "session_end": "1900-01-01",
+            "device_type": "",
+            "referrer_source": "",
+            "conversion_flag": "false",
+            "cart_abandonment_flag": "false",
+        }
+        safe_defaults = _safe_fill_defaults(
+            dataframes["customer_sessions"], defaults, "customer_sessions"
         )
+        if safe_defaults:
+            dataframes["customer_sessions"] = dataframes["customer_sessions"].fillna(safe_defaults)
     else:
         print("⚠️ Customer_sessions DataFrame is missing or None.")
 
@@ -332,7 +399,7 @@ def fill_null_values(dataframes):
 def impute_missing_values(dataframes, table, numeric_cols):
     """
     Impute missing numeric values using median strategy.
-    Handles all-NULL columns by filling with 0 first.
+    Skips columns that are missing or entirely NULL.
 
     Args:
         dataframes (dict): Dictionary of table names to DataFrames
@@ -365,7 +432,6 @@ def impute_missing_values(dataframes, table, numeric_cols):
 
         if non_null_count == 0:
             all_null_cols.append(col_name)
-            print(f"🚫 {col_name}:  ALL NULL - will fill with 0")
         elif non_null_count < total_rows:
             valid_cols.append(col_name)
             null_count = total_rows - non_null_count
@@ -373,15 +439,9 @@ def impute_missing_values(dataframes, table, numeric_cols):
                 f"✅ {col_name}: {non_null_count} non-null, {null_count} null - will impute"
             )
 
-    print(f"\nAll-NULL columns: {all_null_cols}")
-    print(f"Valid columns for imputation: {valid_cols}")
-
-    # Fill all-NULL columns with 0
     if all_null_cols:
-        fill_dict = {col: 0 for col in all_null_cols}
-        df = df.fillna(fill_dict)
-        dataframes[table] = df
-        print(f"✅ Filled all-NULL columns with 0:  {all_null_cols}")
+        print(f"\nAll-NULL columns skipped: {all_null_cols}")
+    print(f"Valid columns for imputation: {valid_cols}")
 
     # Impute valid columns with median
     if valid_cols:
@@ -543,6 +603,17 @@ def clean_text_columns(dataframes):
             if isinstance(field.dataType, StringType)
             and not any(pattern in field.name.lower() for pattern in skip_patterns)
         ]
+
+        if not string_cols:
+            print(f"  ℹ️ No eligible string columns in {table_name}, skipping text cleaning")
+            continue
+
+        counts = _non_null_counts(df, string_cols)
+        string_cols = [col_name for col_name in string_cols if counts.get(col_name, 0) > 0]
+
+        if not string_cols:
+            print(f"  ℹ️ All eligible string columns in {table_name} are NULL, skipping")
+            continue
 
         df = df.cache()  # cache before UDF loop to prevent full re-evaluation per column
         for col_name in string_cols:
@@ -738,6 +809,13 @@ def clean_whitespace_issues(dataframes):
         if not string_cols:
             continue
 
+        counts = _non_null_counts(df, string_cols)
+        string_cols = [col_name for col_name in string_cols if counts.get(col_name, 0) > 0]
+
+        if not string_cols:
+            print(f"ℹ️ All string columns in {table_name} are NULL, skipping whitespace cleanup")
+            continue
+
         for col_name in string_cols: 
             # 1.Trim leading/trailing whitespace
             df = df.withColumn(col_name, trim(col(col_name)))
@@ -791,6 +869,16 @@ def clean_mixed_scripts(dataframes):
             for field in df.schema.fields
             if isinstance(field.dataType, StringType)
         ]
+
+        if not string_cols:
+            continue
+
+        counts = _non_null_counts(df, string_cols)
+        string_cols = [col_name for col_name in string_cols if counts.get(col_name, 0) > 0]
+
+        if not string_cols:
+            print(f"ℹ️ All string columns in {table_name} are NULL, skipping mixed-script cleanup")
+            continue
 
         # Skip ID columns and codes
         text_cols = [
@@ -865,6 +953,15 @@ def validate_all_cleaned_data(dataframes):
             for field in df.schema.fields
             if isinstance(field.dataType, StringType)
         ]
+
+        if not string_cols:
+            continue
+
+        counts = _non_null_counts(df, string_cols)
+        string_cols = [col_name for col_name in string_cols if counts.get(col_name, 0) > 0]
+
+        if not string_cols:
+            continue
 
         for col_name in string_cols: 
             # Check for excessive special characters

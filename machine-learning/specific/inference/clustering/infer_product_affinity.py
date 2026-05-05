@@ -13,7 +13,6 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_inference_outputs_plot
 from specific.model_registry import resolve_best_affinity_model_type
 
 
@@ -345,6 +344,12 @@ def main(BUCKET, EXPORT_PLOTS=False):
 
     # Prepare features
     df = prepare_features(df)
+    
+    feature_count = df.count()
+    if feature_count == 0:
+        print(f"\n⚠ SKIP: Feature engineering produced 0 records. Inference cannot proceed.")
+        spark.stop()
+        return
 
     # Load models
     model, scaler, pca, category_indexer, k = load_models(spark, MODEL_PATH, SELECTED_MODEL_TYPE)
@@ -354,16 +359,6 @@ def main(BUCKET, EXPORT_PLOTS=False):
 
     # Generate predictions
     predictions = generate_predictions(spark, df, model, scaler, pca, category_indexer, k, SELECTED_MODEL_TYPE)
-
-    export_inference_outputs_plot(
-        model_name=f"product_affinity_{SELECTED_MODEL_TYPE}",
-        predictions_df=predictions,
-        label_column="cluster_label",
-        numeric_columns=["cluster_centroid_distance"],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-        run_name=f"{SELECTED_MODEL_TYPE}_k{k}",
-    )
 
     # Save
     save_predictions(predictions, f"{OUTPUT_PATH}product_affinity_clustering.parquet")

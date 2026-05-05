@@ -610,4 +610,4 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
 
 if __name__ == "__main__":
     BUCKET_NAME = "pulse-bucket-1"
-    main(BUCKET_NAME, EXPORT_PLOTS=True)
+    main(BUCKET_NAME, EXPORT_PLOTS=False)

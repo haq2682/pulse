@@ -50,7 +50,6 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_training_metrics_plot
 from specific.model_registry import save_best_model_manifest
 
 from pyspark.sql import functions as F
@@ -1367,13 +1366,6 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     save_class_thresholds(spark, model_output_path, global_high_threshold, high_percentile)
     save_decision_thresholds(spark, model_output_path, decision_thresholds)
 
-    export_training_metrics_plot(
-        model_name="demand_forecast_classification",
-        metrics=metrics_rows,
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-    )
-
     print(f"End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("✓ Training completed\n")
 
@@ -1381,4 +1373,4 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
 
 
 if __name__ == "__main__":
-    main("pulse-bucket-1", EXPORT_PLOTS=True)
+    main("pulse-bucket-1", EXPORT_PLOTS=False)

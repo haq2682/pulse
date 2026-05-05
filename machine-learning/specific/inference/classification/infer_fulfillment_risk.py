@@ -10,7 +10,6 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_inference_outputs_plot
 
 
 from pyspark.sql import SparkSession
@@ -723,6 +722,12 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     df = join_all_tables(orders_df, order_items_df, products_df, inventory_df, suppliers_df, customers_df)
     df = generate_simulated_features(df)   # display columns only, not in ML
     df = engineer_features(df)
+    
+    feature_count = df.count()
+    if feature_count == 0:
+        print(f"\n⚠ SKIP: Feature engineering produced 0 records. Inference cannot proceed.")
+        spark.stop()
+        return
 
     if not validate_feature_columns(df):
         return
@@ -730,16 +735,6 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     df_prepared = prepare_features(df, preprocessors)
 
     predictions_df = generate_predictions(spark, df_prepared, model, selected_model, MODEL_VERSION)
-
-    export_inference_outputs_plot(
-        model_name=f"fulfillment_risk_{selected_model}",
-        predictions_df=predictions_df,
-        label_column="predicted_risk_label",
-        numeric_columns=["delay_probability", "expected_delay_days", "confidence_score"],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-        run_name=selected_model,
-    )
 
     print("\nSample predictions:")
     predictions_df.select(

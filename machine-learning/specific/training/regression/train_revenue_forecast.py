@@ -23,7 +23,6 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_training_metrics_plot
 from specific.model_registry import save_best_model_manifest
 
 
@@ -557,13 +556,6 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
 
     for m in models_results:
         print(f"{m['model']:<25} {m['rmse']:<15.2f} {m['mae']:<15.2f} {m['r2']:<10.4f} {m['mape']:<10.2f}%")
-
-    export_training_metrics_plot(
-        model_name=MODEL_NAME,
-        metrics=models_results,
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-    )
 
     # Exclude naive baseline from auto-selection (it has no saveable model)
     trained_results = [m for m in models_results if m["model"] != "naive_baseline"]

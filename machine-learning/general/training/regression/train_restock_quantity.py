@@ -18,7 +18,6 @@ from utils.multi_bucket_loader import (
     get_training_window,
     GENERAL_MODEL_BUCKET
 )
-from utils.plot_exporter import export_training_metrics_plot
 from general.model_registry import save_best_model_manifest
 
 # Import spark_utils FIRST to set up JARs before pyspark imports
@@ -844,12 +843,6 @@ def main(EXPORT_PLOTS=False):
     )
     print(f"✓ Saved best model manifest to: {manifest_path}")
 
-    export_training_metrics_plot(
-        model_name=MODEL_NAME,
-        metrics=models_results,
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-    )
     print("\n" + "="*60)
     print(f"Best Model: {best['model']} (R² = {best['r2']:.4f})")
     print("="*60)

@@ -22,7 +22,6 @@ from utils.multi_bucket_loader import (
     get_training_window,
     GENERAL_MODEL_BUCKET
 )
-from utils.plot_exporter import export_training_metrics_plot
 
 # Import spark_utils FIRST to set up JARs before pyspark imports
 _ML_ROOT_VAR = next((p for p in Path(__file__).resolve().parents if p.name == "machine-learning"), None)
@@ -943,13 +942,6 @@ def main(EXPORT_PLOTS=False):
         {**metrics_days, "model": f"{metrics_days['model']}_{metrics_days['target']}"},
         {**metrics_prob, "model": f"{metrics_prob['model']}_{metrics_prob['target']}"},
     ]
-    export_training_metrics_plot(
-        model_name=MODEL_NAME,
-        metrics=plot_metrics,
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-    )
-    
     print(f"\n✓ Training completed")
     print(f"End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     

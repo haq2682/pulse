@@ -37,7 +37,6 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_training_metrics_plot
 from specific.model_registry import save_best_model_manifest
 
 
@@ -618,13 +617,6 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
         train_df, test_df, max_cardinality, USE_CROSS_VALIDATION
     )
     metrics = evaluate_model(predictions)
-
-    export_training_metrics_plot(
-        model_name="campaign_roi",
-        metrics=[{**metrics, "model": "campaign_revenue"}],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-    )
 
     # ── Step 6: Save all artifacts ───────────────────────────────────────
     print("\nStep 6: Save Model Artifacts")

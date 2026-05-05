@@ -135,6 +135,22 @@ def remove_all_outliers(dataframes):
         numeric_cols = [col for col in numeric_cols if col not in all_ids]
 
         if numeric_cols:
+            counts_row = dataframes[table].agg(
+                *[F.count(F.col(c)).alias(c) for c in numeric_cols]
+            ).collect()[0]
+            non_empty_numeric_cols = [
+                col_name for col_name in numeric_cols if counts_row[col_name] > 0
+            ]
+            skipped_all_null = [
+                col_name for col_name in numeric_cols if counts_row[col_name] == 0
+            ]
+            if skipped_all_null:
+                print(
+                    f"⚠️ Skipping all-NULL numeric columns in {table}: {skipped_all_null}"
+                )
+            numeric_cols = non_empty_numeric_cols
+
+        if numeric_cols:
             print(f"\nRemoving outliers for table: {table}")
             dataframes = remove_outliers(dataframes, table, numeric_cols)
         else:

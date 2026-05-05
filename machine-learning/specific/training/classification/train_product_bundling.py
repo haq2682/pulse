@@ -8,7 +8,6 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_training_metrics_plot
 from specific.model_registry import save_best_model_manifest
 
 
@@ -508,13 +507,6 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     print("=" * 60)
     for m in sorted(all_metrics, key=lambda x: x["f1_score"], reverse=True):
         print(f"{m['model_name']:25s} | F1: {m['f1_score']:.4f} | AUC: {m['auc']:.4f} | Acc: {m['accuracy']:.4f}")
-
-    export_training_metrics_plot(
-        model_name="product_bundling",
-        metrics=all_metrics,
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-    )
 
     best = max(all_metrics, key=lambda x: x["f1_score"])
     manifest_path = save_best_model_manifest(

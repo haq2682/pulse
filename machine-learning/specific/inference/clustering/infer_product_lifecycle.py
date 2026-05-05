@@ -12,7 +12,6 @@ if _ML_ROOT_VAR and str(_ML_ROOT_VAR) not in sys.path:
     sys.path.insert(0, str(_ML_ROOT_VAR))
 
 from spark_utils import create_ml_spark_session
-from general.utils.plot_exporter import export_inference_outputs_plot
 from specific.model_registry import resolve_best_model
 
 
@@ -222,6 +221,12 @@ def main(BUCKET, EXPORT_PLOTS=False):
         spark.stop()
         return
     
+    feature_count = df.count()
+    if feature_count == 0:
+        print(f"\n⚠ SKIP: Feature engineering produced 0 records. Inference cannot proceed.")
+        spark.stop()
+        return
+    
     pipeline, profiles, stats = load_model_and_profiles(
         MODEL_PATH,
         LOCAL_METRICS_PATH,
@@ -237,16 +242,6 @@ def main(BUCKET, EXPORT_PLOTS=False):
     predictions = compute_confidence(predictions, pipeline)
     predictions = add_recommendations(predictions)
 
-    export_inference_outputs_plot(
-        model_name="product_lifecycle_pipeline",
-        predictions_df=predictions,
-        label_column="lifecycle_stage",
-        numeric_columns=["confidence_score"],
-        export_plots=EXPORT_PLOTS,
-        script_name=Path(__file__).stem,
-        run_name="product_lifecycle_pipeline",
-    )
-    
     output = create_output(predictions)
     save_and_summarize(output, f"{OUTPUT_PATH}product_lifecycle_clustering.parquet")
     
