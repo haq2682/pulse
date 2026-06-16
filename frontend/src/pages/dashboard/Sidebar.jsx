@@ -75,8 +75,6 @@ const Sidebar = ({ isOpen, onClose }) => {
             label: 'Marketing',
             subItems: [
                 { label: 'Campaigns', path: `${basePath}/marketing/campaigns` },
-                { label: 'Attribution', path: `${basePath}/marketing/attribution` },
-                { label: 'Channels', path: `${basePath}/marketing/channels` },
             ]
         },
         {
