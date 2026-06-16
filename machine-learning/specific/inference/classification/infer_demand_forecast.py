@@ -37,6 +37,7 @@ from specific.model_registry import resolve_best_model
 
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
+from pyspark import StorageLevel
 from pyspark.sql.types import StringType, DoubleType
 from pyspark.ml import PipelineModel
 from pyspark.ml.functions import vector_to_array
@@ -353,9 +354,32 @@ def apply_calibrator_to_predictions(predictions_df, calibrator, spark):
 # ---------------------------------------------------------------------------
 
 def create_spark_session():
+    os.environ.setdefault("SPARK_SERVER", os.getenv("ML_SPARK_MASTER", "local[2]"))
     return create_ml_spark_session(
         "Demand_Forecast_Classification_Inference",
-        extra_configs={"spark.sql.shuffle.partitions": "8"},
+        extra_configs={
+            "inferSchema": "true",
+            "mergeSchema": "true",
+            "spark.dynamicAllocation.enabled": "false",
+            "spark.driver.memory": os.getenv("ML_SPARK_DRIVER_MEMORY", "4g"),
+            "spark.driver.maxResultSize": os.getenv("ML_SPARK_DRIVER_MAX_RESULT_SIZE", "1g"),
+            "spark.executor.instances": os.getenv("ML_SPARK_EXECUTOR_INSTANCES", "1"),
+            "spark.executor.cores": os.getenv("ML_SPARK_EXECUTOR_CORES", "1"),
+            "spark.executor.memory": os.getenv("ML_SPARK_EXECUTOR_MEMORY", "1536m"),
+            "spark.executor.memoryOverhead": os.getenv("ML_SPARK_EXECUTOR_MEMORY_OVERHEAD", "768"),
+            "spark.sql.shuffle.partitions": os.getenv("ML_SPARK_SHUFFLE_PARTITIONS", "8"),
+            "spark.default.parallelism": os.getenv("ML_SPARK_DEFAULT_PARALLELISM", "4"),
+            "spark.sql.adaptive.enabled": os.getenv("ML_SPARK_SQL_ADAPTIVE", "true"),
+            "spark.sql.adaptive.coalescePartitions.enabled": os.getenv("ML_SPARK_SQL_COALESCE_PARTITIONS", "true"),
+            "spark.sql.adaptive.skewJoin.enabled": os.getenv("ML_SPARK_SQL_SKEW_JOIN", "true"),
+            "spark.network.timeout": os.getenv("ML_SPARK_NETWORK_TIMEOUT", "600s"),
+            "spark.executor.heartbeatInterval": os.getenv("ML_SPARK_HEARTBEAT_INTERVAL", "60s"),
+            "spark.shuffle.io.maxRetries": os.getenv("ML_SPARK_SHUFFLE_MAX_RETRIES", "10"),
+            "spark.shuffle.io.retryWait": os.getenv("ML_SPARK_SHUFFLE_RETRY_WAIT", "10s"),
+            "spark.task.maxFailures": os.getenv("ML_SPARK_TASK_MAX_FAILURES", "8"),
+            "spark.stage.maxConsecutiveAttempts": os.getenv("ML_SPARK_STAGE_MAX_ATTEMPTS", "8"),
+            "spark.speculation": os.getenv("ML_SPARK_SPECULATION", "false"),
+        },
     )
 
 
@@ -906,8 +930,14 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     validate_engineered_feature_columns(features_df, "Inference feature validation")
     latest_features = build_latest_feature_rows(features_df)
 
+    # Persist the windowed feature set — without this, the heavy
+    # window-function pipeline above is recomputed from source parquet on
+    # every downstream action (scoring, calibration collect, plotting, save).
+    latest_features = latest_features.persist(StorageLevel.MEMORY_AND_DISK)
+
     if latest_features.count() == 0:
         print("✗ Inference skipped: no rows available after feature engineering")
+        latest_features.unpersist()
         spark.stop()
         return
 
@@ -925,6 +955,8 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
 
     # 3. Apply threshold to (possibly calibrated) probabilities
     predictions_df = apply_threshold_and_labels(predictions_df, decision_threshold)
+    predictions_df = predictions_df.persist(StorageLevel.MEMORY_AND_DISK)
+    predictions_df.count()
 
     display_samples(predictions_df)
 
@@ -939,6 +971,9 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
         print("✓ Inference completed successfully")
     else:
         print("✗ Inference failed")
+
+    predictions_df.unpersist()
+    latest_features.unpersist()
 
     print(f"End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     spark.stop()

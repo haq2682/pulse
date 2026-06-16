@@ -37,20 +37,35 @@ def inventory_health_aggregations(dataframes):
         .groupBy("product_id")
         .agg(spark_avg("daily_quantity").alias("avg_daily_sales"))
     )
+    products_cols = dataframes["products"].columns
+    inventory_cols = dataframes["inventory"].columns
+
+    products_select = [col("product_id").alias("prod_product_id")]
+    products_select.append(
+        col("supplier_id").alias("prod_supplier_id")
+        if "supplier_id" in products_cols
+        else lit(None).cast("string").alias("prod_supplier_id")
+    )
+    products_select.append(
+        col("cost_price").alias("prod_cost_price")
+        if "cost_price" in products_cols
+        else lit(None).cast("double").alias("prod_cost_price")
+    )
+
+    inventory_supplier_id = (
+        col("supplier_id") if "supplier_id" in inventory_cols else lit(None).cast("string")
+    )
+
     inventory_enhanced = (
         dataframes["inventory"]
         .join(
-            dataframes["products"].select(
-                col("product_id").alias("prod_product_id"),
-                col("supplier_id").alias("prod_supplier_id"),
-                col("cost_price").alias("prod_cost_price"),
-            ),
+            dataframes["products"].select(*products_select),
             dataframes["inventory"]["product_id"] == col("prod_product_id"),
             "left",
         )
         .drop("prod_product_id")
         .withColumn(
-            "supplier_id", coalesce(col("prod_supplier_id"), col("supplier_id"))
+            "supplier_id", coalesce(col("prod_supplier_id"), inventory_supplier_id)
         )
         .withColumn("cost_price", coalesce(col("prod_cost_price"), lit(0.0)))
         .drop("prod_supplier_id", "prod_cost_price")

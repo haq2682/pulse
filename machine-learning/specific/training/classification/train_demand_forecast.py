@@ -54,6 +54,7 @@ from specific.model_registry import save_best_model_manifest
 
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
+from pyspark import StorageLevel
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import VectorAssembler, StringIndexer, OneHotEncoder, FeatureHasher
 from pyspark.ml.functions import vector_to_array
@@ -385,9 +386,35 @@ def save_isotonic_calibrator(spark, calibrator, model_dir: str, model_name: str)
 # ---------------------------------------------------------------------------
 
 def create_spark_session():
+    os.environ.setdefault("SPARK_SERVER", os.getenv("ML_SPARK_MASTER", "local[2]"))
     return create_ml_spark_session(
         "Demand_Forecast_Classification_Training",
-        extra_configs={"spark.sql.shuffle.partitions": "8"},
+        extra_configs={
+            "inferSchema": "true",
+            "mergeSchema": "true",
+            # Use fixed executors for this job to prevent shuffle-file loss
+            # when dynamic allocation removes executors mid-training.
+            "spark.dynamicAllocation.enabled": "false",
+            "spark.driver.memory": os.getenv("ML_SPARK_DRIVER_MEMORY", "4g"),
+            "spark.driver.maxResultSize": os.getenv("ML_SPARK_DRIVER_MAX_RESULT_SIZE", "1g"),
+            "spark.executor.instances": os.getenv("ML_SPARK_EXECUTOR_INSTANCES", "1"),
+            "spark.executor.cores": os.getenv("ML_SPARK_EXECUTOR_CORES", "1"),
+            "spark.executor.memory": os.getenv("ML_SPARK_EXECUTOR_MEMORY", "1536m"),
+            "spark.executor.memoryOverhead": os.getenv("ML_SPARK_EXECUTOR_MEMORY_OVERHEAD", "768"),
+            "spark.sql.shuffle.partitions": os.getenv("ML_SPARK_SHUFFLE_PARTITIONS", "8"),
+            "spark.default.parallelism": os.getenv("ML_SPARK_DEFAULT_PARALLELISM", "4"),
+            "spark.sql.adaptive.enabled": os.getenv("ML_SPARK_SQL_ADAPTIVE", "true"),
+            "spark.sql.adaptive.coalescePartitions.enabled": os.getenv("ML_SPARK_SQL_COALESCE_PARTITIONS", "true"),
+            "spark.sql.adaptive.skewJoin.enabled": os.getenv("ML_SPARK_SQL_SKEW_JOIN", "true"),
+            "spark.network.timeout": os.getenv("ML_SPARK_NETWORK_TIMEOUT", "600s"),
+            "spark.executor.heartbeatInterval": os.getenv("ML_SPARK_HEARTBEAT_INTERVAL", "60s"),
+            # Shuffle resilience for intermittent executor loss / slow IO.
+            "spark.shuffle.io.maxRetries": os.getenv("ML_SPARK_SHUFFLE_MAX_RETRIES", "10"),
+            "spark.shuffle.io.retryWait": os.getenv("ML_SPARK_SHUFFLE_RETRY_WAIT", "10s"),
+            "spark.task.maxFailures": os.getenv("ML_SPARK_TASK_MAX_FAILURES", "8"),
+            "spark.stage.maxConsecutiveAttempts": os.getenv("ML_SPARK_STAGE_MAX_ATTEMPTS", "8"),
+            "spark.speculation": os.getenv("ML_SPARK_SPECULATION", "false"),
+        },
     )
 
 
@@ -925,7 +952,13 @@ def train_single_model(train_df, test_df, model_name):
     pipeline = Pipeline(stages=cat_indexers + [cat_encoder, product_id_hasher, assembler, classifier])
     model = pipeline.fit(train_df)
 
-    predictions = model.transform(test_df)
+    # Persist predictions — the threshold sweep below runs ~9 candidates x 4
+    # evaluators against this DataFrame, and without persisting, each action
+    # would re-trigger the full upstream pipeline (including the windowed
+    # feature engineering), which was driving repeated heavy recomputation
+    # and exhausting driver memory during random forest training.
+    predictions = model.transform(test_df).persist(StorageLevel.MEMORY_AND_DISK)
+    predictions.count()
 
     # For tree models the useful threshold range is tighter — the default sweep
     # starting at 0.30 wastes candidates well below the actual probability mass.
@@ -989,7 +1022,12 @@ def train_single_model(train_df, test_df, model_name):
     ).withColumn(
         "high_demand_probability",
         vector_to_array(F.col("probability")).getItem(1),
-    ).select("predicted_demand_class", "high_demand_probability", "label")
+    ).select("predicted_demand_class", "high_demand_probability", "label").persist(StorageLevel.MEMORY_AND_DISK)
+    plot_predictions.count()
+
+    # predictions is no longer needed once plot_predictions has been
+    # materialised independently — free it up before returning.
+    predictions.unpersist()
 
     metrics = {
         "model": model_name,
@@ -1252,6 +1290,14 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     train_df = train_df.drop("class_weight").withColumnRenamed("sample_weight", "class_weight")
     test_df = test_df.withColumn("class_weight", F.lit(1.0))
 
+    # Persist the finalised train/test frames — they are reused across all 4
+    # model fits plus repeated transforms/evaluations in train_single_model.
+    # Without this, every action recomputes the full windowed feature
+    # engineering pipeline from source parquet, which was the main driver of
+    # the memory pressure that crashed the SparkContext during RF training.
+    train_df = train_df.persist(StorageLevel.MEMORY_AND_DISK)
+    test_df = test_df.persist(StorageLevel.MEMORY_AND_DISK)
+
     print(f"✓ Train rows: {train_df.count()}, Test rows: {test_df.count()}")
     print(f"✓ Time split cutoff ym_index: {cutoff_month}")
     print(
@@ -1330,8 +1376,12 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
                 EXPORT_PLOTS,
                 calibrator=calibrator,
             )
+            plot_predictions_df.unpersist()
         except Exception as exc:
             print(f"✗ Failed model {model_name}: {exc}")
+
+    train_df.unpersist()
+    test_df.unpersist()
 
     if not metrics_rows:
         print("✗ Training skipped: all models failed")

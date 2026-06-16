@@ -13,7 +13,9 @@ def aggregate_suppliers(dataframes):
     # Check if products table has supplier_id
     has_supplier_id_in_products = False
     if "products" in dataframes and dataframes["products"] is not None:
-        has_supplier_id_in_products = dataframes["products"].filter(col("supplier_id").isNotNull()).count() > 0
+        products_df_check = dataframes["products"]
+        if "supplier_id" in products_df_check.columns:
+            has_supplier_id_in_products = products_df_check.filter(col("supplier_id").isNotNull()).count() > 0
     
     # Fallback: Check if inventory table has supplier_id
     has_supplier_id_in_inventory = False

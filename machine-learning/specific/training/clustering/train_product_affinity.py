@@ -320,7 +320,7 @@ def train_bisecting_kmeans(df, features_col, k_values):
 
 def save_models(
     kmeans_models, kmeans_metrics, gmm_models, gmm_metrics, bkm_models, bkm_metrics,
-    all_metrics, scaler_model, pca_model, category_indexer_model, spark, MODEL_OUTPUT_PATH, LOCAL_METRICS_PATH
+    all_metrics, best, scaler_model, pca_model, category_indexer_model, spark, MODEL_OUTPUT_PATH, LOCAL_METRICS_PATH
 ):
     """Save models to MinIO"""
     print(f"\nSaving models to MinIO: {MODEL_OUTPUT_PATH}")
@@ -462,7 +462,7 @@ def main(BUCKET, EXPORT_PLOTS=False):
     # Save models
     save_models(
         kmeans_models, kmeans_metrics, gmm_models, gmm_metrics,
-        bkm_models, bkm_metrics, all_metrics, scaler_model, pca_model,
+        bkm_models, bkm_metrics, all_metrics, best, scaler_model, pca_model,
         category_indexer_model, spark, MODEL_OUTPUT_PATH, LOCAL_METRICS_PATH
     )
 

@@ -71,7 +71,19 @@ def prepare_features(df):
     df = df.withColumn("log_sales_velocity", log1p(col("sales_velocity")))
     df = df.withColumn("log_revenue_velocity", log1p(col("revenue_velocity")))
     df = df.withColumn("log_turnover", log1p(col("inventory_turnover_rate")))
-    
+
+    turnover_p99 = df.agg(expr("percentile_approx(inventory_turnover_rate, 0.99)")).collect()[0][0]
+    turnover_cap = max(turnover_p99 * 1.5, 20.0)
+
+    df = df.withColumn(
+        "inventory_turnover_rate",
+        when(col("inventory_turnover_rate") > turnover_cap, lit(turnover_cap))
+         .otherwise(col("inventory_turnover_rate"))
+    )
+
+    # Recompute log_turnover after capping (matches training)
+    df = df.withColumn("log_turnover", log1p(col("inventory_turnover_rate")))
+
     print(f"Prepared {df.count()} products")
     return df
 

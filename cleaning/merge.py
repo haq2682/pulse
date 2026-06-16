@@ -5,9 +5,18 @@ Merge module for joining related tables.
 import pyspark.sql.functions as F
 
 
-def _first_available_expr(candidates):
-    """Return the first available Spark column expression from ``[(alias, name), ...]``."""
-    exprs = [F.col(f"{alias}.{name}") for alias, name in candidates]
+def _first_available_expr(candidates, schemas):
+    """Return the first available Spark column expression from ``[(alias, name), ...]``.
+
+    Candidates whose column does not exist in the corresponding dataframe's
+    schema (``schemas[alias]``) are skipped, so a missing field is gracefully
+    omitted instead of raising an AnalysisException.
+    """
+    exprs = [
+        F.col(f"{alias}.{name}")
+        for alias, name in candidates
+        if name in schemas.get(alias, [])
+    ]
     if not exprs:
         return None
     if len(exprs) == 1:
@@ -54,9 +63,11 @@ def merge_tables(dataframes, spark):
                 ("is_active", [("c", "is_active")]),
             ]
 
+            schemas = {"c": customers_df.columns, "a": addresses_df.columns}
+
             select_exprs = []
             for output_name, candidates in output_specs:
-                expr = _first_available_expr(candidates)
+                expr = _first_available_expr(candidates, schemas)
                 if expr is not None:
                     select_exprs.append(expr.alias(output_name))
 
@@ -95,9 +106,11 @@ def merge_tables(dataframes, spark):
                 ("sub_category", [("cat", "sub_category"), ("p", "sub_category")]),
             ])
 
+            schemas = {"p": products_df.columns, "cat": categories_df.columns}
+
             select_exprs = []
             for output_name, candidates in output_specs:
-                expr = _first_available_expr(candidates)
+                expr = _first_available_expr(candidates, schemas)
                 if expr is not None:
                     select_exprs.append(expr.alias(output_name))
 

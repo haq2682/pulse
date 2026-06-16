@@ -34,8 +34,9 @@ NUMERICAL_FEATURES = [
 
 CATEGORICAL_FEATURES = [
     "product_a_category",
-    "product_b_category"
-    # NOTE: brands handled via FeatureHasher, not StringIndexer
+    "product_b_category",
+    "product_a_brand",
+    "product_b_brand"
 ]
 
 MODEL_CANDIDATES = ["LogisticRegression", "RandomForest", "DecisionTree", "MultilayerPerceptron"]
@@ -187,41 +188,31 @@ def validate_dataset(df, required_columns):
 
 def prepare_features(df, numerical_features, categorical_features, preprocessors):
     """Prepare features using saved preprocessors (must match training pipeline)"""
-    from pyspark.ml.feature import FeatureHasher
-    
     # Fill nulls (same as training)
     df_filled = df.fillna(0, subset=numerical_features)
     df_filled = df_filled.fillna("Unknown", subset=categorical_features)
-    
-    # Hash brands (same as training) - NOT using StringIndexer for brands
-    hasher = FeatureHasher(
-        inputCols=["product_a_brand", "product_b_brand"],
-        outputCol="brand_hash",
-        numFeatures=128
-    )
-    df_filled = hasher.transform(df_filled)
-    
-    # Apply categorical indexers (only for product categories, not brands)
+
+    # Apply categorical indexers (same order as training)
     categorical_indexed_cols = []
     for i, cat_col in enumerate(categorical_features):
         indexer = preprocessors["categorical_indexers"][i]
         df_filled = indexer.transform(df_filled)
         categorical_indexed_cols.append(f"{cat_col}_indexed")
-    
+
     # Assemble numerical features
     numerical_assembler = VectorAssembler(inputCols=numerical_features, outputCol="numerical_features")
     df_filled = numerical_assembler.transform(df_filled)
-    
+
     # Scale numerical features using saved scaler
     scaler = preprocessors["scaler"]
     df_filled = scaler.transform(df_filled)
-    
+
     # Combine all features (same order as training)
-    all_feature_cols = ["scaled_numerical_features", "brand_hash"] + categorical_indexed_cols
+    all_feature_cols = ["scaled_numerical_features"] + categorical_indexed_cols
     final_assembler = VectorAssembler(inputCols=all_feature_cols, outputCol="features")
     df_vector = final_assembler.transform(df_filled)
-    
-    print(f"✓ Prepared features: {len(numerical_features)} numerical + {len(categorical_features)} categorical + brand_hash")
+
+    print(f"✓ Prepared features: {len(numerical_features)} numerical + {len(categorical_features)} categorical")
     return df_vector
 
 

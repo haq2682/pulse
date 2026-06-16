@@ -25,7 +25,7 @@ def main(BUCKET_NAME):
     scheduled_batch_dag before this function is called).
     """
     fulfillment_risk(BUCKET_NAME)
-    product_bundling(BUCKET_NAME)
+    # product_bundling(BUCKET_NAME)
 
     campaign_roi(BUCKET_NAME)
     delivery_time(BUCKET_NAME)

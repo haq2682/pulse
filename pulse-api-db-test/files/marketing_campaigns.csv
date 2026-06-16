@@ -1,0 +1,201 @@
+campaign_ref,campaign_title,channel_type,launch_date,completion_date,allocated_budget,current_spend,total_impressions,total_clicks,conversion_count,conversion_rate,ctr_rate,avg_cpc,roi_percentage,campaign_status,target_segment,campaign_manager,ad_platform,test_variant,created_timestamp
+1,Weekend Email Crime 1,Email,2025-09-17,2025-10-20,35418.7,2847.83,671,45,0,0.0,6.71,63.29,-100.0,Cancelled,Email_Subscribers,Betty Rivas,,,2025-09-16T01:30:57Z
+2,Q1 Direct Mail Husband 2,Direct Mail,2020-04-27,2020-07-12,3267.59,2856.83,0,0,0,0.0,0.0,0.0,-100.0,Completed,First_Time_Buyers,Linda Murray,,Variant B,2020-04-24T04:18:45Z
+3,Q2 Video Color 3,Video,2026-01-06,2026-03-15,2583.81,0.0,0,0,0,0.0,0.0,0.0,,Planned,Loyalty_Members,Curtis Mills MD,Google Ads,Control,2026-01-05T00:49:39Z
+4,Spring SMS Friend 4,SMS,2023-10-02,2024-03-28,3527.88,3487.61,41639,4279,430,10.05,10.28,0.82,2219.55,Completed,Mobile_Users,Linda Murray,,Control,2023-09-26T23:20:07Z
+5,Summer Email Hand 5,Email,2021-04-04,2021-06-01,2001.45,1869.94,407,9,0,0.0,2.21,207.77,-100.0,Completed,Loyalty_Members,Betty Rivas,,Control,2021-04-01T19:22:31Z
+6,Q1 Email Each 6,Email,2025-11-10,2026-03-31,39355.82,15937.57,26872,1590,150,9.43,5.92,10.02,36.89,Active,Inactive_90d,Travis Jimenez DDS,,Control,2025-11-08T11:46:44Z
+7,Weekend Search Recently 7,Search,2021-07-09,2021-07-17,18016.04,14315.83,63043,3250,172,5.29,5.16,4.4,-34.56,Completed,Inactive_90d,Steven Lawrence,Google Ads,,2021-07-03T14:46:29Z
+8,Q1 Email Somebody 8,Email,2022-07-08,2022-12-08,2181.54,1990.49,40475,2569,34,1.32,6.35,0.77,-16.45,Completed,Holiday_Shoppers,Jeremy Vargas,,Variant A,2022-06-29T15:11:04Z
+9,Weekend Search Ask 9,Search,2021-05-30,2021-11-16,3282.37,2951.88,25317,277,12,4.33,1.09,10.66,-68.53,Completed,Mobile_Users,Kevin Meyer,Google Ads,,2021-05-25T13:44:22Z
+10,Holiday Direct Mail Cell 10,Direct Mail,2022-12-22,2023-03-29,1337.93,1259.16,0,0,0,0.0,0.0,0.0,-100.0,Completed,Loyalty_Members,Betty Rivas,,,2022-12-20T04:04:23Z
+11,Q3 Email Environment 11,Email,2024-03-08,2024-07-23,500.0,409.49,3254,34,0,0.0,1.04,12.04,-100.0,Completed,New_Customers_30d,Travis Jimenez DDS,,,2024-02-25T18:20:35Z
+12,Q3 Search Man 12,Search,2021-09-08,2022-01-23,500.0,497.23,475488,44254,4107,9.28,9.31,0.01,72413.41,Completed,Loyalty_Members,Ricky Hardy,Google Ads,Control,2021-09-05T19:35:27Z
+13,Q2 Direct Mail Business 13,Direct Mail,2022-11-06,2023-02-17,2165.52,2123.64,0,0,0,0.0,0.0,0.0,-100.0,Completed,Loyalty_Members,Jennifer Ramos,,Variant A,2022-11-03T22:12:14Z
+14,Summer Video Institution 14,Video,2022-05-02,2022-08-30,867.72,68.99,40097,562,31,5.52,1.4,0.12,2884.02,Cancelled,Returning_Customers,Monica Garcia,Google Ads,Variant B,2022-04-30T12:58:54Z
+15,Q2 Social Media Available 15,Social Media,2022-06-19,2022-09-24,6067.57,4724.79,2940,213,11,5.16,7.24,22.18,-65.03,Completed,Cart_Abandoners,Jeremy Vargas,Instagram,,2022-06-18T23:38:59Z
+16,Q1 Email Just 16,Email,2020-03-24,2020-04-10,8391.63,6758.49,337666,26147,2836,10.85,7.74,0.26,7111.67,Completed,Holiday_Shoppers,Betty Rivas,,Control,2020-03-21T22:48:08Z
+17,Spring Social Media Change 17,Social Media,2022-05-27,2022-06-03,1459.54,1350.19,6872,228,31,13.6,3.32,5.92,10.94,Completed,Mobile_Users,Steven Lawrence,TikTok,Variant A,2022-05-26T19:28:22Z
+18,Weekend SMS Decade 18,SMS,2020-12-09,2021-06-01,812.2,595.83,2545,131,3,2.29,5.15,4.55,-21.68,Completed,Loyalty_Members,David Johnson,,Control,2020-12-03T01:56:44Z
+19,Q1 Email Put 19,Email,2023-11-26,2024-04-21,500.0,449.84,235618,26047,567,2.18,11.05,0.02,8190.99,Completed,Returning_Customers,Jeremy Vargas,,,2023-11-24T02:40:24Z
+20,Holiday Email Citizen 20,Email,2024-09-23,2025-01-26,4888.76,3508.52,3792,199,15,7.54,5.25,17.63,-33.21,Completed,New_Customers_30d,Angela Murray,,Variant B,2024-09-19T04:15:56Z
+21,Holiday Direct Mail Color 21,Direct Mail,2025-11-21,2026-01-04,807.09,211.26,0,0,0,0.0,0.0,0.0,-100.0,Active,New_Customers_30d,Justin Miller,,Control,2025-11-20T11:39:35Z
+22,Flash Display These 22,Display,2021-09-14,2022-01-04,2064.09,469.83,1128,44,1,2.27,3.9,10.68,-57.84,Cancelled,New_Customers_30d,Jeremy Vargas,Meta Ads,,2021-09-11T11:56:02Z
+23,Q1 Direct Mail May 23,Direct Mail,2020-12-02,2021-05-01,500.0,456.75,0,0,0,0.0,0.0,0.0,-100.0,Completed,Mobile_Users,Jessica Jones,,Variant B,2020-11-19T10:37:55Z
+24,Q4 Email Story 24,Email,2020-03-14,2020-06-14,985.02,928.9,34602,1744,227,13.02,5.04,0.53,4246.03,Completed,Cart_Abandoners,Jessica Jones,,,2020-03-06T17:52:04Z
+25,Holiday Video Reach 25,Video,2020-09-26,2020-11-10,7086.19,6829.05,18204,1218,105,8.62,6.69,5.61,139.0,Completed,High_LTV,Ricky Hardy,Google Ads,Variant B,2020-09-25T20:05:33Z
+26,Spring Direct Mail Much 26,Direct Mail,2025-08-18,2026-02-12,1267.25,588.36,0,0,0,0.0,0.0,0.0,-100.0,Paused,Returning_Customers,Betty Rivas,,Variant A,2025-08-12T19:33:39Z
+27,Flash Direct Mail Society 27,Direct Mail,2022-03-10,2022-03-29,500.0,478.69,0,0,0,0.0,0.0,0.0,-100.0,Completed,Inactive_90d,Gerald Martin,,,2022-03-04T14:00:07Z
+28,Q1 Direct Mail Over 28,Direct Mail,2024-06-09,2024-10-27,1506.47,1286.95,0,0,0,0.0,0.0,0.0,-100.0,Completed,Loyalty_Members,Steven Lawrence,,,2024-06-07T16:20:29Z
+29,Q2 Display Figure 29,Display,2026-01-31,2026-05-13,1834.56,0.0,0,0,0,0.0,0.0,0.0,,Planned,Cart_Abandoners,Gerald Martin,Google Ads,,2026-01-27T12:04:06Z
+30,Weekend Video Detail 30,Video,2025-11-01,2025-12-01,5747.21,5743.72,5341,45,2,4.44,0.84,127.64,-98.75,Completed,Mobile_Users,Ricky Hardy,Google Ads,,2025-10-31T01:16:55Z
+31,Summer Email Few 31,Email,2023-04-15,2023-04-25,7901.44,6849.83,7223,355,28,7.89,4.91,19.3,-27.66,Completed,Returning_Customers,Steven Lawrence,,Variant A,2023-04-14T01:46:30Z
+32,Holiday Social Media Film 32,Social Media,2024-06-14,2024-09-20,985.72,943.59,23170,556,13,2.34,2.4,1.7,27.45,Completed,Returning_Customers,Lisa Dixon,LinkedIn,Variant B,2024-06-07T03:01:49Z
+33,Flash Email Range 33,Email,2023-03-09,2023-09-01,1052.09,979.59,1242,112,6,5.36,9.02,8.75,10.92,Completed,Cart_Abandoners,Justin Miller,,Control,2023-03-06T06:39:52Z
+34,Flash Search Southern 34,Search,2025-03-29,2025-05-03,500.0,432.51,3640,343,22,6.41,9.42,1.26,202.45,Completed,Inactive_90d,Jennifer Ramos,Google Ads,,2025-03-26T06:11:33Z
+35,Summer Search Education 35,Search,2026-01-06,2026-06-02,3182.05,0.0,0,0,0,0.0,0.0,0.0,,Planned,Mobile_Users,Linda Murray,Google Ads,Variant B,2026-01-02T02:18:19Z
+36,Q1 Video Protect 36,Video,2025-02-10,2025-02-24,1685.15,1213.26,76260,6726,971,14.44,8.82,0.18,2352.96,Completed,High_LTV,Kevin Meyer,TikTok,,2025-02-09T14:52:57Z
+37,Spring Email Green 37,Email,2025-01-04,2025-01-30,1790.85,1617.69,2901,39,0,0.0,1.34,41.48,-100.0,Completed,Returning_Customers,Kevin Meyer,,,2025-01-03T07:54:42Z
+38,Q3 Social Media Character 38,Social Media,2023-01-06,2023-04-17,1887.41,285.89,314,36,4,11.11,11.46,7.94,-27.34,Cancelled,Inactive_90d,Jeremy Vargas,LinkedIn,,2023-01-05T05:52:02Z
+39,Summer Video Far 39,Video,2023-03-30,2023-08-02,48944.54,42159.21,47492,4827,86,1.78,10.16,8.73,-69.97,Completed,Inactive_90d,Hannah Thompson,Google Ads,,2023-03-18T05:45:49Z
+40,Flash Email Morning 40,Email,2024-05-23,2024-06-02,500.0,400.34,21762,1641,241,14.69,7.54,0.24,8053.39,Completed,High_LTV,Angela Murray,,Variant B,2024-05-22T07:35:37Z
+41,Q4 Display Office 41,Display,2021-09-22,2021-12-23,500.0,66.74,48003,2885,136,4.71,6.01,0.02,31275.37,Cancelled,High_LTV,Justin Miller,Meta Ads,,2021-09-16T21:04:16Z
+42,Q2 Direct Mail While 42,Direct Mail,2020-01-07,2020-05-31,2000.48,1712.12,0,0,0,0.0,0.0,0.0,-100.0,Completed,Email_Subscribers,Monica Garcia,,,2020-01-01T16:54:13Z
+43,Q1 Email Identify 43,Email,2024-04-28,2024-06-13,12936.06,9519.17,18791,1089,35,3.21,5.8,8.74,-49.41,Completed,First_Time_Buyers,Brenda Martin,,Variant A,2024-04-23T18:57:19Z
+44,Flash SMS Use 44,SMS,2025-07-28,2025-09-28,3647.98,3413.66,1481,59,6,10.17,3.98,57.86,-71.2,Completed,New_Customers_30d,Juan Chan,,Control,2025-07-27T18:37:14Z
+45,Q2 Email Save 45,Email,2024-12-19,2025-06-06,23337.53,17158.55,119671,9553,218,2.28,7.98,1.8,-21.53,Completed,Cart_Abandoners,Betty Rivas,,Variant B,2024-12-16T09:55:18Z
+46,Q1 Display Job 46,Display,2023-04-22,2023-10-07,2106.89,1503.79,28875,1617,47,2.91,5.6,0.93,257.43,Completed,Mobile_Users,Lisa Dixon,Google Ads,Control,2023-04-20T11:22:25Z
+47,Spring Display Defense 47,Display,2021-02-04,2021-04-09,1296.37,1005.39,17662,1720,113,6.57,9.74,0.58,1193.93,Completed,Mobile_Users,Monica Garcia,Google Ads,,2021-02-02T11:07:40Z
+48,Flash SMS Traditional 48,SMS,2024-03-31,2024-06-09,1023.52,756.65,1988,21,1,4.76,1.06,36.03,-90.4,Completed,Mobile_Users,Travis Jimenez DDS,,Variant B,2024-03-25T16:58:04Z
+49,Q3 Social Media Must 49,Social Media,2025-07-28,2025-11-03,10835.61,9666.34,1139046,94621,11295,11.94,8.31,0.1,9486.32,Completed,Email_Subscribers,Ricky Hardy,LinkedIn,Control,2025-07-27T11:35:40Z
+50,Q1 SMS Security 50,SMS,2020-08-23,2020-12-23,500.0,412.13,2171,189,16,8.47,8.71,2.18,544.66,Completed,Returning_Customers,David Johnson,,,2020-08-22T20:20:56Z
+51,Q4 Email Model 51,Email,2020-05-27,2020-09-19,963.47,685.1,14798,1483,216,14.57,10.02,0.46,3261.77,Completed,Inactive_90d,David Johnson,,,2020-05-24T09:03:45Z
+52,Q4 Email Myself 52,Email,2022-06-14,2022-08-08,5564.87,3967.41,2043,108,1,0.93,5.29,36.74,-96.04,Completed,Loyalty_Members,Jeremy Vargas,,Control,2022-06-13T04:13:51Z
+53,Holiday SMS Recent 53,SMS,2024-01-04,2024-06-22,1993.65,1802.02,13331,576,28,4.86,4.32,3.13,-6.11,Completed,Mobile_Users,David Johnson,,Variant A,2023-12-24T12:22:36Z
+54,Spring SMS Effect 54,SMS,2023-11-22,2024-04-04,5270.49,4403.29,871,47,2,4.26,5.4,93.69,-92.17,Completed,Returning_Customers,Travis Jimenez DDS,,,2023-11-14T00:13:18Z
+55,Spring Social Media Eye 55,Social Media,2022-04-27,2022-09-15,1055.26,806.26,29786,1922,258,13.42,6.45,0.42,2485.5,Completed,Mobile_Users,Linda Murray,Instagram,Control,2022-04-26T22:12:10Z
+56,Holiday Email Southern 56,Email,2025-06-26,2025-07-14,2688.73,2666.46,9014,210,11,5.24,2.33,12.7,-47.95,Completed,Loyalty_Members,Jessica Jones,,,2025-06-24T22:24:51Z
+57,Q2 SMS Cover 57,SMS,2023-09-26,2023-10-14,5142.59,3957.82,17060,473,38,8.03,2.77,8.37,-13.21,Completed,Holiday_Shoppers,Justin Miller,,,2023-09-23T16:50:26Z
+58,Weekend Display Production 58,Display,2022-01-09,2022-01-27,625.92,538.4,10602,456,38,8.33,4.3,1.18,907.92,Completed,Cart_Abandoners,Ricky Hardy,Meta Ads,Variant B,2022-01-03T22:19:03Z
+59,Q2 Social Media Near 59,Social Media,2021-07-13,2021-10-03,5473.53,4036.9,638,32,0,0.0,5.02,126.15,-100.0,Completed,Email_Subscribers,Jennifer Martin,Instagram,,2021-07-09T02:32:31Z
+60,Q1 Email Impact 60,Email,2024-12-15,2025-04-03,4107.48,3710.65,544,19,0,0.0,3.49,195.3,-100.0,Completed,New_Customers_30d,Travis Jimenez DDS,,Control,2024-12-08T06:36:28Z
+61,Weekend Direct Mail Point 61,Direct Mail,2020-10-21,2021-02-01,1899.33,1841.26,0,0,0,0.0,0.0,0.0,-100.0,Completed,Cart_Abandoners,Kevin Meyer,,Control,2020-10-19T04:38:06Z
+62,Q3 Email Century 62,Email,2021-06-06,2021-09-21,21996.2,21553.54,2828,126,17,13.49,4.46,171.06,-86.29,Completed,Loyalty_Members,Brenda Martin,,Variant B,2021-06-04T13:19:07Z
+63,Weekend Email News 63,Email,2025-06-11,2025-10-10,4383.32,274.08,975,94,6,6.38,9.64,2.92,30.8,Cancelled,Email_Subscribers,Curtis Mills MD,,Variant B,2025-06-10T20:39:13Z
+64,Summer Email Charge 64,Email,2021-07-11,2021-10-01,2667.9,145.03,185444,10397,126,1.21,5.61,0.01,4680.12,Cancelled,First_Time_Buyers,Linda Murray,,Control,2021-07-09T17:09:03Z
+65,Q2 Email Data 65,Email,2022-01-11,2022-01-22,7718.56,7572.78,9241,74,7,9.46,0.8,102.33,-91.77,Completed,Cart_Abandoners,Betty Rivas,,Control,2022-01-07T07:45:01Z
+66,Holiday SMS Bit 66,SMS,2020-02-19,2020-03-12,500.0,449.05,1531998,164725,22536,13.68,10.75,0.0,172091.04,Completed,New_Customers_30d,Juan Chan,,Variant A,2020-02-09T00:15:37Z
+67,Q1 Search Executive 67,Search,2022-12-30,2023-01-16,8606.19,599.8,13714,258,31,12.02,1.88,2.32,237.6,Cancelled,Mobile_Users,Jessica Jones,Google Ads,Variant B,2022-12-23T00:08:09Z
+68,Holiday Email Military 68,Email,2025-02-28,2025-06-22,1500.52,1153.23,10365,406,17,4.19,3.92,2.84,93.62,Completed,Returning_Customers,Angela Murray,,Variant B,2025-02-15T06:50:25Z
+69,Q1 Video Fact 69,Video,2025-07-02,2025-07-09,840.13,690.14,5991,505,22,4.36,8.43,1.37,65.52,Completed,Email_Subscribers,Jennifer Martin,Google Ads,,2025-06-29T01:43:29Z
+70,Q2 Search Require 70,Search,2022-05-16,2022-08-10,1925.48,358.53,102124,1510,58,3.84,1.48,0.24,1023.34,Cancelled,Email_Subscribers,Curtis Mills MD,Google Ads,Variant A,2022-05-09T01:12:01Z
+71,Q4 SMS System 71,SMS,2021-01-09,2021-04-09,2483.01,2162.91,13183,1516,142,9.37,11.5,1.43,1114.29,Completed,Email_Subscribers,Betty Rivas,,Variant B,2021-01-08T16:11:02Z
+72,Holiday Social Media He 72,Social Media,2023-02-23,2023-03-07,1692.72,1388.79,8348,234,32,13.68,2.8,5.94,-14.38,Completed,First_Time_Buyers,Jennifer Martin,Meta Ads,Control,2023-02-18T10:54:04Z
+73,Q3 Direct Mail Sometimes 73,Direct Mail,2020-08-22,2021-01-20,500.0,357.24,0,0,0,0.0,0.0,0.0,-100.0,Completed,High_LTV,Kevin Meyer,,Variant A,2020-08-21T06:47:24Z
+74,Weekend Search However 74,Search,2024-07-17,2024-10-26,1475.3,1382.25,351803,36836,2746,7.45,10.47,0.04,34205.38,Completed,Inactive_90d,Linda Murray,Google Ads,Variant A,2024-07-10T18:02:27Z
+75,Q2 Video Sell 75,Video,2020-12-05,2021-01-18,10425.21,9676.01,90416,2225,330,14.83,2.46,4.35,191.04,Completed,Email_Subscribers,Jessica Jones,TikTok,,2020-11-28T10:20:25Z
+76,Summer Search Spend 76,Search,2026-02-10,2026-05-27,746.62,0.0,0,0,0,0.0,0.0,0.0,,Planned,Email_Subscribers,Jennifer Martin,Google Ads,Variant A,2026-02-06T19:12:56Z
+77,Weekend Video Government 77,Video,2020-12-23,2021-05-22,500.0,497.22,6848,758,26,3.43,11.07,0.66,445.55,Completed,First_Time_Buyers,Brenda Martin,TikTok,Variant A,2020-12-20T02:43:55Z
+78,Spring Direct Mail Contain 78,Direct Mail,2024-09-05,2024-09-22,3748.78,2851.57,0,0,0,0.0,0.0,0.0,-100.0,Completed,Email_Subscribers,Justin Miller,,,2024-08-27T20:11:38Z
+79,Q3 SMS Happen 79,SMS,2021-11-26,2022-04-11,500.0,402.42,16110,193,16,8.29,1.2,2.09,374.03,Completed,New_Customers_30d,Brenda Martin,,Control,2021-11-25T19:49:01Z
+80,Summer Direct Mail Position 80,Direct Mail,2021-10-24,2022-02-04,1633.62,1567.52,0,0,0,0.0,0.0,0.0,-100.0,Completed,Cart_Abandoners,Monica Garcia,,Control,2021-10-15T09:30:28Z
+81,Summer Video Action 81,Video,2023-12-24,2024-03-16,50250.23,47670.82,43950,3703,172,4.64,8.43,12.87,-74.75,Completed,High_LTV,Angela Murray,Google Ads,Variant A,2023-12-20T02:43:43Z
+82,Flash Social Media Against 82,Social Media,2023-01-14,2023-02-13,3247.52,2569.85,917,92,9,9.78,10.03,27.93,-50.84,Completed,High_LTV,Kevin Meyer,LinkedIn,,2023-01-01T20:18:13Z
+83,Holiday Video Voice 83,Video,2020-08-10,2021-01-16,7721.75,5489.74,1772,96,3,3.12,5.42,57.18,-94.64,Completed,High_LTV,Justin Miller,TikTok,Variant A,2020-08-04T18:49:54Z
+84,Q3 Display Health 84,Display,2021-08-06,2021-09-18,3834.77,3586.72,154470,13385,908,6.78,8.67,0.27,4957.1,Completed,High_LTV,Jessica Jones,Google Ads,,2021-07-26T02:13:35Z
+85,Q3 Display Say 85,Display,2023-07-27,2023-08-31,500.0,397.95,22854,678,35,5.16,2.97,0.59,533.63,Completed,High_LTV,Linda Murray,Meta Ads,Control,2023-07-16T14:15:40Z
+86,Weekend SMS Physical 86,SMS,2020-07-13,2020-10-12,500.0,37.37,9720,1103,113,10.24,11.35,0.03,43887.01,Cancelled,Inactive_90d,Jessica Jones,,Variant B,2020-07-06T03:53:45Z
+87,Q2 Email Forward 87,Email,2024-05-01,2024-09-19,2183.99,2076.02,2501,157,18,11.46,6.28,13.22,-22.56,Completed,Inactive_90d,Jessica Jones,,Control,2024-04-22T05:16:07Z
+88,Q3 SMS I 88,SMS,2023-05-07,2023-08-10,12143.19,10986.06,4508,535,43,8.04,11.87,20.53,-30.84,Completed,Cart_Abandoners,Gerald Martin,,Variant A,2023-05-06T17:03:09Z
+89,Holiday Social Media However 89,Social Media,2022-05-26,2022-09-06,11145.13,10902.01,823,37,3,8.11,4.5,294.65,-98.95,Completed,Holiday_Shoppers,Linda Murray,Instagram,Variant A,2022-05-25T22:38:20Z
+90,Summer Email Door 90,Email,2020-04-23,2020-08-06,17237.13,12773.7,321691,22048,445,2.02,6.85,0.58,375.06,Completed,Cart_Abandoners,Brenda Martin,,Variant B,2020-04-22T20:50:59Z
+91,Holiday Direct Mail Or 91,Direct Mail,2020-12-02,2021-05-15,626.74,584.13,0,0,0,0.0,0.0,0.0,-100.0,Completed,Loyalty_Members,Betty Rivas,,,2020-11-30T09:41:14Z
+92,Weekend Search Add 92,Search,2024-08-15,2024-10-12,12281.26,10874.63,95170,4151,174,4.19,4.36,2.62,52.12,Completed,Mobile_Users,Steven Lawrence,Google Ads,Variant B,2024-08-12T14:58:00Z
+93,Q2 Direct Mail Likely 93,Direct Mail,2021-04-09,2021-09-24,2014.61,174.59,0,0,0,0.0,0.0,0.0,-100.0,Cancelled,Returning_Customers,Justin Miller,,,2021-04-06T19:32:35Z
+94,Q3 Social Media Son 94,Social Media,2025-05-26,2025-09-18,500.0,370.89,221,1,0,0.0,0.45,370.89,-100.0,Completed,New_Customers_30d,Ricky Hardy,TikTok,Variant B,2025-05-22T18:49:39Z
+95,Q1 Social Media Ask 95,Social Media,2024-09-30,2024-11-03,4492.84,213.11,124110,7433,567,7.63,5.99,0.03,28957.85,Cancelled,Mobile_Users,Jennifer Martin,Meta Ads,Control,2024-09-26T05:56:21Z
+96,Q2 Display Region 96,Display,2025-02-28,2025-04-08,3058.31,2240.85,3512,258,14,5.43,7.35,8.69,-32.4,Completed,Email_Subscribers,Lisa Dixon,Meta Ads,,2025-02-27T13:55:55Z
+97,Weekend Social Media Area 97,Social Media,2021-07-25,2022-01-05,500.0,360.24,59374,1133,15,1.32,1.91,0.32,705.13,Completed,Loyalty_Members,Steven Lawrence,Meta Ads,Variant A,2021-07-24T03:45:06Z
+98,Q2 Email Chair 98,Email,2022-07-30,2022-12-22,500.0,46.67,150313,10175,824,8.1,6.77,0.0,54872.59,Cancelled,Cart_Abandoners,Gerald Martin,,,2022-07-29T00:39:58Z
+99,Flash Social Media Apply 99,Social Media,2025-02-19,2025-04-15,1494.61,1376.67,265704,28373,1026,3.62,10.68,0.05,4847.88,Completed,Cart_Abandoners,Monica Garcia,Meta Ads,,2025-02-17T00:48:49Z
+100,Q3 Display Production 100,Display,2021-03-21,2021-04-11,26465.64,23062.82,41702,2619,174,6.64,6.28,8.81,-64.55,Completed,Cart_Abandoners,Curtis Mills MD,Google Ads,Variant B,2021-03-13T14:34:26Z
+101,Flash Display Cost 101,Display,2023-12-10,2024-04-29,2595.14,2265.18,53939,2446,301,12.31,4.53,0.93,1591.48,Completed,Cart_Abandoners,Juan Chan,Meta Ads,,2023-12-06T15:29:06Z
+102,Q3 Video Miss 102,Video,2021-11-19,2022-03-27,3016.0,200.64,2602,65,3,4.62,2.5,3.09,153.16,Cancelled,Email_Subscribers,Travis Jimenez DDS,TikTok,Variant B,2021-11-17T03:21:42Z
+103,Flash SMS In 103,SMS,2020-03-25,2020-08-03,4638.39,4325.88,16170,399,39,9.77,2.47,10.84,-17.27,Completed,Returning_Customers,David Johnson,,,2020-03-20T13:38:03Z
+104,Q3 Direct Mail Choice 104,Direct Mail,2024-11-20,2025-03-13,656.31,557.7,0,0,0,0.0,0.0,0.0,-100.0,Completed,First_Time_Buyers,Lisa Dixon,,,2024-11-18T14:52:11Z
+105,Q3 Video Same 105,Video,2021-11-25,2022-03-21,5518.96,4333.95,1625,55,3,5.45,3.38,78.8,-96.55,Completed,Inactive_90d,Ricky Hardy,Google Ads,Variant B,2021-11-24T01:35:08Z
+106,Q1 SMS Many 106,SMS,2024-01-23,2024-05-09,9409.71,1473.06,7414,484,22,4.55,6.53,3.04,35.11,Cancelled,First_Time_Buyers,Jessica Jones,,Variant A,2024-01-22T05:00:00Z
+107,Holiday Email Population 107,Email,2020-07-28,2020-08-31,500.0,440.33,1940,188,14,7.45,9.69,2.34,196.4,Completed,Inactive_90d,Travis Jimenez DDS,,,2020-07-26T04:04:43Z
+108,Holiday Social Media Science 108,Social Media,2025-04-20,2025-06-16,500.0,489.1,428937,16157,429,2.66,3.77,0.03,8575.62,Completed,Mobile_Users,Curtis Mills MD,Instagram,,2025-04-19T16:24:56Z
+109,Flash Email Analysis 109,Email,2023-10-01,2023-11-10,6567.96,6318.8,6656,339,20,5.9,5.09,18.64,-66.41,Completed,Inactive_90d,Monica Garcia,,Variant A,2023-09-23T05:05:02Z
+110,Q4 Search Little 110,Search,2024-05-27,2024-06-14,1905.98,1631.94,5459,232,13,5.6,4.25,7.03,-55.12,Completed,New_Customers_30d,Ricky Hardy,Google Ads,,2024-05-22T00:49:03Z
+111,Q4 Direct Mail People 111,Direct Mail,2023-05-09,2023-10-07,9542.84,9070.28,0,0,0,0.0,0.0,0.0,-100.0,Completed,Holiday_Shoppers,Gerald Martin,,Control,2023-04-28T11:48:13Z
+112,Weekend Search No 112,Search,2020-12-23,2021-02-24,7591.28,6325.07,292422,23856,2624,11.0,8.16,0.27,1713.14,Completed,High_LTV,Brenda Martin,Google Ads,,2020-12-18T22:16:16Z
+113,Weekend SMS Wonder 113,SMS,2020-11-12,2020-12-12,1533.28,1487.27,276349,26015,3157,12.14,9.41,0.06,14646.38,Completed,Mobile_Users,Kevin Meyer,,Variant A,2020-11-06T11:28:24Z
+114,Holiday Display On 114,Display,2021-01-20,2021-03-02,712.53,76.06,5520,145,15,10.34,2.63,0.52,3208.87,Cancelled,Inactive_90d,Linda Murray,Google Ads,Variant B,2021-01-13T22:07:14Z
+115,Q1 Display Mr 115,Display,2023-04-23,2023-08-25,717.26,585.97,559035,61166,1235,2.02,10.94,0.01,35919.68,Completed,Returning_Customers,Curtis Mills MD,Meta Ads,,2023-04-14T23:42:00Z
+116,Q4 Social Media Image 116,Social Media,2024-01-19,2024-02-18,500.0,386.71,364822,17589,1900,10.8,4.82,0.02,49106.06,Completed,First_Time_Buyers,Kevin Meyer,Instagram,Control,2024-01-15T15:58:52Z
+117,Flash Video Cell 117,Video,2025-05-02,2025-06-12,2123.53,1687.36,10411,1078,61,5.66,10.35,1.57,87.79,Completed,High_LTV,Jeremy Vargas,TikTok,Variant B,2025-04-28T02:02:21Z
+118,Q4 Email Foreign 118,Email,2023-08-03,2023-12-28,750.5,557.44,58176,3936,286,7.27,6.77,0.14,9451.59,Completed,High_LTV,Angela Murray,,,2023-07-28T10:25:43Z
+119,Spring Social Media Level 119,Social Media,2021-06-01,2021-09-07,7136.93,5994.05,1745,191,24,12.57,10.95,31.38,-36.98,Completed,First_Time_Buyers,Jeremy Vargas,TikTok,,2021-05-23T20:01:37Z
+120,Spring Social Media Appear 120,Social Media,2021-03-19,2021-08-05,4902.16,4428.32,17897,1046,152,14.53,5.84,4.23,517.35,Completed,Returning_Customers,Linda Murray,Meta Ads,Control,2021-03-07T21:37:17Z
+121,Summer SMS Offer 121,SMS,2026-02-02,2026-05-10,686.18,0.0,0,0,0,0.0,0.0,0.0,,Planned,First_Time_Buyers,Hannah Thompson,,,2026-01-27T02:57:33Z
+122,Q4 Search Town 122,Search,2025-04-12,2025-09-09,4568.76,4324.97,8237,128,8,6.25,1.55,33.79,-86.23,Completed,Holiday_Shoppers,Ricky Hardy,Google Ads,,2025-04-06T07:55:44Z
+123,Q3 Video Short 123,Video,2020-04-22,2020-07-19,2513.63,570.36,10075,843,90,10.68,8.37,0.68,1790.65,Cancelled,Inactive_90d,Travis Jimenez DDS,TikTok,Variant B,2020-04-19T17:18:27Z
+124,Q1 Direct Mail Be 124,Direct Mail,2025-03-28,2025-04-19,5163.61,3618.53,0,0,0,0.0,0.0,0.0,-100.0,Completed,High_LTV,Lisa Dixon,,Variant B,2025-03-26T22:53:40Z
+125,Q4 Social Media Seem 125,Social Media,2025-05-19,2025-07-25,500.0,481.72,83761,6760,591,8.74,8.07,0.07,12084.27,Completed,Mobile_Users,Linda Murray,LinkedIn,,2025-05-12T09:35:36Z
+126,Flash Video Answer 126,Video,2023-02-06,2023-02-23,8665.34,7192.96,18491,2133,128,6.0,11.54,3.37,-44.55,Completed,High_LTV,Curtis Mills MD,TikTok,Variant B,2023-02-04T20:41:46Z
+127,Q3 Video Gun 127,Video,2021-02-27,2021-04-08,2318.8,1679.96,220313,2450,213,8.69,1.11,0.69,864.7,Completed,Email_Subscribers,Juan Chan,Google Ads,Variant A,2021-02-26T01:57:36Z
+128,Weekend Email Fall 128,Email,2024-10-04,2025-03-18,3978.83,841.0,12365,622,68,10.93,5.03,1.35,704.59,Cancelled,First_Time_Buyers,Angela Murray,,Variant A,2024-10-03T17:35:16Z
+129,Holiday SMS Today 129,SMS,2023-07-07,2023-10-12,11512.43,8672.02,20814,2302,276,11.99,11.06,3.77,80.66,Completed,New_Customers_30d,Linda Murray,,,2023-07-02T21:14:53Z
+130,Summer Email Administration 130,Email,2023-01-15,2023-03-26,9125.33,7550.6,16838,647,69,10.66,3.84,11.67,13.52,Completed,Cart_Abandoners,Hannah Thompson,,,2023-01-13T04:46:18Z
+131,Spring SMS Indeed 131,SMS,2025-06-01,2025-11-11,804.1,763.56,2152,110,6,5.45,5.11,6.94,-55.23,Completed,Email_Subscribers,Betty Rivas,,,2025-05-31T15:42:20Z
+132,Weekend Email Health 132,Email,2022-09-16,2023-01-13,2525.96,46.69,10137,387,41,10.59,3.82,0.12,5599.09,Cancelled,Returning_Customers,Travis Jimenez DDS,,,2022-09-15T10:39:54Z
+133,Q1 Email Movie 133,Email,2023-09-25,2024-03-08,1249.27,959.1,3053,269,15,5.58,8.81,3.57,46.87,Completed,Holiday_Shoppers,Curtis Mills MD,,Variant A,2023-09-23T11:43:18Z
+134,Q1 Display Stuff 134,Display,2020-08-21,2020-11-11,500.0,422.63,3776,52,7,13.46,1.38,8.13,11.34,Completed,Inactive_90d,Kevin Meyer,Meta Ads,,2020-08-11T05:23:41Z
+135,Q3 SMS Alone 135,SMS,2025-09-21,2025-11-30,3833.56,2765.65,6361895,262507,12153,4.63,4.13,0.01,51140.2,Completed,Returning_Customers,Lisa Dixon,,,2025-09-20T11:53:05Z
+136,Q4 Video Test 136,Video,2021-07-01,2021-12-15,500.0,378.25,15167,274,22,8.03,1.81,1.38,978.71,Completed,First_Time_Buyers,Brenda Martin,TikTok,,2021-06-28T00:37:27Z
+137,Spring Social Media Read 137,Social Media,2022-09-04,2022-10-31,1114.14,1103.31,90569,10220,208,2.04,11.28,0.11,1276.74,Completed,First_Time_Buyers,Kevin Meyer,Instagram,,2022-09-01T03:07:12Z
+138,Q2 Search Third 138,Search,2026-02-13,2026-04-29,5161.18,0.0,0,0,0,0.0,0.0,0.0,,Planned,Inactive_90d,Jessica Jones,Google Ads,,2026-02-01T05:44:20Z
+139,Spring Video Western 139,Video,2025-08-21,2025-11-11,1382.61,1073.18,35609,1008,113,11.21,2.83,1.06,1020.61,Completed,Holiday_Shoppers,Ricky Hardy,Google Ads,,2025-08-19T21:14:32Z
+140,Q3 Email Move 140,Email,2020-01-11,2020-02-15,6024.79,4798.72,8516,610,51,8.36,7.16,7.87,-60.28,Completed,High_LTV,Betty Rivas,,,2020-01-10T03:00:56Z
+141,Q4 Video Involve 141,Video,2023-09-15,2023-10-08,804.3,738.57,2136,62,5,8.06,2.9,11.91,-37.7,Completed,New_Customers_30d,Linda Murray,Google Ads,Variant B,2023-09-06T18:34:50Z
+142,Q4 Social Media Bit 142,Social Media,2024-11-20,2024-12-28,4550.48,78.19,20655,1355,107,7.9,6.56,0.06,13809.47,Cancelled,Holiday_Shoppers,Juan Chan,LinkedIn,,2024-11-19T20:30:56Z
+143,Q2 Social Media Them 143,Social Media,2020-03-26,2020-04-11,4066.22,2939.2,1793902,76898,772,1.0,4.29,0.04,3222.77,Completed,Inactive_90d,Juan Chan,TikTok,Variant A,2020-03-20T05:37:25Z
+144,Holiday Social Media Several 144,Social Media,2021-02-06,2021-03-08,500.0,366.11,23626,2780,325,11.69,11.77,0.13,7577.41,Completed,Cart_Abandoners,Lisa Dixon,LinkedIn,Control,2021-01-27T16:56:01Z
+145,Weekend Search Effort 145,Search,2023-03-18,2023-04-17,500.0,51.58,2450,257,26,10.12,10.49,0.2,8555.93,Cancelled,Holiday_Shoppers,Gerald Martin,Google Ads,Control,2023-03-15T23:59:46Z
+146,Q4 Video Room 146,Video,2020-12-04,2021-02-16,500.0,446.71,23264,1665,208,12.49,7.16,0.27,3332.49,Completed,Mobile_Users,Jeremy Vargas,TikTok,Control,2020-11-22T00:45:47Z
+147,Weekend Display Heart 147,Display,2024-03-25,2024-07-28,3894.84,3884.84,13286,654,44,6.73,4.92,5.94,109.63,Completed,High_LTV,Travis Jimenez DDS,Meta Ads,Variant A,2024-03-22T07:52:58Z
+148,Q2 Search Maybe 148,Search,2025-03-20,2025-05-07,5274.66,152.22,43628,1524,162,10.63,3.49,0.1,3211.49,Cancelled,Loyalty_Members,Jessica Jones,Google Ads,,2025-03-19T07:33:46Z
+149,Holiday Display Toward 149,Display,2025-01-25,2025-07-23,883.52,856.0,2219,13,0,0.0,0.59,65.85,-100.0,Completed,Mobile_Users,Juan Chan,Meta Ads,Variant B,2025-01-22T10:05:58Z
+150,Q2 SMS Position 150,SMS,2025-11-19,2026-03-15,562.11,143.59,3631,397,17,4.28,10.93,0.36,2068.49,Active,Cart_Abandoners,Steven Lawrence,,Variant A,2025-11-16T07:48:31Z
+151,Weekend Direct Mail Arrive 151,Direct Mail,2024-05-03,2024-06-17,500.0,494.99,0,0,0,0.0,0.0,0.0,-100.0,Completed,High_LTV,Steven Lawrence,,,2024-04-30T11:18:39Z
+152,Flash Email Page 152,Email,2020-08-06,2020-11-19,911.27,198.61,77414,4878,478,9.8,6.3,0.04,23002.84,Cancelled,High_LTV,Linda Murray,,Control,2020-07-30T01:28:04Z
+153,Holiday Search Other 153,Search,2020-09-13,2020-12-07,571.45,529.82,58954,1240,52,4.19,2.1,0.43,1253.84,Completed,New_Customers_30d,Gerald Martin,Google Ads,Variant B,2020-09-10T05:20:22Z
+154,Flash Social Media Wife 154,Social Media,2021-10-19,2021-12-10,500.0,444.31,577596,29614,1848,6.24,5.13,0.02,20737.59,Completed,Cart_Abandoners,Jessica Jones,LinkedIn,,2021-10-15T03:24:01Z
+155,Holiday Email Marriage 155,Email,2024-08-03,2024-10-30,25019.16,21210.68,8503,108,2,1.85,1.27,196.4,-99.17,Completed,Returning_Customers,Jennifer Ramos,,,2024-08-02T07:59:23Z
+156,Flash Video Walk 156,Video,2025-04-19,2025-10-06,500.0,436.11,13177,1194,93,7.79,9.06,0.37,1054.01,Completed,First_Time_Buyers,Gerald Martin,TikTok,,2025-04-15T14:57:21Z
+157,Weekend Display Change 157,Display,2023-08-21,2023-12-02,669.86,160.12,5798,241,16,6.64,4.16,0.66,1187.06,Cancelled,Inactive_90d,Jessica Jones,Google Ads,Control,2023-08-20T08:48:42Z
+158,Summer SMS Late 158,SMS,2024-05-01,2024-09-27,2008.35,1519.57,16525,289,3,1.04,1.75,5.26,-80.48,Completed,Inactive_90d,Justin Miller,,,2024-04-30T16:08:34Z
+159,Q2 Email Tend 159,Email,2024-10-02,2024-12-18,3160.87,2609.52,328843,5076,297,5.85,1.54,0.51,2014.62,Completed,Mobile_Users,Brenda Martin,,Variant B,2024-09-22T12:28:18Z
+160,Q3 Video Official 160,Video,2020-12-14,2021-02-08,2495.74,2070.43,46224,3550,113,3.18,7.68,0.58,258.03,Completed,First_Time_Buyers,Jessica Jones,TikTok,Control,2020-12-13T16:58:15Z
+161,Holiday SMS Follow 161,SMS,2023-05-30,2023-08-06,500.0,489.26,144623,15824,888,5.61,10.94,0.03,33854.54,Completed,Cart_Abandoners,Jeremy Vargas,,,2023-05-16T10:37:18Z
+162,Summer Social Media Term 162,Social Media,2021-04-08,2021-07-28,1293.91,27.16,1007622,89861,3138,3.49,8.92,0.0,771693.33,Cancelled,New_Customers_30d,Monica Garcia,Instagram,Control,2021-03-31T16:11:12Z
+163,Holiday SMS Ago 163,SMS,2023-10-11,2023-11-19,590.71,36.54,13342,787,32,4.07,5.9,0.05,13746.75,Cancelled,High_LTV,Linda Murray,,Variant A,2023-10-10T06:28:17Z
+164,Spring Display Care 164,Display,2025-11-25,2026-01-21,21986.57,5515.71,390430,37174,1879,5.05,9.52,0.15,6579.71,Paused,Cart_Abandoners,Gerald Martin,Meta Ads,Variant B,2025-11-23T19:44:55Z
+165,Spring Social Media New 165,Social Media,2025-05-20,2025-06-14,7245.74,5654.23,414,24,0,0.0,5.8,235.59,-100.0,Completed,New_Customers_30d,Jessica Jones,Meta Ads,,2025-05-18T23:58:13Z
+166,Q3 Email Three 166,Email,2025-06-07,2025-06-25,1092.08,933.15,8122,955,141,14.76,11.76,0.98,1933.31,Completed,Cart_Abandoners,Ricky Hardy,,Variant A,2025-06-02T13:01:52Z
+167,Flash Email Seven 167,Email,2025-06-13,2025-09-24,500.0,458.69,3407,80,10,12.5,2.35,5.73,204.12,Completed,Loyalty_Members,Ricky Hardy,,Control,2025-06-12T03:59:51Z
+168,Flash Display Similar 168,Display,2021-04-25,2021-06-08,500.0,470.84,32331,2889,415,14.36,8.94,0.16,10831.81,Completed,Holiday_Shoppers,Gerald Martin,Google Ads,,2021-04-22T02:15:07Z
+169,Q1 Direct Mail Truth 169,Direct Mail,2025-07-12,2025-12-24,6605.78,5149.6,0,0,0,0.0,0.0,0.0,-100.0,Completed,Cart_Abandoners,Lisa Dixon,,,2025-07-05T00:41:35Z
+170,Spring Search Doctor 170,Search,2023-10-17,2023-12-15,6202.84,5808.29,1356578,62424,3262,5.23,4.6,0.09,10977.67,Completed,Holiday_Shoppers,Betty Rivas,Google Ads,Variant A,2023-10-15T04:13:19Z
+171,Q4 Display Of 171,Display,2022-02-19,2022-04-12,6359.33,5119.08,230606,15013,1694,11.28,6.51,0.34,4174.05,Completed,Loyalty_Members,Travis Jimenez DDS,Meta Ads,Variant A,2022-02-18T04:30:29Z
+172,Flash Video Simply 172,Video,2021-07-16,2021-10-16,5347.12,5291.53,172312,5646,69,1.22,3.28,0.94,75.86,Completed,First_Time_Buyers,Curtis Mills MD,Google Ads,Variant B,2021-07-11T09:41:00Z
+173,Q1 Display Million 173,Display,2024-11-19,2025-02-27,1482.98,1422.67,2760,47,1,2.13,1.7,30.27,-92.5,Completed,Cart_Abandoners,Brenda Martin,Meta Ads,,2024-11-15T02:48:42Z
+174,Q4 Social Media No 174,Social Media,2022-05-21,2022-06-29,1843.04,1794.9,6257,512,46,8.98,8.18,3.51,386.34,Completed,Returning_Customers,Angela Murray,LinkedIn,Variant A,2022-05-16T13:00:18Z
+175,Summer Direct Mail Why 175,Direct Mail,2023-10-03,2023-11-08,6697.49,5360.31,0,0,0,0.0,0.0,0.0,-100.0,Completed,Returning_Customers,Travis Jimenez DDS,,,2023-09-25T10:03:18Z
+176,Weekend SMS Fine 176,SMS,2021-03-18,2021-04-12,933.18,803.16,8013,721,14,1.94,9.0,1.11,177.31,Completed,High_LTV,Monica Garcia,,Variant A,2021-03-13T23:27:22Z
+177,Q3 Search Day 177,Search,2023-04-24,2023-08-10,4129.22,424.87,36940,4289,129,3.01,11.61,0.1,5869.07,Cancelled,Email_Subscribers,Jeremy Vargas,Google Ads,,2023-04-18T02:15:27Z
+178,Q3 Social Media Mother 178,Social Media,2020-12-11,2021-03-31,9445.92,7509.58,306,18,0,0.0,5.88,417.2,-100.0,Completed,Cart_Abandoners,Juan Chan,Instagram,Variant B,2020-12-10T05:03:34Z
+179,Q4 Direct Mail Reach 179,Direct Mail,2024-04-24,2024-09-15,1688.41,1605.2,0,0,0,0.0,0.0,0.0,-100.0,Completed,Holiday_Shoppers,Jennifer Ramos,,Variant A,2024-04-18T21:58:00Z
+180,Weekend Direct Mail Eat 180,Direct Mail,2022-09-13,2023-03-04,710.32,518.27,0,0,0,0.0,0.0,0.0,-100.0,Completed,Holiday_Shoppers,Hannah Thompson,,Control,2022-09-11T19:04:16Z
+181,Flash SMS Car 181,SMS,2022-01-09,2022-03-28,8763.96,7265.34,28603,313,25,7.99,1.09,23.21,-85.95,Completed,Email_Subscribers,Angela Murray,,,2022-01-05T08:32:33Z
+182,Q3 Video Lot 182,Video,2021-02-21,2021-05-24,567.25,485.29,305684,23170,1467,6.33,7.58,0.02,45618.12,Completed,Returning_Customers,Jessica Jones,TikTok,Variant A,2021-02-20T18:51:30Z
+183,Summer Video Cut 183,Video,2022-06-25,2022-09-09,6379.74,5477.96,4047,162,2,1.23,4.0,33.81,-93.84,Completed,Mobile_Users,Angela Murray,TikTok,,2022-06-24T18:55:05Z
+184,Flash Email Win 184,Email,2022-10-03,2023-02-15,10586.73,9162.07,811608,40824,5301,12.99,5.03,0.22,7542.95,Completed,High_LTV,Kevin Meyer,,Control,2022-10-02T08:11:45Z
+185,Spring Display Final 185,Display,2024-11-10,2025-04-01,500.0,392.28,2385,182,16,8.79,7.63,2.16,97.46,Completed,Email_Subscribers,Linda Murray,Meta Ads,,2024-11-04T13:02:00Z
+186,Flash Search Put 186,Search,2025-06-12,2025-09-30,3415.57,2536.49,15549,518,73,14.09,3.33,4.9,2.18,Completed,Mobile_Users,Jennifer Ramos,Google Ads,Variant A,2025-05-30T18:33:48Z
+187,Weekend Video Field 187,Video,2024-08-10,2024-08-18,504.01,454.97,4157,171,17,9.94,4.11,2.66,65.03,Completed,Mobile_Users,Steven Lawrence,TikTok,Variant B,2024-08-03T12:20:06Z
+188,Spring Display Difficult 188,Display,2022-02-25,2022-06-03,3168.02,2866.07,7193,226,12,5.31,3.14,12.68,-63.25,Completed,High_LTV,Brenda Martin,Meta Ads,,2022-02-23T20:34:15Z
+189,Q1 Direct Mail Recent 189,Direct Mail,2025-04-03,2025-07-23,1365.49,1170.52,0,0,0,0.0,0.0,0.0,-100.0,Completed,Returning_Customers,Betty Rivas,,,2025-03-27T05:12:42Z
+190,Summer Social Media Skin 190,Social Media,2020-08-25,2020-10-08,703.94,605.14,236445,8869,885,9.98,3.75,0.07,5569.32,Completed,Loyalty_Members,Brenda Martin,Instagram,,2020-08-22T02:18:30Z
+191,Summer Display Both 191,Display,2020-05-11,2020-06-28,500.0,405.72,9031,448,58,12.95,4.96,0.91,1782.7,Completed,Holiday_Shoppers,Ricky Hardy,Google Ads,,2020-05-08T04:48:37Z
+192,Weekend SMS After 192,SMS,2026-01-30,2026-03-04,3560.84,0.0,0,0,0,0.0,0.0,0.0,,Planned,Holiday_Shoppers,Travis Jimenez DDS,,Control,2026-01-27T09:00:41Z
+193,Holiday Social Media Those 193,Social Media,2023-03-31,2023-06-28,1494.27,289.61,5569,627,29,4.63,11.26,0.46,872.52,Cancelled,Returning_Customers,Ricky Hardy,Instagram,,2023-03-27T09:08:48Z
+194,Q1 Email Left 194,Email,2022-04-11,2022-08-24,886.92,68.35,277161,2536,202,7.97,0.91,0.03,42363.75,Cancelled,Mobile_Users,Brenda Martin,,,2022-04-04T13:18:54Z
+195,Spring Direct Mail Road 195,Direct Mail,2022-02-27,2022-06-22,1836.73,370.7,0,0,0,0.0,0.0,0.0,-100.0,Cancelled,Returning_Customers,Brenda Martin,,,2022-02-17T04:00:39Z
+196,Summer Display Represent 196,Display,2024-12-20,2025-04-20,1319.54,21.94,23104,2379,114,4.79,10.3,0.01,18617.64,Cancelled,Holiday_Shoppers,Jessica Jones,Meta Ads,Variant A,2024-12-19T03:27:37Z
+197,Q3 Social Media Food 197,Social Media,2023-02-18,2023-03-23,500.0,434.09,3243,365,31,8.49,11.26,1.19,806.05,Completed,High_LTV,Curtis Mills MD,Instagram,,2023-02-17T12:57:18Z
+198,Flash Video Partner 198,Video,2020-11-22,2021-01-24,20089.88,19047.22,347709,32648,3036,9.3,9.39,0.58,1836.1,Completed,Cart_Abandoners,Jeremy Vargas,Google Ads,Control,2020-11-20T09:40:53Z
+199,Q3 Video Deal 199,Video,2022-09-10,2023-01-09,2533.28,2486.8,5965,646,57,8.82,10.83,3.85,-2.89,Completed,New_Customers_30d,Brenda Martin,Google Ads,Variant A,2022-09-08T08:13:54Z
+200,Q4 SMS West 200,SMS,2022-11-04,2023-01-26,500.0,384.56,37199,4411,174,3.94,11.86,0.09,6531.98,Completed,Mobile_Users,Curtis Mills MD,,,2022-11-01T10:28:30Z

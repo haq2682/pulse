@@ -1,0 +1,151 @@
+supplier_id,supplier_name,supplier_rating,supplier_status,is_preferred,is_verified,contract_start_date,contract_end_date,city,state,zip_code,country,tax_id,created_at,contact_email,phone_number
+1,"Rodriguez, Figueroa and Sanchez",3.67,Inactive,False,False,2023-08-02,2026-11-12,Lake Curtis,PA,65302,US,79-2458591,2023-08-01T10:00:48Z,garzaanthony@robinson.org,+10013389083
+2,Hoffman Ltd,4.01,Active,False,True,2024-01-06,2029-01-04,Robinsonshire,North Holland,7924 LJ,NL,NL914763202,2023-12-28T08:24:57Z,lisa02@henderson.com,+312351161559
+3,Davis Inc,3.78,Active,False,True,2021-06-25,2027-07-15,Melanieview,Provence,19116,FR,FR488302652,2021-06-12T03:38:03Z,blairamanda@miller-carter.org,+330341316475
+4,Ray-Bush,2.98,Under Review,False,False,2020-11-29,2028-06-10,Lake Jeremyport,BC,Y4H 8R5,CA,CA754049436,2020-11-19T13:01:24Z,wyattmichelle@ramirez-reid.com,+18350305641
+5,Wood and Sons,4.6,Active,False,True,2021-03-08,2026-03-07,Jacquelineland,GA,44718,US,92-8698256,2021-02-22T06:37:34Z,amandasanchez@gray-mayo.net,+12388496965
+6,Cohen Inc,,Pending,False,False,2021-03-25,2026-08-10,Port Antonio,GA,92240,US,,2021-03-19T23:29:37Z,richard13@walter.biz,+12691669784
+7,"Ellis, Baker and Wright",4.33,Active,False,True,2025-06-11,2030-06-10,Juliechester,DE,48469,US,44-6707197,2025-05-14T13:22:34Z,icox@snyder.com,+16270482814
+8,"Moore, Becker and Carlson",4.35,Active,False,True,2024-09-19,2029-09-18,Jamesmouth,Saitama,100-6310,JP,JP936043811,2024-09-03T19:52:26Z,tasha01@dyer.com,+817015430391
+9,Carter and Sons,3.16,Inactive,False,False,2020-06-24,2024-06-23,Smithview,BC,V9H 5W7,CA,CA235034324,2020-05-31T08:38:18Z,williamrodriguez@evans.com,+13834657871
+10,Farmer-Ryan,4.78,Active,True,True,2021-05-22,2028-01-11,New Mariotown,Bavaria,40007,DE,DE777641645,2021-05-20T00:37:07Z,hickmannatasha@allen-allen.org,+491051834738
+11,Miller Group,2.82,Suspended,False,True,2020-09-27,2027-10-20,Port Amandaberg,MN,65519,US,22-8231838,2020-09-19T11:21:02Z,donnaarroyo@baker.biz,+16701065133
+12,Hickman Ltd,4.21,Active,True,True,2021-01-24,2026-01-23,Lake Larry,Vastra Gotaland,927 80,SE,SE180943908,2021-01-12T09:39:43Z,samuel87@wright.com,+461080132677
+13,Chapman and Sons,5.0,Under Review,False,True,2021-03-13,2026-06-25,North Chad,Delhi,399105,IN,IN941889393,2021-02-14T20:18:54Z,perezrebecca@jones-young.info,+916872343098
+14,Ryan Ltd,,Pending,False,False,2020-05-04,2027-11-19,Sanchezfort,ND,30635,US,,2020-05-02T03:39:04Z,glee@jordan.com,+10812191361
+15,"Valdez, Lucas and Brown",3.11,Active,False,True,2025-04-12,2030-04-11,Laurenville,MA,44179,US,84-9770838,2025-04-11T00:37:20Z,jamesherrera@henderson.info,+13534624751
+16,Baxter Inc,3.4,Inactive,False,True,2020-01-20,2024-01-19,Mortonside,KY,27361,US,37-9487336,2020-01-13T15:58:03Z,williamsyvette@novak.com,+15135427849
+17,Tucker-Lewis,3.87,Active,False,True,2024-07-10,2029-07-09,Barreraburgh,DE,24029,US,27-5437001,2024-07-09T20:11:32Z,ysmith@house-glover.com,+18244935348
+18,Horton-Cross,,Pending,False,False,2022-09-27,2027-08-30,Mooreport,England,A6 3LG,GB,,2022-08-31T11:11:06Z,tanyariley@brown.info,+447868011280
+19,"Calhoun, Schmidt and Brown",3.45,Active,False,True,2024-09-05,2027-09-05,Port Jacobland,IN,99399,US,15-7003042,2024-08-30T09:52:09Z,richarddavid@sanchez.biz,+13158692322
+20,"Silva, Mills and Donovan",2.71,Inactive,False,False,2024-12-10,2028-12-09,Lake Jennifer,LA,30866,US,62-5163555,2024-12-09T06:31:49Z,josephanderson@evans.com,+11607337543
+21,Ellis PLC,,Pending,False,False,2021-04-01,2027-04-04,North Amandahaven,MB,P9R 9N1,CA,,2021-03-14T16:30:22Z,david51@wood.info,+11429401965
+22,"Warner, Carr and Archer",3.85,Active,False,False,2024-02-01,2027-01-31,Lake Lisaport,AZ,67154,US,34-5273534,2024-01-30T09:55:31Z,mcmillandennis@preston.net,+10883561595
+23,Nelson PLC,3.06,Active,False,True,2023-09-20,2027-05-05,Lake Matthew,IL,65108,US,80-3135534,2023-09-17T20:18:55Z,william40@walters.com,+16299468044
+24,Cook and Sons,4.13,Active,False,True,2021-03-06,2027-09-18,Evanmouth,ME,77561,US,31-2422633,2021-02-23T15:26:51Z,hhoffman@landry.com,+19513433200
+25,"Johnson, Wood and Tran",,Pending,False,False,2021-05-16,2027-08-21,Andersonport,Scotland,N8 7JF,GB,,2021-05-14T15:40:38Z,rachel05@fleming.com,+440163287083
+26,Deleon-Henson,3.16,Suspended,False,False,2025-02-21,2026-02-21,Dicksonberg,TAS,5625,AU,AU700141462,2025-02-09T05:40:32Z,michellecherry@keith.com,+619868727743
+27,"Middleton, Patton and Jenkins",4.88,Active,True,True,2024-09-16,2027-09-16,West Erik,LA,54020,US,46-4934149,2024-09-14T12:35:47Z,reyesbenjamin@walker-velasquez.info,+15812236231
+28,Torres-Pope,3.25,Active,False,True,2022-04-29,2026-04-28,East Andrew,England,U7 8AQ,GB,GB518197538,2022-04-24T14:02:49Z,raymondramirez@rasmussen.com,+444668893734
+29,"Hicks, Frazier and Anthony",3.57,Active,False,True,2022-06-11,2026-06-10,Sheilaville,NB,G9A 7Y1,CA,CA277215428,2022-06-10T14:09:28Z,gregory40@carlson.com,+11627204653
+30,Obrien-Dixon,4.37,Inactive,False,True,2022-07-20,2025-07-19,Lamborough,CO,71644,US,63-5232413,2022-07-18T05:43:27Z,bradley60@frost.com,+10805310033
+31,Reynolds-Rush,2.94,Active,True,True,2024-09-14,2027-10-20,Cindyville,MB,P3Z 2H5,CA,CA851044796,2024-08-28T16:46:08Z,william65@terry-spencer.com,+11904966319
+32,Ortega-Gray,3.96,Inactive,False,False,2023-11-15,2025-11-14,New Ashley,MN,79827,US,25-1689025,2023-11-12T19:55:16Z,akelley@mitchell-jordan.org,+16518506716
+33,"Pena, Marshall and Ramos",4.71,Active,True,True,2025-05-21,2028-05-20,New Thomas,SC,80539,US,76-5531230,2025-05-20T02:45:25Z,donnacampbell@schultz.com,+17769453147
+34,"Collins, Drake and Hernandez",2.67,Active,False,False,2021-05-14,2027-06-02,East Traceyland,South Holland,4475 MJ,NL,NL295249057,2021-05-09T19:32:38Z,operry@lee.com,+315494808313
+35,Douglas Inc,3.93,Inactive,False,False,2024-01-14,2028-01-13,Port Ronaldburgh,Skane,602 67,SE,SE793532952,2024-01-11T11:24:48Z,pwilliams@bryant.net,+460143634957
+36,"Larson, Dodson and Vance",3.98,Under Review,False,False,2023-02-07,2028-02-06,Rivasside,NT,4219,AU,AU477753674,2023-01-31T03:56:13Z,vmerritt@cole-walton.com,+614431351823
+37,"Washington, Allen and Gonzales",4.35,Active,True,True,2021-03-19,2028-08-09,Jimmymouth,IA,57301,US,34-5970190,2021-03-18T19:03:02Z,patricia12@hall.com,+12408240084
+38,"Lewis, Perry and Rivera",2.93,Active,False,True,2023-11-29,2028-12-02,Perryborough,AR,43092,US,53-4093109,2023-11-26T06:31:59Z,xprice@shah.org,+17116719022
+39,Woods-Bender,2.88,Under Review,False,True,2024-07-19,2029-07-18,Karenchester,Hesse,89471,DE,DE920814900,2024-07-10T00:48:38Z,tracynelson@johnson-rogers.biz,+499938677496
+40,"Martin, Mcdonald and Anderson",4.17,Active,False,True,2021-09-17,2026-09-16,South Brittanytown,KY,96563,US,36-4540415,2021-08-29T11:05:12Z,dayderek@white-green.com,+11232812067
+41,Gibson LLC,4.01,Active,True,True,2023-11-12,2028-11-10,Ramirezchester,UT,40595,US,68-2194198,2023-11-03T01:40:15Z,mary70@ryan.com,+14936183242
+42,"Williams, Johnson and Wright",,Pending,False,False,2020-05-26,2028-07-28,New Elijahberg,Wales,P2 8NR,GB,,2020-05-24T19:26:05Z,kcaldwell@marshall.com,+444887719065
+43,Obrien Ltd,3.98,Active,False,True,2023-05-21,2026-05-20,Port Loriport,WI,98117,US,85-1348050,2023-05-20T03:19:30Z,lanesarah@byrd.com,+14902787429
+44,Vargas Ltd,4.04,Active,False,True,2022-06-11,2026-06-10,North Heidi,Campania,63955,IT,IT272684373,2022-06-09T10:13:30Z,melissa91@patton.com,+397468071545
+45,Hunter LLC,3.32,Inactive,False,True,2020-08-25,2024-08-24,Port Robertfort,NE,17104,US,79-8750676,2020-08-21T23:32:53Z,hamiltonmichael@zimmerman-graham.net,+13859770348
+46,"Nelson, Morton and Medina",3.96,Active,True,True,2020-09-25,2028-03-29,Marshallshire,Bavaria,82384,DE,DE691458887,2020-09-21T18:21:54Z,marcus31@keith-sanchez.info,+496131712748
+47,"Bishop, Gray and Johnson",4.01,Under Review,False,True,2023-12-15,2026-12-14,Hunterborough,MO,34983,US,80-3426689,2023-12-12T17:04:34Z,lauren54@haynes.com,+19821465840
+48,Allen Group,3.3,Inactive,False,False,2021-08-02,2024-08-01,Petersbury,Wales,L9 9RT,GB,GB620057604,2021-07-29T18:28:20Z,fbrewer@mcguire-davis.com,+445339636057
+49,Holt-Torres,5.0,Active,False,True,2023-12-15,2027-12-14,Thomashaven,Wales,D8 2WT,GB,GB733701411,2023-12-05T16:36:27Z,ronald85@warner-nelson.com,+440262174596
+50,Martinez and Sons,4.13,Inactive,False,False,2023-08-23,2024-08-22,Davidside,SD,73956,US,58-6312692,2023-08-10T22:48:23Z,jamesrodgers@hardy-bray.net,+18091343161
+51,"Campbell, Garcia and Lee",2.97,Active,True,True,2024-04-06,2026-07-22,West Harry,Vastra Gotaland,249 41,SE,SE502482554,2024-03-26T00:54:52Z,ericksondavid@mccann.com,+468692221969
+52,"Raymond, Little and Mullins",4.26,Active,False,True,2023-10-31,2027-10-08,Port Alexanderport,NT,4356,AU,AU963968184,2023-10-29T03:42:49Z,vmendoza@sheppard.info,+618217594647
+53,Short Group,,Pending,False,False,2024-09-27,2027-09-27,Joneston,Madrid,41091,ES,,2024-09-24T16:03:00Z,edwardhart@miller-wright.net,+346959440640
+54,Obrien-Gibbs,3.12,Inactive,False,False,2023-03-05,2024-03-04,Port Alexandra,Lazio,89569,IT,IT407298630,2023-03-04T10:30:53Z,tkerr@branch.org,+395339421047
+55,"Garcia, Farmer and Garrett",4.35,Active,True,True,2020-03-09,2027-04-21,Donnaburgh,NL,P9W 5H5,CA,CA944511703,2020-03-05T21:18:54Z,glennjones@ortiz.org,+17451712368
+56,Carter-Hall,4.61,Active,False,True,2022-01-19,2027-12-24,Jacquelinemouth,Valencia,93695,ES,ES381493671,2022-01-12T03:42:45Z,mcdanielsandra@lawrence.com,+345137098593
+57,"Walker, Hernandez and Baker",3.23,Active,True,True,2023-08-19,2028-06-09,North Brian,NY,25220,US,14-6106390,2023-08-17T23:55:49Z,brooke94@martinez-barker.biz,+11382675869
+58,Mason-Snyder,4.47,Active,False,True,2024-02-29,2026-02-28,New Billchester,VT,58566,US,45-1548888,2024-02-20T03:22:31Z,cassandra01@hayden.org,+13773515850
+59,Key Ltd,4.09,Inactive,False,False,2022-03-26,2025-03-25,Barbaraburgh,TN,93819,US,21-4558545,2022-03-20T11:34:53Z,cstone@white-richards.info,+19005329318
+60,Harrison Group,4.38,Active,False,True,2021-02-28,2026-02-27,Manuelville,GA,27038,US,10-5651899,2021-02-23T19:51:56Z,marksteele@bates-morales.net,+18421020539
+61,Gibson LLC,5.0,Active,True,True,2021-10-25,2028-07-21,Marcusfurt,NC,87812,US,67-7074006,2021-10-20T14:38:49Z,sandovalamy@brown-stone.org,+11783908470
+62,Garrett-Wolf,3.63,Active,False,False,2020-05-04,2026-10-11,West Andrea,MA,89730,US,19-2355439,2020-04-25T11:55:04Z,samuel71@dudley.com,+12124998569
+63,"Moore, Pierce and Tran",3.27,Suspended,False,True,2022-12-22,2026-10-02,East Victoriaville,Telangana,855855,IN,IN802992685,2022-12-19T06:30:17Z,pvalentine@jimenez.com,+913673657661
+64,"Thornton, Perry and Olson",3.18,Active,True,True,2021-10-02,2026-11-26,Sanchezside,NV,22656,US,20-2564141,2021-09-29T01:43:36Z,patrickweeks@francis.biz,+15280988516
+65,Villa-Romero,3.23,Inactive,False,False,2021-12-25,2025-12-24,West Jessicashire,OR,76507,US,55-2738129,2021-11-29T11:56:20Z,cgrimes@washington.biz,+13273158514
+66,Cantu-Kane,3.75,Inactive,False,False,2023-03-21,2025-03-20,New Patrick,England,W5 1GL,GB,GB978779150,2023-03-15T19:57:07Z,vwilliams@thornton-shepherd.biz,+444550229612
+67,"Sparks, Pearson and Hernandez",4.04,Active,False,True,2024-02-26,2027-07-13,East Wayneshire,AR,30392,US,51-2425342,2024-02-25T06:19:48Z,molly71@lozano.com,+12901476797
+68,Harrison LLC,3.99,Active,False,True,2022-04-28,2027-09-06,Cindyfurt,SA,2372,AU,AU665791188,2022-04-27T05:13:54Z,christianmelissa@james.info,+613690034324
+69,"Johnson, Jones and Welch",4.38,Active,False,True,2021-08-15,2027-09-06,Wendyland,CA,62044,US,74-6941939,2021-08-11T01:07:32Z,wgood@padilla.com,+10607159696
+70,Williams Inc,3.81,Active,False,False,2023-12-24,2027-12-23,Michaelchester,Nuevo Leon,70305,MX,MX284547422,2023-12-15T09:32:48Z,johnjenkins@sparks.biz,+525161369681
+71,"Vega, Jimenez and Aguilar",4.82,Active,True,True,2022-03-21,2028-08-28,South Dana,WA,4862,AU,AU647556857,2022-03-05T05:46:50Z,ascott@santana-byrd.com,+615231243292
+72,Alexander LLC,3.61,Inactive,False,False,2024-04-05,2025-04-05,Daniellechester,UT,83989,US,82-8531380,2024-04-04T18:32:31Z,stephen43@castaneda-rodriguez.biz,+19552717744
+73,"Howard, Phillips and Lyons",5.0,Active,False,True,2023-04-26,2027-10-08,Port Dominiqueview,SC,87867,US,19-2514923,2023-04-20T03:46:21Z,knightgina@beltran.com,+18679807935
+74,Lawson LLC,4.24,Under Review,False,True,2023-05-24,2027-05-23,Lake James,TAS,7851,AU,AU970768982,2023-05-10T15:52:58Z,erica21@lucas.org,+611820377889
+75,Oconnor-Davis,3.2,Inactive,False,False,2020-11-21,2027-08-15,Markchester,Saxony,92691,DE,DE156227043,2020-11-20T03:22:06Z,jamesbuchanan@schmidt-mcintyre.com,+495151864492
+76,Sloan-Raymond,3.05,Active,False,True,2021-11-13,2027-06-16,Juliemouth,Ile-de-France,50577,FR,FR238460786,2021-11-10T02:34:55Z,mcdonaldcharles@dalton.biz,+338652816850
+77,"Diaz, Gibbs and Smith",4.14,Active,True,True,2022-01-12,2028-08-15,South Miguelview,SA,2828,AU,AU182855381,2022-01-11T18:31:26Z,xcarson@leonard.com,+618880592962
+78,"Henson, Hoffman and Herman",3.64,Inactive,False,True,2020-11-28,2022-11-28,Lake Bryan,NH,90031,US,56-4985095,2020-11-09T00:52:01Z,tblankenship@ortiz.com,+14738347359
+79,Wilson-Young,4.3,Inactive,False,False,2022-06-21,2026-06-20,South Shawn,IL,89254,US,63-3718884,2022-06-09T16:17:16Z,umatthews@mcclure.com,+12407581814
+80,Gilbert-Crosby,4.13,Inactive,False,True,2020-06-20,2022-06-20,Antoniostad,IA,69130,US,65-2538698,2020-06-16T10:52:25Z,scottsampson@garcia-jennings.net,+15060685361
+81,"Howard, Sanders and Lopez",3.75,Inactive,False,False,2022-02-06,2024-02-06,Port Madisonland,Kanagawa,910-3392,JP,JP797889971,2022-02-05T11:36:10Z,darleneharper@williams.com,+812047277901
+82,Buchanan and Sons,3.21,Active,False,True,2020-02-08,2028-07-06,Port Kathyborough,MB,E1K 7Z8,CA,CA355164255,2020-02-02T19:33:02Z,lisahall@kramer.com,+11179808932
+83,Garrison-Thomas,2.74,Active,True,True,2021-08-19,2028-01-28,New John,ND,81313,US,56-2135470,2021-08-18T22:23:04Z,danieldelacruz@smith.org,+18880670654
+84,Smith-Baker,3.49,Inactive,False,False,2024-03-10,2027-02-24,Lake Robert,FL,15811,US,84-6578736,2024-03-07T13:40:23Z,reesethomas@palmer-rodriguez.net,+15852772217
+85,Dougherty Inc,4.4,Inactive,False,False,2020-03-16,2023-03-16,Stephentown,NC,62196,US,50-6202210,2020-03-09T12:45:34Z,lutzmelanie@parks-henry.info,+18740345054
+86,Lam LLC,3.95,Inactive,False,False,2020-09-11,2023-09-11,North David,ID,75038,US,59-6688090,2020-09-06T17:01:46Z,oscar98@chavez-jacobs.com,+17584161692
+87,"Wilson, Pena and Rich",2.93,Active,False,True,2023-01-22,2026-01-21,South Shannon,Auvergne-Rhone-Alpes,31842,FR,FR747060047,2023-01-12T05:53:01Z,robertwilcox@perry-davis.biz,+337570596401
+88,Ortega-Brooks,3.92,Suspended,False,False,2023-10-06,2027-10-05,Lake Sandra,BC,T1G 2K6,CA,CA133436988,2023-09-30T05:26:49Z,davischristopher@davis-rodgers.com,+15690927557
+89,"Brown, Frye and Hoffman",4.07,Active,False,True,2024-04-11,2027-08-04,South Michaelchester,Osaka,611-9482,JP,JP127824235,2024-03-26T08:12:47Z,schmittcaroline@garcia-romero.com,+816814473947
+90,"Olson, Boone and Bell",3.18,Active,False,True,2021-02-13,2028-06-22,Dannyview,Wales,C9 9NN,GB,GB443154754,2021-02-08T10:47:04Z,lindsaybruce@austin.com,+442258313237
+91,White Ltd,3.91,Under Review,False,True,2020-02-23,2028-09-22,Sandrastad,MD,62187,US,21-2103070,2020-02-18T21:22:32Z,whitedouglas@morales.com,+17866912517
+92,Reese and Sons,,Pending,False,False,2022-08-12,2027-08-11,Barnesmouth,Saxony,82260,DE,,2022-08-01T13:22:48Z,mitchellgriffith@carlson.org,+499226801824
+93,Craig LLC,,Pending,False,False,2020-12-03,2027-12-06,Stanleyfort,Ile-de-France,42847,FR,,2020-11-30T14:36:28Z,nperry@wilson.org,+333842498182
+94,Rose-Parker,3.84,Active,False,True,2023-04-27,2028-04-25,South Tracey,England,A2 1YL,GB,GB705180256,2023-04-23T00:55:58Z,smithkevin@saunders.com,+443969078447
+95,Wilson-Jimenez,3.0,Active,False,True,2021-05-16,2026-08-23,Thompsonfurt,QLD,4560,AU,AU465278987,2021-05-11T12:06:15Z,vincentwhitaker@jones-hensley.com,+615562588153
+96,Smith-Morse,4.05,Active,False,False,2022-08-13,2026-09-30,Barbarashire,Northern Ireland,H3 6YP,GB,GB760756497,2022-08-09T10:57:15Z,amckinney@wilson-smith.com,+443278774701
+97,Solis PLC,4.19,Under Review,False,True,2025-04-19,2029-04-18,Collierstad,England,B5 8ZU,GB,GB478918222,2025-04-13T02:21:22Z,kimdaniel@chapman-warren.biz,+444801624565
+98,Reese-Walker,4.56,Active,False,True,2020-04-02,2027-06-29,North William,SC,99181,US,80-5692934,2020-04-01T17:31:35Z,schmidtjames@bell-mullen.com,+19121655852
+99,Garcia LLC,4.54,Active,True,True,2021-02-11,2026-02-10,East Carrie,ND,69898,US,52-8948107,2021-02-03T17:49:29Z,thompsonkendra@marshall-elliott.org,+12982595269
+100,Maldonado-Macias,2.84,Active,False,True,2024-02-23,2027-02-22,Michellemouth,NM,12180,US,82-6029651,2024-02-12T03:57:06Z,scottharrison@turner.net,+15516940974
+101,Collins Group,3.14,Inactive,False,False,2025-06-03,2030-06-02,North Miguelport,SD,91230,US,31-9795159,2025-05-20T12:33:12Z,newmantiffany@gilbert.biz,+16230913075
+102,Carpenter-Best,4.16,Active,False,True,2022-05-07,2028-08-24,South Reginashire,ON,G9J 9N8,CA,CA881042056,2022-04-27T22:46:31Z,marcalvarez@rosario.com,+18652785854
+103,Haas-Miller,4.16,Active,False,True,2023-06-03,2027-06-02,North John,VA,37168,US,48-5848684,2023-05-29T23:48:14Z,hritter@bishop.biz,+17575844198
+104,Schroeder-Shelton,4.16,Under Review,False,False,2022-02-16,2026-02-15,Port Crystalmouth,England,K2 6TL,GB,GB411871167,2022-02-05T18:06:39Z,riveraangela@mitchell-cummings.org,+447338484219
+105,Cook PLC,5.0,Active,False,False,2024-02-26,2029-02-24,West Kyle,Lazio,16880,IT,IT342313086,2024-02-20T22:37:15Z,tanderson@collins.com,+391657120826
+106,Santiago Ltd,4.2,Active,False,False,2023-08-30,2027-08-29,Lake Ellenhaven,TN,17754,US,51-5788474,2023-08-29T18:57:58Z,andrew42@peterson.com,+11938026206
+107,Cooke and Sons,4.59,Inactive,False,False,2024-06-01,2028-05-31,West Meganville,AL,49110,US,47-1628578,2024-05-31T16:24:12Z,stanleynancy@anderson.org,+19915478872
+108,Griffith Inc,4.47,Active,True,True,2024-10-08,2029-10-07,Diazbury,Occitanie,34405,FR,FR592755658,2024-09-29T14:56:20Z,wbishop@bowers.info,+330549329668
+109,Richardson PLC,4.26,Active,False,False,2021-11-02,2026-11-13,Murrayport,MO,40870,US,10-5375250,2021-10-22T07:33:57Z,ashaw@montoya.com,+17454990453
+110,Williams-Castillo,3.58,Active,False,False,2020-05-07,2028-05-25,Angelaville,SD,48671,US,49-2969909,2020-04-29T10:43:39Z,mitchellkathryn@cole-palmer.biz,+15933272795
+111,Potts and Sons,4.33,Inactive,False,False,2022-05-01,2027-04-30,Wilkersontown,UT,88094,US,37-5151780,2022-04-23T20:33:16Z,gbrown@young-vang.com,+11878519108
+112,Johnson Inc,3.26,Active,False,True,2025-01-23,2030-01-22,Laceyberg,UT,36922,US,66-2950183,2025-01-22T22:48:41Z,mitchellmaria@guerra.org,+19718707286
+113,Bullock Inc,3.63,Active,False,True,2022-07-24,2027-07-23,Jasonberg,Andalusia,10395,ES,ES525146690,2022-07-23T16:41:25Z,srodriguez@turner.com,+343910651801
+114,Fowler-Dean,3.46,Active,False,True,2025-03-27,2029-03-26,North Maryfort,ACT,5067,AU,AU883068639,2025-03-25T20:54:19Z,chenbailey@thomas.com,+616766182512
+115,"Butler, Beck and Miller",3.86,Inactive,False,True,2023-01-05,2027-01-04,Carloshaven,ON,M8X 7X7,CA,CA103729417,2022-12-22T02:11:06Z,myerstheodore@hughes.com,+13375243106
+116,Cooper Ltd,5.0,Active,False,True,2023-06-13,2028-02-21,Port Bonniemouth,Osaka,858-1724,JP,JP152265802,2023-06-07T12:01:32Z,bradleypayne@thompson.info,+816738302843
+117,"White, Taylor and Baldwin",2.49,Active,False,True,2024-07-28,2029-07-27,Johnsonborough,QLD,7408,AU,AU424017094,2024-07-24T00:12:06Z,moodynina@mahoney-robertson.net,+618364408926
+118,King-Mullins,4.28,Under Review,False,False,2023-02-12,2027-02-11,West Michael,VT,64568,US,77-6347476,2023-02-11T01:04:46Z,glennmartin@lloyd.biz,+16246287334
+119,"Gonzales, Huber and Morgan",,Pending,False,False,2024-10-22,2026-10-22,South Heather,Veneto,64090,IT,,2024-10-18T11:27:48Z,sandra84@acosta.biz,+396882634351
+120,"Carney, White and Carter",2.67,Active,True,True,2025-03-03,2029-03-02,North Markport,Northern Ireland,Z1 2HY,GB,GB388258432,2025-02-21T00:20:11Z,sean62@wallace.com,+448373540331
+121,"Bolton, Hill and Whitney",3.47,Active,False,True,2024-03-09,2028-03-08,North Emilyfurt,TAS,4318,AU,AU356979659,2024-02-19T18:38:29Z,william20@allison.info,+616785445877
+122,Martinez and Sons,4.56,Inactive,False,False,2020-07-20,2024-07-19,Michaelshire,Lombardy,83731,IT,IT544454140,2020-07-10T13:05:55Z,jacobserika@watson-hines.org,+393204899642
+123,Moreno Group,3.84,Active,False,True,2021-02-05,2027-03-01,Debrabury,WA,94108,US,42-9197701,2021-02-01T14:38:10Z,johnsonjacob@hughes.com,+17725228728
+124,"Griffin, Davies and Mitchell",3.05,Inactive,False,True,2023-08-07,2024-08-06,Gonzalezberg,WI,10836,US,95-1813936,2023-07-21T19:42:13Z,hayesrachel@osborn-cochran.com,+16231203875
+125,"Reed, Brown and Daniels",3.3,Inactive,False,False,2020-05-03,2025-05-02,Melissaburgh,AK,10866,US,94-9184838,2020-04-28T04:24:46Z,william13@young.com,+18860084840
+126,Spencer-Wood,4.28,Active,True,True,2022-10-25,2026-10-24,New Nicole,KY,56457,US,34-9832465,2022-10-07T16:51:39Z,parkeryvonne@mendoza.org,+14615679334
+127,Martinez LLC,3.29,Active,False,True,2023-11-01,2026-07-25,South Stevenhaven,NSW,7757,AU,AU160252954,2023-10-31T19:56:56Z,david89@saunders.biz,+612176591803
+128,"Bartlett, Brown and Martinez",3.95,Active,False,True,2021-03-08,2026-03-07,West Fred,Saitama,773-1539,JP,JP683074772,2021-02-26T13:55:27Z,sarah35@jacobson.net,+812503926142
+129,Martinez-Turner,3.83,Active,True,True,2023-02-28,2027-12-28,New Danielleshire,NC,55332,US,98-2315798,2023-02-18T10:42:00Z,georgeweber@morgan.com,+10163159996
+130,Williams Ltd,3.34,Active,False,False,2025-06-07,2028-06-06,Debrashire,Scotland,M9 7SG,GB,GB626781451,2025-06-06T23:05:15Z,bmontgomery@small-gardner.com,+449619431142
+131,Sanchez-Aguirre,5.0,Active,False,False,2022-02-17,2026-10-10,Evansland,WI,45358,US,66-7038413,2022-02-02T10:58:16Z,moorerobert@harris-lawson.com,+11212678886
+132,"Flores, Travis and Reed",4.24,Active,False,True,2020-07-30,2028-02-24,Andersonstad,MO,21101,US,47-7942580,2020-07-28T01:46:16Z,floressteven@cole-thomas.com,+18398262244
+133,Dougherty-Lin,2.38,Active,True,True,2021-07-03,2027-04-01,Wrightburgh,WA,91924,US,42-5137094,2021-06-28T09:12:50Z,sarah53@jimenez.info,+17993712406
+134,Koch-Jimenez,3.93,Active,False,True,2021-11-11,2026-11-10,South Williambury,MD,52030,US,93-3283789,2021-11-05T23:58:19Z,brandywilliams@simpson-khan.info,+19375265479
+135,Herrera-Boone,3.34,Active,False,True,2024-05-20,2026-05-20,Andersonview,North Holland,9939 FY,NL,NL705429879,2024-05-13T13:32:02Z,kathryn50@williams-hoffman.com,+318073741672
+136,"Roberts, Hughes and Cole",4.4,Active,False,True,2023-07-21,2026-07-20,Marciaville,RI,72814,US,19-8534089,2023-07-16T01:35:55Z,theresalong@grant-diaz.com,+19688680589
+137,Morrison Group,3.25,Active,False,True,2023-07-30,2027-06-21,North Benjaminmouth,Northern Ireland,L7 2AE,GB,GB792596980,2023-07-27T12:09:04Z,jstone@barry.com,+444388899375
+138,Long PLC,3.72,Active,False,False,2022-03-12,2026-03-11,Brittneyhaven,Bavaria,48722,DE,DE618371508,2022-03-11T07:05:05Z,terickson@cabrera-richardson.com,+496112545738
+139,Silva-Robles,4.15,Active,True,True,2022-09-16,2028-06-05,New Thomasshire,MI,94930,US,24-1378915,2022-09-02T08:52:10Z,jennifersilva@warren.org,+11238282586
+140,Hernandez-Becker,4.41,Active,False,True,2025-05-16,2029-05-15,New Stacyville,Sao Paulo,90492-302,BR,BR524753348,2025-05-12T21:58:43Z,andrewedwards@gutierrez.biz,+557966033419
+141,"Hampton, Knapp and Salas",2.96,Active,False,True,2020-07-27,2027-10-04,Lake Devinborough,Vastra Gotaland,711 59,SE,SE786237617,2020-07-23T05:16:20Z,whitney78@edwards-thompson.net,+469691557924
+142,Payne-Lowe,3.57,Active,True,True,2025-02-24,2030-02-23,Chelseaborough,MS,28528,US,24-4070977,2025-02-07T01:22:17Z,joshuaevans@wise-bush.info,+18669296627
+143,Castillo-Castro,3.47,Active,False,False,2023-07-25,2028-07-23,Keithshire,Scotland,R5 3GP,GB,GB695832844,2023-07-24T07:27:00Z,zhuang@blevins-ballard.com,+447905072368
+144,Roberts Ltd,3.34,Active,False,True,2022-11-01,2026-10-31,West Sandraview,WI,38905,US,20-1517756,2022-10-29T22:27:03Z,ilewis@fitzpatrick-horton.com,+14043842797
+145,Gilbert PLC,5.0,Active,False,True,2023-01-30,2028-01-29,East Brent,WI,67850,US,56-1698108,2023-01-29T11:24:27Z,danawilliams@rivera-kennedy.com,+18361340745
+146,Oconnell and Sons,4.08,Inactive,False,True,2024-10-31,2025-10-31,Delgadofort,VA,89988,US,85-6882609,2024-10-18T20:22:56Z,wsantos@morris-brewer.com,+16292330958
+147,"Andrews, Nichols and Sharp",2.92,Active,True,True,2021-07-29,2026-07-28,East Robertburgh,NL,E3S 1L3,CA,CA387057426,2021-07-15T02:05:12Z,osbornrandy@lopez-curry.com,+12325367294
+148,Smith PLC,4.44,Active,False,True,2023-07-09,2027-07-08,West Justinside,Wales,M8 8PY,GB,GB532557724,2023-07-06T23:18:15Z,ismall@mcdonald.com,+440175186363
+149,"Stevens, Scott and Lopez",5.0,Active,False,True,2022-10-10,2028-01-04,Krystalshire,AZ,23051,US,53-1812172,2022-10-09T01:16:21Z,gregorychase@wilcox-robertson.com,+17012770632
+150,Caldwell-Lopez,4.52,Under Review,False,True,2024-12-11,2027-12-11,South Marcus,KY,20803,US,93-7047102,2024-12-10T07:20:49Z,adamreyes@molina-finley.com,+15206436110

@@ -1,0 +1,63 @@
+cat_id,cat_name,sub_cat,display_sequence,url_slug,active_flag,date_created,category_desc,hierarchy_level,product_count,breadcrumb_path,parent_cat_id
+1,Electronics,,1,electronics,True,2020-01-21T17:18:26Z,Browse our electronics collection with top-rated products and brands.,0,273,Electronics,
+2,Smartphones,Electronics,1,electronics-smartphones,True,2020-02-06T17:18:26Z,Explore smartphones in electronics with curated selections and deals.,1,41,Electronics > Smartphones,1.0
+3,Laptops,Electronics,2,electronics-laptops,True,2020-02-09T17:18:26Z,Explore laptops in electronics with curated selections and deals.,1,35,Electronics > Laptops,1.0
+4,Tablets,Electronics,3,electronics-tablets,True,2020-02-12T17:18:26Z,Explore tablets in electronics with curated selections and deals.,1,41,Electronics > Tablets,1.0
+5,Audio,Electronics,4,electronics-audio,True,2020-01-22T17:18:26Z,Explore audio in electronics with curated selections and deals.,1,37,Electronics > Audio,1.0
+6,Cameras,Electronics,5,electronics-cameras,True,2020-02-17T17:18:26Z,Explore cameras in electronics with curated selections and deals.,1,38,Electronics > Cameras,1.0
+7,Wearables,Electronics,6,electronics-wearables,True,2020-02-18T17:18:26Z,Explore wearables in electronics with curated selections and deals.,1,37,Electronics > Wearables,1.0
+8,Accessories,Electronics,7,electronics-accessories,True,2020-01-26T17:18:26Z,Explore accessories in electronics with curated selections and deals.,1,44,Electronics > Accessories,1.0
+9,Clothing,,2,clothing,True,2020-01-23T05:29:05Z,Browse our clothing collection with top-rated products and brands.,0,237,Clothing,
+10,Men,Clothing,1,clothing-men,True,2020-02-05T05:29:05Z,Explore men in clothing with curated selections and deals.,1,33,Clothing > Men,9.0
+11,Women,Clothing,2,clothing-women,True,2020-02-18T05:29:05Z,Explore women in clothing with curated selections and deals.,1,40,Clothing > Women,9.0
+12,Kids,Clothing,3,clothing-kids,True,2020-02-03T05:29:05Z,Explore kids in clothing with curated selections and deals.,1,44,Clothing > Kids,9.0
+13,Activewear,Clothing,4,clothing-activewear,True,2020-02-02T05:29:05Z,Explore activewear in clothing with curated selections and deals.,1,45,Clothing > Activewear,9.0
+14,Outerwear,Clothing,5,clothing-outerwear,True,2020-02-17T05:29:05Z,Explore outerwear in clothing with curated selections and deals.,1,42,Clothing > Outerwear,9.0
+15,Formal,Clothing,6,clothing-formal,True,2020-02-20T05:29:05Z,Explore formal in clothing with curated selections and deals.,1,33,Clothing > Formal,9.0
+16,Home & Garden,,3,home-garden,True,2020-03-06T17:50:37Z,Browse our home & garden collection with top-rated products and brands.,0,228,Home & Garden,
+17,Furniture,Home & Garden,1,home-garden-furniture,True,2020-03-11T17:50:37Z,Explore furniture in home & garden with curated selections and deals.,1,31,Home & Garden > Furniture,16.0
+18,Kitchen,Home & Garden,2,home-garden-kitchen,True,2020-03-25T17:50:37Z,Explore kitchen in home & garden with curated selections and deals.,1,48,Home & Garden > Kitchen,16.0
+19,Bedding,Home & Garden,3,home-garden-bedding,True,2020-03-27T17:50:37Z,Explore bedding in home & garden with curated selections and deals.,1,37,Home & Garden > Bedding,16.0
+20,Lighting,Home & Garden,4,home-garden-lighting,True,2020-03-18T17:50:37Z,Explore lighting in home & garden with curated selections and deals.,1,34,Home & Garden > Lighting,16.0
+21,Outdoor,Home & Garden,5,home-garden-outdoor,True,2020-03-27T17:50:37Z,Explore outdoor in home & garden with curated selections and deals.,1,34,Home & Garden > Outdoor,16.0
+22,Decor,Home & Garden,6,home-garden-decor,True,2020-04-05T17:50:37Z,Explore decor in home & garden with curated selections and deals.,1,44,Home & Garden > Decor,16.0
+23,Beauty & Health,,4,beauty-health,True,2020-03-07T15:48:54Z,Browse our beauty & health collection with top-rated products and brands.,0,193,Beauty & Health,
+24,Skincare,Beauty & Health,1,beauty-health-skincare,True,2020-03-22T15:48:54Z,Explore skincare in beauty & health with curated selections and deals.,1,42,Beauty & Health > Skincare,23.0
+25,Haircare,Beauty & Health,2,beauty-health-haircare,True,2020-03-10T15:48:54Z,Explore haircare in beauty & health with curated selections and deals.,1,32,Beauty & Health > Haircare,23.0
+26,Makeup,Beauty & Health,3,beauty-health-makeup,True,2020-03-12T15:48:54Z,Explore makeup in beauty & health with curated selections and deals.,1,39,Beauty & Health > Makeup,23.0
+27,Supplements,Beauty & Health,4,beauty-health-supplements,True,2020-03-26T15:48:54Z,Explore supplements in beauty & health with curated selections and deals.,1,34,Beauty & Health > Supplements,23.0
+28,Personal Care,Beauty & Health,5,beauty-health-personal-care,False,2020-03-19T15:48:54Z,Explore personal care in beauty & health with curated selections and deals.,1,46,Beauty & Health > Personal Care,23.0
+29,Sports & Outdoors,,5,sports-outdoors,True,2020-01-31T12:50:47Z,Browse our sports & outdoors collection with top-rated products and brands.,0,175,Sports & Outdoors,
+30,Fitness,Sports & Outdoors,1,sports-outdoors-fitness,True,2020-02-26T12:50:47Z,Explore fitness in sports & outdoors with curated selections and deals.,1,30,Sports & Outdoors > Fitness,29.0
+31,Camping,Sports & Outdoors,2,sports-outdoors-camping,True,2020-02-09T12:50:47Z,Explore camping in sports & outdoors with curated selections and deals.,1,34,Sports & Outdoors > Camping,29.0
+32,Cycling,Sports & Outdoors,3,sports-outdoors-cycling,True,2020-02-08T12:50:47Z,Explore cycling in sports & outdoors with curated selections and deals.,1,35,Sports & Outdoors > Cycling,29.0
+33,Running,Sports & Outdoors,4,sports-outdoors-running,True,2020-02-20T12:50:47Z,Explore running in sports & outdoors with curated selections and deals.,1,38,Sports & Outdoors > Running,29.0
+34,Team Sports,Sports & Outdoors,5,sports-outdoors-team-sports,True,2020-02-10T12:50:47Z,Explore team sports in sports & outdoors with curated selections and deals.,1,38,Sports & Outdoors > Team Sports,29.0
+35,Books & Media,,6,books-media,True,2020-03-08T00:55:33Z,Browse our books & media collection with top-rated products and brands.,0,178,Books & Media,
+36,Fiction,Books & Media,1,books-media-fiction,True,2020-03-09T00:55:33Z,Explore fiction in books & media with curated selections and deals.,1,46,Books & Media > Fiction,35.0
+37,Non-Fiction,Books & Media,2,books-media-non-fiction,True,2020-03-30T00:55:33Z,Explore non-fiction in books & media with curated selections and deals.,1,33,Books & Media > Non-Fiction,35.0
+38,Textbooks,Books & Media,3,books-media-textbooks,True,2020-03-15T00:55:33Z,Explore textbooks in books & media with curated selections and deals.,1,42,Books & Media > Textbooks,35.0
+39,E-Books,Books & Media,4,books-media-e-books,True,2020-03-25T00:55:33Z,Explore e-books in books & media with curated selections and deals.,1,31,Books & Media > E-Books,35.0
+40,Audiobooks,Books & Media,5,books-media-audiobooks,True,2020-03-21T00:55:33Z,Explore audiobooks in books & media with curated selections and deals.,1,26,Books & Media > Audiobooks,35.0
+41,Toys & Games,,7,toys-games,True,2020-01-06T07:09:19Z,Browse our toys & games collection with top-rated products and brands.,0,200,Toys & Games,
+42,Board Games,Toys & Games,1,toys-games-board-games,True,2020-02-01T07:09:19Z,Explore board games in toys & games with curated selections and deals.,1,41,Toys & Games > Board Games,41.0
+43,Action Figures,Toys & Games,2,toys-games-action-figures,True,2020-01-14T07:09:19Z,Explore action figures in toys & games with curated selections and deals.,1,43,Toys & Games > Action Figures,41.0
+44,Puzzles,Toys & Games,3,toys-games-puzzles,True,2020-01-10T07:09:19Z,Explore puzzles in toys & games with curated selections and deals.,1,41,Toys & Games > Puzzles,41.0
+45,Educational,Toys & Games,4,toys-games-educational,True,2020-01-27T07:09:19Z,Explore educational in toys & games with curated selections and deals.,1,34,Toys & Games > Educational,41.0
+46,Video Games,Toys & Games,5,toys-games-video-games,True,2020-01-23T07:09:19Z,Explore video games in toys & games with curated selections and deals.,1,41,Toys & Games > Video Games,41.0
+47,Food & Beverages,,8,food-beverages,True,2020-01-02T04:07:05Z,Browse our food & beverages collection with top-rated products and brands.,0,189,Food & Beverages,
+48,Snacks,Food & Beverages,1,food-beverages-snacks,False,2020-01-14T04:07:05Z,Explore snacks in food & beverages with curated selections and deals.,1,22,Food & Beverages > Snacks,47.0
+49,Beverages,Food & Beverages,2,food-beverages-beverages,True,2020-01-07T04:07:05Z,Explore beverages in food & beverages with curated selections and deals.,1,36,Food & Beverages > Beverages,47.0
+50,Organic,Food & Beverages,3,food-beverages-organic,True,2020-01-29T04:07:05Z,Explore organic in food & beverages with curated selections and deals.,1,32,Food & Beverages > Organic,47.0
+51,International,Food & Beverages,4,food-beverages-international,True,2020-01-14T04:07:05Z,Explore international in food & beverages with curated selections and deals.,1,56,Food & Beverages > International,47.0
+52,Gourmet,Food & Beverages,5,food-beverages-gourmet,True,2020-01-08T04:07:05Z,Explore gourmet in food & beverages with curated selections and deals.,1,43,Food & Beverages > Gourmet,47.0
+53,Automotive,,9,automotive,True,2020-03-15T19:05:07Z,Browse our automotive collection with top-rated products and brands.,0,162,Automotive,
+54,Parts,Automotive,1,automotive-parts,True,2020-03-18T19:05:07Z,Explore parts in automotive with curated selections and deals.,1,34,Automotive > Parts,53.0
+55,Accessories,Automotive,2,automotive-accessories,True,2020-03-18T19:05:07Z,Explore accessories in automotive with curated selections and deals.,1,47,Automotive > Accessories,53.0
+56,Tools,Automotive,3,automotive-tools,True,2020-03-22T19:05:07Z,Explore tools in automotive with curated selections and deals.,1,41,Automotive > Tools,53.0
+57,Care Products,Automotive,4,automotive-care-products,False,2020-03-17T19:05:07Z,Explore care products in automotive with curated selections and deals.,1,40,Automotive > Care Products,53.0
+58,Office Supplies,,10,office-supplies,True,2020-02-08T15:20:56Z,Browse our office supplies collection with top-rated products and brands.,0,165,Office Supplies,
+59,Stationery,Office Supplies,1,office-supplies-stationery,True,2020-02-25T15:20:56Z,Explore stationery in office supplies with curated selections and deals.,1,41,Office Supplies > Stationery,58.0
+60,Furniture,Office Supplies,2,office-supplies-furniture,True,2020-03-02T15:20:56Z,Explore furniture in office supplies with curated selections and deals.,1,45,Office Supplies > Furniture,58.0
+61,Technology,Office Supplies,3,office-supplies-technology,True,2020-02-22T15:20:56Z,Explore technology in office supplies with curated selections and deals.,1,36,Office Supplies > Technology,58.0
+62,Organization,Office Supplies,4,office-supplies-organization,True,2020-02-21T15:20:56Z,Explore organization in office supplies with curated selections and deals.,1,43,Office Supplies > Organization,58.0
