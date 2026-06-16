@@ -1,0 +1,1 @@
+{"class":"org.apache.spark.ml.feature.FeatureHasher","timestamp":1777123646561,"sparkVersion":"3.5.0","uid":"FeatureHasher_c62fcdfaea4f","paramMap":{"outputCol":"product_id_hashed","inputCols":["product_id"],"numFeatures":256},"defaultParamMap":{"outputCol":"FeatureHasher_c62fcdfaea4f__output","numFeatures":262144}}

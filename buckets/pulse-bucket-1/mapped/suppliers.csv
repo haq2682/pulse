@@ -1,0 +1,501 @@
+supplier_id,supplier_rating,supplier_status,is_preferred,is_verified,contract_start_date,contract_end_date,city,state,zip_code,country
+SUPP_1,3.76,Inactive,False,True,2018-12-08,2020-11-10,Memphis,NJ,53062,US
+SUPP_2,4.12,Pending,False,True,2023-10-09,2027-01-27,Toronto,QC,L2G 4V2,CA
+SUPP_3,4.59,Inactive,False,True,2018-05-10,2023-02-05,Montreal,MB,K7E 4M4,CA
+SUPP_4,1.91,Inactive,False,True,2021-12-27,2024-03-30,San Jose,OH,25728,US
+SUPP_5,4.11,Inactive,False,True,2020-04-30,2024-02-10,Portland,FL,81072,US
+SUPP_6,4.49,Inactive,False,True,2023-11-22,2025-03-01,New York,WA,84920,US
+SUPP_7,2.57,Inactive,False,False,2021-07-26,2024-04-07,Dallas,MI,30753,US
+SUPP_8,2.09,Under Review,False,True,2023-05-11,2025-05-26,Montreal,NB,T9H 7M1,CA
+SUPP_9,4.16,Under Review,False,False,2018-07-15,2020-05-07,Denver,MA,46299,US
+SUPP_10,3.51,Inactive,False,True,2024-04-02,2025-09-04,Stuttgart,Baden-Württemberg,27374,DE
+SUPP_11,3.4,Active,True,True,2023-06-05,2026-09-28,Philadelphia,WA,42586,US
+SUPP_12,3.21,Inactive,False,True,2019-02-06,2021-10-02,Denver,MI,64757,US
+SUPP_13,4.48,Active,False,True,2023-09-26,2026-08-15,Houston,NC,25527,US
+SUPP_14,3.06,Under Review,False,False,2019-11-04,2023-05-22,Birmingham,Scotland,OR5 5TA,GB
+SUPP_15,4.18,Inactive,False,False,2019-07-29,2023-10-05,Jacksonville,IL,71531,US
+SUPP_16,2.24,Inactive,False,True,2018-08-29,2022-01-11,Los Angeles,IL,48878,US
+SUPP_17,4.8,Inactive,False,True,2019-02-15,2021-03-04,Vancouver,NS,R7E 2Y0,CA
+SUPP_18,4.43,Active,False,True,2023-10-06,2027-06-14,Toronto,QC,E5T 5J2,CA
+SUPP_19,4.45,Inactive,False,True,2018-11-30,2021-01-15,Boston,IL,64715,US
+SUPP_20,4.06,Active,False,True,2024-10-03,2029-06-18,Ottawa,MB,X4G 4M8,CA
+SUPP_21,4.25,Under Review,False,True,2020-09-26,2023-08-18,Jacksonville,VA,24893,US
+SUPP_22,4.63,Inactive,False,False,2019-02-22,2021-11-22,Cologne,Saxony,27218,DE
+SUPP_23,3.12,Active,True,True,2023-06-10,2027-12-07,Frankfurt,Bavaria,36515,DE
+SUPP_24,3.95,Active,False,True,2022-05-13,2026-07-16,Boston,NY,32883,US
+SUPP_25,3.52,Inactive,False,True,2018-04-28,2020-11-28,Columbus,PA,46298,US
+SUPP_26,4.93,Inactive,False,False,2024-09-15,2026-01-08,Winnipeg,NB,L9S 1P8,CA
+SUPP_27,4.44,Active,True,True,2023-05-13,2026-05-29,Dallas,NC,93500,US
+SUPP_28,4.27,Inactive,False,True,2018-07-08,2020-05-27,Leipzig,North Rhine-Westphalia,43124,DE
+SUPP_29,4.6,Inactive,False,True,2019-03-02,2022-04-07,Austin,AZ,93317,US
+SUPP_30,3.82,Inactive,False,True,2019-07-22,2023-12-19,Strasbourg,Nouvelle-Aquitaine,28060,FR
+SUPP_31,3.98,Inactive,False,True,2022-10-12,2025-10-29,Ottawa,SK,L3R 2E8,CA
+SUPP_32,4.42,Active,True,True,2022-05-10,2026-10-09,Quebec City,NS,L3A 7L2,CA
+SUPP_33,4.88,Inactive,False,False,2019-02-12,2023-11-24,Memphis,MA,92908,US
+SUPP_34,3.47,Inactive,False,False,2023-10-21,2025-09-06,Dallas,NY,19169,US
+SUPP_35,4.71,Under Review,False,True,2024-07-09,2025-07-09,Montreal,AB,V9X 2G1,CA
+SUPP_36,4.24,Inactive,False,True,2022-07-18,2024-06-16,San Antonio,CO,30848,US
+SUPP_37,3.15,Inactive,False,True,2021-08-20,2023-01-31,Cologne,Berlin,95450,DE
+SUPP_38,4.02,Under Review,False,True,2020-12-02,2023-02-02,Fort Worth,CO,54609,US
+SUPP_39,1.59,Inactive,False,True,2023-09-25,2025-02-25,Nashville,CO,81477,US
+SUPP_40,3.01,Active,False,False,2024-06-24,2026-09-26,Houston,NY,72277,US
+SUPP_41,4.66,Active,False,True,2024-11-07,2028-03-16,Quebec City,AB,A6R 9Y4,CA
+SUPP_42,3.03,Active,True,True,2024-08-25,2026-05-28,Toronto,NS,L1T 2T0,CA
+SUPP_43,4.27,Inactive,False,True,2022-09-14,2025-06-04,Portland,NY,38093,US
+SUPP_44,4.22,Inactive,False,True,2019-07-16,2022-11-06,Vancouver,NB,H1Y 3M3,CA
+SUPP_45,1.77,Inactive,False,True,2020-08-26,2024-05-06,Edmonton,NB,M6A 9T5,CA
+SUPP_46,2.24,Inactive,False,True,2020-07-18,2024-12-18,Stuttgart,Hesse,96459,DE
+SUPP_47,3.52,Inactive,False,True,2020-09-02,2023-04-29,Stuttgart,Baden-Württemberg,78339,DE
+SUPP_48,4.82,Inactive,False,True,2018-11-13,2021-07-29,Dallas,IL,94013,US
+SUPP_49,1.93,Inactive,False,True,2020-02-03,2022-11-22,Paris,Auvergne-Rhône-Alpes,32171,FR
+SUPP_50,4.56,Inactive,False,True,2019-03-29,2023-08-15,Winnipeg,QC,A7P 4S7,CA
+SUPP_51,3.09,Under Review,False,True,2021-10-03,2024-07-17,Calgary,ON,J7J 2N0,CA
+SUPP_52,4.44,Inactive,False,True,2018-06-25,2023-06-04,New York,IL,36059,US
+SUPP_53,3.23,Under Review,False,True,2021-09-16,2024-01-25,Winnipeg,SK,T3R 3J9,CA
+SUPP_54,4.21,Inactive,False,True,2022-05-02,2024-04-04,Leipzig,Bavaria,59348,DE
+SUPP_55,4.42,Inactive,False,True,2019-12-21,2023-03-10,Ottawa,ON,L9L 6Y3,CA
+SUPP_56,3.49,Inactive,False,True,2020-06-03,2023-10-23,San Jose,MI,22165,US
+SUPP_57,3.69,Under Review,False,False,2020-01-27,2022-12-02,Philadelphia,MA,52044,US
+SUPP_58,3.54,Inactive,False,True,2023-01-31,2025-04-17,Houston,VA,40498,US
+SUPP_59,4.42,Active,True,True,2022-01-18,2026-06-04,Hamburg,Bavaria,33624,DE
+SUPP_60,3.31,Active,True,True,2024-10-06,2027-04-19,Detroit,VA,52751,US
+SUPP_61,1.24,Under Review,False,True,2018-06-23,2022-06-03,Manchester,Scotland,UU7 2IG,GB
+SUPP_62,2.88,Under Review,False,True,2021-08-28,2023-07-28,Memphis,NC,39101,US
+SUPP_63,3.52,Inactive,False,True,2018-09-01,2023-05-29,Jacksonville,PA,67275,US
+SUPP_64,4.45,Inactive,False,False,2022-10-30,2025-05-03,Indianapolis,NC,78222,US
+SUPP_65,3.43,Inactive,False,True,2019-12-25,2024-10-28,Dallas,FL,29044,US
+SUPP_66,3.11,Inactive,False,False,2021-05-02,2025-01-21,Winnipeg,BC,G4X 6G9,CA
+SUPP_67,3.72,Inactive,False,True,2021-10-03,2024-11-29,Liverpool,Scotland,FQ6 3TY,GB
+SUPP_68,4.39,Active,False,True,2022-10-23,2026-01-13,Edmonton,ON,L5H 4S7,CA
+SUPP_69,1.64,Inactive,False,False,2020-11-08,2022-02-13,Memphis,FL,91990,US
+SUPP_70,4.86,Active,False,True,2023-04-29,2026-11-30,Chicago,TN,25737,US
+SUPP_71,3.02,Suspended,False,False,2023-02-03,2027-11-26,Phoenix,CO,92644,US
+SUPP_72,4.39,Active,False,True,2022-09-01,2027-05-03,El Paso,GA,94326,US
+SUPP_73,3.68,Active,True,True,2024-10-17,2029-01-20,San Diego,OR,54663,US
+SUPP_74,3.07,Inactive,False,True,2023-09-27,2025-08-15,New York,NJ,10579,US
+SUPP_75,4.45,Inactive,False,False,2018-03-12,2019-03-16,Cologne,North Rhine-Westphalia,26514,DE
+SUPP_76,4.13,Inactive,False,True,2022-07-24,2025-08-28,San Jose,VA,20867,US
+SUPP_77,4.32,Under Review,False,False,2019-01-31,2022-12-11,Marseille,Auvergne-Rhône-Alpes,13985,FR
+SUPP_78,4.58,Inactive,False,True,2020-02-08,2024-08-19,Lyon,Occitanie,83787,FR
+SUPP_79,3.85,Active,False,True,2023-07-18,2028-07-11,Berlin,Hesse,95238,DE
+SUPP_80,4.81,Inactive,False,True,2020-08-21,2023-08-28,Edinburgh,England,FK3 3EO,GB
+SUPP_81,4.12,Inactive,False,True,2020-10-17,2025-05-05,Quebec City,MB,P1R 4E0,CA
+SUPP_82,2.44,Inactive,False,True,2019-05-29,2023-05-10,Vancouver,BC,J5K 3X5,CA
+SUPP_83,4.45,Inactive,False,True,2018-03-01,2022-03-29,Boston,FL,70435,US
+SUPP_84,3.07,Inactive,False,False,2018-11-10,2022-01-09,Leeds,Northern Ireland,HE8 2NO,GB
+SUPP_85,1.19,Under Review,False,True,2020-11-24,2023-12-06,Philadelphia,TN,39186,US
+SUPP_86,4.14,Inactive,False,False,2018-01-23,2022-09-30,Seattle,NC,30280,US
+SUPP_87,4.15,Active,False,True,2023-09-05,2027-05-24,Liverpool,England,SX7 4AI,GB
+SUPP_88,3.8,Active,False,True,2024-09-29,2026-02-07,Detroit,TN,24921,US
+SUPP_89,4.91,Inactive,False,False,2021-05-29,2023-08-13,Berlin,Berlin,59597,DE
+SUPP_90,3.02,Active,False,True,2023-08-31,2026-09-02,San Antonio,NC,99221,US
+SUPP_91,2.73,Active,False,True,2021-06-24,2026-06-20,Edinburgh,Scotland,DP4 5DM,GB
+SUPP_92,4.34,Inactive,False,True,2022-03-16,2025-01-30,Montreal,BC,A6E 9N4,CA
+SUPP_93,2.75,Inactive,False,True,2022-08-16,2025-09-01,El Paso,CA,29586,US
+SUPP_94,4.6,Under Review,False,False,2023-10-09,2025-07-17,Vancouver,NB,P2L 9E1,CA
+SUPP_95,4.67,Inactive,False,True,2020-01-25,2022-10-28,Frankfurt,Hesse,27856,DE
+SUPP_96,3.54,Under Review,False,True,2024-04-19,2026-09-23,Columbus,PA,75609,US
+SUPP_97,3.98,Inactive,False,True,2019-08-06,2023-08-13,Frankfurt,Bavaria,10284,DE
+SUPP_98,4.69,Inactive,False,True,2019-11-02,2021-04-02,Bordeaux,Provence-Alpes-Côte d'Azur,72438,FR
+SUPP_99,4.91,Inactive,False,True,2022-05-03,2024-09-20,Charlotte,TX,44731,US
+SUPP_100,3.29,Active,False,False,2021-09-08,2026-07-11,Philadelphia,AZ,28447,US
+SUPP_101,3.75,Active,False,True,2024-11-19,2029-09-24,Glasgow,Scotland,VW8 1ZW,GB
+SUPP_102,4.11,Inactive,False,True,2019-10-29,2024-04-01,Bordeaux,Île-de-France,34439,FR
+SUPP_103,4.09,Under Review,False,True,2021-06-13,2025-08-18,Quebec City,MB,B1K 8V2,CA
+SUPP_104,3.11,Inactive,False,True,2021-03-07,2025-01-11,Seattle,TN,62215,US
+SUPP_105,2.9,Active,False,True,2024-07-21,2028-06-23,Los Angeles,NY,19584,US
+SUPP_106,3.24,Pending,False,False,2024-04-26,2026-12-04,Montreal,MB,K4E 7T1,CA
+SUPP_107,3.05,Active,False,True,2023-11-30,2028-11-13,Strasbourg,Île-de-France,77123,FR
+SUPP_108,4.19,Inactive,False,True,2019-09-06,2024-06-20,Indianapolis,NC,46728,US
+SUPP_109,3.53,Inactive,False,True,2019-08-31,2020-10-15,Liverpool,Wales,QT9 7WJ,GB
+SUPP_110,3.95,Active,False,False,2024-11-17,2029-05-26,Berlin,Baden-Württemberg,41730,DE
+SUPP_111,4.74,Inactive,False,True,2022-10-26,2024-11-18,Indianapolis,MA,17794,US
+SUPP_112,4.89,Inactive,False,True,2021-01-04,2023-02-06,Dallas,TN,56267,US
+SUPP_113,3.32,Inactive,False,True,2021-04-04,2022-10-09,Glasgow,England,NT2 8MK,GB
+SUPP_114,4.23,Inactive,False,True,2019-05-12,2023-07-18,Los Angeles,FL,45664,US
+SUPP_115,4.14,Inactive,False,True,2018-01-06,2019-05-27,Los Angeles,CO,81497,US
+SUPP_116,4.73,Under Review,False,False,2018-03-10,2019-12-10,Portland,VA,36903,US
+SUPP_117,4.76,Inactive,False,True,2020-02-22,2024-03-13,San Jose,VA,23835,US
+SUPP_118,3.72,Suspended,False,True,2024-09-03,2028-05-07,Fort Worth,CA,91301,US
+SUPP_119,1.65,Inactive,False,True,2022-02-01,2024-11-05,Toronto,SK,Y6T 2Y8,CA
+SUPP_120,4.5,Active,False,False,2023-06-13,2026-05-07,Memphis,OH,13785,US
+SUPP_121,2.77,Inactive,False,True,2019-11-05,2021-10-20,Bristol,Northern Ireland,QA4 3ZU,GB
+SUPP_122,3.91,Inactive,False,True,2021-02-26,2025-01-31,Phoenix,TN,54434,US
+SUPP_123,4.33,Inactive,False,True,2021-08-03,2024-10-25,Ottawa,ON,L8S 3Y8,CA
+SUPP_124,4.83,Under Review,False,False,2018-10-13,2020-11-03,Leipzig,North Rhine-Westphalia,25091,DE
+SUPP_125,3.15,Inactive,False,True,2018-05-04,2021-12-05,Phoenix,AZ,42863,US
+SUPP_126,4.96,Inactive,False,False,2020-12-01,2024-12-06,San Antonio,AZ,97770,US
+SUPP_127,4.5,Inactive,False,True,2020-11-29,2022-08-09,Paris,Nouvelle-Aquitaine,72278,FR
+SUPP_128,4.12,Active,False,True,2024-07-26,2029-05-13,Indianapolis,WA,10768,US
+SUPP_129,4.59,Inactive,False,True,2020-03-01,2024-08-05,Memphis,IL,88145,US
+SUPP_130,3.26,Inactive,False,False,2023-12-15,2025-03-30,Detroit,OR,48682,US
+SUPP_131,4.47,Inactive,False,True,2020-08-20,2022-05-14,Chicago,CO,49692,US
+SUPP_132,4.6,Active,False,True,2021-08-04,2026-06-26,San Jose,AZ,68617,US
+SUPP_133,3.64,Inactive,False,True,2020-07-22,2021-11-28,Charlotte,TX,85530,US
+SUPP_134,3.76,Inactive,False,True,2021-08-23,2024-04-01,Seattle,NC,86800,US
+SUPP_135,4.29,Inactive,False,True,2021-08-07,2025-03-10,Seattle,CO,43967,US
+SUPP_136,3.87,Inactive,False,False,2021-04-08,2023-10-15,Calgary,NS,G8M 1V6,CA
+SUPP_137,4.31,Under Review,False,True,2019-05-05,2022-07-28,Leeds,Wales,TJ8 2RX,GB
+SUPP_138,3.02,Inactive,False,False,2023-02-09,2025-03-02,Ottawa,ON,V3E 7X2,CA
+SUPP_139,4.66,Inactive,False,False,2020-12-07,2025-11-23,Berlin,Bavaria,75463,DE
+SUPP_140,4.53,Inactive,False,True,2021-09-23,2023-01-02,Denver,MI,38969,US
+SUPP_141,1.55,Active,True,True,2024-04-23,2028-09-29,Austin,PA,67367,US
+SUPP_142,4.11,Active,False,True,2024-10-15,2029-05-08,San Jose,NJ,39297,US
+SUPP_143,3.33,Inactive,False,True,2022-06-04,2025-06-01,Cologne,Bavaria,76574,DE
+SUPP_144,3.32,Inactive,False,True,2018-07-19,2019-10-21,Austin,OH,37631,US
+SUPP_145,1.81,Inactive,False,True,2018-09-05,2022-06-20,Strasbourg,Provence-Alpes-Côte d'Azur,61919,FR
+SUPP_146,1.81,Inactive,False,False,2020-10-29,2023-04-26,Hamburg,Baden-Württemberg,26300,DE
+SUPP_147,4.91,Under Review,False,True,2022-12-28,2027-09-26,Leeds,Wales,PO2 5WJ,GB
+SUPP_148,1.93,Under Review,False,True,2021-12-01,2023-10-30,Lyon,Provence-Alpes-Côte d'Azur,19465,FR
+SUPP_149,3.81,Inactive,False,True,2023-02-02,2025-08-13,Manchester,England,VO8 4BP,GB
+SUPP_150,4.74,Inactive,False,False,2018-10-31,2023-07-24,Liverpool,Northern Ireland,CT8 1AP,GB
+SUPP_151,4.35,Active,True,True,2024-04-28,2026-09-29,Toulouse,Auvergne-Rhône-Alpes,64175,FR
+SUPP_152,NaN,Pending,False,False,2022-04-24,2027-04-17,Columbus,OR,11685,US
+SUPP_153,4.59,Inactive,False,False,2018-11-02,2023-07-06,Stuttgart,Baden-Württemberg,21842,DE
+SUPP_154,3.36,Inactive,False,True,2023-08-08,2025-08-18,Munich,Hesse,99128,DE
+SUPP_155,3.45,Inactive,False,False,2021-08-13,2026-05-25,Lyon,Nouvelle-Aquitaine,26823,FR
+SUPP_156,3.71,Inactive,False,True,2020-03-03,2023-08-27,San Jose,OH,60499,US
+SUPP_157,4.41,Inactive,False,False,2020-05-21,2022-10-04,Edmonton,MB,L3J 2S9,CA
+SUPP_158,4.68,Active,True,True,2023-01-17,2026-11-25,Berlin,North Rhine-Westphalia,96393,DE
+SUPP_159,4.02,Active,False,True,2021-05-09,2026-01-02,Seattle,VA,67239,US
+SUPP_160,4.66,Active,True,True,2023-11-07,2028-06-20,Stuttgart,Bavaria,46394,DE
+SUPP_161,4.06,Under Review,False,True,2023-07-14,2025-04-15,Los Angeles,TX,59800,US
+SUPP_162,3.62,Active,False,True,2021-09-07,2026-01-07,Lyon,Nouvelle-Aquitaine,99357,FR
+SUPP_163,4.95,Inactive,False,True,2022-04-26,2024-10-05,Nice,Nouvelle-Aquitaine,29868,FR
+SUPP_164,4.68,Inactive,False,True,2019-01-12,2023-07-15,New York,CO,79760,US
+SUPP_165,3.44,Inactive,False,True,2021-06-14,2025-12-10,San Jose,NC,91932,US
+SUPP_166,3.94,Under Review,False,True,2022-11-29,2025-02-07,Winnipeg,SK,C9R 9M4,CA
+SUPP_167,3.93,Active,True,True,2023-02-05,2027-04-25,El Paso,NC,33295,US
+SUPP_168,3.4,Inactive,False,True,2021-04-20,2025-11-23,Nashville,AZ,76871,US
+SUPP_169,4.23,Suspended,False,True,2021-10-02,2026-01-27,Fort Worth,OH,30913,US
+SUPP_170,4.78,Under Review,False,True,2021-07-16,2024-07-25,Glasgow,England,HR8 6HK,GB
+SUPP_171,3.13,Inactive,False,True,2022-08-23,2025-03-10,Frankfurt,North Rhine-Westphalia,56746,DE
+SUPP_172,3.37,Active,False,False,2024-03-09,2026-08-16,Bristol,Northern Ireland,HQ5 9YF,GB
+SUPP_173,4.57,Inactive,False,True,2019-01-24,2022-11-03,Indianapolis,NJ,37990,US
+SUPP_174,4.32,Inactive,False,True,2022-05-29,2025-04-27,Ottawa,AB,P7C 4S6,CA
+SUPP_175,3.26,Active,False,True,2023-11-26,2028-01-29,San Antonio,NY,95058,US
+SUPP_176,4.09,Inactive,False,True,2023-01-16,2025-10-08,Edmonton,MB,A8N 1A2,CA
+SUPP_177,4.81,Active,True,True,2021-10-25,2026-10-05,Fort Worth,IL,25746,US
+SUPP_178,4.27,Inactive,False,True,2022-07-01,2025-11-22,Bordeaux,Provence-Alpes-Côte d'Azur,82931,FR
+SUPP_179,3.5,Inactive,False,True,2018-09-20,2022-09-13,Austin,NY,24247,US
+SUPP_180,1.75,Under Review,False,True,2024-12-25,2029-09-08,Bordeaux,Nouvelle-Aquitaine,31577,FR
+SUPP_181,3.33,Inactive,False,True,2023-11-02,2025-09-19,Columbus,NC,25755,US
+SUPP_182,4.68,Inactive,False,False,2017-12-30,2022-03-02,Houston,OR,44772,US
+SUPP_183,4.25,Inactive,False,True,2020-07-26,2023-04-06,Berlin,Saxony,47449,DE
+SUPP_184,3.73,Inactive,False,True,2018-10-25,2021-07-14,Edinburgh,Wales,JZ4 3OD,GB
+SUPP_185,3.73,Under Review,False,False,2020-08-06,2024-11-16,Edmonton,MB,R2P 6X0,CA
+SUPP_186,4.84,Inactive,False,False,2023-04-04,2024-09-27,Marseille,Provence-Alpes-Côte d'Azur,98032,FR
+SUPP_187,3.84,Inactive,False,False,2019-12-19,2023-02-07,Leipzig,North Rhine-Westphalia,18001,DE
+SUPP_188,1.6,Active,False,True,2023-01-30,2027-06-25,Bristol,England,UO9 2DP,GB
+SUPP_189,2.99,Inactive,False,True,2020-02-03,2023-09-15,Manchester,Northern Ireland,BG7 4QY,GB
+SUPP_190,4.76,Inactive,False,False,2018-02-06,2021-10-13,Marseille,Île-de-France,63236,FR
+SUPP_191,3.9,Inactive,False,False,2021-07-04,2024-01-19,Philadelphia,OR,29313,US
+SUPP_192,4.21,Inactive,False,True,2018-07-09,2021-03-30,Philadelphia,OR,15536,US
+SUPP_193,4.46,Inactive,False,False,2021-05-24,2024-02-27,Vancouver,SK,N6C 9J4,CA
+SUPP_194,4.83,Inactive,False,True,2020-02-10,2021-09-04,Fort Worth,TN,36232,US
+SUPP_195,4.4,Inactive,False,True,2018-04-19,2021-05-13,London,Scotland,MT2 3MC,GB
+SUPP_196,4.27,Inactive,False,True,2019-01-15,2020-09-23,Philadelphia,OR,61339,US
+SUPP_197,4.89,Inactive,False,True,2023-02-27,2027-11-25,Austin,VA,52537,US
+SUPP_198,1.38,Under Review,False,True,2018-10-28,2020-06-27,London,England,YO9 8VY,GB
+SUPP_199,4.47,Inactive,False,True,2019-07-28,2020-09-01,Chicago,TX,49680,US
+SUPP_200,3.48,Under Review,False,True,2022-06-23,2026-05-10,Columbus,MA,51731,US
+SUPP_201,1.55,Under Review,False,False,2021-11-12,2026-04-28,Denver,MI,96997,US
+SUPP_202,2.64,Active,False,True,2024-03-13,2026-01-30,Houston,OR,65877,US
+SUPP_203,1.57,Inactive,False,True,2021-12-21,2024-02-03,Los Angeles,NJ,57785,US
+SUPP_204,2.01,Inactive,False,True,2020-11-29,2025-04-12,Edmonton,NB,V7S 5B9,CA
+SUPP_205,4.4,Inactive,False,True,2022-09-17,2025-06-23,Seattle,NY,68563,US
+SUPP_206,4.6,Inactive,False,True,2019-07-21,2023-02-26,Montreal,QC,M9R 1H1,CA
+SUPP_207,3.86,Inactive,False,True,2018-05-27,2021-08-03,Charlotte,MI,15780,US
+SUPP_208,4.01,Pending,False,False,2024-03-20,2027-01-31,Düsseldorf,Berlin,46140,DE
+SUPP_209,4.29,Inactive,False,True,2020-08-03,2022-08-30,Indianapolis,CA,14356,US
+SUPP_210,4.82,Inactive,False,True,2021-02-02,2025-12-05,Winnipeg,BC,J1G 5M0,CA
+SUPP_211,4.38,Inactive,False,True,2020-09-25,2024-04-01,Stuttgart,Hesse,93397,DE
+SUPP_212,4.26,Under Review,False,False,2023-01-05,2027-06-06,Montreal,AB,M6G 2L7,CA
+SUPP_213,3.11,Active,False,False,2023-04-23,2027-07-17,Leipzig,Bavaria,78257,DE
+SUPP_214,4.66,Inactive,False,True,2021-10-11,2024-01-07,Los Angeles,GA,82930,US
+SUPP_215,2.22,Under Review,False,False,2020-04-20,2022-06-24,Edmonton,QC,H1T 8C8,CA
+SUPP_216,2.84,Active,False,False,2022-03-30,2026-07-24,Fort Worth,IL,23053,US
+SUPP_217,2.16,Active,False,True,2024-10-18,2028-03-18,Austin,TN,20239,US
+SUPP_218,4.06,Under Review,False,True,2024-08-11,2026-04-08,Quebec City,QC,C4M 7L9,CA
+SUPP_219,4.8,Inactive,False,True,2021-12-30,2023-11-19,Chicago,GA,77425,US
+SUPP_220,4.43,Inactive,False,True,2022-07-13,2025-02-08,San Jose,GA,13938,US
+SUPP_221,4.62,Under Review,False,True,2019-03-07,2023-02-18,San Antonio,FL,63302,US
+SUPP_222,3.7,Active,False,False,2023-05-01,2027-04-10,Dallas,OH,90052,US
+SUPP_223,4.5,Inactive,False,True,2020-03-05,2023-04-21,London,Scotland,MA4 2DB,GB
+SUPP_224,3.12,Inactive,False,False,2023-09-06,2025-04-04,El Paso,OH,41487,US
+SUPP_225,3.53,Inactive,False,True,2021-10-07,2023-04-06,Munich,Saxony,62963,DE
+SUPP_226,3.82,Active,False,True,2024-07-17,2028-03-07,San Antonio,OH,55677,US
+SUPP_227,4.18,Inactive,False,False,2022-01-07,2023-09-28,Cologne,Bavaria,81320,DE
+SUPP_228,4.92,Inactive,False,True,2020-04-05,2023-01-04,Berlin,Berlin,68221,DE
+SUPP_229,3.96,Pending,False,False,2024-04-03,2028-07-11,Toronto,QC,H5H 3T9,CA
+SUPP_230,3.96,Inactive,False,True,2018-10-22,2022-11-02,Edinburgh,England,FV8 8XC,GB
+SUPP_231,3.86,Active,False,True,2021-08-16,2026-05-05,San Jose,TX,58966,US
+SUPP_232,4.06,Inactive,False,True,2022-01-29,2023-05-12,Jacksonville,OR,48923,US
+SUPP_233,4.37,Inactive,False,True,2021-10-25,2025-03-20,Portland,MA,99658,US
+SUPP_234,3.86,Inactive,False,False,2023-04-21,2024-12-17,Montreal,NS,S5A 4S5,CA
+SUPP_235,3.9,Inactive,False,True,2024-02-20,2025-09-24,San Antonio,CA,89230,US
+SUPP_236,3.78,Active,False,True,2021-09-24,2026-03-22,Indianapolis,VA,85495,US
+SUPP_237,3.37,Inactive,False,False,2019-06-21,2023-09-21,Boston,TN,19587,US
+SUPP_238,4.81,Active,False,True,2022-03-31,2027-01-10,Winnipeg,BC,T5S 4L5,CA
+SUPP_239,5.0,Under Review,False,False,2020-06-12,2025-05-03,Denver,NC,77062,US
+SUPP_240,3.42,Under Review,False,True,2020-12-26,2021-12-29,Philadelphia,NJ,87102,US
+SUPP_241,4.1,Inactive,False,True,2020-09-07,2022-04-27,Berlin,Berlin,11170,DE
+SUPP_242,NaN,Pending,False,False,2022-02-25,2026-09-14,London,England,QY1 6WK,GB
+SUPP_243,3.21,Inactive,False,True,2019-09-29,2021-04-13,Columbus,OR,80084,US
+SUPP_244,4.2,Under Review,False,True,2020-01-26,2024-12-09,Bordeaux,Provence-Alpes-Côte d'Azur,73049,FR
+SUPP_245,2.32,Active,False,True,2024-11-22,2027-05-19,Phoenix,NY,34804,US
+SUPP_246,3.68,Inactive,False,True,2024-11-16,2028-09-17,Cologne,Saxony,34810,DE
+SUPP_247,4.89,Active,True,True,2023-09-28,2027-10-31,Quebec City,ON,S9E 6N3,CA
+SUPP_248,4.4,Under Review,False,True,2018-11-05,2021-04-09,Birmingham,England,UY6 7OZ,GB
+SUPP_249,4.99,Inactive,False,True,2019-07-14,2022-08-31,Austin,TX,88132,US
+SUPP_250,4.07,Inactive,False,True,2023-08-14,2024-10-09,Glasgow,England,XO5 6LO,GB
+SUPP_251,4.11,Active,False,True,2022-11-03,2027-04-30,Edinburgh,Wales,QR4 5EE,GB
+SUPP_252,4.62,Inactive,False,False,2019-03-18,2023-01-10,Boston,CO,43977,US
+SUPP_253,4.57,Inactive,False,True,2019-01-27,2022-11-23,Dallas,NJ,41531,US
+SUPP_254,4.52,Active,False,True,2024-12-13,2028-04-24,El Paso,WA,99240,US
+SUPP_255,4.69,Active,False,True,2024-09-06,2029-04-14,Toronto,SK,G6K 7H2,CA
+SUPP_256,4.87,Inactive,False,True,2018-07-25,2023-02-28,Quebec City,NS,S2M 8N7,CA
+SUPP_257,4.53,Active,False,True,2023-06-06,2028-06-02,Austin,MI,47004,US
+SUPP_258,1.38,Inactive,False,True,2019-06-10,2022-04-07,Montreal,NS,Y4C 6M1,CA
+SUPP_259,4.03,Inactive,False,False,2018-05-06,2021-12-15,Cologne,Berlin,27961,DE
+SUPP_260,4.95,Inactive,False,True,2022-09-06,2025-10-08,New York,GA,69822,US
+SUPP_261,4.42,Under Review,False,True,2018-01-28,2019-06-09,Phoenix,NC,41583,US
+SUPP_262,4.55,Inactive,False,False,2021-09-23,2023-10-31,Seattle,FL,73508,US
+SUPP_263,4.64,Inactive,False,True,2019-05-09,2022-10-10,Philadelphia,CA,68886,US
+SUPP_264,3.82,Inactive,False,True,2021-12-26,2025-12-21,Toronto,NS,P6G 9R6,CA
+SUPP_265,3.48,Inactive,False,True,2018-07-08,2019-11-20,Los Angeles,WA,57635,US
+SUPP_266,4.1,Inactive,False,True,2018-03-20,2020-05-06,Lyon,Île-de-France,44485,FR
+SUPP_267,2.37,Inactive,False,False,2021-12-24,2024-03-09,Edinburgh,Northern Ireland,GJ4 3TQ,GB
+SUPP_268,3.8,Inactive,False,True,2022-06-16,2025-07-24,Edinburgh,Northern Ireland,AQ1 1JP,GB
+SUPP_269,2.1,Under Review,False,False,2018-10-30,2022-11-13,Munich,Berlin,40667,DE
+SUPP_270,4.97,Under Review,False,True,2018-06-25,2021-10-25,Los Angeles,PA,87295,US
+SUPP_271,4.33,Active,False,True,2022-02-25,2026-01-02,Bristol,England,WO3 9LJ,GB
+SUPP_272,1.99,Inactive,False,True,2020-08-31,2025-04-29,Düsseldorf,Bavaria,71907,DE
+SUPP_273,4.14,Active,True,True,2023-01-08,2026-09-10,Denver,MI,55631,US
+SUPP_274,4.54,Inactive,False,False,2019-06-14,2023-06-09,Bristol,Northern Ireland,KX3 9JY,GB
+SUPP_275,4.5,Inactive,False,True,2019-12-24,2022-01-28,Boston,VA,66817,US
+SUPP_276,5.0,Active,True,True,2022-06-02,2027-01-28,Ottawa,NS,A4B 9M6,CA
+SUPP_277,4.71,Inactive,False,False,2019-10-28,2021-10-11,New York,NJ,90436,US
+SUPP_278,3.12,Under Review,False,False,2023-02-20,2025-04-14,Toronto,ON,T7V 9J3,CA
+SUPP_279,1.93,Inactive,False,True,2019-02-28,2020-05-31,Ottawa,QC,K9B 5A2,CA
+SUPP_280,4.74,Inactive,False,True,2018-10-26,2021-07-10,Nashville,FL,44773,US
+SUPP_281,4.42,Inactive,False,False,2018-06-13,2020-02-13,Liverpool,England,XR1 7TW,GB
+SUPP_282,3.48,Inactive,False,False,2024-04-19,2025-11-16,Toronto,AB,E8Y 2P6,CA
+SUPP_283,4.9,Active,True,True,2022-03-30,2026-05-07,Berlin,Saxony,99481,DE
+SUPP_284,4.78,Inactive,False,True,2020-07-29,2023-07-31,Quebec City,SK,S9S 5Y3,CA
+SUPP_285,3.64,Active,False,True,2024-06-11,2028-09-29,Columbus,TN,82500,US
+SUPP_286,3.1,Inactive,False,False,2020-02-10,2021-07-27,Chicago,FL,58293,US
+SUPP_287,4.66,Inactive,False,True,2022-06-14,2025-09-13,San Diego,MI,74048,US
+SUPP_288,4.39,Inactive,False,False,2022-01-09,2024-04-01,Jacksonville,FL,44781,US
+SUPP_289,4.74,Inactive,False,True,2022-04-05,2023-12-28,Denver,NC,28671,US
+SUPP_290,3.7,Inactive,False,False,2022-02-04,2025-06-11,Portland,MI,51333,US
+SUPP_291,4.73,Inactive,False,True,2022-07-02,2024-05-04,Austin,OR,46821,US
+SUPP_292,4.33,Inactive,False,True,2019-06-11,2023-05-06,Vancouver,AB,S4N 7C6,CA
+SUPP_293,4.91,Inactive,False,False,2018-07-13,2021-08-03,Glasgow,England,MX4 6IE,GB
+SUPP_294,4.39,Active,False,True,2022-03-25,2026-11-16,Dallas,GA,18617,US
+SUPP_295,4.81,Inactive,False,True,2018-02-06,2022-01-17,Los Angeles,NC,53810,US
+SUPP_296,4.43,Inactive,False,True,2021-09-05,2025-03-12,Calgary,NS,Y3H 8X5,CA
+SUPP_297,4.16,Under Review,False,False,2018-03-24,2021-01-23,Detroit,WA,85442,US
+SUPP_298,2.74,Active,False,True,2022-12-04,2026-04-14,Munich,Saxony,31365,DE
+SUPP_299,4.9,Active,False,True,2024-02-02,2028-08-18,Phoenix,WA,28360,US
+SUPP_300,4.0,Inactive,False,True,2021-01-18,2025-11-28,Leeds,Scotland,MI5 2XV,GB
+SUPP_301,4.61,Inactive,False,True,2023-03-05,2025-06-16,Houston,WA,69280,US
+SUPP_302,2.06,Active,False,True,2023-04-25,2027-09-12,Edinburgh,Northern Ireland,EC9 7LC,GB
+SUPP_303,3.42,Active,True,True,2024-08-11,2029-02-13,San Antonio,CA,74694,US
+SUPP_304,3.1,Inactive,False,False,2022-11-23,2024-11-07,Jacksonville,WA,39114,US
+SUPP_305,3.77,Inactive,False,False,2021-04-06,2022-11-03,Edmonton,SK,E1L 9G8,CA
+SUPP_306,3.9,Pending,False,False,2024-04-10,2028-06-26,Nice,Auvergne-Rhône-Alpes,34814,FR
+SUPP_307,4.68,Inactive,False,True,2020-12-05,2022-04-28,Winnipeg,ON,E4R 5H7,CA
+SUPP_308,3.61,Active,False,True,2022-04-16,2026-07-24,Indianapolis,IL,66883,US
+SUPP_309,2.74,Inactive,False,True,2019-03-24,2020-08-09,Edinburgh,England,WF5 2WZ,GB
+SUPP_310,3.89,Inactive,False,True,2019-03-17,2020-05-18,Lyon,Île-de-France,69437,FR
+SUPP_311,3.98,Inactive,False,True,2021-07-08,2025-09-18,Austin,WA,35613,US
+SUPP_312,4.72,Under Review,False,False,2020-03-18,2025-01-20,Philadelphia,CA,13162,US
+SUPP_313,2.83,Inactive,False,True,2020-12-29,2022-12-10,Vancouver,BC,E6Y 8G4,CA
+SUPP_314,4.06,Inactive,False,True,2023-02-19,2024-09-03,Austin,FL,33477,US
+SUPP_315,4.55,Inactive,False,False,2020-12-26,2023-05-19,Charlotte,PA,64494,US
+SUPP_316,3.05,Inactive,False,True,2019-11-25,2024-02-15,Ottawa,SK,P3N 6K4,CA
+SUPP_317,3.14,Inactive,False,True,2018-04-18,2022-03-26,Glasgow,England,CD4 2HK,GB
+SUPP_318,3.76,Inactive,False,True,2018-09-20,2022-12-29,Stuttgart,Hesse,39394,DE
+SUPP_319,3.4,Inactive,False,True,2020-06-25,2024-11-19,London,Wales,ZZ1 6VN,GB
+SUPP_320,4.58,Active,False,True,2023-12-07,2026-04-06,Leeds,Scotland,VT7 7BJ,GB
+SUPP_321,4.42,Active,False,True,2022-05-18,2026-05-04,Phoenix,IL,88011,US
+SUPP_322,4.14,Inactive,False,True,2020-08-23,2025-07-03,Phoenix,WA,34677,US
+SUPP_323,4.27,Active,False,False,2023-03-18,2026-05-18,Vancouver,AB,R1B 2V3,CA
+SUPP_324,2.16,Inactive,False,True,2018-02-14,2020-06-20,Edmonton,QC,S6A 4B4,CA
+SUPP_325,4.71,Active,True,True,2024-01-14,2028-06-27,Austin,NJ,16669,US
+SUPP_326,4.45,Inactive,False,True,2024-07-06,2025-07-16,Portland,NC,92017,US
+SUPP_327,3.38,Inactive,False,False,2022-03-03,2025-06-07,Edmonton,ON,S8K 9J2,CA
+SUPP_328,3.09,Active,True,True,2023-07-27,2027-12-31,Calgary,ON,Y8V 2A2,CA
+SUPP_329,3.14,Inactive,False,False,2021-03-19,2024-02-06,Charlotte,MA,76396,US
+SUPP_330,4.16,Inactive,False,False,2021-02-12,2023-02-05,Jacksonville,VA,95356,US
+SUPP_331,3.72,Under Review,False,True,2023-06-07,2025-02-10,Quebec City,SK,S9L 7P1,CA
+SUPP_332,4.72,Active,True,True,2023-02-19,2026-02-11,Bristol,Scotland,BN8 1CM,GB
+SUPP_333,4.66,Active,True,True,2023-03-19,2026-01-28,Fort Worth,VA,22006,US
+SUPP_334,3.83,Inactive,False,True,2019-10-28,2023-09-24,San Jose,WA,96452,US
+SUPP_335,4.91,Active,False,True,2023-11-03,2028-03-20,Marseille,Occitanie,45486,FR
+SUPP_336,3.64,Inactive,False,True,2023-08-26,2025-06-11,Winnipeg,SK,X8E 9B3,CA
+SUPP_337,NaN,Pending,False,False,2023-09-11,2027-06-19,London,Northern Ireland,GC3 5EQ,GB
+SUPP_338,4.43,Inactive,False,True,2019-01-29,2021-01-17,Houston,VA,47595,US
+SUPP_339,3.74,Inactive,False,True,2019-06-17,2020-10-08,Columbus,TN,91526,US
+SUPP_340,3.23,Active,True,True,2024-04-10,2028-03-27,Memphis,MI,84631,US
+SUPP_341,4.24,Under Review,False,True,2021-10-25,2025-03-14,Columbus,OH,87782,US
+SUPP_342,4.87,Active,True,True,2024-04-19,2026-08-18,Marseille,Occitanie,51255,FR
+SUPP_343,3.1,Active,False,True,2021-11-18,2026-08-15,Calgary,AB,S4V 9B1,CA
+SUPP_344,3.34,Active,True,True,2024-09-24,2026-01-25,Nice,Occitanie,33609,FR
+SUPP_345,4.37,Active,False,True,2023-09-30,2026-11-15,Chicago,NC,23733,US
+SUPP_346,3.89,Active,True,True,2022-07-13,2026-05-02,Charlotte,NJ,35149,US
+SUPP_347,2.09,Inactive,False,True,2021-11-18,2025-12-06,Houston,OR,85055,US
+SUPP_348,3.86,Under Review,False,True,2019-03-24,2024-02-01,Philadelphia,FL,52388,US
+SUPP_349,4.27,Active,False,True,2024-12-25,2027-02-05,Nashville,MI,87328,US
+SUPP_350,4.09,Inactive,False,False,2018-04-02,2019-07-13,Indianapolis,MA,60227,US
+SUPP_351,2.36,Inactive,False,False,2018-05-11,2022-11-23,Cologne,Berlin,35690,DE
+SUPP_352,4.78,Under Review,False,True,2019-06-16,2022-06-22,Nashville,CO,73698,US
+SUPP_353,4.63,Inactive,False,True,2021-12-18,2023-02-24,Charlotte,NJ,47534,US
+SUPP_354,2.04,Inactive,False,True,2022-07-11,2025-01-13,Toronto,ON,G6S 3K3,CA
+SUPP_355,3.89,Inactive,False,True,2021-06-25,2023-11-22,Edmonton,NB,V8V 4L7,CA
+SUPP_356,3.19,Inactive,False,True,2021-03-15,2023-02-25,Indianapolis,FL,20867,US
+SUPP_357,4.57,Inactive,False,False,2023-02-11,2025-06-05,Marseille,Île-de-France,58223,FR
+SUPP_358,4.08,Inactive,False,True,2019-12-09,2024-01-20,Portland,NJ,64886,US
+SUPP_359,3.76,Inactive,False,False,2018-09-07,2021-05-01,Nantes,Occitanie,41879,FR
+SUPP_360,3.04,Active,False,True,2023-01-04,2026-05-31,Nantes,Île-de-France,77946,FR
+SUPP_361,3.89,Under Review,False,False,2019-05-18,2021-03-22,San Antonio,VA,47689,US
+SUPP_362,1.88,Inactive,False,True,2022-02-02,2023-12-13,Liverpool,England,LX9 7AI,GB
+SUPP_363,3.06,Inactive,False,True,2018-12-11,2021-05-22,San Antonio,OR,13897,US
+SUPP_364,3.44,Inactive,False,True,2020-07-18,2025-01-25,Hamburg,Bavaria,65811,DE
+SUPP_365,4.72,Inactive,False,False,2017-12-27,2020-12-30,Nashville,TX,87983,US
+SUPP_366,3.29,Active,False,True,2024-11-09,2028-03-11,Boston,NJ,11336,US
+SUPP_367,3.73,Inactive,False,False,2020-09-22,2024-12-27,Columbus,MA,59768,US
+SUPP_368,4.91,Inactive,False,False,2021-07-07,2022-09-26,Paris,Auvergne-Rhône-Alpes,75639,FR
+SUPP_369,3.85,Active,True,True,2023-10-10,2027-04-13,Paris,Provence-Alpes-Côte d'Azur,40144,FR
+SUPP_370,3.25,Active,True,True,2024-05-27,2027-06-09,Cologne,Berlin,84987,DE
+SUPP_371,4.63,Active,False,False,2024-03-24,2026-01-25,El Paso,MI,30338,US
+SUPP_372,3.62,Inactive,False,True,2018-07-10,2021-04-03,Fort Worth,CO,93924,US
+SUPP_373,4.95,Inactive,False,False,2021-03-26,2025-04-24,Bordeaux,Nouvelle-Aquitaine,41395,FR
+SUPP_374,4.08,Inactive,False,False,2019-12-11,2023-07-03,Charlotte,IL,90257,US
+SUPP_375,3.36,Inactive,False,True,2023-01-18,2024-12-14,Calgary,ON,Y7P 9K7,CA
+SUPP_376,3.17,Inactive,False,True,2019-03-18,2020-06-23,Dallas,CO,99459,US
+SUPP_377,4.47,Inactive,False,True,2023-02-03,2025-07-19,Nantes,Provence-Alpes-Côte d'Azur,21148,FR
+SUPP_378,3.25,Inactive,False,True,2019-06-25,2020-07-15,Portland,OH,34660,US
+SUPP_379,3.81,Inactive,False,True,2023-04-06,2025-01-24,San Antonio,VA,56348,US
+SUPP_380,4.13,Inactive,False,True,2021-11-06,2024-06-14,San Jose,MA,89101,US
+SUPP_381,4.49,Inactive,False,True,2020-07-27,2022-03-07,Charlotte,WA,81464,US
+SUPP_382,NaN,Pending,False,False,2024-02-06,2028-01-04,Los Angeles,VA,37962,US
+SUPP_383,3.59,Inactive,False,False,2024-11-13,2026-08-23,Cologne,Saxony,38610,DE
+SUPP_384,3.74,Active,True,True,2023-01-09,2026-05-13,Glasgow,Northern Ireland,OK8 8HY,GB
+SUPP_385,4.31,Inactive,False,True,2021-02-23,2025-05-25,Vancouver,SK,M5M 3S5,CA
+SUPP_386,3.8,Inactive,False,True,2022-05-24,2024-11-26,Stuttgart,Bavaria,23891,DE
+SUPP_387,4.82,Inactive,False,True,2024-01-10,2025-03-07,Marseille,Auvergne-Rhône-Alpes,16419,FR
+SUPP_388,3.06,Inactive,False,True,2022-05-12,2024-02-18,San Antonio,PA,61621,US
+SUPP_389,4.39,Inactive,False,False,2022-01-23,2025-04-19,Indianapolis,OH,75183,US
+SUPP_390,3.78,Active,True,True,2023-10-22,2026-07-11,San Diego,CO,42677,US
+SUPP_391,3.32,Inactive,False,True,2018-08-01,2020-09-23,San Jose,FL,67709,US
+SUPP_392,3.21,Inactive,False,True,2019-06-05,2024-03-15,Portland,OR,41643,US
+SUPP_393,2.55,Inactive,False,True,2021-01-19,2022-01-31,Leipzig,Bavaria,87465,DE
+SUPP_394,4.39,Active,False,False,2023-10-30,2027-08-20,Dallas,FL,83329,US
+SUPP_395,4.16,Inactive,False,False,2018-11-25,2021-05-19,Toronto,ON,J8X 3X4,CA
+SUPP_396,4.18,Inactive,False,True,2020-01-07,2022-01-21,Nice,Auvergne-Rhône-Alpes,59412,FR
+SUPP_397,4.27,Inactive,False,False,2019-01-27,2023-10-10,Edmonton,NS,B4R 9P7,CA
+SUPP_398,2.29,Inactive,False,True,2023-05-13,2024-08-03,Jacksonville,GA,47281,US
+SUPP_399,4.27,Inactive,False,True,2019-11-21,2023-10-18,Detroit,NY,67530,US
+SUPP_400,1.95,Inactive,False,False,2018-08-22,2019-12-02,Manchester,Northern Ireland,IR5 2QN,GB
+SUPP_401,3.91,Inactive,False,False,2020-03-13,2021-08-29,Boston,TN,99975,US
+SUPP_402,4.92,Inactive,False,True,2018-05-18,2019-10-08,Quebec City,NS,S3H 7V8,CA
+SUPP_403,4.39,Inactive,False,False,2023-06-25,2024-07-13,Hamburg,North Rhine-Westphalia,87037,DE
+SUPP_404,2.66,Active,True,True,2021-04-29,2026-04-07,Memphis,MA,88583,US
+SUPP_405,4.9,Inactive,False,False,2018-06-24,2022-09-18,Bordeaux,Auvergne-Rhône-Alpes,24778,FR
+SUPP_406,3.67,Inactive,False,True,2019-04-10,2021-05-19,Stuttgart,Bavaria,73456,DE
+SUPP_407,4.31,Inactive,False,True,2021-08-10,2023-08-17,San Jose,WA,17794,US
+SUPP_408,4.45,Inactive,False,False,2021-02-16,2024-04-18,New York,NJ,80505,US
+SUPP_409,3.06,Inactive,False,True,2019-03-20,2023-05-28,Quebec City,BC,L7V 1K3,CA
+SUPP_410,3.86,Active,False,True,2023-12-29,2028-09-10,Denver,AZ,56831,US
+SUPP_411,4.75,Inactive,False,True,2021-07-21,2024-06-04,Houston,PA,29799,US
+SUPP_412,2.12,Inactive,False,False,2019-02-09,2023-12-20,Paris,Île-de-France,71278,FR
+SUPP_413,4.41,Inactive,False,True,2018-06-27,2020-08-01,San Jose,FL,15170,US
+SUPP_414,4.95,Inactive,False,False,2018-03-14,2020-09-25,Edmonton,QC,B2Y 9X6,CA
+SUPP_415,4.25,Inactive,False,True,2021-11-20,2024-03-06,Los Angeles,CA,34822,US
+SUPP_416,4.84,Inactive,False,False,2019-10-31,2023-08-29,Columbus,NY,86684,US
+SUPP_417,4.1,Active,False,True,2023-02-07,2026-03-25,Dallas,NY,12989,US
+SUPP_418,3.67,Pending,False,False,2022-09-11,2027-07-25,Portland,NJ,17265,US
+SUPP_419,4.62,Inactive,False,True,2023-03-08,2025-01-22,El Paso,PA,22494,US
+SUPP_420,4.88,Inactive,False,True,2019-11-22,2020-12-06,Ottawa,NS,N1T 4C4,CA
+SUPP_421,4.02,Active,True,True,2024-10-14,2029-06-25,Marseille,Nouvelle-Aquitaine,62726,FR
+SUPP_422,4.45,Under Review,False,True,2023-07-27,2025-09-04,New York,GA,46873,US
+SUPP_423,4.92,Inactive,False,True,2021-03-04,2025-07-19,New York,TX,92759,US
+SUPP_424,4.5,Under Review,False,True,2021-09-13,2023-11-02,Austin,IL,71304,US
+SUPP_425,3.19,Inactive,False,True,2018-05-14,2022-09-18,Edmonton,ON,G5R 9A3,CA
+SUPP_426,3.49,Active,False,True,2023-11-16,2028-01-11,San Antonio,OH,18826,US
+SUPP_427,4.39,Inactive,False,True,2021-12-09,2023-12-12,Quebec City,MB,H9J 4L7,CA
+SUPP_428,4.51,Inactive,False,True,2020-07-16,2023-07-15,Manchester,Northern Ireland,WL7 4XI,GB
+SUPP_429,4.29,Pending,False,True,2024-10-07,2028-08-15,Memphis,MA,97149,US
+SUPP_430,4.31,Inactive,False,True,2021-07-07,2025-01-12,Strasbourg,Auvergne-Rhône-Alpes,76781,FR
+SUPP_431,4.89,Inactive,False,True,2022-08-03,2024-05-06,Memphis,TX,14507,US
+SUPP_432,3.99,Inactive,False,True,2020-08-22,2021-11-11,Detroit,CA,20451,US
+SUPP_433,4.78,Inactive,False,False,2022-08-18,2025-02-11,Stuttgart,Saxony,42082,DE
+SUPP_434,3.78,Under Review,False,True,2018-10-25,2021-12-23,Marseille,Occitanie,75181,FR
+SUPP_435,2.28,Under Review,False,False,2023-09-23,2025-10-30,Boston,WA,26069,US
+SUPP_436,3.87,Inactive,False,True,2024-01-13,2025-08-03,Charlotte,PA,68969,US
+SUPP_437,3.3,Under Review,False,True,2019-08-30,2021-07-12,Birmingham,England,RE8 5NM,GB
+SUPP_438,4.78,Active,True,True,2024-07-21,2028-11-04,San Jose,TX,99231,US
+SUPP_439,4.53,Inactive,False,False,2020-04-24,2021-09-03,New York,FL,10986,US
+SUPP_440,3.24,Active,False,True,2024-01-31,2027-08-03,Detroit,IL,48917,US
+SUPP_441,4.17,Inactive,False,False,2021-01-13,2022-12-31,San Diego,TN,24473,US
+SUPP_442,4.88,Under Review,False,True,2021-05-19,2026-03-09,Austin,CO,10774,US
+SUPP_443,4.47,Under Review,False,False,2018-06-15,2022-08-14,Edinburgh,Scotland,WZ4 1ZU,GB
+SUPP_444,2.03,Under Review,False,True,2018-08-14,2020-10-10,Jacksonville,MA,40841,US
+SUPP_445,4.54,Inactive,False,False,2023-03-09,2025-02-15,Edmonton,MB,S8S 5R0,CA
+SUPP_446,4.47,Inactive,False,False,2020-05-25,2024-03-02,Denver,MI,67543,US
+SUPP_447,4.19,Inactive,False,True,2018-12-28,2022-08-19,Liverpool,Wales,YG6 1YI,GB
+SUPP_448,4.41,Inactive,False,False,2022-08-06,2025-07-02,San Antonio,NY,15392,US
+SUPP_449,4.32,Under Review,False,True,2018-02-17,2022-06-23,Los Angeles,PA,56768,US
+SUPP_450,3.85,Active,True,True,2024-04-16,2028-11-10,Vancouver,SK,S7H 5X6,CA
+SUPP_451,4.85,Active,False,True,2023-03-16,2027-11-13,Detroit,NY,92630,US
+SUPP_452,4.82,Under Review,False,True,2018-02-21,2020-07-30,Memphis,PA,95934,US
+SUPP_453,3.59,Inactive,False,True,2021-06-13,2023-12-22,Leeds,England,IP5 6AJ,GB
+SUPP_454,4.59,Inactive,False,True,2022-11-08,2025-10-23,Munich,Baden-Württemberg,80420,DE
+SUPP_455,3.85,Inactive,False,True,2021-03-26,2022-12-06,Toronto,NS,S7G 8V0,CA
+SUPP_456,3.56,Inactive,False,True,2018-05-17,2020-05-22,Edinburgh,England,GP9 8YC,GB
+SUPP_457,3.09,Inactive,False,False,2018-05-26,2022-11-08,Fort Worth,VA,28292,US
+SUPP_458,3.04,Suspended,False,True,2022-04-16,2027-01-13,Winnipeg,AB,A7M 3H6,CA
+SUPP_459,4.2,Inactive,False,False,2021-03-16,2023-09-10,Indianapolis,GA,23650,US
+SUPP_460,4.8,Inactive,False,True,2020-05-13,2023-11-28,San Antonio,VA,61508,US
+SUPP_461,3.04,Active,True,True,2024-10-16,2027-06-30,Düsseldorf,Bavaria,88022,DE
+SUPP_462,4.41,Inactive,False,True,2020-10-28,2023-02-27,Strasbourg,Auvergne-Rhône-Alpes,76037,FR
+SUPP_463,2.99,Inactive,False,False,2018-01-22,2019-09-21,Philadelphia,OR,88759,US
+SUPP_464,4.37,Inactive,False,True,2021-01-01,2025-05-02,Ottawa,ON,Y8G 6K1,CA
+SUPP_465,2.07,Inactive,False,True,2024-09-13,2025-09-24,San Jose,GA,72076,US
+SUPP_466,4.5,Inactive,False,True,2019-09-25,2022-06-10,Austin,OR,98556,US
+SUPP_467,4.6,Active,False,True,2024-12-24,2026-07-23,New York,MA,23653,US
+SUPP_468,4.16,Inactive,False,False,2020-08-28,2022-12-17,Nantes,Provence-Alpes-Côte d'Azur,61962,FR
+SUPP_469,1.71,Inactive,False,True,2018-08-18,2020-05-20,Munich,Saxony,96975,DE
+SUPP_470,NaN,Pending,False,False,2024-12-20,2026-10-19,San Diego,NC,15421,US
+SUPP_471,1.83,Inactive,False,True,2020-09-22,2025-06-02,San Diego,NC,83827,US
+SUPP_472,3.69,Inactive,False,True,2020-02-13,2023-01-14,Columbus,NY,34241,US
+SUPP_473,4.92,Inactive,False,True,2021-07-01,2025-08-05,Leeds,England,NZ3 2YH,GB
+SUPP_474,3.55,Inactive,False,False,2023-01-03,2025-03-20,Edmonton,MB,R6R 4S1,CA
+SUPP_475,3.67,Active,False,False,2022-05-23,2027-04-12,El Paso,OR,45292,US
+SUPP_476,4.15,Inactive,False,True,2019-09-09,2024-02-13,Montreal,AB,L9X 6M4,CA
+SUPP_477,4.0,Active,False,True,2022-11-24,2026-02-16,Nice,Auvergne-Rhône-Alpes,56760,FR
+SUPP_478,4.57,Inactive,False,True,2021-08-01,2025-09-16,Portland,IL,85806,US
+SUPP_479,4.36,Active,True,True,2024-12-24,2027-09-17,Düsseldorf,Baden-Württemberg,92944,DE
+SUPP_480,2.83,Active,False,True,2023-01-03,2027-02-28,Toronto,ON,A4Y 9K6,CA
+SUPP_481,4.21,Inactive,False,True,2021-11-05,2023-10-22,Philadelphia,NY,23068,US
+SUPP_482,3.82,Inactive,False,True,2024-03-22,2025-12-21,Birmingham,Northern Ireland,NZ5 2PT,GB
+SUPP_483,4.11,Inactive,False,True,2020-01-01,2021-05-07,Phoenix,OR,73839,US
+SUPP_484,4.86,Inactive,False,True,2020-10-05,2025-07-09,Denver,IL,51470,US
+SUPP_485,3.4,Under Review,False,False,2019-04-05,2023-05-12,Winnipeg,NB,N7S 6C7,CA
+SUPP_486,4.46,Under Review,False,True,2020-03-28,2024-05-02,Portland,FL,54403,US
+SUPP_487,2.38,Inactive,False,True,2024-09-17,2025-11-01,Detroit,TN,68624,US
+SUPP_488,3.95,Inactive,False,True,2023-11-03,2025-08-04,El Paso,NY,65097,US
+SUPP_489,4.55,Under Review,False,False,2019-02-25,2022-01-20,Jacksonville,CA,98401,US
+SUPP_490,2.73,Inactive,False,True,2021-02-17,2024-05-18,Boston,OR,78421,US
+SUPP_491,4.78,Inactive,False,False,2021-03-29,2022-10-22,Houston,WA,31655,US
+SUPP_492,4.38,Active,False,False,2024-05-20,2026-09-08,Winnipeg,SK,X1C 5B0,CA
+SUPP_493,2.9,Inactive,False,True,2022-02-02,2024-06-16,Charlotte,MA,69245,US
+SUPP_494,4.21,Inactive,False,True,2018-11-30,2022-08-22,Liverpool,Scotland,UN6 2GS,GB
+SUPP_495,4.37,Inactive,False,True,2018-09-20,2023-05-29,Boston,NY,20833,US
+SUPP_496,4.39,Inactive,False,True,2020-02-14,2021-08-26,Stuttgart,Berlin,66055,DE
+SUPP_497,5.0,Active,False,True,2023-03-15,2027-04-12,Calgary,NB,Y5J 5T9,CA
+SUPP_498,1.02,Inactive,False,False,2019-11-29,2024-03-06,Chicago,PA,79495,US
+SUPP_499,4.84,Active,True,True,2024-12-25,2028-01-11,Nashville,VA,96928,US
+SUPP_500,1.83,Inactive,False,False,2020-03-25,2023-07-27,Munich,Saxony,43380,DE

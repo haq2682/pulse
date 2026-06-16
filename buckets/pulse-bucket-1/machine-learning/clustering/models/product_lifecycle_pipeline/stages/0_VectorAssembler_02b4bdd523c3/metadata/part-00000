@@ -1,0 +1,1 @@
+{"class":"org.apache.spark.ml.feature.VectorAssembler","timestamp":1769663990217,"sparkVersion":"3.5.0","uid":"VectorAssembler_02b4bdd523c3","paramMap":{"inputCols":["log_age","log_sales_velocity","log_revenue_velocity","log_turnover"],"outputCol":"features_raw","handleInvalid":"skip"},"defaultParamMap":{"outputCol":"VectorAssembler_02b4bdd523c3__output","handleInvalid":"error"}}

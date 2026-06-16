@@ -1,0 +1,1 @@
+{"class":"org.apache.spark.ml.feature.StringIndexerModel","timestamp":1773363443277,"sparkVersion":"3.5.0","uid":"StringIndexer_e807b44977e7","paramMap":{"outputCol":"label","inputCol":"payment_status","handleInvalid":"skip"},"defaultParamMap":{"outputCol":"StringIndexer_e807b44977e7__output","stringOrderType":"frequencyDesc","handleInvalid":"error"}}

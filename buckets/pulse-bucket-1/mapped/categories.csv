@@ -1,0 +1,76 @@
+category_id,category,sub_category
+1,Electronics,NaN
+2,Clothing,NaN
+3,Home & Garden,NaN
+4,Sports & Outdoors,NaN
+5,Beauty & Personal Care,NaN
+6,Books & Media,NaN
+7,Toys & Games,NaN
+8,Food & Grocery,NaN
+9,Automotive,NaN
+10,Health & Wellness,NaN
+11,Smartphones,NaN
+12,Laptops,Bestseller
+13,Audio Equipment,NaN
+14,Cameras,NaN
+15,Wearable Technology,NaN
+16,Gaming,Bestseller
+17,Mens Clothing,New Arrivals
+18,Womens Clothing,Clearance
+19,Kids Clothing,Bestseller
+20,Footwear,Seasonal
+21,Accessories,NaN
+22,Furniture,NaN
+23,Kitchen,Bestseller
+24,Bedding,Clearance
+25,Garden Supplies,NaN
+26,Home Decor,NaN
+27,Exercise Equipment,Featured
+28,Outdoor Recreation,NaN
+29,Team Sports,Featured
+30,Water Sports,NaN
+31,Cycling,NaN
+32,Skincare,NaN
+33,Makeup,Featured
+34,Hair Care,Bestseller
+35,Fragrances,New Arrivals
+36,Fiction,Featured
+37,Non-Fiction,Featured
+38,Music,Featured
+39,Movies,NaN
+40,Action Figures,New Arrivals
+41,Board Games,Clearance
+42,Building Sets,NaN
+43,Dolls,Bestseller
+44,Educational Toys,Seasonal
+45,Snacks,NaN
+46,Beverages,Bestseller
+47,Pantry Staples,Seasonal
+48,Organic Foods,Seasonal
+49,Car Parts,NaN
+50,Car Accessories,New Arrivals
+51,Tools,NaN
+52,Car Care,Featured
+53,Vitamins,Bestseller
+54,Fitness Supplements,Bestseller
+55,Medical Supplies,Seasonal
+56,Wellness Devices,NaN
+57,iPhone,NaN
+58,Android Phones,NaN
+59,Gaming Laptops,NaN
+60,Business Laptops,NaN
+61,Ultrabooks,NaN
+62,Headphones,Seasonal
+63,Speakers,NaN
+64,Mens Shirts,Seasonal
+65,Mens Pants,NaN
+66,Mens Outerwear,Seasonal
+67,Dresses,Bestseller
+68,Tops,NaN
+69,Womens Pants,Featured
+70,Living Room Furniture,Bestseller
+71,Bedroom Furniture,New Arrivals
+72,Office Furniture,NaN
+73,Cardio Machines,NaN
+74,Strength Training,Seasonal
+75,Yoga & Pilates,Bestseller
