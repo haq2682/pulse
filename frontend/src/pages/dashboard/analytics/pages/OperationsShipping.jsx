@@ -177,7 +177,7 @@ export default function OperationsShipping() {
         const shipCostBarData = {
             labels: shipCostSorted.map((r) => r.country ?? 'Unknown'),
             datasets: [{
-                label: 'Total Shipping Cost ($)',
+                label: 'Total Shipping Cost',
                 data: shipCostSorted.map((r) => +(r.total_shipping_cost ?? 0).toFixed(2)),
                 backgroundColor: PALETTE,
             }],
@@ -194,8 +194,8 @@ export default function OperationsShipping() {
         const shipVsSubtotalGrouped = top10.length > 0 ? {
             labels: top10.map((r) => r.country ?? 'Unknown'),
             datasets: [
-                { label: 'Total Shipping Cost ($)', data: top10.map((r) => +(r.total_shipping_cost ?? 0).toFixed(2)),  backgroundColor: 'rgba(239,68,68,0.82)' },
-                { label: 'Total Subtotal ($)',       data: top10.map((r) => +(r.total_subtotal ?? 0).toFixed(2)),       backgroundColor: 'rgba(59,130,246,0.82)' },
+                { label: 'Total Shipping Cost', data: top10.map((r) => +(r.total_shipping_cost ?? 0).toFixed(2)),  backgroundColor: 'rgba(239,68,68,0.82)' },
+                { label: 'Total Subtotal',       data: top10.map((r) => +(r.total_subtotal ?? 0).toFixed(2)),       backgroundColor: 'rgba(59,130,246,0.82)' },
             ],
         } : null;
 
@@ -220,7 +220,7 @@ export default function OperationsShipping() {
         const stateShipCostBarData = stateShipCostSorted.length > 0 ? {
             labels: stateShipCostSorted.map((r) => `${r.state_province ?? '?'}, ${r.country ?? '?'}`),
             datasets: [{
-                label: 'Total Shipping Cost ($)',
+                label: 'Total Shipping Cost',
                 data: stateShipCostSorted.map((r) => +(r.total_shipping_cost ?? 0).toFixed(2)),
                 backgroundColor: 'rgba(59,130,246,0.82)',
             }],
@@ -439,11 +439,11 @@ export default function OperationsShipping() {
                                 <Column field="total_shipping_cost"         header="Shipping Cost"         sortable body={(r) => fmt.currency(r.total_shipping_cost)} />
                                 <Column field="total_subtotal"              header="Total Subtotal"        sortable body={(r) => fmt.currency(r.total_subtotal)} />
                                 <Column field="avg_shipping_pct_of_subtotal" header="Avg Shipping %"      sortable body={(r) => (
-                                    <Tag value={fmt.pct(r.avg_shipping_pct_of_subtotal)}
-                                        severity={(+(r.avg_shipping_pct_of_subtotal ?? 0)) <= 5 ? 'success' : (+(r.avg_shipping_pct_of_subtotal ?? 0)) <= 12 ? 'warning' : 'danger'} />
+                                    <Tag value={fmt.probToPct(r.avg_shipping_pct_of_subtotal)}
+                                        severity={(+(r.avg_shipping_pct_of_subtotal ?? 0)) <= 0.05 ? 'success' : (+(r.avg_shipping_pct_of_subtotal ?? 0)) <= 0.12 ? 'warning' : 'danger'} />
                                 )} />
-                                <Column field="median_shipping_pct_of_subtotal" header="Median Shipping %" sortable body={(r) => fmt.pct(r.median_shipping_pct_of_subtotal)} />
-                                <Column field="shipping_pct_of_subtotal_overall" header="Overall Shipping %" sortable body={(r) => fmt.pct(r.shipping_pct_of_subtotal_overall)} />
+                                <Column field="median_shipping_pct_of_subtotal" header="Median Shipping %" sortable body={(r) => fmt.probToPct(r.median_shipping_pct_of_subtotal)} />
+                                <Column field="shipping_pct_of_subtotal_overall" header="Overall Shipping %" sortable body={(r) => fmt.probToPct(r.shipping_pct_of_subtotal_overall)} />
                             </DataTable>
                         </div>
                     </Card>
@@ -464,10 +464,10 @@ export default function OperationsShipping() {
                                 <Column field="total_shipping_cost"         header="Shipping Cost"     sortable body={(r) => fmt.currency(r.total_shipping_cost)} />
                                 <Column field="total_subtotal"              header="Total Subtotal"    sortable body={(r) => fmt.currency(r.total_subtotal)} />
                                 <Column field="avg_shipping_pct_of_subtotal" header="Avg Shipping %"  sortable body={(r) => (
-                                    <Tag value={fmt.pct(r.avg_shipping_pct_of_subtotal)}
-                                        severity={(+(r.avg_shipping_pct_of_subtotal ?? 0)) <= 5 ? 'success' : (+(r.avg_shipping_pct_of_subtotal ?? 0)) <= 12 ? 'warning' : 'danger'} />
+                                    <Tag value={fmt.probToPct(r.avg_shipping_pct_of_subtotal)}
+                                        severity={(+(r.avg_shipping_pct_of_subtotal ?? 0)) <= 0.05 ? 'success' : (+(r.avg_shipping_pct_of_subtotal ?? 0)) <= 0.12 ? 'warning' : 'danger'} />
                                 )} />
-                                <Column field="median_shipping_pct_of_subtotal" header="Median %" sortable body={(r) => fmt.pct(r.median_shipping_pct_of_subtotal)} />
+                                <Column field="median_shipping_pct_of_subtotal" header="Median %" sortable body={(r) => fmt.probToPct(r.median_shipping_pct_of_subtotal)} />
                             </DataTable>
                         </div>
                     </Card>

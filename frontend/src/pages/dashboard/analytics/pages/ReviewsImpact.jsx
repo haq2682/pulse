@@ -184,7 +184,7 @@ export default function ReviewsImpact() {
         const tierRevGrouped = tierVelocity.length > 0 ? {
             labels: tierVelocity.map((r) => r.rating_tier ?? 'Unknown'),
             datasets: [
-                { label: 'Total Revenue ($)', data: tierVelocity.map((r) => +(r.total_revenue_tier ?? 0).toFixed(0)),          backgroundColor: 'rgba(59,130,246,0.82)' },
+                { label: 'Total Revenue', data: tierVelocity.map((r) => +(r.total_revenue_tier ?? 0).toFixed(0)),          backgroundColor: 'rgba(59,130,246,0.82)' },
                 { label: 'Total Units Sold',  data: tierVelocity.map((r) => +(r.total_units_sold_tier ?? 0)),                   backgroundColor: 'rgba(34,197,94,0.82)' },
             ],
         } : null;
@@ -193,7 +193,7 @@ export default function ReviewsImpact() {
         const avgRevTierData = tierVelocity.length > 0 ? {
             labels: tierVelocity.map((r) => r.rating_tier ?? 'Unknown'),
             datasets: [{
-                label: 'Avg Revenue per Product ($)',
+                label: 'Avg Revenue per Product',
                 data: tierVelocity.map((r) => +(r.avg_revenue_per_product ?? 0).toFixed(0)),
                 backgroundColor: tierVelocity.map((r) => {
                     const t = r.rating_tier ?? '';
@@ -238,7 +238,7 @@ export default function ReviewsImpact() {
         const topImpactGrouped = topImpactProds.length > 0 ? {
             labels: topImpactProds.map((r) => truncate(r.product_name ?? `ID ${r.product_id}`, 20)),
             datasets: [
-                { label: 'Total Revenue ($)', data: topImpactProds.map((r) => +(r.total_revenue ?? 0).toFixed(0)),       backgroundColor: 'rgba(59,130,246,0.82)' },
+                { label: 'Total Revenue', data: topImpactProds.map((r) => +(r.total_revenue ?? 0).toFixed(0)),       backgroundColor: 'rgba(59,130,246,0.82)' },
                 { label: 'Units Sold',        data: topImpactProds.map((r) => +(r.total_units_sold ?? 0)),                backgroundColor: 'rgba(34,197,94,0.82)' },
             ],
         } : null;

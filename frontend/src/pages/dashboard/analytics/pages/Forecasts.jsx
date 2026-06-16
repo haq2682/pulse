@@ -372,14 +372,14 @@ export default function Forecasts() {
     const topAov = aovRows ? [...aovRows].sort((a, b) => (+(b.predicted_next_aov ?? 0)) - (+(a.predicted_next_aov ?? 0))).slice(0, 12) : [];
     const aovBarData = topAov.length > 0 ? {
         labels: topAov.map((r) => String(r.customer_id ?? '').slice(0, 12)),
-        datasets: [{ label: 'Predicted AOV ($)', data: topAov.map((r) => +(r.predicted_next_aov ?? 0)), backgroundColor: PALETTE[0] }],
+        datasets: [{ label: 'Predicted AOV', data: topAov.map((r) => +(r.predicted_next_aov ?? 0)), backgroundColor: PALETTE[0] }],
     } : null;
 
     // ── CLV Prediction ────────────────────────────────────────────────────────
     const topClv = clvRows ? [...clvRows].sort((a, b) => (+(b.predicted_clv ?? 0)) - (+(a.predicted_clv ?? 0))).slice(0, 12) : [];
     const clvBarData = topClv.length > 0 ? {
         labels: topClv.map((r) => String(r.customer_id ?? '').slice(0, 12)),
-        datasets: [{ label: 'Predicted CLV ($)', data: topClv.map((r) => +(r.predicted_clv ?? 0)), backgroundColor: PALETTE[1] }],
+        datasets: [{ label: 'Predicted CLV', data: topClv.map((r) => +(r.predicted_clv ?? 0)), backgroundColor: PALETTE[1] }],
     } : null;
 
     // ── Stock Status ──────────────────────────────────────────────────────────
@@ -389,7 +389,7 @@ export default function Forecasts() {
     // ── Restock Quantity ──────────────────────────────────────────────────────
     const topRestock = restockRows ? [...restockRows].sort((a, b) => (+(b.recommended_restock_quantity ?? 0)) - (+(a.recommended_restock_quantity ?? 0))).slice(0, 12) : [];
     const restockBarData = topRestock.length > 0 ? {
-        labels: topRestock.map((r) => String(r.product_id ?? '').slice(0, 12)),
+        labels: topRestock.map((r) => (r.product_name ?? String(r.product_id ?? '')).slice(0, 18)),
         datasets: [{ label: 'Restock Qty', data: topRestock.map((r) => +(r.recommended_restock_quantity ?? 0)), backgroundColor: PALETTE[2] }],
     } : null;
     const totalRestockCost = getSummaryStats('restock_quantity').total_estimated_cost
@@ -416,7 +416,7 @@ export default function Forecasts() {
     const demandClassDist = demandRows ? distDoughnutData(countBy(demandRows, 'predicted_demand_class')) : null;
     const topDemand = demandRows ? [...demandRows].sort((a, b) => demandProbability(b) - demandProbability(a)).slice(0, 12) : [];
     const demandBarData = topDemand.length > 0 ? {
-        labels: topDemand.map((r) => String(r.product_id ?? '').slice(0, 12)),
+        labels: topDemand.map((r) => (r.product_name ?? String(r.product_id ?? '')).slice(0, 18)),
         datasets: [{ label: 'P(High Demand)', data: topDemand.map((r) => demandProbability(r)), backgroundColor: PALETTE[4] }],
     } : null;
     const demandSummary = getSummaryStats('demand_forecast') ?? {};
@@ -432,10 +432,10 @@ export default function Forecasts() {
     // ── Price Optimization ────────────────────────────────────────────────────
     const topPriceGap = priceRows ? [...priceRows].sort((a, b) => Math.abs(+(b.optimal_price ?? 0) - +(b.current_price ?? 0)) - Math.abs(+(a.optimal_price ?? 0) - +(a.current_price ?? 0))).slice(0, 10) : [];
     const priceGroupedData = topPriceGap.length > 0 ? {
-        labels: topPriceGap.map((r) => String(r.product_id ?? '').slice(0, 12)),
+        labels: topPriceGap.map((r) => (r.product_name ?? String(r.product_id ?? '')).slice(0, 18)),
         datasets: [
-            { label: 'Current Price ($)', data: topPriceGap.map((r) => +(r.current_price ?? 0)), backgroundColor: PALETTE[3] },
-            { label: 'Optimal Price ($)', data: topPriceGap.map((r) => +(r.optimal_price ?? 0)), backgroundColor: PALETTE[1] },
+            { label: 'Current Price', data: topPriceGap.map((r) => +(r.current_price ?? 0)), backgroundColor: PALETTE[3] },
+            { label: 'Optimal Price', data: topPriceGap.map((r) => +(r.optimal_price ?? 0)), backgroundColor: PALETTE[1] },
         ],
     } : null;
 
@@ -478,7 +478,7 @@ export default function Forecasts() {
     const revLineData = revSorted.length > 0 ? {
         labels: revSorted.map((r) => String(r.forecast_date ?? '').slice(0, 10)),
         datasets: [{
-            label: 'Predicted Revenue ($)',
+            label: 'Predicted Revenue',
             data: revSorted.map((r) => +(r.predicted_revenue ?? 0)),
             borderColor: 'rgba(59,130,246,0.9)', backgroundColor: 'rgba(59,130,246,0.15)',
             fill: true, tension: 0.3,
@@ -518,7 +518,7 @@ export default function Forecasts() {
     const topSessions = sessConvRows ? [...sessConvRows].sort((a, b) => (+(b.predicted_conversion_value ?? 0)) - (+(a.predicted_conversion_value ?? 0))).slice(0, 12) : [];
     const sessConvBarData = topSessions.length > 0 ? {
         labels: topSessions.map((r) => String(r.session_id ?? '').slice(0, 12)),
-        datasets: [{ label: 'Predicted Value ($)', data: topSessions.map((r) => +(r.predicted_conversion_value ?? 0)), backgroundColor: PALETTE[5] }],
+        datasets: [{ label: 'Predicted Value', data: topSessions.map((r) => +(r.predicted_conversion_value ?? 0)), backgroundColor: PALETTE[5] }],
     } : null;
 
     // ── Review Sentiment ──────────────────────────────────────────────────────
@@ -737,7 +737,7 @@ export default function Forecasts() {
                                 <div className="p-6">
                                     <h3 className="text-base font-semibold text-gray-900 mb-3 pb-2 border-b border-gray-200">Critical & Low Stock Products</h3>
                                     <DataTable value={criticalStock} rows={8} className="p-datatable-sm" stripedRows>
-                                        <Column field="product_id" header="Product ID" />
+                                        <Column field="product_name" header="Product" body={(r) => r.product_name ?? r.product_id} />
                                         <Column field="predicted_status" header="Status" body={(r) => <Tag value={r.predicted_status ?? '—'} severity={r.predicted_status === 'Out of Stock' ? 'danger' : r.predicted_status === 'Low Stock' ? 'warning' : 'info'} />} />
                                         <Column field="days_until_stockout" header="Days to Stockout" body={(r) => fmt.days(r.days_until_stockout)} sortable />
                                         <Column field="reorder_recommendation" header="Reorder?" body={(r) => <Tag value={r.reorder_recommendation ? 'Yes' : 'No'} severity={r.reorder_recommendation ? 'danger' : 'success'} />} />
@@ -764,7 +764,7 @@ export default function Forecasts() {
                                 <div className="p-6">
                                     <h3 className="text-base font-semibold text-gray-900 mb-3 pb-2 border-b border-gray-200">Critical / High Risk Products</h3>
                                     <DataTable value={criticalStockout} rows={8} className="p-datatable-sm" stripedRows>
-                                        <Column field="product_id" header="Product ID" />
+                                        <Column field="product_name" header="Product" body={(r) => r.product_name ?? r.product_id} />
                                         <Column field="stockout_risk_level" header="Risk" body={(r) => <Tag value={r.stockout_risk_level ?? '—'} severity={r.stockout_risk_level === 'Critical' ? 'danger' : 'warning'} />} />
                                         <Column field="stockout_probability" header="Probability" body={(r) => fmt.probToPct(r.stockout_probability)} sortable />
                                         <Column field="days_until_stockout" header="Days Left" body={(r) => fmt.days(r.days_until_stockout)} sortable />
@@ -833,7 +833,7 @@ export default function Forecasts() {
                                     <div className="p-6">
                                         <h3 className="text-base font-semibold text-gray-900 mb-3 pb-2 border-b border-gray-200">Demand Forecast Samples</h3>
                                         <DataTable value={[...demandRows].sort((a, b) => demandProbability(b) - demandProbability(a)).slice(0, 20)} rows={10} className="p-datatable-sm" stripedRows>
-                                            <Column field="product_id" header="Product ID" />
+                                            <Column field="product_name" header="Product" body={(r) => r.product_name ?? r.product_id} />
                                             <Column field="predicted_demand_class" header="Class" />
                                             <Column field="high_demand_probability" header="P(High)" body={(r) => fmt.probToPct(demandProbability(r))} sortable />
                                             <Column field="forecast_horizon_days" header="Horizon (days)" sortable />
@@ -860,7 +860,7 @@ export default function Forecasts() {
                         <div className="p-6">
                             <h3 className="text-base font-semibold text-gray-900 mb-3 pb-2 border-b border-gray-200">Safety Stock Table</h3>
                             <DataTable value={[...safetyRows].sort((a, b) => (+(b.adjustment_factor ?? 0)) - (+(a.adjustment_factor ?? 0)))} paginator rows={10} className="p-datatable-sm" stripedRows>
-                                <Column field="product_id" header="Product ID" />
+                                <Column field="product_name" header="Product" body={(r) => r.product_name ?? r.product_id} />
                                 <Column field="required_safety_stock_units" header="Safety Stock (units)" sortable />
                                 <Column field="adjustment_factor" header="Adjustment Factor" body={(r) => fmt.decimal(r.adjustment_factor, 2)} sortable />
                                 <Column field="demand_pattern" header="Demand Pattern" body={(r) => <Tag value={r.demand_pattern ?? '—'} severity={r.demand_pattern === 'Erratic' ? 'danger' : r.demand_pattern === 'Variable' ? 'warning' : 'success'} />} />
@@ -1140,7 +1140,7 @@ export default function Forecasts() {
                                     <h3 className="text-base font-semibold text-gray-900 mb-3 pb-2 border-b border-gray-200">Most Negative Reviews</h3>
                                     <DataTable value={negativeReviews} rows={8} className="p-datatable-sm" stripedRows>
                                         <Column field="review_id" header="Review ID" />
-                                        <Column field="product_id" header="Product ID" />
+                                        <Column field="product_name" header="Product" body={(r) => r.product_name ?? r.product_id} />
                                         <Column field="predicted_sentiment" header="Sentiment" body={(r) => <Tag value={r.predicted_sentiment ?? '—'} severity={r.predicted_sentiment === 'Positive' ? 'success' : r.predicted_sentiment === 'Negative' ? 'danger' : 'warning'} />} />
                                         <Column field="sentiment_score" header="Score" body={(r) => fmt.decimal(r.sentiment_score, 2)} sortable />
                                         <Column field="confidence_score" header="Confidence" body={(r) => fmt.probToPct(r.confidence_score)} />
@@ -1195,8 +1195,8 @@ export default function Forecasts() {
                                 <div className="p-6">
                                     <h3 className="text-base font-semibold text-gray-900 mb-3 pb-2 border-b border-gray-200">Top Complementary Pairs</h3>
                                     <DataTable value={topBundles} rows={8} className="p-datatable-sm" stripedRows>
-                                        <Column field="product_id_a" header="Product A" />
-                                        <Column field="product_id_b" header="Product B" />
+                                        <Column field="product_name_a" header="Product A" body={(r) => r.product_name_a ?? r.product_id_a} />
+                                        <Column field="product_name_b" header="Product B" body={(r) => r.product_name_b ?? r.product_id_b} />
                                         <Column field="bundle_category" header="Category" />
                                         <Column field="affinity_score" header="Affinity" body={(r) => fmt.decimal(r.affinity_score, 3)} sortable />
                                         <Column field="lift" header="Lift" body={(r) => fmt.decimal(r.lift, 2)} sortable />
@@ -1225,7 +1225,7 @@ export default function Forecasts() {
                                 <div className="p-6">
                                     <h3 className="text-base font-semibold text-gray-900 mb-3 pb-2 border-b border-gray-200">Affinity Cluster Table</h3>
                                     <DataTable value={affinityRows} paginator rows={8} className="p-datatable-sm" stripedRows>
-                                        <Column field="product_id" header="Product ID" />
+                                        <Column field="product_name" header="Product" body={(r) => r.product_name ?? r.product_id} />
                                         <Column field="cluster_id" header="Cluster" />
                                         <Column field="cluster_label" header="Label" />
                                     </DataTable>
@@ -1247,7 +1247,7 @@ export default function Forecasts() {
                                 <div className="p-6">
                                     <h3 className="text-base font-semibold text-gray-900 mb-3 pb-2 border-b border-gray-200">Lifecycle Stage Table</h3>
                                     <DataTable value={lifecycleRows} paginator rows={8} className="p-datatable-sm" stripedRows>
-                                        <Column field="product_id" header="Product ID" />
+                                        <Column field="product_name" header="Product" body={(r) => r.product_name ?? r.product_id} />
                                         <Column field="lifecycle_stage" header="Stage" body={(r) => <Tag value={r.lifecycle_stage ?? '—'} severity={r.lifecycle_stage === 'Growth' ? 'success' : r.lifecycle_stage === 'Decline' ? 'danger' : 'info'} />} />
                                         <Column field="cluster_centroid_distance" header="Centroid Dist." body={(r) => fmt.decimal(r.cluster_centroid_distance, 3)} sortable />
                                     </DataTable>

@@ -644,7 +644,7 @@ const CustomerOverview = () => {
                                         ...defaultBarOpts().plugins,
                                         legend: { display: true, position: 'top' },
                                     },
-                                    scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + v.toLocaleString() } } },
+                                    scales: { y: { beginAtZero: true, ticks: { callback: (v) => fmt.currencyShort(v) } } },
                                 }}
                             />
                         </div>

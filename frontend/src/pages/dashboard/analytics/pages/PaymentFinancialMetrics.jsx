@@ -191,14 +191,14 @@ export default function PaymentFinancialMetrics() {
             labels: aovMonthSorted.map((r) => r.year_month ?? `${r.order_year}-${String(r.order_month).padStart(2, '0')}`),
             datasets: [
                 {
-                    label: 'Avg Order Value ($)',
+                    label: 'Avg Order Value',
                     data: aovMonthSorted.map((r) => +(r.avg_order_value ?? 0).toFixed(2)),
                     borderColor: 'rgba(59,130,246,0.9)',
                     backgroundColor: 'rgba(59,130,246,0.15)',
                     tension: 0.3, fill: true,
                 },
                 {
-                    label: 'Total Revenue ($k)',
+                    label: 'Total Revenue (k)',
                     data: aovMonthSorted.map((r) => +((+(r.total_revenue ?? 0)) / 1000).toFixed(2)),
                     borderColor: 'rgba(34,197,94,0.9)',
                     backgroundColor: 'rgba(34,197,94,0.15)',
@@ -212,7 +212,7 @@ export default function PaymentFinancialMetrics() {
         const revBySegBarData = revSegSorted.length > 0 ? {
             labels: revSegSorted.map((r) => r.customer_segment ?? 'Unknown'),
             datasets: [{
-                label: 'Revenue ($)',
+                label: 'Revenue',
                 data: revSegSorted.map((r) => +(r.segment_revenue ?? 0).toFixed(2)),
                 backgroundColor: PALETTE,
             }],
@@ -223,7 +223,7 @@ export default function PaymentFinancialMetrics() {
         const revByRfmBarData = revRfmSorted.length > 0 ? {
             labels: revRfmSorted.map((r) => r.rfm_segment ?? 'Unknown'),
             datasets: [{
-                label: 'Revenue ($)',
+                label: 'Revenue',
                 data: revRfmSorted.map((r) => +(r.segment_revenue ?? 0).toFixed(2)),
                 backgroundColor: PALETTE,
             }],
@@ -239,7 +239,7 @@ export default function PaymentFinancialMetrics() {
         const revPerCustRfmData = revRfmSorted.length > 0 ? {
             labels: revRfmSorted.map((r) => r.rfm_segment ?? 'Unknown'),
             datasets: [{
-                label: 'Revenue per Customer ($)',
+                label: 'Revenue per Customer',
                 data: revRfmSorted.map((r) => +(r.revenue_per_customer ?? 0).toFixed(2)),
                 backgroundColor: 'rgba(139,92,246,0.82)',
             }],
@@ -250,7 +250,7 @@ export default function PaymentFinancialMetrics() {
         const aovByRfmBarData = aovRfmSorted.length > 0 ? {
             labels: aovRfmSorted.map((r) => r.rfm_segment ?? 'Unknown'),
             datasets: [{
-                label: 'Avg Order Value ($)',
+                label: 'Avg Order Value',
                 data: aovRfmSorted.map((r) => +(r.avg_order_value_segment ?? 0).toFixed(2)),
                 backgroundColor: 'rgba(59,130,246,0.82)',
             }],
@@ -261,7 +261,7 @@ export default function PaymentFinancialMetrics() {
         const revByDeviceBarData = revDevSorted.length > 0 ? {
             labels: revDevSorted.map((r) => r.preferred_device_type ?? 'Unknown'),
             datasets: [{
-                label: 'Revenue ($)',
+                label: 'Revenue',
                 data: revDevSorted.map((r) => +(r.segment_revenue ?? 0).toFixed(2)),
                 backgroundColor: PALETTE,
             }],
@@ -272,7 +272,7 @@ export default function PaymentFinancialMetrics() {
         const revByReferrerBarData = revRefSorted.length > 0 ? {
             labels: revRefSorted.map((r) => r.preferred_referrer_source ?? 'Unknown'),
             datasets: [{
-                label: 'Revenue ($)',
+                label: 'Revenue',
                 data: revRefSorted.map((r) => +(r.segment_revenue ?? 0).toFixed(2)),
                 backgroundColor: PALETTE,
             }],
@@ -299,7 +299,7 @@ export default function PaymentFinancialMetrics() {
         const revByLabelBarData = revLabelSorted.length > 0 ? {
             labels: revLabelSorted.map((r) => r.customer_segment_label ?? 'Unknown'),
             datasets: [{
-                label: 'Revenue ($)',
+                label: 'Revenue',
                 data: revLabelSorted.map((r) => +(r.segment_revenue ?? 0).toFixed(2)),
                 backgroundColor: PALETTE,
             }],
@@ -541,7 +541,7 @@ export default function PaymentFinancialMetrics() {
                                 <Column field="customer_count"        header="Customers"            sortable body={(r) => fmt.number(r.customer_count)} />
                                 <Column field="segment_revenue"       header="Revenue"              sortable body={(r) => fmt.currency(r.segment_revenue)} />
                                 <Column field="revenue_per_customer"  header="Rev per Customer"     sortable body={(r) => fmt.currency(r.revenue_per_customer)} />
-                                <Column field="revenue_share"         header="Revenue Share"        sortable body={(r) => fmt.pct(r.revenue_share)} />
+                                <Column field="revenue_share"         header="Revenue Share"        sortable body={(r) => fmt.probToPct(r.revenue_share)} />
                             </DataTable>
                         </div>
                     </Card>
@@ -578,9 +578,9 @@ export default function PaymentFinancialMetrics() {
                                 <Column field="units_sold"            header="Units Sold"          sortable body={(r) => fmt.number(r.units_sold)} />
                                 <Column field="total_category_revenue" header="Revenue"            sortable body={(r) => fmt.currency(r.total_category_revenue)} />
                                 <Column field="total_category_profit" header="Profit"              sortable body={(r) => fmt.currency(r.total_category_profit)} />
-                                <Column field="avg_profit_margin"     header="Avg Margin"          sortable body={(r) => (
-                                    <Tag value={fmt.pct(r.avg_profit_margin)}
-                                        severity={(+(r.avg_profit_margin ?? 0)) < 10 ? 'danger' : (+(r.avg_profit_margin ?? 0)) < 20 ? 'warning' : 'success'} />
+                                <Column field="avg_profit_margin"     header="Avg Profit / Unit"          sortable body={(r) => (
+                                    <Tag value={fmt.currency(r.avg_profit_margin)}
+                                        severity={(+(r.avg_profit_margin ?? 0)) < 0 ? 'danger' : (+(r.avg_profit_margin ?? 0)) < 5 ? 'warning' : 'success'} />
                                 )} />
                             </DataTable>
                         </div>
@@ -606,7 +606,7 @@ export default function PaymentFinancialMetrics() {
                                             tension: 0.4, fill: true,
                                         }],
                                     }}
-                                    options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false, ticks: { callback: (v) => '$' + v.toLocaleString() } } } }}
+                                    options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false, ticks: { callback: (v) => fmt.currencyShort(v) } } } }}
                                 />
                             </div>
                         </div>
@@ -633,7 +633,7 @@ export default function PaymentFinancialMetrics() {
                                             pointRadius: 2,
                                         }],
                                     }}
-                                    options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false, ticks: { callback: (v) => '$' + v.toLocaleString() } } } }}
+                                    options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false, ticks: { callback: (v) => fmt.currencyShort(v) } } } }}
                                 />
                             </div>
                         </div>
@@ -656,7 +656,7 @@ export default function PaymentFinancialMetrics() {
                                 <Column field="customer_count" header="Customers" sortable body={(r) => fmt.number(r.customer_count)} />
                                 <Column field="segment_revenue" header="Revenue" sortable body={(r) => fmt.currency(r.segment_revenue)} />
                                 <Column field="revenue_per_customer" header="Rev / Customer" sortable body={(r) => fmt.currency(r.revenue_per_customer)} />
-                                <Column field="revenue_share" header="Revenue Share" sortable body={(r) => fmt.pct(r.revenue_share)} />
+                                <Column field="revenue_share" header="Revenue Share" sortable body={(r) => fmt.probToPct(r.revenue_share)} />
                             </DataTable>
                         </div>
                     </Card>

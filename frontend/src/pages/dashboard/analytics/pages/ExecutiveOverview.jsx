@@ -457,11 +457,11 @@ const ExecutiveOverview = () => {
             scales: {
                 y: {
                     beginAtZero: true,
-                    ticks: { callback: (v) => '$' + v.toLocaleString() },
+                    ticks: { callback: (v) => fmt.currencyShort(v) },
                 },
             },
         }),
-        []
+        [fmt]
     );
 
     const productChartData = useMemo(() => {
@@ -743,7 +743,7 @@ const ExecutiveOverview = () => {
                         },
                         {
                             label: 'On-Time Delivery',
-                            value: fmt.pct(operationsData?.onTimeDeliveryRate),
+                            value: fmt.probToPct(operationsData?.onTimeDeliveryRate),
                             show:  operationsData?.onTimeDeliveryRate > 0,
                         },
                         {
@@ -910,7 +910,7 @@ const ExecutiveOverview = () => {
                                     labels: (derived.bhWeeklyRaw).map((r) => `${r.grain_year}-W${String(r.grain_week ?? 0).padStart(2,'0')}`),
                                     datasets: [{ label: 'Revenue', data: (derived.bhWeeklyRaw).map((r) => +(r.total_revenue ?? 0)), backgroundColor: 'rgba(59,130,246,0.8)' }],
                                 }}
-                                options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + v.toLocaleString() } } } }}
+                                options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: (v) => fmt.currencyShort(v) } } } }}
                             />
                         </div>
                     </div>
@@ -923,7 +923,7 @@ const ExecutiveOverview = () => {
                                         labels: (derived.bhMonthlyRaw).map((r) => `${r.grain_year}-${String(r.grain_month ?? 0).padStart(2,'0')}`),
                                         datasets: [{ label: 'Revenue', data: (derived.bhMonthlyRaw).map((r) => +(r.total_revenue ?? 0)), backgroundColor: 'rgba(34,197,94,0.8)' }],
                                     }}
-                                    options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + v.toLocaleString() } } } }}
+                                    options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: (v) => fmt.currencyShort(v) } } } }}
                                 />
                             </div>
                         </div>

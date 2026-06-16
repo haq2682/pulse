@@ -181,7 +181,7 @@ const ProductProfitability = () => {
         const rows = [...(derived?.categoryProfit ?? [])].sort((a, b) => (b.avg_profit_margin ?? 0) - (a.avg_profit_margin ?? 0));
         return {
             labels: rows.map((r) => r.category ?? ''),
-            datasets: [{ label: 'Avg Profit Margin (%)', data: rows.map((r) => ((r.avg_profit_margin ?? 0) * 100).toFixed(2)), backgroundColor: PALETTE }],
+            datasets: [{ label: 'Avg Profit / Unit', data: rows.map((r) => +(r.avg_profit_margin ?? 0).toFixed(2)), backgroundColor: PALETTE }],
         };
     }, [derived]);
 
@@ -191,7 +191,7 @@ const ProductProfitability = () => {
         return {
             labels: top10.map((r) => r.product_name ?? ''),
             datasets: [
-                { label: 'Profit Margin (%)', data: top10.map((r) => ((r.profit_margin ?? 0) * 100).toFixed(2)), backgroundColor: 'rgba(34,197,94,0.8)' },
+                { label: 'Profit / Unit', data: top10.map((r) => +(r.profit_margin ?? 0).toFixed(2)), backgroundColor: 'rgba(34,197,94,0.8)' },
             ],
         };
     }, [derived]);
@@ -219,7 +219,7 @@ const ProductProfitability = () => {
         const top10 = [...(derived?.carryingCost ?? [])].sort((a, b) => (b.storage_cost ?? 0) - (a.storage_cost ?? 0)).slice(0, 10);
         return {
             labels: top10.map((r) => r.product_name ?? ''),
-            datasets: [{ label: 'Storage Cost ($)', data: top10.map((r) => r.storage_cost ?? 0), backgroundColor: 'rgba(239,68,68,0.8)' }],
+            datasets: [{ label: 'Storage Cost', data: top10.map((r) => r.storage_cost ?? 0), backgroundColor: 'rgba(239,68,68,0.8)' }],
         };
     }, [derived]);
 
@@ -295,7 +295,7 @@ const ProductProfitability = () => {
                     <KPICard icon="pi-star" iconBg="bg-yellow-50" iconColor="text-yellow-500" value={derived.bestMarginCat.category ?? ''} label="Best Margin Category *" />
                 )}
                 {(derived?.bestMarginCat?.avg_profit_margin ?? 0) > 0 && (
-                    <KPICard icon="pi-percentage" iconBg="bg-purple-50" iconColor="text-purple-500" value={fmt.pct((derived.bestMarginCat.avg_profit_margin ?? 0) * 100)} label="Best Category Margin % *" />
+                    <KPICard icon="pi-percentage" iconBg="bg-purple-50" iconColor="text-purple-500" value={fmt.currency(derived.bestMarginCat.avg_profit_margin)} label="Best Category Avg Profit / Unit *" />
                 )}
                 {(derived?.marginErosion?.length ?? 0) > 0 && (
                     <KPICard icon="pi-exclamation-triangle" iconBg="bg-red-50" iconColor="text-red-500" value={fmt.number(derived.marginErosion.length)} label="Margin Erosion Risk Products *" />
@@ -311,7 +311,7 @@ const ProductProfitability = () => {
                     <div className="col-span-1 lg:col-span-2">
                         <ChartWrapper title="Category Revenue vs Profit *" showUpdateBadge={false}>
                             <div className="h-[300px]">
-                                <Bar data={catProfitBarData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'top' } }, scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + v.toLocaleString() } } } }} />
+                                <Bar data={catProfitBarData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'top' } }, scales: { y: { beginAtZero: true, ticks: { callback: (v) => fmt.currencyShort(v) } } } }} />
                             </div>
                         </ChartWrapper>
                     </div>
@@ -357,7 +357,7 @@ const ProductProfitability = () => {
                 {(derived?.carryingCost?.length ?? 0) > 0 && (
                     <ChartWrapper title="Top 10 Products by Inventory Carrying Cost *" showUpdateBadge={false}>
                         <div className="h-[300px]">
-                            <Bar data={carryingCostData} options={{ responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { callback: (v) => '$' + v.toLocaleString() } } } }} />
+                            <Bar data={carryingCostData} options={{ responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { callback: (v) => fmt.currencyShort(v) } } } }} />
                         </div>
                     </ChartWrapper>
                 )}
@@ -373,7 +373,7 @@ const ProductProfitability = () => {
                             rows={[
                                 { label: 'Revenue',          value: fmt.currency(row.category_revenue),      show: (row.category_revenue ?? 0) > 0 },
                                 { label: 'Profit',           value: fmt.currency(row.category_profit),       show: (row.category_profit ?? 0) > 0 },
-                                { label: 'Profit Margin',    value: fmt.pct((row.avg_profit_margin ?? 0) * 100), show: true },
+                                { label: 'Avg Profit / Unit', value: fmt.currency(row.avg_profit_margin), show: true },
                                 { label: 'Products',         value: fmt.number(row.products_in_category),    show: (row.products_in_category ?? 0) > 0 },
                                 { label: 'Profit / Product', value: fmt.currency(row.profit_per_product),    show: (row.profit_per_product ?? 0) > 0 },
                                 { label: 'Revenue / Product',value: fmt.currency(row.revenue_per_product),   show: (row.revenue_per_product ?? 0) > 0 },
@@ -392,7 +392,7 @@ const ProductProfitability = () => {
                             <Column field="product_name" header="Product" sortable />
                             <Column field="category" header="Category" sortable />
                             <Column field="brand" header="Brand" sortable />
-                            <Column field="profit_margin" header="Margin %" sortable body={(r) => fmt.pct((r.profit_margin ?? 0) * 100)} />
+                            <Column field="profit_margin" header="Profit / Unit" sortable body={(r) => fmt.currency(r.profit_margin)} />
                             <Column field="total_revenue" header="Revenue" sortable body={(r) => fmt.currency(r.total_revenue)} />
                             <Column field="total_units_sold" header="Units Sold" sortable body={(r) => fmt.number(r.total_units_sold)} />
                         </DataTable>
@@ -410,7 +410,7 @@ const ProductProfitability = () => {
                         <DataTable value={[...derived.lowMarginHighTraffic].sort((a, b) => (b.traffic_score ?? 0) - (a.traffic_score ?? 0))} paginator rows={10} stripedRows size="small">
                             <Column field="product_name" header="Product" sortable />
                             <Column field="category" header="Category" sortable />
-                            <Column field="profit_margin" header="Margin %" sortable body={(r) => fmt.pct((r.profit_margin ?? 0) * 100)} />
+                            <Column field="profit_margin" header="Profit / Unit" sortable body={(r) => fmt.currency(r.profit_margin)} />
                             <Column field="traffic_score" header="Traffic Score" sortable body={(r) => fmt.decimal(r.traffic_score, 2)} />
                             <Column field="view_to_purchase_rate" header="View→Purchase" sortable body={(r) => fmt.pct((r.view_to_purchase_rate ?? 0) * 100)} />
                             <Column field="total_revenue" header="Revenue" sortable body={(r) => fmt.currency(r.total_revenue)} />
@@ -432,9 +432,9 @@ const ProductProfitability = () => {
                             <Column field="category" header="Category" sortable />
                             <Column field="products_in_category" header="Products" sortable body={(r) => fmt.number(r.products_in_category)} />
                             <Column field="total_revenue" header="Revenue" sortable body={(r) => fmt.currency(r.total_revenue)} />
-                            <Column field="avg_profit_margin" header="Avg Margin %" sortable body={(r) => fmt.pct((r.avg_profit_margin ?? 0) * 100)} />
+                            <Column field="avg_profit_margin" header="Avg Profit / Unit" sortable body={(r) => fmt.currency(r.avg_profit_margin)} />
                             <Column field="avg_view_to_purchase_rate" header="Avg View→Purchase" sortable body={(r) => fmt.pct((r.avg_view_to_purchase_rate ?? 0) * 100)} />
-                            <Column field="revenue_share" header="Revenue Share %" sortable body={(r) => fmt.pct((r.revenue_share ?? 0) * 100)} />
+                            <Column field="revenue_share" header="Revenue Share %" sortable body={(r) => fmt.probToPct(r.revenue_share)} />
                         </DataTable>
                     </div>
                 </Card>
@@ -470,8 +470,8 @@ const ProductProfitability = () => {
                             <Column field="products_in_category" header="Products" sortable body={(r) => fmt.number(r.products_in_category)} />
                             <Column field="category_revenue" header="Revenue" sortable body={(r) => fmt.currency(r.category_revenue)} />
                             <Column field="category_profit" header="Profit" sortable body={(r) => fmt.currency(r.category_profit)} />
-                            <Column field="avg_profit_margin" header="Avg Margin %" sortable body={(r) => fmt.pct((r.avg_profit_margin ?? 0) * 100)} />
-                            <Column field="profit_share" header="Profit Share %" sortable body={(r) => fmt.pct((r.profit_share ?? 0) * 100)} />
+                            <Column field="avg_profit_margin" header="Avg Profit / Unit" sortable body={(r) => fmt.currency(r.avg_profit_margin)} />
+                            <Column field="profit_share" header="Profit Share %" sortable body={(r) => fmt.probToPct(r.profit_share)} />
                             <Column field="revenue_per_product" header="Rev / Product" sortable body={(r) => fmt.currency(r.revenue_per_product)} />
                             <Column field="profit_per_product" header="Profit / Product" sortable body={(r) => fmt.currency(r.profit_per_product)} />
                         </DataTable>

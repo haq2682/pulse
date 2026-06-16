@@ -498,7 +498,7 @@ const CustomerHealthRetention = () => {
                                 options={{
                                     responsive: true, maintainAspectRatio: false,
                                     plugins: { legend: { display: false } },
-                                    scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + v.toLocaleString() } } },
+                                    scales: { y: { beginAtZero: true, ticks: { callback: (v) => fmt.currencyShort(v) } } },
                                 }}
                             />
                         </div>
@@ -621,7 +621,7 @@ const CustomerHealthRetention = () => {
                         { label: 'Total Carts Created', value: fmt.number(cb.total_carts_created), show: (cb.total_carts_created ?? 0) > 0 },
                         { label: 'Total Abandoned Carts', value: fmt.number(cb.total_abandoned_carts), show: (cb.total_abandoned_carts ?? 0) > 0 },
                         { label: 'Total Purchased Carts', value: fmt.number(cb.total_purchased_carts), show: (cb.total_purchased_carts ?? 0) > 0 },
-                        { label: 'Avg Abandonment Rate', value: fmt.pct(cb.avg_cart_abandonment_rate), show: (cb.avg_cart_abandonment_rate ?? 0) > 0 },
+                        { label: 'Avg Abandonment Rate', value: fmt.probToPct(cb.avg_cart_abandonment_rate), show: (cb.avg_cart_abandonment_rate ?? 0) > 0 },
                         { label: 'Total Abandoned Value', value: fmt.currency(cb.total_abandoned_value), show: (cb.total_abandoned_value ?? 0) > 0 },
                         { label: 'Avg Time in Cart', value: `${(cb.avg_time_in_cart_days ?? 0).toFixed(1)} days`, show: (cb.avg_time_in_cart_days ?? 0) > 0 },
                     ]}
@@ -668,7 +668,7 @@ const CustomerHealthRetention = () => {
                             <Column field="customer_id" header="Customer ID" sortable />
                             <Column field="total_abandoned_carts" header="Abandoned Carts" sortable body={(r) => fmt.number(r.total_abandoned_carts)} />
                             <Column field="total_abandoned_value" header="Abandoned Value" sortable body={(r) => fmt.currency(r.total_abandoned_value)} />
-                            <Column field="cart_abandonment_rate" header="Abandonment Rate" sortable body={(r) => fmt.pct(r.cart_abandonment_rate)} />
+                            <Column field="cart_abandonment_rate" header="Abandonment Rate" sortable body={(r) => fmt.probToPct(r.cart_abandonment_rate)} />
                             <Column field="total_revenue" header="Total Revenue" sortable body={(r) => fmt.currency(r.total_revenue)} />
                             <Column field="customer_lifetime_value" header="CLV" sortable body={(r) => fmt.currency(r.customer_lifetime_value)} />
                         </DataTable>
@@ -692,8 +692,8 @@ const CustomerHealthRetention = () => {
                             <Column field="wishlist_items_count" header="Wishlist Items" sortable body={(r) => fmt.number(r.wishlist_items_count)} />
                             <Column field="total_carts_created" header="Carts Created" sortable body={(r) => fmt.number(r.total_carts_created)} />
                             <Column field="total_purchased_carts" header="Purchased Carts" sortable body={(r) => fmt.number(r.total_purchased_carts)} />
-                            <Column field="cart_abandonment_rate" header="Cart Abandon Rate" sortable body={(r) => fmt.pct(r.cart_abandonment_rate)} />
-                            <Column field="session_conversion_rate" header="Session Conv. Rate" sortable body={(r) => fmt.pct(r.session_conversion_rate)} />
+                            <Column field="cart_abandonment_rate" header="Cart Abandon Rate" sortable body={(r) => fmt.probToPct(r.cart_abandonment_rate)} />
+                            <Column field="session_conversion_rate" header="Session Conv. Rate" sortable body={(r) => fmt.probToPct(r.session_conversion_rate)} />
                         </DataTable>
                     </div>
                 </Card>
@@ -708,7 +708,7 @@ const CustomerHealthRetention = () => {
                             title={row.is_discount_hunter ? 'Discount Hunters *' : 'Non-Discount Customers *'}
                             rows={[
                                 { label: 'Customer Count', value: fmt.number(row.customer_count), show: (row.customer_count ?? 0) > 0 },
-                                { label: 'Avg Discount Share', value: fmt.pct(row.avg_discount_share), show: (row.avg_discount_share ?? 0) > 0 },
+                                { label: 'Avg Discount Share', value: fmt.probToPct(row.avg_discount_share), show: (row.avg_discount_share ?? 0) > 0 },
                                 { label: 'Avg Discount / Order', value: fmt.currency(row.avg_discount_per_order), show: (row.avg_discount_per_order ?? 0) > 0 },
                                 { label: 'Avg CLV', value: fmt.currency(row.avg_clv), show: (row.avg_clv ?? 0) > 0 },
                                 { label: 'Avg Revenue', value: fmt.currency(row.avg_revenue), show: (row.avg_revenue ?? 0) > 0 },

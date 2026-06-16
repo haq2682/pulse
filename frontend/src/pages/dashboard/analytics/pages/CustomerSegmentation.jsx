@@ -556,7 +556,7 @@ const CustomerSegmentation = () => {
                                     maintainAspectRatio: false,
                                     plugins: { legend: { display: true, position: 'top' } },
                                     scales: {
-                                        y: { beginAtZero: true, ticks: { callback: (v) => '$' + v.toLocaleString() } },
+                                        y: { beginAtZero: true, ticks: { callback: (v) => fmt.currencyShort(v) } },
                                     },
                                 }}
                             />
@@ -590,7 +590,7 @@ const CustomerSegmentation = () => {
                                 data={referrerData}
                                 options={{
                                     ...barOpts('Avg CLV by Referrer', false),
-                                    scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + v.toLocaleString() } } },
+                                    scales: { y: { beginAtZero: true, ticks: { callback: (v) => fmt.currencyShort(v) } } },
                                 }}
                             />
                         </div>
@@ -605,7 +605,7 @@ const CustomerSegmentation = () => {
                                 options={{
                                     responsive: true, maintainAspectRatio: false,
                                     plugins: { legend: { display: true, position: 'top' } },
-                                    scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + v.toLocaleString() } } },
+                                    scales: { y: { beginAtZero: true, ticks: { callback: (v) => fmt.currencyShort(v) } } },
                                 }}
                             />
                         </div>

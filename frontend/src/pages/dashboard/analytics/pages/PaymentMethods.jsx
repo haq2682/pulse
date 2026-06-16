@@ -186,7 +186,7 @@ export default function PaymentMethods() {
         const aovBarData = {
             labels: aovSorted.map((r) => r.payment_method ?? 'Unknown'),
             datasets: [{
-                label: 'Avg Order Value ($)',
+                label: 'Avg Order Value',
                 data: aovSorted.map((r) => +(r.avg_order_value_method ?? 0).toFixed(2)),
                 backgroundColor: 'rgba(59,130,246,0.82)',
             }],
@@ -197,7 +197,7 @@ export default function PaymentMethods() {
         const revenueBarData = {
             labels: revSorted.map((r) => r.payment_method ?? 'Unknown'),
             datasets: [{
-                label: 'Total Revenue ($)',
+                label: 'Total Revenue',
                 data: revSorted.map((r) => +(r.total_revenue ?? 0).toFixed(2)),
                 backgroundColor: PALETTE,
             }],
@@ -459,8 +459,8 @@ export default function PaymentMethods() {
                                 <Column field="completed_payments" header="Completed"         sortable body={(r) => fmt.number(r.completed_payments)} />
                                 <Column field="distinct_orders"    header="Distinct Orders"   sortable body={(r) => fmt.number(r.distinct_orders)} />
                                 <Column field="success_rate"       header="Success Rate"      sortable body={(r) => (
-                                    <Tag value={fmt.pct(r.success_rate)}
-                                        severity={(+(r.success_rate ?? 0)) >= 90 ? 'success' : (+(r.success_rate ?? 0)) >= 70 ? 'warning' : 'danger'} />
+                                    <Tag value={fmt.probToPct(r.success_rate)}
+                                        severity={(+(r.success_rate ?? 0)) >= 0.90 ? 'success' : (+(r.success_rate ?? 0)) >= 0.70 ? 'warning' : 'danger'} />
                                 )} />
                             </DataTable>
                         </div>

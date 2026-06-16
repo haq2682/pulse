@@ -545,8 +545,8 @@ export default function EngagementBehavior() {
                                 <Column field="wishlist_items_count"  header="Wishlist Items"       sortable body={(r) => fmt.number(r.wishlist_items_count)} />
                                 <Column field="total_carts_created"   header="Carts Created"        sortable body={(r) => fmt.number(r.total_carts_created)} />
                                 <Column field="total_purchased_carts" header="Purchased Carts"      sortable body={(r) => fmt.number(r.total_purchased_carts)} />
-                                <Column field="cart_abandonment_rate" header="Cart Abandonment %"   sortable body={(r) => fmt.pct(r.cart_abandonment_rate)} />
-                                <Column field="session_conversion_rate" header="Session Conv. %"    sortable body={(r) => fmt.pct(r.session_conversion_rate)} />
+                                <Column field="cart_abandonment_rate" header="Cart Abandonment %"   sortable body={(r) => fmt.probToPct(r.cart_abandonment_rate)} />
+                                <Column field="session_conversion_rate" header="Session Conv. %"    sortable body={(r) => fmt.probToPct(r.session_conversion_rate)} />
                             </DataTable>
                         </div>
                     </Card>

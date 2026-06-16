@@ -161,7 +161,7 @@ export default function FunnelWishlist() {
             .sort((a, b) => (+(b.wishlist_adds ?? 0)) - (+(a.wishlist_adds ?? 0)))
             .slice(0, 12);
         const topAddsBarData = {
-            labels: topAddsSorted.map((r) => `Product ${r.product_id}`),
+            labels: topAddsSorted.map((r) => r.product_name ?? `Product ${r.product_id}`),
             datasets: [{ label: 'Wishlist Adds', data: topAddsSorted.map((r) => +(r.wishlist_adds ?? 0)), backgroundColor: 'rgba(59,130,246,0.82)' }],
         };
 
@@ -170,7 +170,7 @@ export default function FunnelWishlist() {
             .sort((a, b) => (+(b.wishlist_purchases ?? 0)) - (+(a.wishlist_purchases ?? 0)))
             .slice(0, 12);
         const topPurchBarData = {
-            labels: topPurchSorted.map((r) => `Product ${r.product_id}`),
+            labels: topPurchSorted.map((r) => r.product_name ?? `Product ${r.product_id}`),
             datasets: [{ label: 'Wishlist Purchases', data: topPurchSorted.map((r) => +(r.wishlist_purchases ?? 0)), backgroundColor: 'rgba(34,197,94,0.82)' }],
         };
 
@@ -180,8 +180,8 @@ export default function FunnelWishlist() {
             .sort((a, b) => (+(b.wishlist_conversion_rate ?? 0)) - (+(a.wishlist_conversion_rate ?? 0)))
             .slice(0, 12);
         const convRateBarData = {
-            labels: convRateSorted.map((r) => `Product ${r.product_id}`),
-            datasets: [{ label: 'Conversion Rate %', data: convRateSorted.map((r) => +(r.wishlist_conversion_rate ?? 0).toFixed(2)), backgroundColor: 'rgba(139,92,246,0.82)' }],
+            labels: convRateSorted.map((r) => r.product_name ?? `Product ${r.product_id}`),
+            datasets: [{ label: 'Conversion Rate %', data: convRateSorted.map((r) => +((r.wishlist_conversion_rate ?? 0) * 100).toFixed(2)), backgroundColor: 'rgba(139,92,246,0.82)' }],
         };
 
         // ---- Adds vs Purchases grouped bar (top 10) -------------------------
@@ -189,7 +189,7 @@ export default function FunnelWishlist() {
             .sort((a, b) => (+(b.wishlist_adds ?? 0)) - (+(a.wishlist_adds ?? 0)))
             .slice(0, 10);
         const addVsPurchBarData = {
-            labels: top10.map((r) => `Product ${r.product_id}`),
+            labels: top10.map((r) => r.product_name ?? `Product ${r.product_id}`),
             datasets: [
                 { label: 'Wishlist Adds',      data: top10.map((r) => +(r.wishlist_adds ?? 0)),      backgroundColor: 'rgba(59,130,246,0.75)' },
                 { label: 'Wishlist Purchases', data: top10.map((r) => +(r.wishlist_purchases ?? 0)), backgroundColor: 'rgba(34,197,94,0.75)' },
@@ -219,7 +219,7 @@ export default function FunnelWishlist() {
             .sort((a, b) => (+(b.abandoned_wishlist_count ?? 0)) - (+(a.abandoned_wishlist_count ?? 0)))
             .slice(0, 12);
         const abandonProdBarData = abandonProdSorted.length > 0 ? {
-            labels: abandonProdSorted.map((r) => `Product ${r.product_id}`),
+            labels: abandonProdSorted.map((r) => r.product_name ?? `Product ${r.product_id}`),
             datasets: [{ label: 'Abandoned Wishlist Count', data: abandonProdSorted.map((r) => +(r.abandoned_wishlist_count ?? 0)), backgroundColor: 'rgba(239,68,68,0.82)' }],
         } : null;
 
@@ -316,7 +316,7 @@ export default function FunnelWishlist() {
                 <KPICard icon="pi-heart"       iconBg="bg-pink-50"   iconColor="text-pink-600"   value={fmt.number(kpis.totalItems)}      label="Total Wishlist Items" />
                 <KPICard icon="pi-users"       iconBg="bg-blue-50"   iconColor="text-blue-600"   value={fmt.number(kpis.customersUsing)}  label="Customers Using Wishlist" />
                 <KPICard icon="pi-box"         iconBg="bg-purple-50" iconColor="text-purple-600" value={fmt.number(kpis.productsInList)}  label="Products in Wishlist" />
-                <KPICard icon="pi-percentage"  iconBg="bg-green-50"  iconColor="text-green-600"  value={fmt.pct(kpis.convRate)}           label="Wishlist Conv. Rate" />
+                <KPICard icon="pi-percentage"  iconBg="bg-green-50"  iconColor="text-green-600"  value={fmt.probToPct(kpis.convRate)}           label="Wishlist Conv. Rate" />
             </div>
 
             {/* ── Wishlist Activity ──────────────────────────────────────── */}
@@ -417,7 +417,7 @@ export default function FunnelWishlist() {
                             <DataTable value={ttpDist} scrollable stripedRows emptyMessage="No data" className="text-sm">
                                 <Column field="time_bucket" header="Time Bucket"   sortable />
                                 <Column field="count"       header="Count"         sortable body={(r) => fmt.number(r.count)} />
-                                <Column field="share"       header="Share %"       sortable body={(r) => fmt.pct(r.share)} />
+                                <Column field="share"       header="Share %"       sortable body={(r) => fmt.probToPct(r.share)} />
                             </DataTable>
                         </div>
                     </Card>
@@ -429,10 +429,10 @@ export default function FunnelWishlist() {
                         <div className="p-6">
                             <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">Wishlist Performance by Product</h3>
                             <DataTable value={byProduct} paginator rows={15} scrollable stripedRows emptyMessage="No data" className="text-sm">
-                                <Column field="product_id"              header="Product ID"          sortable />
+                                <Column field="product_name" header="Product" sortable body={(r) => r.product_name ?? r.product_id} />
                                 <Column field="wishlist_adds"           header="Wishlist Adds"       sortable body={(r) => fmt.number(r.wishlist_adds)} />
                                 <Column field="wishlist_purchases"      header="Purchases"           sortable body={(r) => fmt.number(r.wishlist_purchases)} />
-                                <Column field="wishlist_conversion_rate" header="Conv. Rate %"       sortable body={(r) => fmt.pct(r.wishlist_conversion_rate)} />
+                                <Column field="wishlist_conversion_rate" header="Conv. Rate %"       sortable body={(r) => fmt.probToPct(r.wishlist_conversion_rate)} />
                             </DataTable>
                         </div>
                     </Card>
@@ -450,7 +450,7 @@ export default function FunnelWishlist() {
                                 <Column field="customer_id"              header="Customer ID"       sortable />
                                 <Column field="wishlist_adds"            header="Wishlist Adds"     sortable body={(r) => fmt.number(r.wishlist_adds)} />
                                 <Column field="wishlist_purchases"       header="Purchases"         sortable body={(r) => fmt.number(r.wishlist_purchases)} />
-                                <Column field="wishlist_conversion_rate" header="Conv. Rate %"      sortable body={(r) => fmt.pct(r.wishlist_conversion_rate)} />
+                                <Column field="wishlist_conversion_rate" header="Conv. Rate %"      sortable body={(r) => fmt.probToPct(r.wishlist_conversion_rate)} />
                             </DataTable>
                         </div>
                     </Card>
@@ -483,7 +483,7 @@ export default function FunnelWishlist() {
                             >
                                 <Column field="wishlist_id"    header="Wishlist ID"    sortable />
                                 <Column field="customer_id"    header="Customer ID"    sortable />
-                                <Column field="product_id"     header="Product ID"     sortable />
+                                <Column field="product_name"   header="Product"        sortable body={(r) => r.product_name ?? r.product_id} />
                                 <Column field="added_date"     header="Added Date"     sortable />
                                 <Column field="purchased_date" header="Purchased Date" sortable body={(r) => r.purchased_date ?? '—'} />
                                 <Column field="removed_date"   header="Removed Date"   sortable body={(r) => r.removed_date ?? '—'} />

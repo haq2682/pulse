@@ -170,11 +170,11 @@ export default function PaymentRefunds() {
             labels: refundRateSorted.map((r) => r.payment_method ?? 'Unknown'),
             datasets: [{
                 label: 'Refund Rate %',
-                data: refundRateSorted.map((r) => +(r.refund_rate_payments ?? 0).toFixed(2)),
+                data: refundRateSorted.map((r) => +((r.refund_rate_payments ?? 0) * 100).toFixed(2)),
                 backgroundColor: refundRateSorted.map((r) => {
                     const rate = +(r.refund_rate_payments ?? 0);
-                    if (rate >= 20) return 'rgba(239,68,68,0.82)';
-                    if (rate >= 10) return 'rgba(234,179,8,0.82)';
+                    if (rate >= 0.20) return 'rgba(239,68,68,0.82)';
+                    if (rate >= 0.10) return 'rgba(234,179,8,0.82)';
                     return 'rgba(34,197,94,0.82)';
                 }),
             }],
@@ -185,7 +185,7 @@ export default function PaymentRefunds() {
         const refundAmtBarData = {
             labels: refundAmtSorted.map((r) => r.payment_method ?? 'Unknown'),
             datasets: [{
-                label: 'Total Refund Amount ($)',
+                label: 'Total Refund Amount',
                 data: refundAmtSorted.map((r) => +(r.total_refund_amount ?? 0).toFixed(2)),
                 backgroundColor: 'rgba(239,68,68,0.75)',
             }],
@@ -195,7 +195,7 @@ export default function PaymentRefunds() {
         const avgRefundBarData = {
             labels: refundRateSorted.map((r) => r.payment_method ?? 'Unknown'),
             datasets: [{
-                label: 'Avg Refund per Payment ($)',
+                label: 'Avg Refund per Payment',
                 data: refundRateSorted.map((r) => +(r.avg_refund_per_payment ?? 0).toFixed(2)),
                 backgroundColor: 'rgba(249,115,22,0.82)',
             }],
@@ -215,7 +215,7 @@ export default function PaymentRefunds() {
             labels: topRefundProdSorted.map((r) => r.product_name || `Product ${r.product_id}`),
             datasets: [{
                 label: 'Refund Rate %',
-                data: topRefundProdSorted.map((r) => +(r.refund_rate_orders ?? 0).toFixed(2)),
+                data: topRefundProdSorted.map((r) => +((r.refund_rate_orders ?? 0) * 100).toFixed(2)),
                 backgroundColor: 'rgba(239,68,68,0.82)',
             }],
         } : null;
@@ -227,7 +227,7 @@ export default function PaymentRefunds() {
         const topProdAmtBarData = topProdAmtSorted.length > 0 ? {
             labels: topProdAmtSorted.map((r) => r.product_name || `Product ${r.product_id}`),
             datasets: [{
-                label: 'Total Refund Amount ($)',
+                label: 'Total Refund Amount',
                 data: topProdAmtSorted.map((r) => +(r.total_refund_amount ?? 0).toFixed(2)),
                 backgroundColor: PALETTE,
             }],
@@ -246,14 +246,14 @@ export default function PaymentRefunds() {
             datasets: [
                 {
                     label: 'Refund Rate (Orders) %',
-                    data: monthsSorted.map((r) => +(r.refund_rate_orders ?? 0).toFixed(2)),
+                    data: monthsSorted.map((r) => +((r.refund_rate_orders ?? 0) * 100).toFixed(2)),
                     borderColor: 'rgba(239,68,68,0.9)',
                     backgroundColor: 'rgba(239,68,68,0.15)',
                     tension: 0.3, fill: true,
                 },
                 {
                     label: 'Refund Rate (Amount) %',
-                    data: monthsSorted.map((r) => +(r.refund_rate_amount ?? 0).toFixed(2)),
+                    data: monthsSorted.map((r) => +((r.refund_rate_amount ?? 0) * 100).toFixed(2)),
                     borderColor: 'rgba(249,115,22,0.9)',
                     backgroundColor: 'rgba(249,115,22,0.15)',
                     tension: 0.3, fill: true,
@@ -370,7 +370,7 @@ export default function PaymentRefunds() {
                 />
                 <KPICard
                     icon="pi-percentage" iconBg="bg-orange-100" iconColor="text-orange-600"
-                    value={fmt.pct(kpis.overallRefundRate)}
+                    value={fmt.probToPct(kpis.overallRefundRate)}
                     label="Avg Refund Rate"
                 />
                 <KPICard
@@ -482,11 +482,11 @@ export default function PaymentRefunds() {
                                 <Column field="payment_method"       header="Payment Method"       sortable />
                                 <Column field="total_payments"       header="Total Payments"       sortable body={(r) => fmt.number(r.total_payments)} />
                                 <Column field="payments_with_refund" header="Payments w/ Refund"   sortable body={(r) => fmt.number(r.payments_with_refund)} />
-                                <Column field="total_refund_amount"  header="Total Refund ($)"     sortable body={(r) => fmt.currency(r.total_refund_amount)} />
-                                <Column field="avg_refund_per_payment" header="Avg Refund ($)"     sortable body={(r) => fmt.currency(r.avg_refund_per_payment)} />
+                                <Column field="total_refund_amount"  header="Total Refund"     sortable body={(r) => fmt.currency(r.total_refund_amount)} />
+                                <Column field="avg_refund_per_payment" header="Avg Refund"     sortable body={(r) => fmt.currency(r.avg_refund_per_payment)} />
                                 <Column field="refund_rate_payments" header="Refund Rate"          sortable body={(r) => (
-                                    <Tag value={fmt.pct(r.refund_rate_payments)}
-                                        severity={(+(r.refund_rate_payments ?? 0)) >= 20 ? 'danger' : (+(r.refund_rate_payments ?? 0)) >= 10 ? 'warning' : 'success'} />
+                                    <Tag value={fmt.probToPct(r.refund_rate_payments)}
+                                        severity={(+(r.refund_rate_payments ?? 0)) >= 0.20 ? 'danger' : (+(r.refund_rate_payments ?? 0)) >= 0.10 ? 'warning' : 'success'} />
                                 )} />
                             </DataTable>
                         </div>
@@ -503,7 +503,7 @@ export default function PaymentRefunds() {
                             <DataTable value={ttpSorted} scrollable stripedRows emptyMessage="No data" className="text-sm">
                                 <Column field="payment_method"      header="Payment Method"     sortable />
                                 <Column field="refunded_payments"   header="Refunded Payments"  sortable body={(r) => fmt.number(r.refunded_payments)} />
-                                <Column field="total_refund_amount" header="Total Refund ($)"   sortable body={(r) => fmt.currency(r.total_refund_amount)} />
+                                <Column field="total_refund_amount" header="Total Refund"   sortable body={(r) => fmt.currency(r.total_refund_amount)} />
                                 <Column field="avg_days_to_refund"  header="Avg Days"           sortable body={(r) => fmt.decimal(r.avg_days_to_refund, 1)} />
                                 <Column field="min_days_to_refund"  header="Min Days"           sortable body={(r) => fmt.decimal(r.min_days_to_refund, 1)} />
                                 <Column field="max_days_to_refund"  header="Max Days"           sortable body={(r) => fmt.decimal(r.max_days_to_refund, 1)} />
@@ -525,10 +525,10 @@ export default function PaymentRefunds() {
                                 <Column field="category"            header="Category"           sortable />
                                 <Column field="orders_for_product"  header="Total Orders"       sortable body={(r) => fmt.number(r.orders_for_product)} />
                                 <Column field="orders_with_refund"  header="Orders w/ Refund"   sortable body={(r) => fmt.number(r.orders_with_refund)} />
-                                <Column field="total_refund_amount" header="Refund Amount ($)"  sortable body={(r) => fmt.currency(r.total_refund_amount)} />
+                                <Column field="total_refund_amount" header="Refund Amount"  sortable body={(r) => fmt.currency(r.total_refund_amount)} />
                                 <Column field="refund_rate_orders"  header="Refund Rate"        sortable body={(r) => (
-                                    <Tag value={fmt.pct(r.refund_rate_orders)}
-                                        severity={(+(r.refund_rate_orders ?? 0)) >= 20 ? 'danger' : (+(r.refund_rate_orders ?? 0)) >= 10 ? 'warning' : 'success'} />
+                                    <Tag value={fmt.probToPct(r.refund_rate_orders)}
+                                        severity={(+(r.refund_rate_orders ?? 0)) >= 0.20 ? 'danger' : (+(r.refund_rate_orders ?? 0)) >= 0.10 ? 'warning' : 'success'} />
                                 )} />
                             </DataTable>
                         </div>

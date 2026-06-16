@@ -32,8 +32,6 @@ import SupplierPerformance from './analytics/pages/SupplierPerformance';
 import SupplierOperations from './analytics/pages/SupplierOperations';
 import SupplierEconomics from './analytics/pages/SupplierEconomics';
 import MarketingCampaigns from './analytics/pages/MarketingCampaigns';
-import MarketingAttribution from './analytics/pages/MarketingAttribution';
-import MarketingChannels from './analytics/pages/MarketingChannels';
 import FunnelOverview from './analytics/pages/FunnelOverview';
 import FunnelCart from './analytics/pages/FunnelCart';
 import FunnelCheckout from './analytics/pages/FunnelCheckout';
@@ -830,14 +828,6 @@ const Dashboard = () => {
         // Marketing routes
         if (pathname.includes('/marketing/campaigns')) {
             return <MarketingCampaigns />;
-        }
-
-        if (pathname.includes('/marketing/attribution')) {
-            return <MarketingAttribution />;
-        }
-
-        if (pathname.includes('/marketing/channels')) {
-            return <MarketingChannels />;
         }
 
         // Funnel routes

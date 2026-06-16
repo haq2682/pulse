@@ -214,7 +214,7 @@ const ProductEngagement = () => {
             labels: rows.map((r) => r.category ?? ''),
             datasets: [
                 { label: 'Avg View→Purchase (%)', data: rows.map((r) => ((r.avg_view_to_purchase_rate ?? 0) * 100).toFixed(2)), backgroundColor: 'rgba(34,197,94,0.8)' },
-                { label: 'Avg Revenue / View ($)', data: rows.map((r) => (r.avg_revenue_per_view ?? 0).toFixed(2)), backgroundColor: 'rgba(59,130,246,0.8)' },
+                { label: 'Avg Revenue / View', data: rows.map((r) => (r.avg_revenue_per_view ?? 0).toFixed(2)), backgroundColor: 'rgba(59,130,246,0.8)' },
             ],
         };
     }, [derived]);
@@ -512,7 +512,7 @@ const ProductEngagement = () => {
                             <Column field="supplier_id" header="Supplier ID" sortable />
                             <Column field="total_units_sold" header="Units Sold" sortable body={(r) => fmt.number(r.total_units_sold)} />
                             <Column field="total_revenue" header="Revenue" sortable body={(r) => fmt.currency(r.total_revenue)} />
-                            <Column field="profit_margin" header="Margin" sortable body={(r) => fmt.pct(r.profit_margin)} />
+                            <Column field="profit_margin" header="Profit / Unit" sortable body={(r) => fmt.currency(r.profit_margin)} />
                             <Column field="supplier_performance_score" header="Perf. Score" sortable body={(r) => fmt.decimal(r.supplier_performance_score, 2)} />
                             <Column field="supplier_reliability_score" header="Reliability" sortable body={(r) => fmt.decimal(r.supplier_reliability_score, 2)} />
                         </DataTable>
@@ -550,7 +550,7 @@ const ProductEngagement = () => {
                             <Column field="supplier_id" header="Supplier ID" sortable />
                             <Column field="total_revenue" header="Revenue" sortable body={(r) => fmt.currency(r.total_revenue)} />
                             <Column field="sup_total_stockouts" header="Supplier Stockouts" sortable body={(r) => fmt.number(r.sup_total_stockouts)} />
-                            <Column field="sup_stockout_rate" header="Stockout Rate" sortable body={(r) => fmt.pct(r.sup_stockout_rate)} />
+                            <Column field="sup_stockout_rate" header="Stockout Rate" sortable body={(r) => fmt.probToPct(r.sup_stockout_rate)} />
                             <Column field="supplier_performance_score" header="Perf. Score" sortable body={(r) => fmt.decimal(r.supplier_performance_score, 2)} />
                             <Column field="supplier_reliability_score" header="Reliability" sortable body={(r) => fmt.decimal(r.supplier_reliability_score, 2)} />
                         </DataTable>

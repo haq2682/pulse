@@ -342,7 +342,7 @@ export default function RecommendationsCoverage() {
                 />
                 <KPICard
                     icon="pi-percentage" iconBg="bg-purple-100" iconColor="text-purple-600"
-                    value={fmt.pct(kpis.coverageRate)}
+                    value={fmt.probToPct(kpis.coverageRate)}
                     label="Coverage Rate"
                 />
             </div>

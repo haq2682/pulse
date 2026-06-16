@@ -167,12 +167,12 @@ export default function ReviewsSentiment() {
             labels: sentCatSorted.map((r) => r.category ?? 'Unknown'),
             datasets: [{
                 label: 'Positive Share %',
-                data: sentCatSorted.map((r) => +(r.positive_share ?? 0).toFixed(1)),
+                data: sentCatSorted.map((r) => +((r.positive_share ?? 0) * 100).toFixed(1)),
                 backgroundColor: sentCatSorted.map((r) => {
                     const v = +(r.positive_share ?? 0);
-                    if (v >= 70) return 'rgba(34,197,94,0.82)';
-                    if (v >= 50) return 'rgba(59,130,246,0.82)';
-                    if (v >= 30) return 'rgba(234,179,8,0.82)';
+                    if (v >= 0.70) return 'rgba(34,197,94,0.82)';
+                    if (v >= 0.50) return 'rgba(59,130,246,0.82)';
+                    if (v >= 0.30) return 'rgba(234,179,8,0.82)';
                     return 'rgba(239,68,68,0.82)';
                 }),
             }],
@@ -215,11 +215,11 @@ export default function ReviewsSentiment() {
             labels: negByCatSorted.map((r) => r.category ?? 'Unknown'),
             datasets: [{
                 label: 'Negative Share %',
-                data: negByCatSorted.map((r) => +(r.negative_share ?? 0).toFixed(1)),
+                data: negByCatSorted.map((r) => +((r.negative_share ?? 0) * 100).toFixed(1)),
                 backgroundColor: negByCatSorted.map((r) => {
                     const v = +(r.negative_share ?? 0);
-                    if (v >= 30) return 'rgba(239,68,68,0.82)';
-                    if (v >= 15) return 'rgba(234,179,8,0.82)';
+                    if (v >= 0.30) return 'rgba(239,68,68,0.82)';
+                    if (v >= 0.15) return 'rgba(234,179,8,0.82)';
                     return 'rgba(34,197,94,0.82)';
                 }),
             }],
@@ -458,8 +458,8 @@ export default function ReviewsSentiment() {
                                 <Column field="positive_reviews"   header="Positive"          sortable body={(r) => fmt.number(r.positive_reviews)} />
                                 <Column field="neutral_reviews"    header="Neutral"           sortable body={(r) => fmt.number(r.neutral_reviews)} />
                                 <Column field="negative_reviews"   header="Negative"          sortable body={(r) => fmt.number(r.negative_reviews)} />
-                                <Column field="positive_share"     header="Positive %"        sortable body={(r) => fmt.pct(r.positive_share)} />
-                                <Column field="negative_share"     header="Negative %"        sortable body={(r) => fmt.pct(r.negative_share)} />
+                                <Column field="positive_share"     header="Positive %"        sortable body={(r) => fmt.probToPct(r.positive_share)} />
+                                <Column field="negative_share"     header="Negative %"        sortable body={(r) => fmt.probToPct(r.negative_share)} />
                                 <Column field="avg_sentiment_score" header="Sentiment Score"  sortable body={(r) => fmt.decimal(r.avg_sentiment_score, 3)} />
                             </DataTable>
                         </div>
@@ -500,7 +500,7 @@ export default function ReviewsSentiment() {
                                 value={[...derived.velDaily].sort((a, b) => (a.review_date ?? '').localeCompare(b.review_date ?? '')).slice(-60)}
                                 paginator rows={15} stripedRows emptyMessage="No data" className="text-sm"
                             >
-                                <Column field="product_id"       header="Product ID"  sortable />
+                                <Column field="product_name"     header="Product"     sortable body={(r) => r.product_name ?? r.product_id} />
                                 <Column field="review_date"      header="Date"        sortable />
                                 <Column field="daily_reviews"    header="Daily Reviews" sortable body={(r) => fmt.number(r.daily_reviews)} />
                                 <Column field="avg_rating_daily" header="Avg Rating"  sortable body={(r) => fmt.decimal(r.avg_rating_daily, 2)} />

@@ -168,7 +168,7 @@ export default function EngagementConversion() {
             datasets: [
                 { label: 'Session Count',      data: abandonedVsConv.map((r) => +(r.session_count ?? 0)),      backgroundColor: 'rgba(59,130,246,0.82)' },
                 { label: 'Avg Products Viewed',data: abandonedVsConv.map((r) => +(r.avg_products_viewed ?? 0).toFixed(2)), backgroundColor: 'rgba(249,115,22,0.82)' },
-                { label: 'Avg Cart Value ($)', data: abandonedVsConv.map((r) => +(r.avg_cart_value ?? 0).toFixed(2)),      backgroundColor: 'rgba(34,197,94,0.82)' },
+                { label: 'Avg Cart Value', data: abandonedVsConv.map((r) => +(r.avg_cart_value ?? 0).toFixed(2)),      backgroundColor: 'rgba(34,197,94,0.82)' },
             ],
         } : null;
 
@@ -360,7 +360,7 @@ export default function EngagementConversion() {
                 />
                 <KPICard
                     icon="pi-times-circle" iconBg="bg-red-100" iconColor="text-red-600"
-                    value={fmt.pct(kpis.abandRate)}
+                    value={fmt.probToPct(kpis.abandRate)}
                     label="Avg Cart Abandonment Rate"
                 />
                 <KPICard
@@ -387,7 +387,7 @@ export default function EngagementConversion() {
                             { label: 'Total Carts Created',       value: fmt.number(cartBehavior.total_carts_created) },
                             { label: 'Abandoned Carts',            value: fmt.number(cartBehavior.total_abandoned_carts) },
                             { label: 'Purchased Carts',            value: fmt.number(cartBehavior.total_purchased_carts) },
-                            { label: 'Avg Abandonment Rate',       value: fmt.pct(cartBehavior.avg_cart_abandonment_rate) },
+                            { label: 'Avg Abandonment Rate',       value: fmt.probToPct(cartBehavior.avg_cart_abandonment_rate) },
                             { label: 'Total Abandoned Value',      value: fmt.currency(cartBehavior.total_abandoned_value) },
                             { label: 'Avg Time in Cart',           value: `${fmt.decimal(cartBehavior.avg_time_in_cart_days, 1)} days` },
                         ].map(({ label, value }) => (
@@ -487,8 +487,8 @@ export default function EngagementConversion() {
                                     <Column field="carts"             header="Total Carts"      sortable body={(r) => fmt.number(r.carts)} />
                                     <Column field="converted_carts"   header="Converted"        sortable body={(r) => fmt.number(r.converted_carts)} />
                                     <Column field="abandoned_carts"   header="Abandoned"        sortable body={(r) => fmt.number(r.abandoned_carts)} />
-                                    <Column field="conversion_rate"   header="Conversion Rate"  sortable body={(r) => fmt.pct(r.conversion_rate)} />
-                                    <Column field="abandonment_rate"  header="Abandonment Rate" sortable body={(r) => fmt.pct(r.abandonment_rate)} />
+                                    <Column field="conversion_rate"   header="Conversion Rate"  sortable body={(r) => fmt.probToPct(r.conversion_rate)} />
+                                    <Column field="abandonment_rate"  header="Abandonment Rate" sortable body={(r) => fmt.probToPct(r.abandonment_rate)} />
                                 </DataTable>
                             </div>
                         </Card>
@@ -515,7 +515,7 @@ export default function EngagementConversion() {
                                 <Column field="customer_id"           header="Customer ID"           sortable />
                                 <Column field="total_abandoned_carts" header="Abandoned Carts"       sortable body={(r) => fmt.number(r.total_abandoned_carts)} />
                                 <Column field="total_abandoned_value" header="Abandoned Value"       sortable body={(r) => fmt.currency(r.total_abandoned_value)} />
-                                <Column field="cart_abandonment_rate" header="Abandonment Rate"      sortable body={(r) => fmt.pct(r.cart_abandonment_rate)} />
+                                <Column field="cart_abandonment_rate" header="Abandonment Rate"      sortable body={(r) => fmt.probToPct(r.cart_abandonment_rate)} />
                                 <Column field="total_revenue"         header="Total Revenue"         sortable body={(r) => fmt.currency(r.total_revenue)} />
                                 <Column field="customer_lifetime_value" header="Customer LTV"        sortable body={(r) => fmt.currency(r.customer_lifetime_value)} />
                             </DataTable>

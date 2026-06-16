@@ -324,12 +324,12 @@ export default function EngagementMetrics() {
                 />
                 <KPICard
                     icon="pi-percentage" iconBg="bg-green-100" iconColor="text-green-600"
-                    value={fmt.pct(kpis.overallConvRate)}
+                    value={fmt.probToPct(kpis.overallConvRate)}
                     label="Overall Conversion Rate"
                 />
                 <KPICard
                     icon="pi-shopping-cart" iconBg="bg-red-100" iconColor="text-red-600"
-                    value={fmt.pct(kpis.cartAbandRate)}
+                    value={fmt.probToPct(kpis.cartAbandRate)}
                     label="Cart Abandonment Rate"
                 />
             </div>
@@ -421,8 +421,8 @@ export default function EngagementMetrics() {
                                     { label: 'Total Carts Tracked',   value: fmt.number(cartSum.total_carts_tracked) },
                                     { label: 'Abandoned Carts',        value: fmt.number(cartSum.abandoned_carts) },
                                     { label: 'Converted Carts',        value: fmt.number(cartSum.converted_carts) },
-                                    { label: 'Abandonment Rate',       value: fmt.pct(cartSum.abandonment_rate) },
-                                    { label: 'Purchase Rate',          value: fmt.pct(cartSum.purchase_rate) },
+                                    { label: 'Abandonment Rate',       value: fmt.probToPct(cartSum.abandonment_rate) },
+                                    { label: 'Purchase Rate',          value: fmt.probToPct(cartSum.purchase_rate) },
                                 ].map(({ label, value }) => (
                                     <div key={label} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
                                         <span className="text-gray-600 text-sm">{label}</span>

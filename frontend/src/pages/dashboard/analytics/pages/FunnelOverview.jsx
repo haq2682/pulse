@@ -178,7 +178,7 @@ export default function FunnelOverview() {
             labels: byDevice.map((r) => r.device_type ?? 'Unknown'),
             datasets: [{
                 label: 'Conversion Rate %',
-                data: byDevice.map((r) => +(r.conversion_rate ?? 0).toFixed(2)),
+                data: byDevice.map((r) => +((r.conversion_rate ?? 0) * 100).toFixed(2)),
                 backgroundColor: 'rgba(59,130,246,0.82)',
             }],
         };
@@ -188,7 +188,7 @@ export default function FunnelOverview() {
             labels: byReferrer.map((r) => r.referrer_source ?? 'Unknown'),
             datasets: [{
                 label: 'Conversion Rate %',
-                data: byReferrer.map((r) => +(r.conversion_rate ?? 0).toFixed(2)),
+                data: byReferrer.map((r) => +((r.conversion_rate ?? 0) * 100).toFixed(2)),
                 backgroundColor: 'rgba(34,197,94,0.82)',
             }],
         };
@@ -221,7 +221,7 @@ export default function FunnelOverview() {
         const avgValByDeviceData = {
             labels: deviceLabels,
             datasets: [{
-                label: 'Avg Session Value ($)',
+                label: 'Avg Session Value',
                 data: byDevice.map((r) => +(r.avg_session_value ?? 0).toFixed(2)),
                 backgroundColor: 'rgba(6,182,212,0.82)',
             }],
@@ -237,7 +237,7 @@ export default function FunnelOverview() {
         const hvBarData = hvVsReg.length > 0 ? {
             labels: hvVsReg.map((r) => r.is_high_value_session ? 'High-Value' : 'Regular'),
             datasets: [
-                { label: 'Avg Session Value ($)',  data: hvVsReg.map((r) => +(r.avg_session_value ?? 0).toFixed(2)), backgroundColor: 'rgba(59,130,246,0.82)' },
+                { label: 'Avg Session Value',  data: hvVsReg.map((r) => +(r.avg_session_value ?? 0).toFixed(2)), backgroundColor: 'rgba(59,130,246,0.82)' },
                 { label: 'Avg Products Viewed',    data: hvVsReg.map((r) => +(r.avg_products_viewed ?? 0).toFixed(2)), backgroundColor: 'rgba(34,197,94,0.82)' },
                 { label: 'Avg Items in Cart',      data: hvVsReg.map((r) => +(r.avg_items_in_cart ?? 0).toFixed(2)), backgroundColor: 'rgba(249,115,22,0.82)' },
             ],
@@ -250,7 +250,7 @@ export default function FunnelOverview() {
                 { label: 'Session Count',        data: abandonVsConv.map((r) => +(r.session_count ?? 0)), backgroundColor: 'rgba(59,130,246,0.82)' },
                 { label: 'Avg Products Viewed',  data: abandonVsConv.map((r) => +(r.avg_products_viewed ?? 0).toFixed(2)), backgroundColor: 'rgba(34,197,94,0.82)' },
                 { label: 'Avg Items in Cart',    data: abandonVsConv.map((r) => +(r.avg_items_in_cart ?? 0).toFixed(2)), backgroundColor: 'rgba(249,115,22,0.82)' },
-                { label: 'Avg Cart Value ($)',   data: abandonVsConv.map((r) => +(r.avg_cart_value ?? 0).toFixed(2)), backgroundColor: 'rgba(139,92,246,0.82)' },
+                { label: 'Avg Cart Value',   data: abandonVsConv.map((r) => +(r.avg_cart_value ?? 0).toFixed(2)), backgroundColor: 'rgba(139,92,246,0.82)' },
             ],
         } : null;
 
@@ -453,7 +453,7 @@ export default function FunnelOverview() {
                                 <Column field="sessions_with_orders" header="With Orders"     sortable body={(r) => fmt.number(r.sessions_with_orders)} />
                                 <Column field="high_value_sessions"  header="High-Value"      sortable body={(r) => fmt.number(r.high_value_sessions)} />
                                 <Column field="avg_session_value"    header="Avg Session Val" sortable body={(r) => fmt.currency(r.avg_session_value)} />
-                                <Column field="conversion_rate"      header="Conv. Rate %"    sortable body={(r) => fmt.pct(r.conversion_rate)} />
+                                <Column field="conversion_rate"      header="Conv. Rate %"    sortable body={(r) => fmt.probToPct(r.conversion_rate)} />
                             </DataTable>
                         </div>
                     </Card>
@@ -472,7 +472,7 @@ export default function FunnelOverview() {
                                 <Column field="sessions_with_orders" header="With Orders"     sortable body={(r) => fmt.number(r.sessions_with_orders)} />
                                 <Column field="high_value_sessions"  header="High-Value"      sortable body={(r) => fmt.number(r.high_value_sessions)} />
                                 <Column field="avg_session_value"    header="Avg Session Val" sortable body={(r) => fmt.currency(r.avg_session_value)} />
-                                <Column field="conversion_rate"      header="Conv. Rate %"    sortable body={(r) => fmt.pct(r.conversion_rate)} />
+                                <Column field="conversion_rate"      header="Conv. Rate %"    sortable body={(r) => fmt.probToPct(r.conversion_rate)} />
                             </DataTable>
                         </div>
                     </Card>
@@ -494,7 +494,7 @@ export default function FunnelOverview() {
                                 <Column field="orders_from_session"    header="Orders"              sortable body={(r) => fmt.number(r.orders_from_session)} />
                                 <Column field="session_monetary_value" header="Session Value"       sortable body={(r) => fmt.currency(r.session_monetary_value)} />
                                 <Column field="session_engagement_score" header="Engagement"        sortable body={(r) => fmt.decimal(r.session_engagement_score)} />
-                                <Column field="view_to_order_rate"     header="View→Order Rate"     sortable body={(r) => fmt.pct(r.view_to_order_rate)} />
+                                <Column field="view_to_order_rate"     header="View→Order Rate"     sortable body={(r) => fmt.probToPct(r.view_to_order_rate)} />
                             </DataTable>
                         </div>
                     </Card>

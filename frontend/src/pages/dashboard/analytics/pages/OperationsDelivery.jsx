@@ -480,8 +480,8 @@ export default function OperationsDelivery() {
                                 <Column field="on_time_orders"   header="On-Time"             sortable body={(r) => fmt.number(r.on_time_orders)} />
                                 <Column field="avg_delivery_days" header="Avg Delivery (d)"   sortable body={(r) => fmt.decimal(r.avg_delivery_days, 1)} />
                                 <Column field="on_time_rate"     header="On-Time Rate"        sortable body={(r) => (
-                                    <Tag value={fmt.pct(r.on_time_rate)}
-                                        severity={(+(r.on_time_rate ?? 0)) >= 90 ? 'success' : (+(r.on_time_rate ?? 0)) >= 70 ? 'warning' : 'danger'} />
+                                    <Tag value={fmt.probToPct(r.on_time_rate)}
+                                        severity={(+(r.on_time_rate ?? 0)) >= 0.90 ? 'success' : (+(r.on_time_rate ?? 0)) >= 0.70 ? 'warning' : 'danger'} />
                                 )} />
                             </DataTable>
                         </div>
@@ -523,8 +523,8 @@ export default function OperationsDelivery() {
                                 <Column field="on_time_orders"   header="On-Time"             sortable body={(r) => fmt.number(r.on_time_orders)} />
                                 <Column field="avg_delivery_days" header="Avg Delivery (d)"   sortable body={(r) => fmt.decimal(r.avg_delivery_days, 1)} />
                                 <Column field="on_time_rate"     header="On-Time Rate"        sortable body={(r) => (
-                                    <Tag value={fmt.pct(r.on_time_rate)}
-                                        severity={(+(r.on_time_rate ?? 0)) >= 90 ? 'success' : (+(r.on_time_rate ?? 0)) >= 70 ? 'warning' : 'danger'} />
+                                    <Tag value={fmt.probToPct(r.on_time_rate)}
+                                        severity={(+(r.on_time_rate ?? 0)) >= 0.90 ? 'success' : (+(r.on_time_rate ?? 0)) >= 0.70 ? 'warning' : 'danger'} />
                                 )} />
                             </DataTable>
                         </div>

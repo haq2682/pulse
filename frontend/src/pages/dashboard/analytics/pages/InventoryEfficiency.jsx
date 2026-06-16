@@ -133,7 +133,7 @@ export default function InventoryEfficiency() {
         const carryingBarData = {
             labels: top10Carrying.map((r) => r.product_name ?? r.product_id),
             datasets: [{
-                label: 'Storage Cost (USD)',
+                label: 'Storage Cost',
                 data: top10Carrying.map((r) => r.storage_cost ?? 0),
                 backgroundColor: 'rgba(139,92,246,0.82)',
             }],

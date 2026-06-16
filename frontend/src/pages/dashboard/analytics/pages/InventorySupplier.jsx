@@ -405,7 +405,7 @@ export default function InventorySupplier() {
                         <Column field="stock_efficiency_ratio"    header="Efficiency Ratio"  sortable body={(r) => fmt.decimal(r.stock_efficiency_ratio, 3)} />
                         <Column field="stockout_rate"             header="Stockout Rate"      sortable body={(r) => fmt.pct((r.stockout_rate ?? 0) * 100)} />
                         <Column field="total_revenue_generated"   header="Revenue"           sortable body={(r) => fmt.currency(r.total_revenue_generated)} />
-                        <Column field="avg_profit_margin"         header="Profit Margin"     sortable body={(r) => fmt.pct((r.avg_profit_margin ?? 0) * 100)} />
+                        <Column field="avg_profit_margin"         header="Avg Profit / Unit" sortable body={(r) => fmt.currency(r.avg_profit_margin)} />
                         <Column field="total_products_supplied"   header="Products"          sortable body={(r) => fmt.number(r.total_products_supplied)} />
                         <Column field="total_stockouts"           header="Stockouts"         sortable body={(r) => fmt.number(r.total_stockouts)} />
                         <Column field="avg_restock_lead_time"     header="Lead Time (days)"  sortable body={(r) => fmt.decimal(r.avg_restock_lead_time, 1)} />

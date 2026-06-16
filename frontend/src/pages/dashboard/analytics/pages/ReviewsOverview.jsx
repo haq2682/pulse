@@ -260,7 +260,7 @@ export default function ReviewsOverview() {
             labels: tierVelLabels,
             datasets: [
                 { label: 'Avg Units Sold/Product', data: tierVelocity.map((r) => +(r.avg_units_sold_per_product ?? 0).toFixed(0)), backgroundColor: 'rgba(59,130,246,0.82)' },
-                { label: 'Avg Revenue/Product ($)', data: tierVelocity.map((r) => +(r.avg_revenue_per_product ?? 0).toFixed(0)), backgroundColor: 'rgba(34,197,94,0.82)' },
+                { label: 'Avg Revenue/Product', data: tierVelocity.map((r) => +(r.avg_revenue_per_product ?? 0).toFixed(0)), backgroundColor: 'rgba(34,197,94,0.82)' },
                 { label: 'Avg Reviews/Product',    data: tierVelocity.map((r) => +(r.avg_reviews_per_product ?? 0).toFixed(1)),  backgroundColor: 'rgba(249,115,22,0.82)' },
             ],
         } : null;

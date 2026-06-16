@@ -5798,8 +5798,8 @@ def main(bucket_name=None):
                 })
             )
 
-            analysis["wishlist_by_product"] = (
-                dataframes["agg_wishlist"]  
+            _wbp = (
+                dataframes["agg_wishlist"]
                 .groupBy("product_id")
                 .agg(
                     F.count("*").alias("wishlist_adds"),
@@ -5810,6 +5810,16 @@ def main(bucket_name=None):
                     F.col("wishlist_purchases") / F.col("wishlist_adds")
                 )
             )
+            if (
+                "agg_products" in dataframes
+                and "product_name" in dataframes["agg_products"].columns
+            ):
+                _wbp = _wbp.join(
+                    dataframes["agg_products"].select("product_id", "product_name"),
+                    on="product_id",
+                    how="left"
+                )
+            analysis["wishlist_by_product"] = _wbp
 
             analysis["wishlist_by_customer"] = (
                 dataframes["agg_wishlist"] 
@@ -5895,11 +5905,21 @@ def main(bucket_name=None):
                 )
 
                 # By product
-                analysis["abandoned_wishlist_by_product"] = (
+                _awbp = (
                     abandoned.groupBy("product_id")
                     .agg(F.count("*").alias("abandoned_wishlist_count"))
                     .orderBy(F.col("abandoned_wishlist_count").desc())
                 )
+                if (
+                    "agg_products" in dataframes
+                    and "product_name" in dataframes["agg_products"].columns
+                ):
+                    _awbp = _awbp.join(
+                        dataframes["agg_products"].select("product_id", "product_name"),
+                        on="product_id",
+                        how="left"
+                    )
+                analysis["abandoned_wishlist_by_product"] = _awbp
 
                 wl3 = dataframes["agg_wishlist"].select(
                     "wishlist_id",
@@ -6837,8 +6857,11 @@ def main(bucket_name=None):
         # ----------------------------------------------------------------
         # 1) Daily review velocity per product
         # ----------------------------------------------------------------
+        _vel_daily_cols = ["product_id", "review_date"]
+        if "product_name" in reviews.columns:
+            _vel_daily_cols = ["product_id", "product_name", "review_date"]
         analysis["review_velocity_daily"] = (
-            reviews.groupBy("product_id", "review_date")
+            reviews.groupBy(*_vel_daily_cols)
             .agg(
                 F.count("*").alias("daily_reviews"),
                 F.avg("rating").alias("avg_rating_daily"),

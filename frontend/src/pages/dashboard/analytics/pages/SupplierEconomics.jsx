@@ -163,8 +163,8 @@ export default function SupplierEconomics() {
         const marginBarData = {
             labels: marginSorted.map((r) => suppLabel(r.supplier_id)),
             datasets: [{
-                label: 'Avg Profit Margin',
-                data: marginSorted.map((r) => +((r.avg_profit_margin ?? 0) * 100).toFixed(1)),
+                label: 'Avg Profit / Unit',
+                data: marginSorted.map((r) => +(r.avg_profit_margin ?? 0).toFixed(2)),
                 backgroundColor: 'rgba(34,197,94,0.82)',
             }],
         };
@@ -413,8 +413,8 @@ export default function SupplierEconomics() {
                 />
                 <KPICard
                     icon="pi-percentage" iconBg="bg-green-100" iconColor="text-green-600"
-                    value={fmt.pct(avgProfitMargin * 100)}
-                    label="Avg Profit Margin"
+                    value={fmt.currency(avgProfitMargin)}
+                    label="Avg Profit / Unit"
                 />
                 <KPICard
                     icon="pi-warehouse" iconBg="bg-purple-100" iconColor="text-purple-600"
@@ -509,13 +509,13 @@ export default function SupplierEconomics() {
                         <Column field="total_revenue_generated" header="Revenue" sortable
                             body={(r) => r.total_revenue_generated != null ? fmt.currency(r.total_revenue_generated) : '—'} />
                         <Column field="revenue_contribution_share" header="Rev. Share" sortable
-                            body={(r) => r.revenue_contribution_share != null ? fmt.pct(r.revenue_contribution_share * 100) : '—'} />
+                            body={(r) => r.revenue_contribution_share != null ? fmt.probToPct(r.revenue_contribution_share) : '—'} />
                         <Column field="total_orders_fulfilled" header="Orders" sortable
                             body={(r) => r.total_orders_fulfilled != null ? fmt.number(r.total_orders_fulfilled) : '—'} />
                         <Column field="avg_order_value" header="Avg Order Value" sortable
                             body={(r) => r.avg_order_value != null ? fmt.currency(r.avg_order_value) : '—'} />
-                        <Column field="avg_profit_margin" header="Profit Margin" sortable
-                            body={(r) => r.avg_profit_margin != null ? fmt.pct(r.avg_profit_margin * 100) : '—'} />
+                        <Column field="avg_profit_margin" header="Avg Profit / Unit" sortable
+                            body={(r) => r.avg_profit_margin != null ? fmt.currency(r.avg_profit_margin) : '—'} />
                         <Column field="total_storage_cost" header="Carrying Cost" sortable
                             body={(r) => r.total_storage_cost != null ? fmt.currency(r.total_storage_cost) : '—'} />
                         <Column field="avg_storage_cost_per_unit" header="Cost / Unit" sortable

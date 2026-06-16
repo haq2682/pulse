@@ -528,7 +528,7 @@ const CustomerValueAnalysis = () => {
                                     options={{
                                         responsive: true, maintainAspectRatio: false,
                                         plugins: { legend: { display: true, position: 'top' } },
-                                        scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + v.toLocaleString() } } },
+                                        scales: { y: { beginAtZero: true, ticks: { callback: (v) => fmt.currencyShort(v) } } },
                                     }}
                                 />
                             </div>
@@ -559,7 +559,7 @@ const CustomerValueAnalysis = () => {
                                 options={{
                                     responsive: true, maintainAspectRatio: false,
                                     plugins: { legend: { display: true, position: 'top' } },
-                                    scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + v.toLocaleString() } } },
+                                    scales: { y: { beginAtZero: true, ticks: { callback: (v) => fmt.currencyShort(v) } } },
                                 }}
                             />
                         </div>
@@ -577,7 +577,7 @@ const CustomerValueAnalysis = () => {
                                 options={{
                                     responsive: true, maintainAspectRatio: false,
                                     plugins: { legend: { display: true, position: 'top' } },
-                                    scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + v.toLocaleString() } } },
+                                    scales: { y: { beginAtZero: true, ticks: { callback: (v) => fmt.currencyShort(v) } } },
                                 }}
                             />
                         </div>
@@ -592,7 +592,7 @@ const CustomerValueAnalysis = () => {
                                 options={{
                                     responsive: true, maintainAspectRatio: false,
                                     plugins: { legend: { display: true, position: 'top' } },
-                                    scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + v.toLocaleString() } } },
+                                    scales: { y: { beginAtZero: true, ticks: { callback: (v) => fmt.currencyShort(v) } } },
                                 }}
                             />
                         </div>
@@ -610,7 +610,7 @@ const CustomerValueAnalysis = () => {
                                         plugins: { legend: { display: true, position: 'top' } },
                                         scales: {
                                             x: { stacked: true },
-                                            y: { beginAtZero: true, stacked: true, ticks: { callback: (v) => '$' + v.toLocaleString() } },
+                                            y: { beginAtZero: true, stacked: true, ticks: { callback: (v) => fmt.currencyShort(v) } },
                                         },
                                     }}
                                 />
@@ -627,7 +627,7 @@ const CustomerValueAnalysis = () => {
                         title="Discount Hunters Summary *"
                         rows={[
                             { label: 'Customer Count',        value: fmt.number(h.customer_count),         show: (h.customer_count ?? 0) > 0 },
-                            { label: 'Avg Discount Share',    value: fmt.pct(h.avg_discount_share),         show: (h.avg_discount_share ?? 0) > 0 },
+                            { label: 'Avg Discount Share',    value: fmt.probToPct(h.avg_discount_share),         show: (h.avg_discount_share ?? 0) > 0 },
                             { label: 'Avg Discount / Order',  value: fmt.currency(h.avg_discount_per_order), show: (h.avg_discount_per_order ?? 0) > 0 },
                             { label: 'Avg CLV',               value: fmt.currency(h.avg_clv),               show: (h.avg_clv ?? 0) > 0 },
                             { label: 'Avg Revenue',           value: fmt.currency(h.avg_revenue),           show: (h.avg_revenue ?? 0) > 0 },
@@ -637,7 +637,7 @@ const CustomerValueAnalysis = () => {
                         title="Non-Discount Customers Summary *"
                         rows={[
                             { label: 'Customer Count',        value: fmt.number(n.customer_count),         show: (n.customer_count ?? 0) > 0 },
-                            { label: 'Avg Discount Share',    value: fmt.pct(n.avg_discount_share),         show: true },
+                            { label: 'Avg Discount Share',    value: fmt.probToPct(n.avg_discount_share),         show: true },
                             { label: 'Avg Discount / Order',  value: fmt.currency(n.avg_discount_per_order), show: true },
                             { label: 'Avg CLV',               value: fmt.currency(n.avg_clv),               show: (n.avg_clv ?? 0) > 0 },
                             { label: 'Avg Revenue',           value: fmt.currency(n.avg_revenue),           show: (n.avg_revenue ?? 0) > 0 },
@@ -662,7 +662,7 @@ const CustomerValueAnalysis = () => {
                             <Column field="avg_clv" header="Avg CLV" sortable body={(r) => fmt.currency(r.avg_clv)} />
                             <Column field="total_revenue" header="Total Revenue" sortable body={(r) => fmt.currency(r.total_revenue)} />
                             <Column field="avg_revenue_per_customer" header="Avg Rev/Customer" sortable body={(r) => fmt.currency(r.avg_revenue_per_customer)} />
-                            <Column field="avg_discount_share" header="Avg Discount Share" sortable body={(r) => fmt.pct(r.avg_discount_share)} />
+                            <Column field="avg_discount_share" header="Avg Discount Share" sortable body={(r) => fmt.probToPct(r.avg_discount_share)} />
                         </DataTable>
                     </div>
                 </Card>
@@ -725,7 +725,7 @@ const CustomerValueAnalysis = () => {
                             <Column field="customer_id" header="Customer ID" sortable />
                             <Column field="total_revenue" header="Revenue" sortable body={(r) => fmt.currency(r.total_revenue)} />
                             <Column field="total_discount_received" header="Total Discount" sortable body={(r) => fmt.currency(r.total_discount_received)} />
-                            <Column field="discount_to_revenue_ratio" header="Discount/Rev Ratio" sortable body={(r) => fmt.pct(r.discount_to_revenue_ratio)} />
+                            <Column field="discount_to_revenue_ratio" header="Discount/Rev Ratio" sortable body={(r) => fmt.probToPct(r.discount_to_revenue_ratio)} />
                             <Column field="avg_discount_per_order" header="Avg Disc/Order" sortable body={(r) => fmt.currency(r.avg_discount_per_order)} />
                             <Column field="customer_lifetime_value" header="CLV" sortable body={(r) => fmt.currency(r.customer_lifetime_value)} />
                         </DataTable>
@@ -770,7 +770,7 @@ const CustomerValueAnalysis = () => {
                             <Column field="customer_id" header="Customer ID" sortable />
                             <Column field="total_revenue" header="Revenue" sortable body={(r) => fmt.currency(r.total_revenue)} />
                             <Column field="total_discount_received" header="Total Discount" sortable body={(r) => fmt.currency(r.total_discount_received)} />
-                            <Column field="discount_share_of_revenue" header="Discount Share" sortable body={(r) => fmt.pct(r.discount_share_of_revenue)} />
+                            <Column field="discount_share_of_revenue" header="Discount Share" sortable body={(r) => fmt.probToPct(r.discount_share_of_revenue)} />
                             <Column field="avg_discount_per_order" header="Avg Disc/Order" sortable body={(r) => fmt.currency(r.avg_discount_per_order)} />
                             <Column field="customer_lifetime_value" header="CLV" sortable body={(r) => fmt.currency(r.customer_lifetime_value)} />
                             <Column field="total_orders" header="Orders" sortable body={(r) => fmt.number(r.total_orders)} />
@@ -799,8 +799,8 @@ const CustomerValueAnalysis = () => {
                             <Column field="customer_lifetime_value" header="CLV" sortable body={(r) => fmt.currency(r.customer_lifetime_value)} />
                             <Column field="total_revenue" header="Revenue" sortable body={(r) => fmt.currency(r.total_revenue)} />
                             <Column field="total_orders" header="Orders" sortable body={(r) => fmt.number(r.total_orders)} />
-                            <Column field="session_conversion_rate" header="Conv. Rate" sortable body={(r) => fmt.pct(r.session_conversion_rate)} />
-                            <Column field="cart_abandonment_rate" header="Cart Abandon" sortable body={(r) => fmt.pct(r.cart_abandonment_rate)} />
+                            <Column field="session_conversion_rate" header="Conv. Rate" sortable body={(r) => fmt.probToPct(r.session_conversion_rate)} />
+                            <Column field="cart_abandonment_rate" header="Cart Abandon" sortable body={(r) => fmt.probToPct(r.cart_abandonment_rate)} />
                             <Column field="customer_activity_score" header="Activity Score" sortable body={(r) => (r.customer_activity_score ?? 0).toFixed(2)} />
                         </DataTable>
                     </div>

@@ -169,7 +169,7 @@ export default function MarketingCampaigns() {
             .slice(0, 12);
         const revenueBarData = {
             labels: revSorted.map(camLabel),
-            datasets: [{ label: 'Revenue ($)', data: revSorted.map((r) => +(r.revenue_generated ?? 0).toFixed(2)), backgroundColor: PALETTE }],
+            datasets: [{ label: 'Revenue', data: revSorted.map((r) => +(r.revenue_generated ?? 0).toFixed(2)), backgroundColor: PALETTE }],
         };
 
         // ---- ROAS bar (from campaign_performance, top 12) -------------------
@@ -197,8 +197,8 @@ export default function MarketingCampaigns() {
         const budgetVsSpentData = {
             labels: budgetSorted.map(camLabel),
             datasets: [
-                { label: 'Budget ($)', data: budgetSorted.map((r) => +(r.budget ?? 0).toFixed(2)), backgroundColor: 'rgba(59,130,246,0.7)' },
-                { label: 'Spent ($)',  data: budgetSorted.map((r) => +(r.spent_amount ?? 0).toFixed(2)), backgroundColor: 'rgba(249,115,22,0.7)' },
+                { label: 'Budget', data: budgetSorted.map((r) => +(r.budget ?? 0).toFixed(2)), backgroundColor: 'rgba(59,130,246,0.7)' },
+                { label: 'Spent',  data: budgetSorted.map((r) => +(r.spent_amount ?? 0).toFixed(2)), backgroundColor: 'rgba(249,115,22,0.7)' },
             ],
         };
 

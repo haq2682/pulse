@@ -171,7 +171,7 @@ export default function FunnelCart() {
         // ---- Avg cart value by status bar -----------------------------------
         const avgValByStatusData = {
             labels: valueStats.map((r) => r.cart_status ?? 'Unknown'),
-            datasets: [{ label: 'Avg Cart Value ($)', data: valueStats.map((r) => +(r.avg_cart_value ?? 0).toFixed(2)), backgroundColor: 'rgba(59,130,246,0.82)' }],
+            datasets: [{ label: 'Avg Cart Value', data: valueStats.map((r) => +(r.avg_cart_value ?? 0).toFixed(2)), backgroundColor: 'rgba(59,130,246,0.82)' }],
         };
 
         // ---- Avg items by status bar ----------------------------------------

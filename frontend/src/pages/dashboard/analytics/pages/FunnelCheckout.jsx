@@ -175,7 +175,7 @@ export default function FunnelCheckout() {
             labels: dropoffReasonsSorted.map((r) => r.cart_abandonment_reason ?? 'Unknown'),
             datasets: [{
                 label: 'Conv. After Abandonment %',
-                data: dropoffReasonsSorted.map((r) => +(r.conversion_after_abandonment_rate ?? 0).toFixed(2)),
+                data: dropoffReasonsSorted.map((r) => +((r.conversion_after_abandonment_rate ?? 0) * 100).toFixed(2)),
                 backgroundColor: 'rgba(34,197,94,0.82)',
             }],
         };
@@ -230,15 +230,15 @@ export default function FunnelCheckout() {
         const deviceConvBarData = deviceConv.length > 0 ? {
             labels: deviceConv.map((r) => r.device_used ?? 'Unknown'),
             datasets: [
-                { label: 'Conversion Rate %',  data: deviceConv.map((r) => +(r.conversion_rate ?? 0).toFixed(2)),  backgroundColor: 'rgba(34,197,94,0.82)' },
-                { label: 'Abandonment Rate %', data: deviceConv.map((r) => +(r.abandonment_rate ?? 0).toFixed(2)), backgroundColor: 'rgba(239,68,68,0.82)' },
+                { label: 'Conversion Rate %',  data: deviceConv.map((r) => +((r.conversion_rate ?? 0) * 100).toFixed(2)),  backgroundColor: 'rgba(34,197,94,0.82)' },
+                { label: 'Abandonment Rate %', data: deviceConv.map((r) => +((r.abandonment_rate ?? 0) * 100).toFixed(2)), backgroundColor: 'rgba(239,68,68,0.82)' },
             ],
         } : null;
 
         // ---- Device conversion rate doughnut --------------------------------
         const deviceConvDoughnutData = deviceConv.length > 0 ? {
             labels: deviceConv.map((r) => r.device_used ?? 'Unknown'),
-            datasets: [{ data: deviceConv.map((r) => +(r.conversion_rate ?? 0).toFixed(2)), backgroundColor: PALETTE }],
+            datasets: [{ data: deviceConv.map((r) => +((r.conversion_rate ?? 0) * 100).toFixed(2)), backgroundColor: PALETTE }],
         } : null;
 
         // ---- Abandoned vs Converted bar -------------------------------------
@@ -248,7 +248,7 @@ export default function FunnelCheckout() {
                 { label: 'Session Count',       data: abandonVsConv.map((r) => +(r.session_count ?? 0)),                          backgroundColor: 'rgba(59,130,246,0.82)' },
                 { label: 'Avg Products Viewed', data: abandonVsConv.map((r) => +(r.avg_products_viewed ?? 0).toFixed(2)),          backgroundColor: 'rgba(34,197,94,0.82)' },
                 { label: 'Avg Items in Cart',   data: abandonVsConv.map((r) => +(r.avg_items_in_cart ?? 0).toFixed(2)),            backgroundColor: 'rgba(249,115,22,0.82)' },
-                { label: 'Avg Cart Value ($)',  data: abandonVsConv.map((r) => +(r.avg_cart_value ?? 0).toFixed(2)),               backgroundColor: 'rgba(139,92,246,0.82)' },
+                { label: 'Avg Cart Value',  data: abandonVsConv.map((r) => +(r.avg_cart_value ?? 0).toFixed(2)),               backgroundColor: 'rgba(139,92,246,0.82)' },
             ],
         } : null;
 
@@ -345,7 +345,7 @@ export default function FunnelCheckout() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <KPICard icon="pi-times-circle"  iconBg="bg-red-50"    iconColor="text-red-600"    value={fmt.number(kpis.totalDropoffs)}        label="Total Dropoffs" />
                 <KPICard icon="pi-exclamation-triangle" iconBg="bg-orange-50" iconColor="text-orange-600" value={fmt.decimal(kpis.avgRiskScore, 3)} label="Avg Abandon Risk" />
-                <KPICard icon="pi-refresh"       iconBg="bg-green-50"  iconColor="text-green-600"  value={fmt.pct(kpis.avgConvAfterAband)}        label="Avg Recovery Rate" />
+                <KPICard icon="pi-refresh"       iconBg="bg-green-50"  iconColor="text-green-600"  value={fmt.probToPct(kpis.avgConvAfterAband)}        label="Avg Recovery Rate" />
                 <KPICard icon="pi-info-circle"   iconBg="bg-blue-50"   iconColor="text-blue-600"   value={kpis.topReason}                         label="Top Dropoff Reason" />
             </div>
 
@@ -442,7 +442,7 @@ export default function FunnelCheckout() {
                                 <Column field="cart_abandonment_reason"            header="Reason"                sortable />
                                 <Column field="dropoff_count"                      header="Dropoff Count"         sortable body={(r) => fmt.number(r.dropoff_count)} />
                                 <Column field="avg_abandonment_risk_score"         header="Avg Risk Score"        sortable body={(r) => fmt.decimal(r.avg_abandonment_risk_score, 3)} />
-                                <Column field="conversion_after_abandonment_rate"  header="Recovery Rate %"       sortable body={(r) => fmt.pct(r.conversion_after_abandonment_rate)} />
+                                <Column field="conversion_after_abandonment_rate"  header="Recovery Rate %"       sortable body={(r) => fmt.probToPct(r.conversion_after_abandonment_rate)} />
                             </DataTable>
                         </div>
                     </Card>
@@ -459,12 +459,12 @@ export default function FunnelCheckout() {
                                 <Column field="converted_carts"   header="Converted"          sortable body={(r) => fmt.number(r.converted_carts)} />
                                 <Column field="abandoned_carts"   header="Abandoned"          sortable body={(r) => fmt.number(r.abandoned_carts)} />
                                 <Column field="conversion_rate"   header="Conv. Rate %"       sortable body={(r) => (
-                                    <Tag value={fmt.pct(r.conversion_rate)}
-                                        severity={(+(r.conversion_rate ?? 0)) >= 50 ? 'success' : (+(r.conversion_rate ?? 0)) >= 25 ? 'warning' : 'danger'} />
+                                    <Tag value={fmt.probToPct(r.conversion_rate)}
+                                        severity={(+(r.conversion_rate ?? 0)) >= 0.50 ? 'success' : (+(r.conversion_rate ?? 0)) >= 0.25 ? 'warning' : 'danger'} />
                                 )} />
                                 <Column field="abandonment_rate"  header="Abandon Rate %"     sortable body={(r) => (
-                                    <Tag value={fmt.pct(r.abandonment_rate)}
-                                        severity={(+(r.abandonment_rate ?? 0)) >= 75 ? 'danger' : (+(r.abandonment_rate ?? 0)) >= 50 ? 'warning' : 'success'} />
+                                    <Tag value={fmt.probToPct(r.abandonment_rate)}
+                                        severity={(+(r.abandonment_rate ?? 0)) >= 0.75 ? 'danger' : (+(r.abandonment_rate ?? 0)) >= 0.50 ? 'warning' : 'success'} />
                                 )} />
                             </DataTable>
                         </div>
