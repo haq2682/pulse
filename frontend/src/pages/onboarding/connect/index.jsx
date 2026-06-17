@@ -727,7 +727,7 @@ const Connect = () => {
                                             <li className="flex items-start gap-2">
                                                 <Text className="text-sm text-gray-700 m-0 flex-1">
                                                     • The guidelines on data preparation can be found from{' '}
-                                                    <CustomLink href="#" gradient={true}>
+                                                    <CustomLink href="/data_preparation_guide.pdf" download="data_preparation_guide.pdf" gradient={true}>
                                                         here
                                                     </CustomLink>
                                                 </Text>
