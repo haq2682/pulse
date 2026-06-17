@@ -18,8 +18,30 @@ from dotenv import load_dotenv, find_dotenv
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from utils.helpers import parse_minio_endpoint
+from utils.table_mapper import map_table_name
 
 load_dotenv(find_dotenv())
+
+
+def _resolve_canonical_table_name(raw_name: str) -> str:
+    """
+    Resolve a raw ingested filename/sheet stem (e.g. "campaigns_dataset") to its
+    canonical schema table name (e.g. "marketing_campaigns"), mirroring the
+    resolution ``utils/file_loader.py`` (via ``normalize_name``) already applies
+    when the Spark mapping pipeline first loads ``ingested/``.
+
+    Without this, the ingested cache here would be keyed by the raw upload
+    filename instead of the canonical table name used everywhere else
+    (manual_mappings, table_name params, etc.), making same-table manual
+    mappings indistinguishable from cross-table ones whenever the uploaded
+    file isn't already named exactly like its canonical table.
+
+    Returns None if no canonical match is found — callers decide their own
+    fallback (e.g. keep the raw name) so the file is still cached either way.
+    """
+    cleaned = re.sub(r"(dataset|data|table|export)$", "", raw_name.lower())
+    cleaned = re.sub(r"[^0-9a-zA-Z_]+", "_", cleaned).strip("_")
+    return map_table_name(cleaned, threshold=80)
 
 # Initialize MinIO client
 minio_endpoint = parse_minio_endpoint(os.getenv("MINIO_ENDPOINT", "localhost:9000"))
@@ -118,9 +140,17 @@ def load_ingested_files_cache(bucket_name: str, required_tables=None):
                 continue
 
             if is_chunked and file_ext == '.parquet':
-                table_name = parts[0]   # parent directory = canonical table name
+                table_name = parts[0]   # parent directory — already canonical (written by initial_load.py)
             else:
-                table_name = filename[: -len(file_ext)]  # flat file stem
+                # Flat file (user-uploaded batch mode): the filename stem is
+                # whatever the user named their file (e.g. "campaigns_dataset"),
+                # not necessarily the canonical table name. Resolve it the same
+                # way utils/file_loader.py does for the Spark mapping pipeline,
+                # so this cache is keyed consistently with manual_mappings'
+                # table names (e.g. "marketing_campaigns") — otherwise same-table
+                # lookups below would be mistaken for cross-table ones.
+                raw_stem = filename[: -len(file_ext)]
+                table_name = _resolve_canonical_table_name(raw_stem) or raw_stem
 
             if required_tables and table_name not in required_tables:
                 continue
@@ -150,7 +180,10 @@ def load_ingested_files_cache(bucket_name: str, required_tables=None):
                     excel_file = pd.ExcelFile(BytesIO(file_data), engine='openpyxl')
                     for sheet_name in excel_file.sheet_names:
                         df = pd.read_excel(excel_file, sheet_name=sheet_name)
-                        tname = f"{table_name}_{sheet_name}"
+                        # Resolve from the sheet name itself (mirrors file_loader.py,
+                        # which treats each sheet as its own table), falling back to
+                        # the combined name if no canonical match is found.
+                        tname = _resolve_canonical_table_name(sheet_name) or f"{table_name}_{sheet_name}"
                         ingested_cache[tname] = df
                         print(f"  Cached {tname} from ingested/ ({len(df)} rows)")
 
@@ -243,19 +276,70 @@ def _common_join_keys(left_df: pd.DataFrame, right_df: pd.DataFrame) -> list[str
     return sorted(common)
 
 
+# Mirrors map.py's table_primary_keys / cleaning_utils.py's _CLEANED_PRIMARY_KEYS.
+_TABLE_PRIMARY_KEYS = {
+    "addresses":           "address_id",
+    "customers":           "customer_id",
+    "suppliers":           "supplier_id",
+    "categories":          "category_id",
+    "products":            "product_id",
+    "inventory":           "inventory_id",
+    "wishlist":            "wishlist_id",
+    "shopping_cart":       "cart_id",
+    "cart_items":          "cart_item_id",
+    "orders":              "order_id",
+    "order_items":         "order_item_id",
+    "payments":            "payment_id",
+    "reviews":             "review_id",
+    "marketing_campaigns": "campaign_id",
+    "customer_sessions":   "session_id",
+}
+
+
+def _raw_primary_key_column(table_name: str, df: pd.DataFrame, auto_mappings: dict) -> tuple:
+    """
+    Resolve (canonical_pk_col, raw_pk_col) for *table_name* using the table's
+    canonical primary key plus the auto-mapping record of which raw ingested
+    column it was renamed from. Returns (None, None) if any link is missing
+    (no canonical PK defined, no auto-mapping recorded, or the canonical PK
+    isn't actually present/populated in *df*).
+
+    Used to recover a same-table manual mapping via a real value-based join
+    instead of assuming the ingested file and the mapped-temp file share row
+    order/count — the only assumption that's safe is that BOTH files share the
+    same logical row identity (the primary key), regardless of how many
+    chunk files or Spark partitions either side was read through.
+    """
+    pk_col = _TABLE_PRIMARY_KEYS.get(table_name)
+    if not pk_col or pk_col not in df.columns or df[pk_col].isna().all():
+        return None, None
+
+    table_auto = (auto_mappings or {}).get(table_name) or {}
+    pk_source_ref = table_auto.get(pk_col)
+    if not pk_source_ref:
+        return None, None
+
+    _, raw_pk_col, _ = _parse_source_reference(pk_source_ref, default_table=table_name)
+    return (pk_col, raw_pk_col) if raw_pk_col else (None, None)
+
+
 def _apply_mappings_to_df(df: pd.DataFrame, table_name: str, manual_mappings: dict,
                            ingested_cache: dict, updated_results: dict,
                            is_streaming: bool = False,
-                           extra_source_df: "pd.DataFrame | None" = None) -> pd.DataFrame:
+                           extra_source_df: "pd.DataFrame | None" = None,
+                           auto_mappings: dict = None) -> pd.DataFrame:
     """
     Apply manual column renames (and cross-table lookups) to a DataFrame in-place.
     Shared by both CSV and Parquet paths.
 
     is_streaming : bool
-        Set to True for the streaming (db/api) Parquet path.
-        In streaming mode the DataFrame already has CANONICAL column names
-        (produced by Spark's mapping pipeline).  Missing/null canonical columns
-        appear as all-null placeholder columns.
+        Set to True only for genuine continuous CDC streaming batches (Parquet
+        under ``_batch_id=N/``), where a later micro-batch will still arrive and
+        can fill in a column left null here. False for CSV and for the flat
+        batch/db/api initial-load Delta/Parquet layout, where this is the only
+        batch and missing columns must be resolved now. In all cases the
+        DataFrame already has CANONICAL column names (produced by the mapping
+        pipeline); missing/null canonical columns appear as all-null placeholders.
 
     extra_source_df : pd.DataFrame | None
         The companion ``_extra_cols/`` Parquet written by ``_write_spark_native``
@@ -263,6 +347,16 @@ def _apply_mappings_to_df(df: pd.DataFrame, table_name: str, manual_mappings: di
         from the original micro-batch (canonical + extra source columns) so we
         can back-fill a null canonical slot from the raw source column the user
         identified in the manual mappings UI.  Only present in streaming mode.
+
+    auto_mappings : dict | None
+        The {table: {canonical_col: qualified_source_ref}} record of how the
+        *automatic* mapping pass renamed columns (saved to
+        ``onboarding.auto_mappings``). Used to look up the raw ingested name of
+        a table's own primary key, so a same-table manual mapping can be
+        recovered with a real value-based join instead of assuming the
+        mapped-temp file and the ingested/ file share row order — which may not
+        hold for db/api initial loads whose ``ingested/`` data spans multiple
+        chunk files read through multiple Spark partitions.
     """
     if table_name not in manual_mappings:
         return df
@@ -334,11 +428,72 @@ def _apply_mappings_to_df(df: pd.DataFrame, table_name: str, manual_mappings: di
                 f"continuous streaming job for all subsequent batches."
             )
         else:
-            # Try cross-table lookup from ingested files (effective in batch mode).
+            # Column not present in the mapped-temp file (extra/raw columns are
+            # dropped before mapped-temp is written) — recover it from ingested/.
             print(f"     🔍 '{source_col}' not found in {table_name} — searching ingested files...")
-            source_table, source_df = find_column_in_ingested(source_col, ingested_cache, preferred_table=source_table)
 
-            if source_table is not None:
+            # Prefer the table the user explicitly selected. Only fall back to a
+            # fuzzy search across every cached ingested table (which may land on
+            # a different table than `table_name`) when that direct lookup misses
+            # — e.g. legacy/unqualified manual mappings with no source table.
+            direct_df = ingested_cache.get(source_table) if source_table else None
+            if direct_df is not None and source_col in direct_df.columns:
+                found_table, source_df = source_table, direct_df
+            else:
+                found_table, source_df = find_column_in_ingested(
+                    source_col, ingested_cache, preferred_table=source_table
+                )
+
+            if found_table is not None and found_table == table_name:
+                # Same-table recovery. Prefer a real value-based join on the
+                # table's own primary key (resolved via auto_mappings) — this is
+                # correct regardless of row order or how many chunk files /
+                # Spark partitions either side was read through (relevant for
+                # db/api initial loads, whose ingested/ data can span multiple
+                # chunk_NNNN.parquet files). Only fall back to positional
+                # alignment — valid because mapping never filters or reorders
+                # rows, only renames/drops columns — when no usable primary-key
+                # link is available (e.g. single-file batch CSV uploads, where
+                # row order is trivially preserved anyway).
+                canonical_pk, raw_pk = _raw_primary_key_column(table_name, df, auto_mappings)
+                if canonical_pk and raw_pk and raw_pk in source_df.columns:
+                    left_key = df[canonical_pk].astype(str)
+                    right_key = source_df[raw_pk].astype(str)
+                    subset = (
+                        source_df.assign(**{f"__pk_{canonical_pk}": right_key})[[f"__pk_{canonical_pk}", source_col]]
+                        .drop_duplicates(subset=[f"__pk_{canonical_pk}"])
+                        .rename(columns={source_col: canonical_col})
+                    )
+                    df = df.assign(**{f"__pk_{canonical_pk}": left_key})
+                    df.drop(columns=[canonical_col], inplace=True, errors="ignore")
+                    df = pd.merge(df, subset, on=f"__pk_{canonical_pk}", how="left").drop(columns=[f"__pk_{canonical_pk}"])
+                    print(
+                        f"     ✅ Mapped {qualified_ref} → {canonical_col} "
+                        f"(recovered from ingested/, joined on primary key '{canonical_pk}')"
+                    )
+                elif len(source_df) == len(df):
+                    df[canonical_col] = source_df[source_col].to_numpy()
+                    print(
+                        f"     ✅ Mapped {qualified_ref} → {canonical_col} "
+                        f"(recovered from ingested/, same-table positional fill — "
+                        f"no primary-key link available for a value-based join)"
+                    )
+                else:
+                    warning_msg = (
+                        f"Row count mismatch between mapped-temp ({len(df)} rows) and "
+                        f"ingested/ ({len(source_df)} rows) for '{table_name}', and no "
+                        f"primary-key link available — cannot safely recover '{qualified_ref}'"
+                    )
+                    print(f"     ⚠️  {warning_msg}")
+                    updated_results["failed_mappings"].append({
+                        "table": table_name,
+                        "canonical_column": canonical_col,
+                        "source_column": qualified_ref,
+                        "error": warning_msg,
+                        "stage": "row_count_mismatch",
+                    })
+            elif found_table is not None:
+                # Genuine cross-table mapping — needs a relational join.
                 join_keys = _common_join_keys(df, source_df)
                 if join_keys:
                     source_subset = (
@@ -350,12 +505,12 @@ def _apply_mappings_to_df(df: pd.DataFrame, table_name: str, manual_mappings: di
                     df.drop(columns=[canonical_col], inplace=True, errors="ignore")
                     df = pd.merge(df, source_subset, on=join_keys, how="left")
                     print(
-                        f"     ✅ Mapped {qualified_ref} (from {source_table}) → {canonical_col} "
+                        f"     ✅ Mapped {qualified_ref} (from {found_table}) → {canonical_col} "
                         f"in {table_name} via key join {join_keys}"
                     )
                 else:
                     warning_msg = (
-                        f"No valid join key between '{table_name}' and '{source_table}' for '{qualified_ref}'"
+                        f"No valid join key between '{table_name}' and '{found_table}' for '{qualified_ref}'"
                     )
                     print(f"     ⚠️  {warning_msg}")
                     updated_results["failed_mappings"].append({
@@ -382,16 +537,22 @@ def _apply_mappings_to_df(df: pd.DataFrame, table_name: str, manual_mappings: di
     return df
 
 
-def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
+def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict, auto_mappings: dict = None):
     """
     Apply manual mappings to files in the mapped-temp folder.
 
-    Supports two storage layouts written by the mapping pipeline:
+    Supports the storage layouts written by the mapping pipeline:
 
-    **Batch mode (CSV)**
+    **Legacy batch mode (CSV)**
         ``mapped-temp/{table_name}.csv``  →  ``mapped/{table_name}.csv``
 
-    **Streaming mode — db / api (Parquet)**
+    **Batch / db / api initial load (flat Delta/Parquet)**
+        ``mapped-temp/{table_name}/part-*.parquet``  (written by
+        ``save_dataframes_to_minio``; no ``_batch_id=`` partitioning — this is
+        the only batch, so missing columns must be resolved now, not deferred)
+        →  ``mapped/{table_name}/_batch_id=0/part-0.parquet``
+
+    **Continuous CDC streaming — db / api (partitioned Parquet)**
         ``mapped-temp/{table_name}/_batch_id=0/part-*.parquet``
         →  ``mapped/{table_name}/_batch_id=0/part-0.parquet``
 
@@ -425,12 +586,19 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
             continue
         for _, source_ref in table_map.items():
             source_table, source_col, _ = _parse_source_reference(source_ref, default_table=target)
-            if source_table and source_col and source_table != target:
+            # Include same-table sources too: extra/raw columns are dropped from
+            # mapped-temp, so even a same-table mapping must be recovered from
+            # ingested/. Without this, a mix of same-table and cross-table
+            # mappings across tables would cause `required_tables` to only
+            # cover the cross-table sources, filtering the same-table sources
+            # out of the ingested cache entirely.
+            if source_table and source_col:
                 required_source_tables.add(source_table)
 
-    # Load ingested files for cross-table column lookup (batch mode uses these;
-    # streaming mode may not have an ingested/ folder — that's fine).
-    print("📂 Loading ingested files for cross-table column lookup...")
+    # Load ingested files for column lookup (batch mode uses these to recover
+    # both same-table and cross-table manual mappings; streaming mode may not
+    # have an ingested/ folder — that's fine).
+    print("📂 Loading ingested files for column lookup...")
     ingested_cache = load_ingested_files_cache(
         bucket_name,
         required_tables=required_source_tables if required_source_tables else None,
@@ -449,11 +617,25 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
 
     csv_objects = [obj for obj in top_objects if obj.object_name.endswith(".csv")]
 
-    # Streaming mode: look for Parquet files one level deeper
+    # Parquet mode: look for Parquet files one level deeper. This covers two
+    # distinct layouts that both lack top-level .csv files:
+    #   • Genuine CDC streaming  — mapped-temp/{table}/_batch_id=N/part-*.parquet
+    #     (written by _write_spark_native; a later micro-batch will still arrive).
+    #   • Batch / db / api initial-load — mapped-temp/{table}/part-*.parquet
+    #     (flat Delta/Parquet table written by save_dataframes_to_minio; this is
+    #     the ONLY batch — there is no later run that will fill in null columns).
+    # These must be told apart: only the former should defer an already-present
+    # null canonical column to "a later batch" instead of resolving it now.
     streaming_tables = {}
     streaming_extra_tables = {}
     if not csv_objects:
         streaming_tables, streaming_extra_tables = _detect_streaming_parquet_tables(bucket_name, temp_folder)
+
+    is_streaming_layout = any(
+        "_batch_id=" in key
+        for keys in streaming_tables.values()
+        for key in keys
+    )
 
     if not csv_objects and not streaming_tables:
         raise ValueError(
@@ -490,7 +672,8 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
 
                 df = _apply_mappings_to_df(df, table_name, manual_mappings,
                                             ingested_cache, updated_results,
-                                            is_streaming=False)
+                                            is_streaming=False,
+                                            auto_mappings=auto_mappings)
 
                 try:
                     mapped_file_name = f"mapped/{table_name}.csv"
@@ -515,9 +698,10 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
                         {"table": table_name, "error": error_msg, "stage": "saving"}
                     )
 
-        # ── STREAMING MODE: partitioned Parquet directories ───────────────────
+        # ── PARQUET MODE: streaming (_batch_id=N/) or flat batch/db/api Delta ──
         else:
-            print(f"🌊 Detected streaming mode ({len(streaming_tables)} Parquet tables)\n")
+            layout_desc = "streaming" if is_streaming_layout else "batch/db/api (flat Delta/Parquet)"
+            print(f"🌊 Detected {layout_desc} mode ({len(streaming_tables)} Parquet tables)\n")
             for table_name, parquet_keys in streaming_tables.items():
                 print(f"Processing table: {table_name} ({len(parquet_keys)} parquet file(s))")
 
@@ -569,8 +753,9 @@ def apply_manual_mappings_to_files(bucket_name: str, manual_mappings: dict):
 
                 df = _apply_mappings_to_df(df, table_name, manual_mappings,
                                             ingested_cache, updated_results,
-                                            is_streaming=True,
-                                            extra_source_df=extra_source_df)
+                                            is_streaming=is_streaming_layout,
+                                            extra_source_df=extra_source_df,
+                                            auto_mappings=auto_mappings)
 
                 # Strip any legacy __src__* helper columns that may exist in older
                 # mapped-temp files (deprecated approach, kept for compatibility).
@@ -717,13 +902,20 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Apply manual mappings to mapped files")
     parser.add_argument("--bucket-name", required=True, help="MinIO bucket name")
     parser.add_argument("--manual-mappings", required=True, help="JSON string of manual mappings")
-    
+    parser.add_argument(
+        "--auto-mappings", default="{}",
+        help="JSON string of the automatic mapping pass's column renames "
+             "(onboarding.auto_mappings) — used to recover same-table manual "
+             "mappings via a primary-key join instead of row-position alignment.",
+    )
+
     args = parser.parse_args()
-    
+
     manual_mappings = json.loads(args.manual_mappings)
-    
+    auto_mappings = json.loads(args.auto_mappings)
+
     # Apply manual mappings to files
-    apply_manual_mappings_to_files(args.bucket_name, manual_mappings)
+    apply_manual_mappings_to_files(args.bucket_name, manual_mappings, auto_mappings=auto_mappings)
     
     # Update mapping results in Redis
     load_mapping_results_from_files(args.bucket_name, manual_mappings)

@@ -1728,15 +1728,15 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
         
         # Get the onboarding record
         onboarding = db.execute(
-            text("SELECT business_id, mapping_status FROM onboarding WHERE user_id = :user_id AND is_completed = false"),
+            text("SELECT business_id, mapping_status, auto_mappings FROM onboarding WHERE user_id = :user_id AND is_completed = false"),
             {"user_id": user_id}
         )
         onboarding_record = onboarding.fetchone()
-        
+
         if not onboarding_record:
             raise HTTPException(status_code=404, detail="Onboarding record not found")
-        
-        business_id, mapping_status = onboarding_record
+
+        business_id, mapping_status, auto_mappings_payload = onboarding_record
         
         if not business_id:
             raise HTTPException(status_code=400, detail="Business ID not found")
@@ -1782,17 +1782,33 @@ async def apply_manual_mappings(request: Request, db=Depends(get_db)):
         
         # Apply the manual mappings using the apply_manual_mappings.py script
         script_path = "/app/mapping/apply_manual_mappings.py"
-        
+
         # Check if script exists
         if not os.path.exists(script_path):
             raise HTTPException(status_code=500, detail=f"Manual mapping script not found at {script_path}")
-        
+
+        # Parsed so the script can resolve a same-table mapping's raw primary-key
+        # column (via the auto-mapping pass) and join on it instead of assuming
+        # row order/count between mapped-temp and ingested/ — needed for db/api
+        # initial loads whose ingested/ data can span multiple chunk files.
+        auto_mappings = {}
+        if isinstance(auto_mappings_payload, dict):
+            auto_mappings = auto_mappings_payload
+        elif isinstance(auto_mappings_payload, str):
+            try:
+                parsed_auto_mappings = json.loads(auto_mappings_payload)
+                if isinstance(parsed_auto_mappings, dict):
+                    auto_mappings = parsed_auto_mappings
+            except Exception:
+                pass
+
         # Build the command to run the manual mapping script
         cmd = [
             "python3",
             script_path,
             "--bucket-name", business_id,
-            "--manual-mappings", json.dumps(normalized_manual_mappings)
+            "--manual-mappings", json.dumps(normalized_manual_mappings),
+            "--auto-mappings", json.dumps(auto_mappings),
         ]
         
         # Run the script synchronously (it's fast since it just renames columns)

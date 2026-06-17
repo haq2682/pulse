@@ -62,9 +62,10 @@ const Mapping = () => {
     const [missingCols, setMissingCols] = useState([]);
     const [extraCols, setExtraCols] = useState([]);
     const [allFieldsIdentified, setAllFieldsIdentified] = useState(false);
-    
+
     // AutoComplete state
     const [filteredColumns, setFilteredColumns] = useState({});
+    const [fieldErrors, setFieldErrors] = useState({});
 
     // Helper function to safely extract onboarding ID from pathname
     const getOnboardingIdFromPath = () => {
@@ -197,11 +198,52 @@ const Mapping = () => {
         };
     }, [user?.user_id]);
 
+    // A value is only valid if it's an actual selection from the unmapped-columns
+    // dropdown (an object carrying the source table/column), or empty (skipping
+    // the field is allowed). Free-typed text that was never selected has no
+    // reliable table/column metadata and must be rejected with an error.
+    const isValidMappingValue = (value) => {
+        if (!value) return true;
+        if (typeof value !== 'object') return false;
+        const sourceColumn = value.originalColumn || value.value;
+        const sourceTable = value.table;
+        return extraCols.some(item => item.column === sourceColumn && item.table === sourceTable);
+    };
+
     const handleMappingChange = (fieldKey, value) => {
         setMappings(prev => ({
             ...prev,
             [fieldKey]: value
         }));
+
+        // Clear a previously-shown error as soon as the field becomes valid again;
+        // don't flag new errors here since onChange fires on every keystroke
+        // while searching (validation on blur/submit handles that instead).
+        if (isValidMappingValue(value)) {
+            setFieldErrors(prev => {
+                if (!prev[fieldKey]) return prev;
+                const next = { ...prev };
+                delete next[fieldKey];
+                return next;
+            });
+        }
+    };
+
+    const handleMappingBlur = (fieldKey) => {
+        const value = mappings[fieldKey];
+        if (isValidMappingValue(value)) {
+            setFieldErrors(prev => {
+                if (!prev[fieldKey]) return prev;
+                const next = { ...prev };
+                delete next[fieldKey];
+                return next;
+            });
+        } else {
+            setFieldErrors(prev => ({
+                ...prev,
+                [fieldKey]: 'Please select a column from the dropdown suggestions.'
+            }));
+        }
     };
 
     const searchColumns = (event, fieldKey) => {
@@ -228,10 +270,23 @@ const Mapping = () => {
 
     const handleContinue = async (e) => {
         e.preventDefault();
-        
+
+        // Reject any field whose value isn't a real selection from the
+        // unmapped-columns dropdown (free-typed/mismatched text included).
+        const invalidFields = Object.keys(mappings).filter(key => !isValidMappingValue(mappings[key]));
+        if (invalidFields.length > 0) {
+            const newFieldErrors = {};
+            invalidFields.forEach(key => {
+                newFieldErrors[key] = 'Please select a column from the dropdown suggestions.';
+            });
+            setFieldErrors(prev => ({ ...prev, ...newFieldErrors }));
+            setError('Some fields contain a value that was not selected from the dropdown. Please fix them before continuing.');
+            return;
+        }
+
         // Check if all required fields are mapped
         const unmappedFields = Object.keys(mappings).filter(key => !mappings[key]);
-        
+
         if (unmappedFields.length > 0) {
             // Show confirmation dialog
             const skipped = unmappedFields.map(key => {
@@ -638,14 +693,21 @@ const Mapping = () => {
                                                         suggestions={filteredColumns[fieldKey] || []}
                                                         completeMethod={(e) => searchColumns(e, fieldKey)}
                                                         onChange={(e) => handleMappingChange(fieldKey, e.value)}
+                                                        onBlur={() => handleMappingBlur(fieldKey)}
+                                                        onSelect={() => handleMappingBlur(fieldKey)}
                                                         field="label"
                                                         placeholder="Search and select a column"
-                                                        className="w-full"
+                                                        className={`w-full ${fieldErrors[fieldKey] ? 'p-invalid' : ''}`}
                                                         inputClassName="w-full"
                                                         disabled={mappingLoading}
                                                         dropdown
                                                         forceSelection={false}
                                                     />
+                                                    {fieldErrors[fieldKey] && (
+                                                        <Text className="text-red-600 text-sm mt-1 mb-0">
+                                                            {fieldErrors[fieldKey]}
+                                                        </Text>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
