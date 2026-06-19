@@ -121,11 +121,16 @@ npm ci
 ### PostgreSQL initialization
 
 PostgreSQL is initialized automatically on first container start.
-`.docker/postgresql/Dockerfile` copies every file in `sql/` into
-`/docker-entrypoint-initdb.d/`:
+`.docker/postgresql/Dockerfile` copies each file in `sql/` into
+`/docker-entrypoint-initdb.d/` individually:
 
 ```dockerfile
-COPY ./sql/* /docker-entrypoint-initdb.d/
+COPY ./sql/add_api_url_column.sql /docker-entrypoint-initdb.d/
+COPY ./sql/add_pipeline_mode_columns.sql /docker-entrypoint-initdb.d/
+COPY ./sql/create_airflow_database.sql /docker-entrypoint-initdb.d/
+COPY ./sql/create_cleaning_state_table.sql /docker-entrypoint-initdb.d/
+# COPY ./sql/create_debezium_user.sh /docker-entrypoint-initdb.d/
+COPY ./sql/schema.sql /docker-entrypoint-initdb.d/
 ```
 
 **Ordering risk (verified):** Postgres runs `/docker-entrypoint-initdb.d/`
@@ -134,6 +139,45 @@ scripts in alphabetical filename order. `add_api_url_column.sql` and
 `ALTER TABLE` the `onboarding` and `pipeline_status` tables that
 `schema.sql` creates. On a fresh database, these two files will attempt to
 run before their target tables exist.
+
+### Debezium user creation
+
+`sql/create_debezium_user.sh` would normally run as part of
+`/docker-entrypoint-initdb.d/` (alphabetically between
+`create_cleaning_state_table.sql` and `schema.sql`), creating the
+`debezium_user` role that Debezium uses to read the WAL for CDC. Its
+`COPY` line in `.docker/postgresql/Dockerfile` is commented out because
+the script's bash heredoc breaks on Windows checkouts (CRLF line
+endings), even though it runs fine on Linux/macOS.
+
+Run the equivalent commands manually instead, after the `postgresql`
+container is up, substituting the values from your `.env`
+(`POSTGRES_USER`, `POSTGRES_DATABASE_NAME`, `DEBEZIUM_PASSWORD`):
+
+```bash
+docker exec -it postgresql psql -U <POSTGRES_USER> -d <POSTGRES_DATABASE_NAME>
+```
+
+```sql
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT FROM pg_catalog.pg_roles WHERE rolname = 'debezium_user'
+    ) THEN
+        CREATE USER debezium_user WITH
+            REPLICATION
+            LOGIN
+            PASSWORD '<DEBEZIUM_PASSWORD>';
+    END IF;
+END
+$$;
+
+GRANT USAGE ON SCHEMA public TO debezium_user;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO debezium_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT SELECT ON TABLES TO debezium_user;
+```
 
 ### Schema migrations
 
