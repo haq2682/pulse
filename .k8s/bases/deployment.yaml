@@ -341,13 +341,21 @@ spec:
           readinessProbe:
             tcpSocket:
               port: 2181
-            initialDelaySeconds: 15
+            initialDelaySeconds: 20
             periodSeconds: 10
+          # Zookeeper's JVM can legitimately take well over a minute to bind
+          # its port on constrained hardware (and Kafka's own startup blocks
+          # on this being ready first - see pulse-kafka below). The old
+          # 30s/20s/default-3-failures window killed it at ~90s, which was
+          # cutting it off mid-startup rather than catching a genuine hang -
+          # failureThreshold raised alongside initialDelaySeconds so a slow
+          # boot gets a real chance before Kubernetes gives up on it.
           livenessProbe:
             tcpSocket:
               port: 2181
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 20
+            failureThreshold: 5
       volumes:
         - name: pulse-zookeeper-data
           persistentVolumeClaim:
@@ -439,13 +447,22 @@ spec:
           readinessProbe:
             tcpSocket:
               port: 9092
-            initialDelaySeconds: 20
+            initialDelaySeconds: 30
             periodSeconds: 10
+          # Kafka's own JVM startup is slow, and it blocks on Zookeeper
+          # already being reachable (KAFKA_ZOOKEEPER_CONNECT above) before it
+          # can finish booting - so this needs a longer window than
+          # Zookeeper's own probe, not the same one. The old 40s/20s/
+          # default-3-failures window killed it at ~80-100s; observed restart
+          # spacing under load matched that almost exactly, i.e. it was being
+          # killed right before it would have come up, not because it was
+          # actually stuck.
           livenessProbe:
             tcpSocket:
               port: 9092
-            initialDelaySeconds: 40
+            initialDelaySeconds: 90
             periodSeconds: 20
+            failureThreshold: 5
       volumes:
         - name: pulse-kafka-storage
           persistentVolumeClaim:
@@ -1568,8 +1585,8 @@ spec:
 # ─────────────────────────────────────────────────────────────────────────
 # Nginx gateway - serves the SPA and proxies /api (incl. WebSocket upgrades)
 # and /upload same-origin. TLS is not terminated here; see nginx/nginx.conf
-# and nginx/conf.d/upload.conf - it only ever listens on port 80. TLS
-# termination is expected to happen at the Ingress once one is added.
+# and nginx/templates/upload.conf.template - it only ever listens on port
+# 80. TLS termination is expected to happen at the Ingress once one is added.
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
@@ -1593,6 +1610,17 @@ spec:
           image: pulse-nginx
           ports:
             - containerPort: 80
+          env:
+            # Overrides the image's own defaults (api/nifi, Docker Compose's
+            # service names) to the real Kubernetes Service names - see
+            # nginx/templates/upload.conf.template and .docker/nginx/Dockerfile.
+            # nginx resolves these at config-load time (not per-request), so
+            # getting this wrong doesn't just misroute - it crash-loops the
+            # container with "host not found in upstream".
+            - name: API_UPSTREAM_HOST
+              value: pulse-api
+            - name: NIFI_UPSTREAM_HOST
+              value: pulse-nifi
           resources:
             requests:
               cpu: 100m
@@ -1613,8 +1641,9 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 20
         # Sidecar exporter - scrapes nginx's built-in stub_status module over
-        # localhost (see nginx/conf.d/upload.conf's /stub_status location,
-        # restricted to 127.0.0.1 only) and re-exposes it for Prometheus.
+        # localhost (see nginx/templates/upload.conf.template's /stub_status
+        # location, restricted to 127.0.0.1 only) and re-exposes it for
+        # Prometheus.
         - name: pulse-nginx-exporter
           image: nginx/nginx-prometheus-exporter:1.5.1
           args:

@@ -144,7 +144,7 @@ spec:
 ---
 # ─────────────────────────────────────────────────────────────────────────
 # API - only pulse-nginx calls it (same-origin gateway design, see
-# nginx/conf.d/upload.conf). Egress covers every backing service it's
+# nginx/templates/upload.conf.template). Egress covers every backing service it's
 # wired to in deployment.yaml, plus the internet (Gemini API, Google OAuth,
 # SMTP relay) since those aren't cluster-internal destinations - restricted
 # to HTTPS/submission ports and excluding private IP ranges, so this rule

@@ -9,8 +9,17 @@
 # which is where the certs live. This keeps the image cert-free and startable
 # anywhere without mounting an ssl directory.
 #
-# Service names (api / nifi) resolve via Docker's embedded DNS on the
-# spark-network and via Kubernetes service names in prod.
+# Upstream hostnames come from ${API_UPSTREAM_HOST}/${NIFI_UPSTREAM_HOST},
+# substituted into this file by the base nginx image's own envsubst-on-
+# templates entrypoint step (this file lives in /etc/nginx/templates/, not
+# /etc/nginx/conf.d/ - see the Dockerfile). Docker Compose's service names
+# (api, nifi) and Kubernetes' Service names (pulse-api, pulse-nifi) are NOT
+# the same string, so a single hardcoded hostname can't work in both -
+# nginx resolves a literal (non-variable) proxy_pass/upstream target at
+# config-load time, so the wrong one doesn't just misroute, it makes nginx
+# fail to start at all ("host not found in upstream"). The Dockerfile ENVs
+# default these to Compose's names; deployment.yaml overrides them to the
+# Kubernetes Service names for the pulse-nginx container.
 # =============================================================================
 
 # Large file upload settings
@@ -30,7 +39,7 @@ proxy_request_buffering off;
 # Upstream to NiFi HandleHttpRequest
 upstream nifi_upload {
     least_conn;
-    server nifi:8080 max_fails=3 fail_timeout=30s;
+    server ${NIFI_UPSTREAM_HOST}:8080 max_fails=3 fail_timeout=30s;
     keepalive 32;
 }
 
@@ -54,7 +63,7 @@ server {
 
     # ── API proxy: /api/* -> FastAPI (prefix stripped) ──────────────────
     location /api/ {
-        proxy_pass http://api:8000/;
+        proxy_pass http://${API_UPSTREAM_HOST}:8000/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -71,7 +80,7 @@ server {
     # ── Health check ─────────────────────────────────────────────────────
     location = /health {
         access_log off;
-        proxy_pass http://api:8000/health;
+        proxy_pass http://${API_UPSTREAM_HOST}:8000/health;
         proxy_set_header Host $host;
     }
 
