@@ -1,0 +1,1603 @@
+# Deployments (and two Jobs) for every active service in docker-compose.yml,
+# excluding the "cassandra" and "debezium-cassandra" services, which are
+# already commented out there.
+#
+# Conventions used throughout this file:
+#
+# 1. command vs. args - docker-compose's `command:` field overrides a
+#    container's CMD only, leaving its built-in ENTRYPOINT untouched. That is
+#    what Kubernetes' `args:` field does too, so every docker-compose
+#    `command:` below is translated to k8s `args:` (not `command:`, which
+#    would override ENTRYPOINT - a different thing). The one exception is
+#    pulse-minio-init, which uses docker-compose's `entrypoint:` field - that
+#    genuinely overrides ENTRYPOINT, so it is translated to k8s `command:`.
+#
+# 2. Secrets - the five Secret objects referenced below (pulse-postgresql-
+#    secret, pulse-minio-secret, pulse-airflow-secret, pulse-api-secret,
+#    pulse-nifi-secret) are never defined here. They materialize from the
+#    ExternalSecret objects in secrets/ (see docs/SECRETS_MANAGEMENT.md) -
+#    the External Secrets Operator running in-cluster reads each one from
+#    HashiCorp Vault and creates/updates a plain Secret with a matching name
+#    automatically. Pods never talk to Vault directly. Expected keys per secret:
+#      pulse-postgresql-secret: POSTGRES_USER, POSTGRES_PASSWORD,
+#                                POSTGRES_DB, DEBEZIUM_PASSWORD
+#      pulse-minio-secret:      MINIO_ROOT_USER, MINIO_ROOT_PASSWORD,
+#                                MINIO_ACCESS_KEY, MINIO_SECRET_KEY
+#      pulse-airflow-secret:    AIRFLOW_FERNET_KEY, AIRFLOW_SECRET_KEY,
+#                                AIRFLOW_ADMIN_USER, AIRFLOW_ADMIN_PASSWORD
+#      pulse-api-secret:        SECRET_KEY, GEMINI_API_KEY, GOOGLE_CLIENT_ID,
+#                                GOOGLE_CLIENT_SECRET, SMTP_USER, SMTP_PASSWORD
+#      pulse-nifi-secret:       NIFI_ADMIN_USER, NIFI_ADMIN_PASSWORD,
+#                                NIFI_SENSITIVE_PROPS_KEY
+#
+# 3. Service discovery - docker-compose used fixed 10.5.0.x addresses on the
+#    spark-network bridge network. Those are replaced with the matching
+#    ClusterIP Service name from svc.yaml (e.g. pulse-postgresql,
+#    pulse-kafka:9092), which is how pods find each other in Kubernetes.
+#
+# 4. Startup ordering - docker-compose's `depends_on` only controls container
+#    *start* order, not readiness, and Kubernetes has no direct equivalent
+#    for Deployments. Every service here already needs to tolerate a
+#    dependency being briefly unreachable on first boot (the same is true
+#    today whenever docker-compose starts these containers in parallel), so
+#    no extra init-container "wait for dependency" logic has been added here
+#    to keep these manifests simple.
+#
+# 5. Application code - cleaning/, mapping/, transformation/, analysis/,
+#    machine-learning/, and sql/ are already COPY'd into the pulse-api and
+#    pulse-python images at build time (see .docker/api/Dockerfile and
+#    .docker/python/Dockerfile), so - unlike docker-compose - they are not
+#    bind-mounted here. This matches the "bake code into the image" target
+#    already recommended in docs/CLOUD_DEPLOYMENT_GUIDE.md.
+#
+# 6. Known gap - the pulse-api image does not COPY jars/deps/ (docker-compose
+#    bind-mounts it at runtime instead), so the Spark driver classpath jars
+#    it needs are not present in this Deployment yet. Fixing this means
+#    adding a COPY to .docker/api/Dockerfile - a Dockerfile change, so it's
+#    intentionally left as a follow-up rather than worked around here.
+#
+# 7. /var/run/docker.sock is deliberately NOT mounted into the Airflow
+#    Deployments below - it never was, even though docker-compose mounts it.
+#    DAG task execution has been migrated from DockerOperator/exec_run() (see
+#    docs/CLOUD_DEPLOYMENT_GUIDE.md's Blocker 1) to KubernetesPodOperator and
+#    pipeline_config.run_k8s_task_pod(), both of which create Pods through
+#    the Kubernetes API using the pulse-airflow ServiceAccount (see
+#    rbac.yaml) - a narrow, auditable set of permissions instead of
+#    docker.sock's effectively-root access to the whole host. That's why
+#    pulse-airflow-webserver/scheduler below set serviceAccountName:
+#    pulse-airflow and a POD_NAMESPACE env var (via the downward API) instead
+#    of a socket mount. There is no more standalone pulse-python Deployment
+#    either - every pipeline script now runs in its own ephemeral pod
+#    (labelled app: pulse-task / pulse-db-stream / pulse-api-stream, see
+#    networkpolicy.yaml) created on demand from the pulse-python image,
+#    rather than being exec'd into one shared long-running pod.
+
+# ─────────────────────────────────────────────────────────────────────────
+# PostgreSQL
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-postgresql
+  namespace: production
+  labels:
+    app: pulse-postgresql
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # single ReadWriteOnce volume: never run two pods at once
+  selector:
+    matchLabels:
+      app: pulse-postgresql
+  template:
+    metadata:
+      labels:
+        app: pulse-postgresql
+    spec:
+      containers:
+        - name: pulse-postgresql
+          image: pulse-postgresql
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: pulse-postgresql-secret
+          env:
+            - name: POSTGRESQL_WAL_LEVEL
+              value: "logical"
+          volumeMounts:
+            - name: pulse-postgresql-storage
+              mountPath: /bitnami/postgresql
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          readinessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 30
+            periodSeconds: 20
+        # Sidecar exporter - postgres_exporter connects to PostgreSQL over
+        # localhost (containers in one pod share a network namespace), reads
+        # pg_stat_* views, and re-exposes them as Prometheus metrics on its
+        # own port. See monitoring.yaml's pulse-postgresql ServiceMonitor.
+        - name: pulse-postgres-exporter
+          image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+          ports:
+            - name: metrics
+              containerPort: 9187
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-postgresql-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-postgresql-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-postgresql-secret
+                  key: POSTGRES_DB
+            - name: DATA_SOURCE_NAME
+              value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:5432/$(POSTGRES_DB)?sslmode=disable"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      volumes:
+        - name: pulse-postgresql-storage
+          persistentVolumeClaim:
+            claimName: pulse-postgresql-pvc
+---
+# ─────────────────────────────────────────────────────────────────────────
+# MinIO
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-minio
+  namespace: production
+  labels:
+    app: pulse-minio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pulse-minio
+  template:
+    metadata:
+      labels:
+        app: pulse-minio
+    spec:
+      containers:
+        - name: pulse-minio
+          image: pulse-minio
+          args:
+            - server
+            - /data
+            - --console-address
+            - ":9001"
+          ports:
+            - containerPort: 9000
+            - containerPort: 9001
+          envFrom:
+            - secretRef:
+                name: pulse-minio-secret
+          volumeMounts:
+            - name: pulse-minio-storage
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes:
+        - name: pulse-minio-storage
+          persistentVolumeClaim:
+            claimName: pulse-minio-pvc
+---
+# ─────────────────────────────────────────────────────────────────────────
+# MinIO bucket bootstrap - one-shot Job (docker-compose's minio-init).
+# Runs to completion and exits; it is not a long-running pod, so a Job (not
+# a Deployment) is the correct fit here.
+# Docs: https://kubernetes.io/docs/concepts/workloads/controllers/job/
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pulse-minio-init
+  namespace: production
+  labels:
+    app: pulse-minio-init
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: pulse-minio-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: pulse-minio-init
+          image: minio/mc
+          envFrom:
+            - secretRef:
+                name: pulse-minio-secret
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for MinIO...";
+              until mc alias set local http://pulse-minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" 2>/dev/null; do
+                sleep 2;
+              done;
+              echo "Creating buckets...";
+              mc mb --ignore-existing local/pulse-bucket-1;
+              mc mb --ignore-existing local/pulse-test-bucket;
+              mc mb --ignore-existing local/pulse-checkpoints;
+              echo "Buckets created";
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Zookeeper
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-zookeeper
+  namespace: production
+  labels:
+    app: pulse-zookeeper
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pulse-zookeeper
+  template:
+    metadata:
+      labels:
+        app: pulse-zookeeper
+    spec:
+      # Downloads the JMX-to-Prometheus javaagent jar once into an emptyDir
+      # that the main container then mounts read-only. Confluent's images
+      # are plain JVM processes wrapped by cp-base-new's launch scripts,
+      # which read KAFKA_OPTS (the shared convention across all
+      # Confluent/Kafka-family images, not just Kafka itself) and pass it
+      # straight to `java`, so a -javaagent flag there is all that's needed.
+      initContainers:
+        - name: jmx-exporter-init
+          image: curlimages/curl:8.10.1
+          command:
+            - sh
+            - -c
+            - curl -sSL -o /jmx-exporter/jmx_prometheus_javaagent.jar https://github.com/prometheus/jmx_exporter/releases/download/1.6.0/jmx_prometheus_javaagent-1.6.0.jar
+          volumeMounts:
+            - name: pulse-jmx-exporter-jar
+              mountPath: /jmx-exporter
+      containers:
+        - name: pulse-zookeeper
+          image: confluentinc/cp-zookeeper:7.7.0
+          ports:
+            - containerPort: 2181
+            - name: jmx-metrics
+              containerPort: 7071
+          env:
+            - name: ZOOKEEPER_CLIENT_PORT
+              value: "2181"
+            - name: ZOOKEEPER_TICK_TIME
+              value: "2000"
+            - name: KAFKA_OPTS
+              value: "-javaagent:/jmx-exporter/jmx_prometheus_javaagent.jar=7071:/etc/jmx-exporter/zookeeper.yml"
+          volumeMounts:
+            - name: pulse-zookeeper-data
+              mountPath: /var/lib/zookeeper/data
+            - name: pulse-zookeeper-log
+              mountPath: /var/lib/zookeeper/log
+            - name: pulse-jmx-exporter-jar
+              mountPath: /jmx-exporter
+              readOnly: true
+            - name: pulse-jmx-exporter-config
+              mountPath: /etc/jmx-exporter
+              readOnly: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          readinessProbe:
+            tcpSocket:
+              port: 2181
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 2181
+            initialDelaySeconds: 30
+            periodSeconds: 20
+      volumes:
+        - name: pulse-zookeeper-data
+          persistentVolumeClaim:
+            claimName: pulse-zookeeper-data-pvc
+        - name: pulse-zookeeper-log
+          persistentVolumeClaim:
+            claimName: pulse-zookeeper-log-pvc
+        - name: pulse-jmx-exporter-jar
+          emptyDir: {}
+        - name: pulse-jmx-exporter-config
+          configMap:
+            name: pulse-jmx-exporter-zookeeper-config
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Kafka
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-kafka
+  namespace: production
+  labels:
+    app: pulse-kafka
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pulse-kafka
+  template:
+    metadata:
+      labels:
+        app: pulse-kafka
+    spec:
+      # See the matching comment on pulse-zookeeper's initContainer above -
+      # same javaagent jar, same mechanism, different JMX rules file.
+      initContainers:
+        - name: jmx-exporter-init
+          image: curlimages/curl:8.10.1
+          command:
+            - sh
+            - -c
+            - curl -sSL -o /jmx-exporter/jmx_prometheus_javaagent.jar https://github.com/prometheus/jmx_exporter/releases/download/1.6.0/jmx_prometheus_javaagent-1.6.0.jar
+          volumeMounts:
+            - name: pulse-jmx-exporter-jar
+              mountPath: /jmx-exporter
+      containers:
+        - name: pulse-kafka
+          image: confluentinc/cp-kafka:7.7.0
+          ports:
+            - containerPort: 9092
+            - name: jmx-metrics
+              containerPort: 7071
+          env:
+            - name: KAFKA_BROKER_ID
+              value: "1"
+            - name: KAFKA_ZOOKEEPER_CONNECT
+              value: pulse-zookeeper:2181
+            - name: KAFKA_LISTENERS
+              value: PLAINTEXT://0.0.0.0:9092
+            # Must be the Service DNS name so other pods can resolve it.
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: PLAINTEXT://pulse-kafka:9092
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+              value: "true"
+            - name: KAFKA_LOG_RETENTION_HOURS
+              value: "168"
+            - name: KAFKA_OPTS
+              value: "-javaagent:/jmx-exporter/jmx_prometheus_javaagent.jar=7071:/etc/jmx-exporter/kafka.yml"
+          volumeMounts:
+            - name: pulse-kafka-storage
+              mountPath: /var/lib/kafka/data
+            - name: pulse-jmx-exporter-jar
+              mountPath: /jmx-exporter
+              readOnly: true
+            - name: pulse-jmx-exporter-config
+              mountPath: /etc/jmx-exporter
+              readOnly: true
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          readinessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 40
+            periodSeconds: 20
+      volumes:
+        - name: pulse-kafka-storage
+          persistentVolumeClaim:
+            claimName: pulse-kafka-pvc
+        - name: pulse-jmx-exporter-jar
+          emptyDir: {}
+        - name: pulse-jmx-exporter-config
+          configMap:
+            name: pulse-jmx-exporter-kafka-config
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Redis
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-redis
+  namespace: production
+  labels:
+    app: pulse-redis
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pulse-redis
+  template:
+    metadata:
+      labels:
+        app: pulse-redis
+    spec:
+      containers:
+        - name: pulse-redis
+          image: redis:7-alpine
+          args:
+            - redis-server
+            - --appendonly
+            - "yes"
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: pulse-redis-storage
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 15
+            periodSeconds: 20
+        # Sidecar exporter - same localhost pattern as postgres_exporter
+        # above. Redis here has no password set (no REDIS_PASSWORD is
+        # referenced anywhere in this file), so no auth env var is needed.
+        - name: pulse-redis-exporter
+          image: oliver006/redis_exporter:v1.88.0
+          ports:
+            - name: metrics
+              containerPort: 9121
+          env:
+            - name: REDIS_ADDR
+              value: redis://localhost:6379
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      volumes:
+        - name: pulse-redis-storage
+          persistentVolumeClaim:
+            claimName: pulse-redis-pvc
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Debezium (Kafka Connect + connectors)
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-debezium
+  namespace: production
+  labels:
+    app: pulse-debezium
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pulse-debezium
+  template:
+    metadata:
+      labels:
+        app: pulse-debezium
+    spec:
+      # See the matching comment on pulse-zookeeper's initContainer above.
+      # quay.io/debezium/connect is a Kafka Connect distribution and reads
+      # the same KAFKA_OPTS convention as the Confluent images.
+      initContainers:
+        - name: jmx-exporter-init
+          image: curlimages/curl:8.10.1
+          command:
+            - sh
+            - -c
+            - curl -sSL -o /jmx-exporter/jmx_prometheus_javaagent.jar https://github.com/prometheus/jmx_exporter/releases/download/1.6.0/jmx_prometheus_javaagent-1.6.0.jar
+          volumeMounts:
+            - name: pulse-jmx-exporter-jar
+              mountPath: /jmx-exporter
+      containers:
+        - name: pulse-debezium
+          image: pulse-debezium
+          ports:
+            - containerPort: 8083
+            - name: jmx-metrics
+              containerPort: 7071
+          env:
+            - name: KAFKA_OPTS
+              value: "-javaagent:/jmx-exporter/jmx_prometheus_javaagent.jar=7071:/etc/jmx-exporter/kafka-connect.yml"
+            - name: BOOTSTRAP_SERVERS
+              value: pulse-kafka:9092
+            - name: GROUP_ID
+              value: debezium-connect
+            - name: CONFIG_STORAGE_TOPIC
+              value: debezium_configs
+            - name: OFFSET_STORAGE_TOPIC
+              value: debezium_offsets
+            - name: STATUS_STORAGE_TOPIC
+              value: debezium_status
+            - name: CONFIG_STORAGE_REPLICATION_FACTOR
+              value: "1"
+            - name: OFFSET_STORAGE_REPLICATION_FACTOR
+              value: "1"
+            - name: STATUS_STORAGE_REPLICATION_FACTOR
+              value: "1"
+            - name: KEY_CONVERTER
+              value: org.apache.kafka.connect.json.JsonConverter
+            - name: VALUE_CONVERTER
+              value: org.apache.kafka.connect.json.JsonConverter
+            - name: KEY_CONVERTER_SCHEMAS_ENABLE
+              value: "false"
+            - name: VALUE_CONVERTER_SCHEMAS_ENABLE
+              value: "false"
+            - name: CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE
+              value: "false"
+            - name: CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE
+              value: "false"
+            # NOTE: no credentials file is mounted at /etc/gcp yet (see the
+            # jars/gcp-credentials.json bind mount in docker-compose.yml) -
+            # only Debezium connectors that need GCP (e.g. Spanner) are
+            # affected. This would need a 6th Vault path + ExternalSecret
+            # (see docs/SECRETS_MANAGEMENT.md) plus a volumeMount here - not
+            # done yet since nothing currently exercises the GCP connectors.
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /etc/gcp/credentials.json
+          volumeMounts:
+            - name: pulse-jmx-exporter-jar
+              mountPath: /jmx-exporter
+              readOnly: true
+            - name: pulse-jmx-exporter-config
+              mountPath: /etc/jmx-exporter
+              readOnly: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8083
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8083
+            initialDelaySeconds: 40
+            periodSeconds: 20
+      volumes:
+        - name: pulse-jmx-exporter-jar
+          emptyDir: {}
+        - name: pulse-jmx-exporter-config
+          configMap:
+            name: pulse-jmx-exporter-kafka-connect-config
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Spark Master
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-spark-master
+  namespace: production
+  labels:
+    app: pulse-spark-master
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pulse-spark-master
+  template:
+    metadata:
+      labels:
+        app: pulse-spark-master
+    spec:
+      containers:
+        - name: pulse-spark-master
+          image: pulse-spark
+          args:
+            - /opt/spark/bin/spark-class
+            - org.apache.spark.deploy.master.Master
+          ports:
+            - containerPort: 7077
+            - containerPort: 8080
+            - containerPort: 4040
+          env:
+            # Must be the pod's own address, matching docker-compose's use of
+            # the container's own fixed IP for these two settings.
+            - name: SPARK_MASTER_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: SPARK_LOCAL_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: MINIO_ENDPOINT
+              value: pulse-minio:9000
+            - name: PYSPARK_PYTHON
+              value: python3.10
+            - name: PYSPARK_DRIVER_PYTHON
+              value: python3.10
+            # spark.ui.prometheus.enabled turns on Spark's built-in metrics
+            # servlet - see monitoring.yaml's pulse-spark-master ServiceMonitor.
+            - name: SPARK_MASTER_OPTS
+              value: "-Dspark.shuffle.service.enabled=true -Dspark.ui.prometheus.enabled=true"
+          envFrom:
+            - secretRef:
+                name: pulse-minio-secret
+          volumeMounts:
+            - name: pulse-spark-master-storage
+              mountPath: /opt/spark/data
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          readinessProbe:
+            tcpSocket:
+              port: 7077
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 7077
+            initialDelaySeconds: 30
+            periodSeconds: 20
+      volumes:
+        - name: pulse-spark-master-storage
+          persistentVolumeClaim:
+            claimName: pulse-spark-master-pvc
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Spark Worker - not a docker-compose service (workers were started
+# manually via bash/start_worker_linux.sh). Settings below (cores, memory,
+# SPARK_WORKER_OPTS) are copied from that script.
+#
+# Unlike the bash script, which generates a unique container name per
+# invocation to avoid clashing with previously-started workers, no such
+# trick is needed here: every replica of a Deployment already gets its own
+# unique pod identity and pod IP for free. Each replica's spark-class
+# process independently connects OUT to spark://pulse-spark-master:7077 and
+# registers itself - the master never needs to know about workers in
+# advance - so scaling this Deployment (manually now, or later via HPA) is
+# enough on its own for new workers to join the cluster. No PVC is attached:
+# workers are stateless compute, which is also what makes them safe to
+# scale up/down freely.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-spark-worker
+  namespace: production
+  labels:
+    app: pulse-spark-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pulse-spark-worker
+  template:
+    metadata:
+      labels:
+        app: pulse-spark-worker
+    spec:
+      containers:
+        - name: pulse-spark-worker
+          image: pulse-spark
+          args:
+            - /opt/spark/bin/spark-class
+            - org.apache.spark.deploy.worker.Worker
+            - spark://pulse-spark-master:7077
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SPARK_LOCAL_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            # Sized for a 4-core/16GB machine (see the sizing note at the
+            # top of hpa.yaml) - down from 2/6g, its original bash-script-
+            # derived value.
+            - name: SPARK_WORKER_CORES
+              value: "1"
+            - name: SPARK_WORKER_MEMORY
+              value: 2g
+            - name: PYSPARK_PYTHON
+              value: python3.10
+            - name: PYSPARK_DRIVER_PYTHON
+              value: python3.10
+            # spark.ui.prometheus.enabled turns on Spark's built-in metrics
+            # servlet - see monitoring.yaml's pulse-spark-worker ServiceMonitor.
+            - name: SPARK_WORKER_OPTS
+              value: "-Dspark.shuffle.service.enabled=true -Dspark.worker.cleanup.enabled=true -Dspark.worker.cleanup.interval=300 -Dspark.worker.cleanup.appDataTtl=600 -Dspark.ui.prometheus.enabled=true"
+            - name: MINIO_ENDPOINT
+              value: pulse-minio:9000
+          envFrom:
+            - secretRef:
+                name: pulse-minio-secret
+          # Matches SPARK_WORKER_CORES/SPARK_WORKER_MEMORY above: the worker
+          # JVM is configured to use exactly this much, so requests and
+          # limits are set equal rather than left to burst.
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          readinessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 20
+---
+# ─────────────────────────────────────────────────────────────────────────
+# NiFi
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-nifi
+  namespace: production
+  labels:
+    app: pulse-nifi
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pulse-nifi
+  template:
+    metadata:
+      labels:
+        app: pulse-nifi
+    spec:
+      containers:
+        - name: pulse-nifi
+          image: pulse-nifi
+          ports:
+            - containerPort: 8080
+            - containerPort: 8443
+            - containerPort: 10000
+          env:
+            # Sized for a 4-core/16GB machine (see the sizing note at the
+            # top of hpa.yaml) - down from 8g/16g. Container memory limit
+            # (3Gi below) intentionally leaves ~1Gi of headroom above
+            # NIFI_JVM_HEAP_MAX/-Xmx for JVM overhead outside the heap
+            # (metaspace, thread stacks, direct buffers, NiFi's off-heap
+            # content/provenance repositories) - sizing the limit equal to
+            # -Xmx risks an OOMKill from the container's cgroup even while
+            # the JVM itself still has heap room.
+            - name: NIFI_JVM_HEAP_INIT
+              value: 1g
+            - name: NIFI_JVM_HEAP_MAX
+              value: 2g
+            - name: JAVA_OPTS
+              value: >-
+                -Xms1g
+                -Xmx2g
+                -XX:+UseG1GC
+                -XX:MaxGCPauseMillis=500
+                -XX:InitiatingHeapOccupancyPercent=45
+                -XX:G1HeapRegionSize=16m
+            - name: NIFI_WEB_HTTP_PORT
+              value: "8080"
+            - name: NIFI_WEB_HTTP_HOST
+              value: 0.0.0.0
+            - name: NIFI_WEB_HTTPS_PORT
+              value: "8443"
+            - name: NIFI_SENSITIVE_PROPS_ALGORITHM
+              value: AES/GCM/NoPadding
+            - name: NIFI_CLUSTER_IS_NODE
+              value: "false"
+            - name: MINIO_ENDPOINT
+              value: pulse-minio:9000
+            - name: POSTGRES_SERVER
+              value: pulse-postgresql
+            - name: KAFKA_BOOTSTRAP
+              value: pulse-kafka:9092
+            - name: SINGLE_USER_CREDENTIALS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-nifi-secret
+                  key: NIFI_ADMIN_USER
+            - name: SINGLE_USER_CREDENTIALS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-nifi-secret
+                  key: NIFI_ADMIN_PASSWORD
+            - name: NIFI_SENSITIVE_PROPS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-nifi-secret
+                  key: NIFI_SENSITIVE_PROPS_KEY
+          envFrom:
+            - secretRef:
+                name: pulse-minio-secret
+            - secretRef:
+                name: pulse-postgresql-secret
+          volumeMounts:
+            - name: pulse-nifi-storage
+              mountPath: /opt/nifi/nifi-current/data
+          resources:
+            requests:
+              cpu: 250m
+              memory: 2Gi
+            limits:
+              cpu: 1000m
+              memory: 3Gi
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 120
+            periodSeconds: 30
+      volumes:
+        - name: pulse-nifi-storage
+          persistentVolumeClaim:
+            claimName: pulse-nifi-pvc
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Airflow init - one-shot Job (docker-compose's airflow-init): runs
+# migrations and creates the admin user, then exits. A Job is the correct
+# fit for the same reason as pulse-minio-init above.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pulse-airflow-init
+  namespace: production
+  labels:
+    app: pulse-airflow-init
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: pulse-airflow-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: pulse-airflow-init
+          image: pulse-airflow
+          args:
+            - bash
+            - -c
+            - |
+              airflow db migrate &&
+              airflow db upgrade &&
+              airflow connections create-default-connections &&
+              airflow users create --username "$AIRFLOW_ADMIN_USER" --password "$AIRFLOW_ADMIN_PASSWORD" --firstname Pulse --lastname Admin --role Admin --email admin@pulse.local
+          env:
+            - name: AIRFLOW__CORE__EXECUTOR
+              value: LocalExecutor
+            - name: AIRFLOW__CORE__LOAD_EXAMPLES
+              value: "False"
+            - name: AIRFLOW__API__AUTH_BACKENDS
+              value: airflow.api.auth.backend.basic_auth
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-postgresql-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-postgresql-secret
+                  key: POSTGRES_PASSWORD
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              value: postgresql+psycopg2://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@pulse-postgresql:5432/airflow
+            # Airflow itself only reads the double-underscore config names
+            # below - docker-compose renamed AIRFLOW_FERNET_KEY/
+            # AIRFLOW_SECRET_KEY (the .env/Secret key names) to these via
+            # ${VAR} substitution; envFrom alone does not rename keys, so
+            # these need explicit secretKeyRef entries too.
+            - name: AIRFLOW__CORE__FERNET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-airflow-secret
+                  key: AIRFLOW_FERNET_KEY
+            - name: AIRFLOW__WEBSERVER__SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-airflow-secret
+                  key: AIRFLOW_SECRET_KEY
+            - name: REDIS_HOST
+              value: pulse-redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: GEMINI_MODEL
+              value: gemini-2.0-flash-lite
+            - name: _PIP_ADDITIONAL_REQUIREMENTS
+              value: "minio scipy pandas numpy psycopg2-binary"
+          envFrom:
+            - secretRef:
+                name: pulse-airflow-secret
+            - secretRef:
+                name: pulse-api-secret
+          volumeMounts:
+            - name: pulse-airflow-logs
+              mountPath: /opt/airflow/logs
+            - name: pulse-airflow-dags
+              mountPath: /opt/airflow/dags
+            - name: pulse-airflow-plugins
+              mountPath: /opt/airflow/plugins
+            - name: pulse-airflow-config
+              mountPath: /opt/airflow/config
+      volumes:
+        - name: pulse-airflow-logs
+          persistentVolumeClaim:
+            claimName: pulse-airflow-logs-pvc
+        # DAG/plugin/config source lives in the image already (see note 5 at
+        # the top of this file) - emptyDir here is just scratch space with
+        # the same directory shape, not a live host bind mount like
+        # docker-compose used.
+        - name: pulse-airflow-dags
+          emptyDir: {}
+        - name: pulse-airflow-plugins
+          emptyDir: {}
+        - name: pulse-airflow-config
+          emptyDir: {}
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Airflow Webserver
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-airflow-webserver
+  namespace: production
+  labels:
+    app: pulse-airflow-webserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pulse-airflow-webserver
+  template:
+    metadata:
+      labels:
+        app: pulse-airflow-webserver
+    spec:
+      serviceAccountName: pulse-airflow
+      containers:
+        - name: pulse-airflow-webserver
+          image: pulse-airflow
+          args:
+            - airflow
+            - webserver
+          ports:
+            - containerPort: 8080
+          env:
+            - name: AIRFLOW__CORE__EXECUTOR
+              value: LocalExecutor
+            - name: AIRFLOW__CORE__LOAD_EXAMPLES
+              value: "False"
+            - name: AIRFLOW__API__AUTH_BACKENDS
+              value: airflow.api.auth.backend.basic_auth
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-postgresql-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-postgresql-secret
+                  key: POSTGRES_PASSWORD
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              value: postgresql+psycopg2://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@pulse-postgresql:5432/airflow
+            # See the matching comment in pulse-airflow-init - envFrom does
+            # not rename keys, so these need explicit secretKeyRef entries.
+            - name: AIRFLOW__CORE__FERNET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-airflow-secret
+                  key: AIRFLOW_FERNET_KEY
+            - name: AIRFLOW__WEBSERVER__SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-airflow-secret
+                  key: AIRFLOW_SECRET_KEY
+            - name: AIRFLOW__WEBSERVER__RATE_LIMIT_STORAGE_URL
+              value: redis://pulse-redis:6379/0
+            - name: AIRFLOW__WEBSERVER__RATE_LIMIT_ENABLED
+              value: "True"
+            - name: AIRFLOW__WEBSERVER__RATE_LIMIT_DEFAULT
+              value: "200 per day;50 per hour"
+            - name: AIRFLOW__CORE__DAGS_FOLDER
+              value: /opt/airflow/dags
+            - name: AIRFLOW__CORE__PLUGINS_FOLDER
+              value: /opt/airflow/plugins
+            - name: AIRFLOW__LOGGING__BASE_LOG_FOLDER
+              value: /opt/airflow/logs
+            - name: MINIO_ENDPOINT
+              value: pulse-minio:9000
+            - name: KAFKA_BOOTSTRAP
+              value: pulse-kafka:9092
+            - name: POSTGRES_SERVER
+              value: pulse-postgresql
+            - name: POSTGRES_DATABASE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-postgresql-secret
+                  key: POSTGRES_DB
+            - name: REDIS_HOST
+              value: pulse-redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: GEMINI_MODEL
+              value: gemini-2.0-flash-lite
+            - name: DEBEZIUM_URL
+              value: http://pulse-debezium:8083
+            # airflow/config/pipeline_config.py defaults this to
+            # spark://10.5.0.3:7077 (the docker-compose static IP) if unset.
+            - name: SPARK_MASTER_URL
+              value: spark://pulse-spark-master:7077
+            # Task pods are created in this same namespace - see note 7 at
+            # the top of this file and rbac.yaml. The downward API is the
+            # standard way a pod learns its own namespace; nothing needs to
+            # hardcode it.
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            # Image used for every KubernetesPodOperator/run_k8s_task_pod
+            # task pod. Keep in sync with the images: transformer in
+            # kustomization.yaml - see the comment on PYTHON_IMAGE in
+            # pipeline_config.py.
+            - name: PIPELINE_PYTHON_IMAGE
+              value: haq2682/pulse-python:latest
+            - name: PYTHONPATH
+              value: /opt/airflow/utils:/opt/airflow/config
+            - name: _PIP_ADDITIONAL_REQUIREMENTS
+              value: "minio scipy pandas numpy psycopg2-binary apache-airflow-providers-cncf-kubernetes kubernetes"
+            # Airflow emits StatsD metrics natively - point it at the
+            # statsd-exporter sidecar below over localhost (same pod network
+            # namespace). The sidecar bridges UDP StatsD -> Prometheus.
+            - name: AIRFLOW__METRICS__STATSD_ON
+              value: "True"
+            - name: AIRFLOW__METRICS__STATSD_HOST
+              value: localhost
+            - name: AIRFLOW__METRICS__STATSD_PORT
+              value: "9125"
+            - name: AIRFLOW__METRICS__STATSD_PREFIX
+              value: airflow
+          envFrom:
+            - secretRef:
+                name: pulse-airflow-secret
+            - secretRef:
+                name: pulse-minio-secret
+            - secretRef:
+                name: pulse-api-secret
+          volumeMounts:
+            - name: pulse-airflow-logs
+              mountPath: /opt/airflow/logs
+            - name: pulse-airflow-dags
+              mountPath: /opt/airflow/dags
+            - name: pulse-airflow-plugins
+              mountPath: /opt/airflow/plugins
+            - name: pulse-airflow-config
+              mountPath: /opt/airflow/config
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+        # Sidecar - bridges Airflow's StatsD metrics (UDP 9125) to a
+        # Prometheus-scrapeable HTTP endpoint (9102). See monitoring.yaml's
+        # pulse-airflow-webserver ServiceMonitor.
+        - name: pulse-statsd-exporter
+          image: prom/statsd-exporter:v0.30.0-distroless
+          ports:
+            - name: statsd-udp
+              containerPort: 9125
+              protocol: UDP
+            - name: metrics
+              containerPort: 9102
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      volumes:
+        - name: pulse-airflow-logs
+          persistentVolumeClaim:
+            claimName: pulse-airflow-logs-pvc
+        - name: pulse-airflow-dags
+          emptyDir: {}
+        - name: pulse-airflow-plugins
+          emptyDir: {}
+        - name: pulse-airflow-config
+          emptyDir: {}
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Airflow Scheduler - has a Service now (see svc.yaml) purely so its
+# statsd-exporter sidecar's metrics port is reachable; the scheduler process
+# itself still doesn't serve any application traffic.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-airflow-scheduler
+  namespace: production
+  labels:
+    app: pulse-airflow-scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pulse-airflow-scheduler
+  template:
+    metadata:
+      labels:
+        app: pulse-airflow-scheduler
+    spec:
+      serviceAccountName: pulse-airflow
+      containers:
+        - name: pulse-airflow-scheduler
+          image: pulse-airflow
+          args:
+            - airflow
+            - scheduler
+          env:
+            - name: AIRFLOW__CORE__EXECUTOR
+              value: LocalExecutor
+            - name: AIRFLOW__CORE__LOAD_EXAMPLES
+              value: "False"
+            - name: AIRFLOW__API__AUTH_BACKENDS
+              value: airflow.api.auth.backend.basic_auth
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-postgresql-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-postgresql-secret
+                  key: POSTGRES_PASSWORD
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              value: postgresql+psycopg2://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@pulse-postgresql:5432/airflow
+            # See the matching comment in pulse-airflow-init - envFrom does
+            # not rename keys, so these need explicit secretKeyRef entries.
+            - name: AIRFLOW__CORE__FERNET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-airflow-secret
+                  key: AIRFLOW_FERNET_KEY
+            - name: AIRFLOW__WEBSERVER__SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-airflow-secret
+                  key: AIRFLOW_SECRET_KEY
+            - name: AIRFLOW__CORE__DAGS_FOLDER
+              value: /opt/airflow/dags
+            - name: AIRFLOW__CORE__PLUGINS_FOLDER
+              value: /opt/airflow/plugins
+            - name: AIRFLOW__LOGGING__BASE_LOG_FOLDER
+              value: /opt/airflow/logs
+            - name: MINIO_ENDPOINT
+              value: pulse-minio:9000
+            - name: KAFKA_BOOTSTRAP
+              value: pulse-kafka:9092
+            - name: POSTGRES_SERVER
+              value: pulse-postgresql
+            - name: POSTGRES_DATABASE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-postgresql-secret
+                  key: POSTGRES_DB
+            - name: REDIS_HOST
+              value: pulse-redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: GEMINI_MODEL
+              value: gemini-2.0-flash-lite
+            - name: DEBEZIUM_URL
+              value: http://pulse-debezium:8083
+            - name: SPARK_MASTER_URL
+              value: spark://pulse-spark-master:7077
+            # See the matching comment in pulse-airflow-webserver.
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: PIPELINE_PYTHON_IMAGE
+              value: haq2682/pulse-python:latest
+            - name: PYTHONPATH
+              value: /opt/airflow/utils:/opt/airflow/config
+            - name: _PIP_ADDITIONAL_REQUIREMENTS
+              value: "minio scipy pandas numpy psycopg2-binary apache-airflow-providers-cncf-kubernetes kubernetes"
+            # See the matching comment in pulse-airflow-webserver.
+            - name: AIRFLOW__METRICS__STATSD_ON
+              value: "True"
+            - name: AIRFLOW__METRICS__STATSD_HOST
+              value: localhost
+            - name: AIRFLOW__METRICS__STATSD_PORT
+              value: "9125"
+            - name: AIRFLOW__METRICS__STATSD_PREFIX
+              value: airflow
+          envFrom:
+            - secretRef:
+                name: pulse-airflow-secret
+            - secretRef:
+                name: pulse-minio-secret
+            - secretRef:
+                name: pulse-api-secret
+          volumeMounts:
+            - name: pulse-airflow-logs
+              mountPath: /opt/airflow/logs
+            - name: pulse-airflow-dags
+              mountPath: /opt/airflow/dags
+            - name: pulse-airflow-plugins
+              mountPath: /opt/airflow/plugins
+            - name: pulse-airflow-config
+              mountPath: /opt/airflow/config
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+        # See the matching sidecar in pulse-airflow-webserver. Scheduler
+        # heartbeat lag and DAG parse time - the highest-value metrics here -
+        # are both emitted by the scheduler process, not the webserver.
+        - name: pulse-statsd-exporter
+          image: prom/statsd-exporter:v0.30.0-distroless
+          ports:
+            - name: statsd-udp
+              containerPort: 9125
+              protocol: UDP
+            - name: metrics
+              containerPort: 9102
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      volumes:
+        - name: pulse-airflow-logs
+          persistentVolumeClaim:
+            claimName: pulse-airflow-logs-pvc
+        - name: pulse-airflow-dags
+          emptyDir: {}
+        - name: pulse-airflow-plugins
+          emptyDir: {}
+        - name: pulse-airflow-config
+          emptyDir: {}
+---
+# ─────────────────────────────────────────────────────────────────────────
+# API (FastAPI)
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-api
+  namespace: production
+  labels:
+    app: pulse-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pulse-api
+  template:
+    metadata:
+      labels:
+        app: pulse-api
+    spec:
+      containers:
+        - name: pulse-api
+          image: pulse-api
+          ports:
+            - containerPort: 8000
+          env:
+            - name: POSTGRES_SERVER
+              value: pulse-postgresql
+            # api/config.py's Settings class has a REQUIRED (no default)
+            # postgres_database_name field - the app fails to start without
+            # this exact env var name (POSTGRES_DB alone, from
+            # pulse-postgresql-secret below, is not enough).
+            - name: POSTGRES_DATABASE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-postgresql-secret
+                  key: POSTGRES_DB
+            - name: MINIO_ENDPOINT
+              value: pulse-minio:9000
+            - name: KAFKA_BOOTSTRAP
+              value: pulse-kafka:9092
+            # api/routers/pipeline.py and api/services/pipeline_service.py
+            # read this (not DEBEZIUM_URL) - without it they fall back to
+            # the docker-compose static IP.
+            - name: KAFKA_CONNECT_URL
+              value: http://pulse-debezium:8083
+            - name: REDIS_HOST
+              value: pulse-redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: SPARK_MASTER_URL
+              value: spark://pulse-spark-master:7077
+            - name: PYSPARK_PYTHON
+              value: python3.10
+            - name: PYSPARK_DRIVER_PYTHON
+              value: python3.10
+            - name: GEMINI_MODEL
+              value: gemini-2.0-flash-lite
+            - name: AIRFLOW_BASE_URL
+              value: http://pulse-airflow-webserver:8080
+            - name: AIRFLOW_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-airflow-secret
+                  key: AIRFLOW_ADMIN_USER
+            - name: AIRFLOW_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-airflow-secret
+                  key: AIRFLOW_ADMIN_PASSWORD
+            - name: AIRFLOW_FERNET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pulse-airflow-secret
+                  key: AIRFLOW_FERNET_KEY
+            # Non-secret companions to the credentials in pulse-api-secret
+            # (SMTP_USER/PASSWORD, GOOGLE_CLIENT_ID/SECRET) - see .env.example.
+            - name: SMTP_HOST
+              value: smtp.gmail.com
+            - name: SMTP_PORT
+              value: "587"
+            - name: FROM_EMAIL
+              value: "Pulse Analytics Engine <no-reply@example.com>"
+            - name: GOOGLE_REDIRECT_URI
+              value: http://CHANGE_ME.example.com/auth/google/callback
+            - name: FRONTEND_URL
+              value: http://CHANGE_ME.example.com
+            - name: SESSION_EXPIRE_MINUTES
+              value: "1440"
+            - name: PASSWORD_RESET_EXPIRE_MINUTES
+              value: "30"
+            - name: ENVIRONMENT
+              value: production
+          envFrom:
+            - secretRef:
+                name: pulse-postgresql-secret
+            - secretRef:
+                name: pulse-minio-secret
+            - secretRef:
+                name: pulse-api-secret
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Frontend (static SPA image, no API/upload proxying - see pulse-nginx below
+# for the gateway that does same-origin /api and /upload proxying)
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-frontend
+  namespace: production
+  labels:
+    app: pulse-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pulse-frontend
+  template:
+    metadata:
+      labels:
+        app: pulse-frontend
+    spec:
+      containers:
+        - name: pulse-frontend
+          image: pulse-frontend
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Nginx gateway - serves the SPA and proxies /api (incl. WebSocket upgrades)
+# and /upload same-origin. TLS is not terminated here; see nginx/nginx.conf
+# and nginx/conf.d/upload.conf - it only ever listens on port 80. TLS
+# termination is expected to happen at the Ingress once one is added.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-nginx
+  namespace: production
+  labels:
+    app: pulse-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pulse-nginx
+  template:
+    metadata:
+      labels:
+        app: pulse-nginx
+    spec:
+      containers:
+        - name: pulse-nginx
+          image: pulse-nginx
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20
+        # Sidecar exporter - scrapes nginx's built-in stub_status module over
+        # localhost (see nginx/conf.d/upload.conf's /stub_status location,
+        # restricted to 127.0.0.1 only) and re-exposes it for Prometheus.
+        - name: pulse-nginx-exporter
+          image: nginx/nginx-prometheus-exporter:1.5.1
+          args:
+            - --nginx.scrape-uri=http://localhost/stub_status
+          ports:
+            - name: metrics
+              containerPort: 9113
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi

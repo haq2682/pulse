@@ -10,3 +10,18 @@
 start/
 .gitignore
 */**/*.ipynb
+
+# Secrets — never ship in a build context
+.env
+**/.env
+nginx/ssl/
+*.pem
+
+# Infrastructure / local tooling
+terraform/
+*.tfstate
+*.tfstate.*
+.ansible/
+
+# Node build artifacts
+**/node_modules

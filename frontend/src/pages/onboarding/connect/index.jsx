@@ -17,8 +17,7 @@ import usePageTitle from '@/hooks/usePageTitle';
 
 const CHUNK_SIZE = 5 * 1024 * 1024;
 const MAPPING_STATUS_POLL_INTERVAL = 3000; // 3 seconds
-// const NIFI_UPLOAD_URL = import.meta.env.VITE_NIFI_UPLOAD_URL || 'http://10.5.0.12:8082/upload';
-const NIFI_UPLOAD_URL = 'http://localhost:8082/upload';
+const NIFI_UPLOAD_URL = import.meta.env.VITE_NIFI_UPLOAD_URL || '/upload';
 
 const Connect = () => {
     usePageTitle('Onboarding - Connect');

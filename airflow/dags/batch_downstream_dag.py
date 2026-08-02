@@ -19,6 +19,13 @@ The batch pipeline is entirely user-driven: the user uploads files, reviews
 the mapping results, optionally fixes missing columns, then kicks off the
 rest of the pipeline.  A schedule would be meaningless here.
 
+ML forecasting/prediction is temporarily disabled project-wide
+-----------------------------------------------------------------
+The ml_train / ml_infer / trigger_drift_check steps below are commented out,
+not deleted — see the matching note in ml_retrain_dag.py. The general/
+specific model background in the section below still describes the intended
+design for when ML is re-enabled.
+
 General vs Specific ML Models
 ------------------------------
 General models are pre-trained globally across all businesses and their
@@ -32,14 +39,15 @@ After onboarding, specific models are retrained unconditionally on every
 subsequent scheduled_batch run so they always reflect the latest tenant data.
 General models are retrained only when KS-test drift is detected (ml_retrain DAG).
 
-Flow (fully sequential — no parallel branches)
-----------------------------------------------
-  clean
-    → transform
-    → analyze
-    → ml_train        (trains specific models for this business bucket)
-    → ml_infer        (general inference uses global models; specific uses trained above)
-    → trigger_drift_check   (fires ml_retrain DAG asynchronously)
+Flow
+----
+  clean → transform → analyze
+  (ml_train → ml_infer → trigger_drift_check when ML is re-enabled)
+
+Each step runs in its own Kubernetes Pod via KubernetesPodOperator (the
+pulse-python image, RBAC via the pulse-airflow ServiceAccount — see
+rbac.yaml) rather than a Docker container, so there's no docker.sock
+dependency. See docs/CLOUD_DEPLOYMENT_GUIDE.md for the history.
 
 Crash / retry
 -------------
@@ -61,17 +69,20 @@ from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.models import Variable
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator
-from airflow.providers.docker.operators.docker import DockerOperator
+# Only used by trigger_drift_check, which is commented out along with ML.
+# from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from config.pipeline_config import (
     DEFAULT_BUCKET,
     DEFAULT_TASK_ARGS,
+    POD_NAMESPACE,
     PYTHON_IMAGE,
-    SPARK_NETWORK,
-    docker_pipeline_env,
-    docker_app_mounts,
+    TASK_POD_LABELS,
+    TASK_POD_RESOURCES,
+    TASK_SERVICE_ACCOUNT,
+    k8s_pipeline_env,
 )
 
 BUCKET = Variable.get("default_bucket", default_var=DEFAULT_BUCKET)
@@ -88,6 +99,21 @@ _task_defaults = dict(
     email_on_retry=DEFAULT_TASK_ARGS["email_on_retry"],
 )
 
+# Shared kwargs every KubernetesPodOperator task below needs - defined once
+# so each task only has to specify what's different about it (name, script,
+# args).
+_pod_task_defaults = dict(
+    namespace=POD_NAMESPACE,
+    image=PYTHON_IMAGE,
+    env_vars=k8s_pipeline_env(),
+    service_account_name=TASK_SERVICE_ACCOUNT,
+    labels=TASK_POD_LABELS,
+    container_resources=TASK_POD_RESOURCES(),
+    in_cluster=True,
+    get_logs=True,
+    is_delete_operator_pod=True,   # clean up the pod once the task finishes
+    **_task_defaults,
+)
 
 
 with DAG(
@@ -107,100 +133,95 @@ with DAG(
 ) as dag:
 
     # ── 1. Clean ───────────────────────────────────────────────────────────
-    clean = DockerOperator(
+    clean = KubernetesPodOperator(
         task_id="clean",
-        image=PYTHON_IMAGE,
-        command=[
-            "python3", "/app/cleaning/cleaning.py",
+        name="pulse-batch-clean",
+        cmds=["python3", "/app/cleaning/cleaning.py"],
+        arguments=[
             "--bucket-name", "{{ dag_run.conf.get('bucket') or params.bucket }}",
         ],
-        environment=docker_pipeline_env(),
-        network_mode=SPARK_NETWORK,
-        mounts=docker_app_mounts(),
-        auto_remove="force",
-        do_xcom_push=False,
-        mount_tmp_dir=False,
+        **_pod_task_defaults,
     )
 
     # ── 2. Transform ───────────────────────────────────────────────────────
-    transform = DockerOperator(
+    transform = KubernetesPodOperator(
         task_id="transform",
-        image=PYTHON_IMAGE,
-        command=[
-            "python3", "/app/transformation/transformation.py",
+        name="pulse-batch-transform",
+        cmds=["python3", "/app/transformation/transformation.py"],
+        arguments=[
             "--bucket-name", "{{ dag_run.conf.get('bucket') or params.bucket }}",
         ],
-        environment=docker_pipeline_env(),
-        network_mode=SPARK_NETWORK,
-        mounts=docker_app_mounts(),
-        auto_remove="force",
-        do_xcom_push=False,
-        mount_tmp_dir=False,
+        **_pod_task_defaults,
     )
 
     # ── 3. Analyze ─────────────────────────────────────────────────────────
-    analyze = DockerOperator(
+    analyze = KubernetesPodOperator(
         task_id="analyze",
-        image=PYTHON_IMAGE,
-        command=[
-            "python3", "/app/analysis/analysis.py",
+        name="pulse-batch-analyze",
+        cmds=["python3", "/app/analysis/analysis.py"],
+        arguments=[
             "--bucket-name", "{{ dag_run.conf.get('bucket') or params.bucket }}",
         ],
-        environment=docker_pipeline_env(),
-        network_mode=SPARK_NETWORK,
-        mounts=docker_app_mounts(),
-        auto_remove="force",
-        do_xcom_push=False,
-        mount_tmp_dir=False,
+        **_pod_task_defaults,
     )
 
     # ── 4. Train specific ML models for this business bucket ──────────────
+    # ML forecasting/prediction is temporarily disabled project-wide — see
+    # the matching note in ml_retrain_dag.py. Commented out, not deleted;
+    # nothing else in this DAG references these tasks. Left in the older
+    # DockerOperator form on purpose — no point migrating operator syntax
+    # for code that isn't running; convert it the same way as clean/
+    # transform/analyze above when ML is re-enabled.
     # General models are pre-trained globally (pulse-bucket-1) and require no
     # per-business training.  Specific models are per-business and must be
     # trained once on this business's own cleaned data before inference runs.
-    ml_train = DockerOperator(
-        task_id="ml_train",
-        image=PYTHON_IMAGE,
-        command=[
-            "python3", "/app/machine-learning/specific/train.py",
-            "--bucket-name", "{{ dag_run.conf.get('bucket') or params.bucket }}",
-        ],
-        environment=docker_pipeline_env(),
-        network_mode=SPARK_NETWORK,
-        mounts=docker_app_mounts(),
-        auto_remove="force",
-        do_xcom_push=False,
-        mount_tmp_dir=False,
-        execution_timeout=timedelta(hours=2),
-    )
+    # ml_train = DockerOperator(
+    #     task_id="ml_train",
+    #     image=PYTHON_IMAGE,
+    #     command=[
+    #         "python3", "/app/machine-learning/specific/train.py",
+    #         "--bucket-name", "{{ dag_run.conf.get('bucket') or params.bucket }}",
+    #     ],
+    #     environment=docker_pipeline_env(),
+    #     network_mode=SPARK_NETWORK,
+    #     mounts=docker_app_mounts(),
+    #     auto_remove="force",
+    #     do_xcom_push=False,
+    #     mount_tmp_dir=False,
+    #     execution_timeout=timedelta(hours=2),
+    # )
 
     # ── 5. ML Inference ────────────────────────────────────────────────────
     # Runs infer_all.py (general + specific models).
     # General models load from pulse-bucket-1 (global); specific models load
     # from this business bucket (guaranteed trained by the previous step).
-    ml_infer = DockerOperator(
-        task_id="ml_infer",
-        image=PYTHON_IMAGE,
-        command=[
-            "python3", "/app/machine-learning/infer_all.py",
-            "--bucket-name", "{{ dag_run.conf.get('bucket') or params.bucket }}",
-        ],
-        environment=docker_pipeline_env(),
-        network_mode=SPARK_NETWORK,
-        mounts=docker_app_mounts(),
-        auto_remove="force",
-        do_xcom_push=False,
-        mount_tmp_dir=False,
-    )
+    # ml_infer = DockerOperator(
+    #     task_id="ml_infer",
+    #     image=PYTHON_IMAGE,
+    #     command=[
+    #         "python3", "/app/machine-learning/infer_all.py",
+    #         "--bucket-name", "{{ dag_run.conf.get('bucket') or params.bucket }}",
+    #     ],
+    #     environment=docker_pipeline_env(),
+    #     network_mode=SPARK_NETWORK,
+    #     mounts=docker_app_mounts(),
+    #     auto_remove="force",
+    #     do_xcom_push=False,
+    #     mount_tmp_dir=False,
+    # )
 
     # ── 6. Trigger KS drift check + conditional retraining ────────────────
-    # Runs asynchronously so this DAG completes immediately after firing.
-    trigger_drift_check = TriggerDagRunOperator(
-        task_id="trigger_drift_check",
-        trigger_dag_id="ml_retrain",
-        conf={"bucket": "{{ dag_run.conf.get('bucket') or params.bucket }}", "source_dag": "batch_downstream"},
-        wait_for_completion=False,
-    )
+    # Disabled along with the rest of ML — there is nothing to retrain while
+    # ml_retrain_dag.py is fully commented out, and firing it would just
+    # trigger a DAG with no active tasks.
+    # trigger_drift_check = TriggerDagRunOperator(
+    #     task_id="trigger_drift_check",
+    #     trigger_dag_id="ml_retrain",
+    #     conf={"bucket": "{{ dag_run.conf.get('bucket') or params.bucket }}", "source_dag": "batch_downstream"},
+    #     wait_for_completion=False,
+    # )
 
     # ── Sequential dependencies (no parallel branches) ────────────────────
-    clean >> transform >> analyze >> ml_train >> ml_infer >> trigger_drift_check
+    # Full chain when ML is re-enabled:
+    #   clean >> transform >> analyze >> ml_train >> ml_infer >> trigger_drift_check
+    clean >> transform >> analyze

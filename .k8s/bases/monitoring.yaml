@@ -1,0 +1,548 @@
+# Prometheus monitoring wiring for every service in deployment.yaml that now
+# exposes metrics (native endpoints, JMX javaagents, sidecar exporters, or
+# app-level instrumentation - see the comments next to each in
+# deployment.yaml and svc.yaml).
+#
+# This file does NOT install Prometheus/Grafana themselves - only the
+# `monitoring.coreos.com/v1` ServiceMonitor CRD is expected to already exist
+# in-cluster (installed by the Prometheus Operator, typically via the
+# kube-prometheus-stack Helm chart). ServiceMonitor objects sit inert with
+# no effect until a Prometheus instance is actually running and configured
+# to pick them up - see the label note below.
+#
+# All ServiceMonitors live in the `monitoring` namespace (a ServiceMonitor
+# can watch Services in a different namespace than its own - that's what
+# `namespaceSelector` below is for) and each one targets `production` via
+# `namespaceSelector.matchNames`, matching every other object in this repo.
+#
+# IMPORTANT for whoever installs kube-prometheus-stack later: by default its
+# Prometheus CR only picks up ServiceMonitors carrying a `release: <chart
+# release name>` label (Helm value `prometheus.prometheusSpec.
+# serviceMonitorSelectorNilUsesHelmValues`, true by default). Either set that
+# Helm value to `false` (so Prometheus watches every ServiceMonitor
+# cluster-wide, regardless of labels - simplest for a single-cluster,
+# single-team setup like this one), or add a matching `release:` label to
+# every object below. Not decided here since it depends on how
+# kube-prometheus-stack ends up being installed.
+#
+# Docs: https://prometheus-operator.dev/docs/getting-started/design/#servicemonitor
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+---
+# ─────────────────────────────────────────────────────────────────────────
+# JMX exporter configs - mounted into pulse-zookeeper/pulse-kafka/
+# pulse-debezium via the pulse-jmx-exporter-config volume in deployment.yaml.
+# These MUST live in the `production` namespace (the same namespace as the
+# pods that mount them - ConfigMap volume mounts cannot cross namespaces),
+# which is why they carry `namespace: production` here despite being
+# conceptually part of "the monitoring system". Everything else in this file
+# is genuinely cluster-scoped or lives in `monitoring` on purpose.
+#
+# Content is copied verbatim from the upstream prometheus/jmx_exporter
+# example configs (kafka-2_0_0.yml, kafka-connect.yml, zookeeper.yaml) -
+# these are the standard, maintained MBean-to-metric mapping rules for each
+# JVM, not something written from scratch here.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pulse-jmx-exporter-zookeeper-config
+  namespace: production
+  labels:
+    app: pulse-zookeeper
+data:
+  zookeeper.yml: |
+    rules:
+      # replicated Zookeeper
+      - pattern: "org.apache.ZooKeeperService<name0=ReplicatedServer_id(\\d+)><>(\\w+)"
+        name: "zookeeper_$2"
+        type: GAUGE
+      - pattern: "org.apache.ZooKeeperService<name0=ReplicatedServer_id(\\d+), name1=replica.(\\d+)><>(\\w+)"
+        name: "zookeeper_$3"
+        type: GAUGE
+        labels:
+          replicaId: "$2"
+      - pattern: "org.apache.ZooKeeperService<name0=ReplicatedServer_id(\\d+), name1=replica.(\\d+), name2=(\\w+)><>(Packets\\w+)"
+        name: "zookeeper_$4"
+        type: COUNTER
+        labels:
+          replicaId: "$2"
+          memberType: "$3"
+      - pattern: "org.apache.ZooKeeperService<name0=ReplicatedServer_id(\\d+), name1=replica.(\\d+), name2=(\\w+)><>(\\w+)"
+        name: "zookeeper_$4"
+        type: GAUGE
+        labels:
+          replicaId: "$2"
+          memberType: "$3"
+      - pattern: "org.apache.ZooKeeperService<name0=ReplicatedServer_id(\\d+), name1=replica.(\\d+), name2=(\\w+), name3=(\\w+)><>(\\w+)"
+        name: "zookeeper_$4_$5"
+        type: GAUGE
+        labels:
+          replicaId: "$2"
+          memberType: "$3"
+      # standalone Zookeeper
+      - pattern: "org.apache.ZooKeeperService<name0=StandaloneServer_port(\\d+)><>(\\w+)"
+        type: GAUGE
+        name: "zookeeper_$2"
+      - pattern: "org.apache.ZooKeeperService<name0=StandaloneServer_port(\\d+), name1=InMemoryDataTree><>(\\w+)"
+        type: GAUGE
+        name: "zookeeper_$2"
+      - pattern: "org.apache.ZooKeeperService<name0=StandaloneServer_port(\\d+), name1=(\\w+)><>(\\w+)"
+        type: GAUGE
+        name: "zookeeper_$2_$3"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pulse-jmx-exporter-kafka-config
+  namespace: production
+  labels:
+    app: pulse-kafka
+data:
+  kafka.yml: |
+    lowercaseOutputName: true
+    rules:
+    # Special cases and very specific rules
+    - pattern : kafka.server<type=(.+), name=(.+), clientId=(.+), topic=(.+), partition=(.*)><>Value
+      name: kafka_server_$1_$2
+      type: GAUGE
+      labels:
+        clientId: "$3"
+        topic: "$4"
+        partition: "$5"
+    - pattern : kafka.server<type=(.+), name=(.+), clientId=(.+), brokerHost=(.+), brokerPort=(.+)><>Value
+      name: kafka_server_$1_$2
+      type: GAUGE
+      labels:
+        clientId: "$3"
+        broker: "$4:$5"
+    - pattern : kafka.server<type=(.+), cipher=(.+), protocol=(.+), listener=(.+), networkProcessor=(.+)><>connections
+      name: kafka_server_$1_connections_tls_info
+      type: GAUGE
+      labels:
+        cipher: "$2"
+        protocol: "$3"
+        listener: "$4"
+        networkProcessor: "$5"
+    - pattern : kafka.server<type=(.+), clientSoftwareName=(.+), clientSoftwareVersion=(.+), listener=(.+), networkProcessor=(.+)><>connections
+      name: kafka_server_$1_connections_software
+      type: GAUGE
+      labels:
+        clientSoftwareName: "$2"
+        clientSoftwareVersion: "$3"
+        listener: "$4"
+        networkProcessor: "$5"
+    - pattern: kafka.server<type=(.+), listener=(.+), networkProcessor=(.+)><>(.+):
+      name: kafka_server_$1_$4
+      type: GAUGE
+      labels:
+        listener: "$2"
+        networkProcessor: "$3"
+    - pattern: kafka.server<type=(.+), listener=(.+), networkProcessor=(.+)><>(.+)
+      name: kafka_server_$1_$4
+      type: GAUGE
+      labels:
+        listener: "$2"
+        networkProcessor: "$3"
+    # Generic per-second counters with 0-2 key/value pairs
+    - pattern: kafka.(\w+)<type=(.+), name=(.+)PerSec\w*, (\w+)=(.+), (\w+)=(.+)><>Count
+      name: kafka_$1_$2_$3_total
+      type: COUNTER
+      labels:
+        "$4": "$5"
+        "$6": "$7"
+    - pattern: kafka.(\w+)<type=(.+), name=(.+)PerSec\w*, (\w+)=(.+)><>Count
+      name: kafka_$1_$2_$3_total
+      type: COUNTER
+      labels:
+        "$4": "$5"
+    - pattern: kafka.(\w+)<type=(.+), name=(.+)PerSec\w*><>Count
+      name: kafka_$1_$2_$3_total
+      type: COUNTER
+    # Generic gauges with 0-2 key/value pairs
+    - pattern: kafka.(\w+)<type=(.+), name=(.+), (\w+)=(.+), (\w+)=(.+)><>Value
+      name: kafka_$1_$2_$3
+      type: GAUGE
+      labels:
+        "$4": "$5"
+        "$6": "$7"
+    - pattern: kafka.(\w+)<type=(.+), name=(.+), (\w+)=(.+)><>Value
+      name: kafka_$1_$2_$3
+      type: GAUGE
+      labels:
+        "$4": "$5"
+    - pattern: kafka.(\w+)<type=(.+), name=(.+)><>Value
+      name: kafka_$1_$2_$3
+      type: GAUGE
+    # Emulate Kafka Connect JMX metrics for consumer/producer, e.g.
+    # kafka.consumer:type=consumer-fetch-manager-metrics,partition="0",topic="foo",client-id="consumer-1"
+    - pattern: kafka.(producer|consumer)<type=(.+), client-id=(.+)><>(.+-total|.+-avg|.+-rate|.+-count)
+      name: kafka_$1_$2_$4
+      type: GAUGE
+      labels:
+        clientId: "$3"
+    - pattern: kafka.(producer|consumer)<type=(.+), client-id=(.+), topic=(.+)><>(.+-total|.+-avg|.+-rate|.+-count)
+      name: kafka_$1_$2_$5
+      type: GAUGE
+      labels:
+        clientId: "$3"
+        topic: "$4"
+    - pattern: kafka.(producer|consumer)<type=(.+), client-id=(.+), topic=(.+), partition=(.+)><>(.+-total|.+-avg|.+-rate|.+-count)
+      name: kafka_$1_$2_$6
+      type: GAUGE
+      labels:
+        clientId: "$3"
+        topic: "$4"
+        partition: "$5"
+    # Consumer group lag - the highest-value metric in this file
+    - pattern: kafka.consumer<type=consumer-fetch-manager-metrics, client-id=(.+), topic=(.+), partition=(.+)><>records-lag
+      name: kafka_consumer_fetch_manager_records_lag
+      type: GAUGE
+      labels:
+        clientId: "$1"
+        topic: "$2"
+        partition: "$3"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pulse-jmx-exporter-kafka-connect-config
+  namespace: production
+  labels:
+    app: pulse-debezium
+data:
+  kafka-connect.yml: |
+    lowercaseOutputName: true
+    rules:
+      # kafka.connect:type=app-info,client-id="{clientid}"
+      # kafka.consumer:type=app-info,client-id="{clientid}"
+      # kafka.producer:type=app-info,client-id="{clientid}"
+      - pattern: 'kafka.(.+)<type=app-info, client-id=(.+)><>start-time-ms'
+        name: kafka_$1_start_time_seconds
+        labels:
+          clientId: "$2"
+        help: "Kafka $1 JMX metric start time seconds"
+        type: GAUGE
+        valueFactor: 0.001
+      - pattern: 'kafka.(.+)<type=app-info, client-id=(.+)><>(commit-id|version): (.+)'
+        name: kafka_$1_$3_info
+        value: 1
+        labels:
+          clientId: "$2"
+          $3: "$4"
+        help: "Kafka $1 JMX metric info version and commit-id"
+        type: GAUGE
+      # Connect worker/connector/task status - the highest-value metrics
+      # here: a failed or stuck connector fails silently otherwise.
+      - pattern: kafka.connect<type=connector-metrics, connector=(.+)><>connector-class
+        name: kafka_connect_connector_class
+        labels:
+          connector: "$1"
+        type: GAUGE
+      - pattern: kafka.connect<type=connect-worker-metrics><>(connector-count|task-count|connector-startup-attempts-total|connector-startup-failure-total|connector-startup-success-total)
+        name: kafka_connect_worker_$1
+        type: GAUGE
+      - pattern: kafka.connect<type=connector-task-metrics, connector=(.+), task=(.+)><>status
+        name: kafka_connect_connector_task_status
+        labels:
+          connector: "$1"
+          task: "$2"
+        type: GAUGE
+      - pattern: kafka.connect<type=connector-task-metrics, connector=(.+), task=(.+)><>(running-ratio|pause-ratio|offset-commit-success-percentage|offset-commit-failure-percentage)
+        name: kafka_connect_connector_task_$3
+        labels:
+          connector: "$1"
+          task: "$2"
+        type: GAUGE
+      - pattern: kafka.connect<type=source-task-metrics, connector=(.+), task=(.+)><>(source-record-poll-total|source-record-write-total|source-record-active-count)
+        name: kafka_connect_source_task_$3
+        labels:
+          connector: "$1"
+          task: "$2"
+        type: GAUGE
+      - pattern: kafka.connect<type=sink-task-metrics, connector=(.+), task=(.+)><>(sink-record-read-total|sink-record-send-total|sink-record-lag-max|offset-commit-completion-total)
+        name: kafka_connect_sink_task_$3
+        labels:
+          connector: "$1"
+          task: "$2"
+        type: GAUGE
+      # Generic fallback for anything else under kafka.connect
+      - pattern: kafka.connect<type=(.+), connector=(.+), task=(.+)><>(.+-total|.+-avg|.+-rate|.+-count|.+-max|.+-min)
+        name: kafka_connect_$1_$4
+        labels:
+          connector: "$2"
+          task: "$3"
+        type: GAUGE
+      - pattern: kafka.connect<type=(.+), connector=(.+)><>(.+-total|.+-avg|.+-rate|.+-count|.+-max|.+-min)
+        name: kafka_connect_$1_$3
+        labels:
+          connector: "$2"
+        type: GAUGE
+---
+# ─────────────────────────────────────────────────────────────────────────
+# ServiceMonitors - one per scraped service, in the `monitoring` namespace,
+# each pointed at `production` via namespaceSelector.
+# ─────────────────────────────────────────────────────────────────────────
+
+# MinIO - native Prometheus endpoints, no exporter needed. Two separate
+# scrape targets: cluster-wide aggregate metrics and per-node metrics.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pulse-minio
+  namespace: monitoring
+  labels:
+    app: pulse-minio
+spec:
+  namespaceSelector:
+    matchNames:
+      - production
+  selector:
+    matchLabels:
+      app: pulse-minio
+  endpoints:
+    - port: s3-api
+      path: /minio/v2/metrics/cluster
+      interval: 30s
+    - port: s3-api
+      path: /minio/v2/metrics/node
+      interval: 30s
+---
+# Spark Master - built-in Prometheus servlet (spark.ui.prometheus.enabled,
+# set via SPARK_MASTER_OPTS in deployment.yaml), scraped off the existing UI
+# port. Path convention per Spark 3.x's metrics servlet - not yet verified
+# against a live scrape on this cluster since no Prometheus instance is
+# running to confirm it end-to-end; if the path is wrong, `kubectl port-
+# forward` to the pod's 8080 and check the master UI's own metrics link.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pulse-spark-master
+  namespace: monitoring
+  labels:
+    app: pulse-spark-master
+spec:
+  namespaceSelector:
+    matchNames:
+      - production
+  selector:
+    matchLabels:
+      app: pulse-spark-master
+  endpoints:
+    - port: ui
+      path: /metrics/master/prometheus/
+      interval: 30s
+---
+# Spark Worker - same servlet, same caveat as pulse-spark-master above.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pulse-spark-worker
+  namespace: monitoring
+  labels:
+    app: pulse-spark-worker
+spec:
+  namespaceSelector:
+    matchNames:
+      - production
+  selector:
+    matchLabels:
+      app: pulse-spark-worker
+  endpoints:
+    - port: ui
+      path: /metrics/worker/prometheus/
+      interval: 30s
+---
+# Zookeeper - JMX exporter javaagent, ensemble health.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pulse-zookeeper
+  namespace: monitoring
+  labels:
+    app: pulse-zookeeper
+spec:
+  namespaceSelector:
+    matchNames:
+      - production
+  selector:
+    matchLabels:
+      app: pulse-zookeeper
+  endpoints:
+    - port: jmx-metrics
+      path: /metrics
+      interval: 30s
+---
+# Kafka - JMX exporter javaagent, broker health + consumer lag.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pulse-kafka
+  namespace: monitoring
+  labels:
+    app: pulse-kafka
+spec:
+  namespaceSelector:
+    matchNames:
+      - production
+  selector:
+    matchLabels:
+      app: pulse-kafka
+  endpoints:
+    - port: jmx-metrics
+      path: /metrics
+      interval: 30s
+---
+# Debezium (Kafka Connect) - JMX exporter javaagent. Highest-value target in
+# this whole file: a stuck/failed CDC connector fails silently (Postgres
+# keeps writing, Kafka just stops receiving) without this.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pulse-debezium
+  namespace: monitoring
+  labels:
+    app: pulse-debezium
+spec:
+  namespaceSelector:
+    matchNames:
+      - production
+  selector:
+    matchLabels:
+      app: pulse-debezium
+  endpoints:
+    - port: jmx-metrics
+      path: /metrics
+      interval: 30s
+---
+# PostgreSQL - postgres_exporter sidecar. Watch replication slot lag
+# specifically (POSTGRESQL_WAL_LEVEL: logical in deployment.yaml exists for
+# Debezium - lag here means the CDC pipeline is falling behind).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pulse-postgresql
+  namespace: monitoring
+  labels:
+    app: pulse-postgresql
+spec:
+  namespaceSelector:
+    matchNames:
+      - production
+  selector:
+    matchLabels:
+      app: pulse-postgresql
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+---
+# Redis - redis_exporter sidecar. Shared between app caching and Airflow's
+# webserver rate limiter, so a stall degrades both in non-obvious ways.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pulse-redis
+  namespace: monitoring
+  labels:
+    app: pulse-redis
+spec:
+  namespaceSelector:
+    matchNames:
+      - production
+  selector:
+    matchLabels:
+      app: pulse-redis
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+---
+# Nginx - nginx-prometheus-exporter sidecar off stub_status. This is the
+# edge gateway, so RED metrics (rate/errors/duration) here matter more than
+# almost anywhere else in the stack.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pulse-nginx
+  namespace: monitoring
+  labels:
+    app: pulse-nginx
+spec:
+  namespaceSelector:
+    matchNames:
+      - production
+  selector:
+    matchLabels:
+      app: pulse-nginx
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+---
+# API - prometheus-fastapi-instrumentator, exposed at /metrics on the app's
+# own port (see api/main.py). Primary user-facing surface, worth per-route
+# latency/error breakdown.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pulse-api
+  namespace: monitoring
+  labels:
+    app: pulse-api
+spec:
+  namespaceSelector:
+    matchNames:
+      - production
+  selector:
+    matchLabels:
+      app: pulse-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+---
+# Airflow Webserver - statsd-exporter sidecar. Bridges Airflow's native
+# StatsD metrics to Prometheus.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pulse-airflow-webserver
+  namespace: monitoring
+  labels:
+    app: pulse-airflow-webserver
+spec:
+  namespaceSelector:
+    matchNames:
+      - production
+  selector:
+    matchLabels:
+      app: pulse-airflow-webserver
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+---
+# Airflow Scheduler - same statsd-exporter pattern. Scheduler heartbeat lag
+# and DAG parse time - the metrics you'd actually alert on - are both
+# emitted by the scheduler process, not the webserver.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pulse-airflow-scheduler
+  namespace: monitoring
+  labels:
+    app: pulse-airflow-scheduler
+spec:
+  namespaceSelector:
+    matchNames:
+      - production
+  selector:
+    matchLabels:
+      app: pulse-airflow-scheduler
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s

@@ -1,0 +1,19 @@
+# One StorageClass for the whole project. Every PVC in pvc.yaml requests
+# storage by naming this class, so there is a single place to change if the
+# underlying provisioner ever changes (e.g. moving off minikube later).
+#
+# minikube ships its own dynamic provisioner (the "storage-provisioner"
+# addon, enabled by default) that watches for PVCs requesting this exact
+# provisioner name and creates a hostPath-backed PersistentVolume for each
+# one automatically - no manual PersistentVolume objects needed.
+#
+# Docs: https://kubernetes.io/docs/concepts/storage/storage-classes/
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: pulse-storage
+  labels:
+    app: pulse-storage
+provisioner: k8s.io/minikube-hostpath
+reclaimPolicy: Delete
+volumeBindingMode: Immediate

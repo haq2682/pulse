@@ -3,19 +3,12 @@ services:
     build:
       context: .
       dockerfile: .docker/frontend/Dockerfile
+      # Vite inlines VITE_* at build time (runtime env is ignored).
+      # Dev default: frontend talks to the API/upload gateway directly.
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+        VITE_NIFI_UPLOAD_URL: ${VITE_NIFI_UPLOAD_URL:-http://localhost:8082/upload}
     container_name: frontend
-    env_file:
-      - .env
-    environment:
-      - VITE_POSTGRES_USER=${POSTGRES_USER}
-      - VITE_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - VITE_POSTGRES_DB=${POSTGRES_DATABASE_NAME}
-      - VITE_POSTGRES_SERVER=${POSTGRES_SERVER}
-      - VITE_MINIO_ENDPOINT=${MINIO_ENDPOINT}
-      - VITE_MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
-      - VITE_MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
-      - VITE_KAFKA_BOOTSTRAP=${KAFKA_BOOTSTRAP_EXTERNAL}
-      - VITE_API_URL=${VITE_API_URL}
     ports:
       - "5173:80"
     networks:
@@ -55,9 +48,9 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_MODEL=${GEMINI_MODEL}
       - AIRFLOW_BASE_URL=${AIRFLOW_BASE_URL:-http://10.5.0.17:8080}
-      - AIRFLOW_FERNET_KEY=${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLt0jJgrg=}
-      - AIRFLOW_USERNAME=${AIRFLOW_ADMIN_USER:-admin}
-      - AIRFLOW_PASSWORD=${AIRFLOW_ADMIN_PASSWORD:-admin}
+      - AIRFLOW_FERNET_KEY=${AIRFLOW_FERNET_KEY}
+      - AIRFLOW_USERNAME=${AIRFLOW_ADMIN_USER}
+      - AIRFLOW_PASSWORD=${AIRFLOW_ADMIN_PASSWORD}
     depends_on:
       - postgresql
       - python
@@ -455,7 +448,7 @@ services:
       - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
-      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-pulse_secret_key_change_me}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY}
       - _PIP_ADDITIONAL_REQUIREMENTS=minio scipy pandas numpy psycopg2-binary
     volumes:
       - ./airflow/dags:/opt/airflow/dags
@@ -495,8 +488,8 @@ services:
       - AIRFLOW__WEBSERVER__RATE_LIMIT_STORAGE_URL=redis://10.5.0.11:6379/0
       - AIRFLOW__WEBSERVER__RATE_LIMIT_ENABLED=True
       - AIRFLOW__WEBSERVER__RATE_LIMIT_DEFAULT=200 per day;50 per hour
-      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLt0jJgrg=}
-      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-pulse_secret_key_change_me}
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY}
       - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
       - AIRFLOW__CORE__PLUGINS_FOLDER=/opt/airflow/plugins
       - AIRFLOW__LOGGING__BASE_LOG_FOLDER=/opt/airflow/logs
@@ -548,8 +541,8 @@ services:
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.5.0.5:5432/airflow
-      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLt0jJgrg=}
-      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-pulse_secret_key_change_me}
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY}
       - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
       - AIRFLOW__CORE__PLUGINS_FOLDER=/opt/airflow/plugins
       - AIRFLOW__LOGGING__BASE_LOG_FOLDER=/opt/airflow/logs

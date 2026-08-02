@@ -3,32 +3,47 @@ Central configuration for all Airflow pipeline DAGs.
 
 All environment-dependent values default to what is defined in docker-compose.yml.
 Override at runtime via Airflow Variables (Admin → Variables in the UI) or env vars.
+
+Task execution: Kubernetes, not Docker
+---------------------------------------
+Pipeline steps run as their own Kubernetes Pods (via KubernetesPodOperator,
+or via run_k8s_task_pod() below for call sites that need to run several
+steps in sequence from inside one Python task), using the pulse-python
+image with cleaning/mapping/transformation/analysis/machine-learning
+already baked in at build time - see .docker/python/Dockerfile. There is
+no host bind mount and no docker.sock dependency: this replaced an earlier
+DockerOperator/exec_run()-based design that needed both (see
+docs/CLOUD_DEPLOYMENT_GUIDE.md for the history).
 """
 
 import os
 
 # ---------------------------------------------------------------------------
-# Docker container name that runs PySpark / pipeline scripts
+# Task pod image
 # ---------------------------------------------------------------------------
-PYTHON_CONTAINER = os.getenv("PIPELINE_PYTHON_CONTAINER", "python")
+PYTHON_IMAGE = os.getenv(
+    "PIPELINE_PYTHON_IMAGE", "haq2682/pulse-python:latest"
+)
 
-# Docker image and network used by DockerOperator tasks.
-# These must match what is defined in docker-compose.yml.
-PYTHON_IMAGE  = os.getenv("PIPELINE_PYTHON_IMAGE",  "python-py310")
-SPARK_NETWORK = os.getenv("PIPELINE_SPARK_NETWORK",  "spark-network")
+# ---------------------------------------------------------------------------
+# Where task pods get created
+# ---------------------------------------------------------------------------
+# The namespace Airflow itself is running in, injected via the Kubernetes
+# Downward API (POD_NAMESPACE env var on pulse-airflow-webserver/scheduler -
+# see deployment.yaml). Task pods are created in the same namespace so they
+# can reach every other pulse-* service the same way Airflow itself does.
+POD_NAMESPACE = os.getenv("POD_NAMESPACE", "default")
 
-# Absolute HOST path to the Pulse workspace root.  DockerOperator bind-mounts
-# these directories so each spawned container sees the same live code and JARs
-# as the long-running `python` docker-compose service.
-# MUST be set via the PULSE_APP_HOST_PATH environment variable in docker-compose.
-_app_host_path_raw = os.getenv("PULSE_APP_HOST_PATH", "")
-if not _app_host_path_raw:
-    raise EnvironmentError(
-        "PULSE_APP_HOST_PATH environment variable is not set. "
-        "Add it to the Airflow scheduler/webserver environment in docker-compose.yml "
-        "(e.g. PULSE_APP_HOST_PATH=/path/to/pulse)."
-    )
-APP_HOST_PATH = _app_host_path_raw
+# The ServiceAccount task pods run as - see .k8s/bases/rbac.yaml. Pods
+# themselves don't need any Kubernetes API permissions (they just run a
+# script); this is a plain, unprivileged default identity for them.
+TASK_SERVICE_ACCOUNT = "pulse-airflow"
+
+# Labels applied to spawned pods - also what the matching NetworkPolicy
+# entries in .k8s/bases/networkpolicy.yaml select on.
+TASK_POD_LABELS       = {"app": "pulse-task"}
+DB_STREAM_POD_LABELS  = {"app": "pulse-db-stream"}
+API_STREAM_POD_LABELS = {"app": "pulse-api-stream"}
 
 # ---------------------------------------------------------------------------
 # MinIO
@@ -345,14 +360,16 @@ SPECIFIC_MODELS = [
 
 
 # ---------------------------------------------------------------------------
-# DockerOperator helpers
+# Kubernetes task pod helpers
 # ---------------------------------------------------------------------------
 
-def docker_pipeline_env() -> dict:
+def k8s_pipeline_env() -> dict:
     """
-    Return the environment dict forwarded into every DockerOperator container.
+    Return the environment dict forwarded into every task pod (KubernetesPodOperator's
+    env_vars accepts a plain dict, and run_k8s_task_pod() below uses this too).
     Values are read from the Airflow scheduler's own environment at task-run
-    time, so they stay in sync with whatever is in docker-compose / .env.
+    time, so they stay in sync with whatever is configured on
+    pulse-airflow-webserver/scheduler in deployment.yaml.
     """
     import os as _os
     return {
@@ -369,35 +386,101 @@ def docker_pipeline_env() -> dict:
         "REDIS_PORT":        str(REDIS_PORT),
         "GEMINI_API_KEY":    _os.getenv("GEMINI_API_KEY", ""),
         "GEMINI_MODEL":      _os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite"),
-        "SPARK_MASTER_URL":  _os.getenv("SPARK_MASTER_URL", "spark://10.5.0.3:7077"),
-        "SPARK_SERVER":      _os.getenv("SPARK_MASTER_URL", "spark://10.5.0.3:7077"),
+        "SPARK_MASTER_URL":  _os.getenv("SPARK_MASTER_URL", "spark://pulse-spark-master:7077"),
+        "SPARK_SERVER":      _os.getenv("SPARK_MASTER_URL", "spark://pulse-spark-master:7077"),
     }
 
 
-def docker_app_mounts() -> list:
-    """
-    Return a list of docker.types.Mount objects that replicate the bind-mounts
-    defined for the `python` docker-compose service.  Every DockerOperator
-    container therefore sees the same live code and JAR files without needing
-    a full image rebuild whenever a script changes.
+def _resource_requirements(cpu_request, mem_request, cpu_limit, mem_limit):
+    """Small wrapper so call sites below read as plain numbers/strings."""
+    from kubernetes.client import V1ResourceRequirements
+    return V1ResourceRequirements(
+        requests={"cpu": cpu_request, "memory": mem_request},
+        limits={"cpu": cpu_limit, "memory": mem_limit},
+    )
 
-    Source paths are resolved relative to APP_HOST_PATH, which must be set to
-    the absolute path of the Pulse workspace root ON THE HOST machine (i.e.
-    the PULSE_APP_HOST_PATH env var injected into the Airflow containers).
+
+# Bounded, short-lived steps (clean/transform/analyze/connector-deploy/etc).
+# Kept modest given this project's minikube target - see hpa.yaml's sizing
+# comment about this being a 4-core/16GB machine.
+def TASK_POD_RESOURCES():
+    return _resource_requirements("250m", "512Mi", "1000m", "2Gi")
+
+
+# The 24/7 streaming pods (db_streaming / api_streaming) run a Spark
+# Structured Streaming consumer continuously, not a single short script.
+def STREAM_POD_RESOURCES():
+    return _resource_requirements("500m", "1Gi", "1500m", "3Gi")
+
+
+def run_k8s_task_pod(name: str, command: list, timeout_seconds: int) -> tuple:
     """
-    from docker.types import Mount
-    base = APP_HOST_PATH
-    return [
-        Mount(target="/app/jars",
-              source=f"{base}/jars/deps",         type="bind", read_only=True),
-        Mount(target="/app/cleaning",
-              source=f"{base}/cleaning",           type="bind", read_only=True),
-        Mount(target="/app/transformation",
-              source=f"{base}/transformation",     type="bind", read_only=True),
-        Mount(target="/app/analysis",
-              source=f"{base}/analysis",           type="bind", read_only=True),
-        Mount(target="/app/machine-learning",
-              source=f"{base}/machine-learning",   type="bind", read_only=True),
-        Mount(target="/app/mapping",
-              source=f"{base}/mapping",            type="bind", read_only=True),
-    ]
+    Run `command` to completion in a fresh, single-container Kubernetes Pod
+    (using PYTHON_IMAGE), and return (exit_code, logs).
+
+    This is the Kubernetes-native replacement for what
+    `docker_sdk_container.exec_run()` used to do: run one command, block
+    until it finishes (or times out), get its exit code and output, then
+    clean up - used by call sites that run several short-lived steps in a
+    row from inside a single Python task (scheduled_batch_dag.py,
+    db_streaming_dag.py's connector-deploy step), where a full
+    KubernetesPodOperator-per-step isn't a natural fit. For anything that's
+    naturally one Airflow task = one container run, use
+    KubernetesPodOperator directly instead (see batch_downstream_dag.py).
+
+    Always deletes the pod when done, whether it succeeded, failed, or
+    timed out - never leaves one behind.
+    """
+    import time
+    from kubernetes import client, config as k8s_config
+
+    try:
+        k8s_config.load_incluster_config()
+    except k8s_config.ConfigException:
+        k8s_config.load_kube_config()
+
+    core_v1 = client.CoreV1Api()
+    env_list = [client.V1EnvVar(name=k, value=str(v)) for k, v in k8s_pipeline_env().items()]
+
+    pod = client.V1Pod(
+        metadata=client.V1ObjectMeta(generate_name=f"{name}-", labels=TASK_POD_LABELS),
+        spec=client.V1PodSpec(
+            restart_policy="Never",
+            service_account_name=TASK_SERVICE_ACCOUNT,
+            containers=[
+                client.V1Container(
+                    name="task",
+                    image=PYTHON_IMAGE,
+                    command=command,
+                    env=env_list,
+                    resources=TASK_POD_RESOURCES(),
+                )
+            ],
+        ),
+    )
+
+    created = core_v1.create_namespaced_pod(namespace=POD_NAMESPACE, body=pod)
+    pod_name = created.metadata.name
+
+    try:
+        deadline = time.monotonic() + timeout_seconds
+        current = None
+        while time.monotonic() < deadline:
+            current = core_v1.read_namespaced_pod(name=pod_name, namespace=POD_NAMESPACE)
+            if current.status.phase in ("Succeeded", "Failed"):
+                break
+            time.sleep(3)
+        else:
+            raise TimeoutError(f"Pod {pod_name} did not finish within {timeout_seconds}s")
+
+        logs = core_v1.read_namespaced_pod_log(name=pod_name, namespace=POD_NAMESPACE)
+        container_status = current.status.container_statuses[0] if current.status.container_statuses else None
+        terminated = container_status.state.terminated if container_status and container_status.state else None
+        exit_code = terminated.exit_code if terminated else (0 if current.status.phase == "Succeeded" else 1)
+        return exit_code, logs
+
+    finally:
+        try:
+            core_v1.delete_namespaced_pod(name=pod_name, namespace=POD_NAMESPACE, grace_period_seconds=0)
+        except Exception:
+            pass

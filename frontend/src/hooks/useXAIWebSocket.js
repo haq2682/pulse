@@ -25,9 +25,14 @@ export const useXAIWebSocket = (businessId) => {
 
     const getWebSocketUrl = useCallback(() => {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        const wsProtocol = apiUrl.startsWith('https') ? 'wss' : 'ws';
-        const wsHost = apiUrl.replace(/^https?:\/\//, '');
-        return `${wsProtocol}://${wsHost}/xai/ws/${businessId}`;
+        // Absolute base (dev): derive the ws host from the API URL.
+        if (apiUrl.startsWith('http')) {
+            const wsProtocol = apiUrl.startsWith('https') ? 'wss' : 'ws';
+            const wsHost = apiUrl.replace(/^https?:\/\//, '');
+            return `${wsProtocol}://${wsHost}/xai/ws/${businessId}`;
+        }
+        // Relative base (prod, same-origin via nginx /api): keep it relative.
+        return `${apiUrl}/xai/ws/${businessId}`;
     }, [businessId]);
 
     const connect = useCallback(() => {

@@ -72,7 +72,12 @@ from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.models import Variable
-from airflow.providers.docker.operators.docker import DockerOperator
+# DockerOperator/docker_pipeline_env/docker_app_mounts no longer exist
+# (task execution moved to KubernetesPodOperator - see
+# docs/CLOUD_DEPLOYMENT_GUIDE.md and pipeline_config.py) and this whole
+# DAG's registration is commented out below along with the rest of ML, so
+# these stay commented rather than updated - re-enable both together.
+# from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.operators.python import PythonOperator, ShortCircuitOperator
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -84,9 +89,9 @@ from config.pipeline_config import (
     KS_MIN_SAMPLE_SIZE,
     MODEL_FEATURE_MAP,
     PYTHON_IMAGE,
-    SPARK_NETWORK,
-    docker_pipeline_env,
-    docker_app_mounts,
+    # SPARK_NETWORK,           # removed along with Docker-based task execution
+    # docker_pipeline_env,     # removed along with Docker-based task execution
+    # docker_app_mounts,       # removed along with Docker-based task execution
 )
 
 BUCKET = Variable.get("default_bucket", default_var=DEFAULT_BUCKET)
@@ -298,77 +303,83 @@ def save_new_baselines(**context):
 # ---------------------------------------------------------------------------
 # DAG definition
 # ---------------------------------------------------------------------------
-with DAG(
-    dag_id="ml_retrain",
-    description=(
-        "KS-test drift detection + conditional ML model retraining. "
-        "Use dag_run.conf={'force_retrain': true} for initial training."
-    ),
-    schedule_interval="0 3 * * 0",   # weekly Sunday 03:00 UTC + on-demand triggers
-    start_date=datetime(2024, 1, 1),
-    catchup=False,
-    max_active_runs=1,
-    tags=["pulse", "ml", "drift", "retrain"],
-    default_args=_task_defaults,
-    params={"bucket": BUCKET},
-    render_template_as_native_obj=True,
-) as dag:
-
-    # ── 1. Verify transformed data exists ──────────────────────────────────
-    load_features = PythonOperator(
-        task_id="load_current_features",
-        python_callable=load_current_features,
-    )
-
-    # ── 2. KS drift tests (or force_retrain bypass) ────────────────────────
-    ks_tests = PythonOperator(
-        task_id="run_ks_tests",
-        python_callable=run_ks_tests,
-        execution_timeout=timedelta(minutes=30),
-    )
-
-    # ── 3. Evaluate & split models by category ────────────────────────────
-    evaluate_drift = PythonOperator(
-        task_id="evaluate_drift_report",
-        python_callable=evaluate_drift_report,
-    )
-
-    # ── 4. Gate: skip retraining if no general model drift detected ───────
-    gate_retrain = ShortCircuitOperator(
-        task_id="should_retrain",
-        python_callable=should_retrain_callable,
-        ignore_downstream_trigger_rules=True,
-    )
-
-    # ── 5. Retrain general models ──────────────────────────────────────────
-    # General models intentionally train on ALL tenant buckets (no --bucket-name arg).
-    # The triggering bucket only determines WHICH drift was detected; the retrain
-    # always uses the full cross-tenant dataset so the shared model stays accurate.
-    retrain_general = DockerOperator(
-        task_id="retrain_general",
-        image=PYTHON_IMAGE,
-        command=["python3", "/app/machine-learning/general/train.py"],
-        environment=docker_pipeline_env(),
-        network_mode=SPARK_NETWORK,
-        mounts=docker_app_mounts(),
-        auto_remove="force",
-        do_xcom_push=False,
-        mount_tmp_dir=False,
-        execution_timeout=timedelta(hours=4),
-    )
-
-    # ── 6. Save updated drift baselines for retrained general models ───────
-    save_baselines = PythonOperator(
-        task_id="save_new_baselines",
-        python_callable=save_new_baselines,
-    )
-
-    # ── Dependencies ───────────────────────────────────────────────────────
-    (
-        load_features
-        >> ks_tests
-        >> evaluate_drift
-        >> gate_retrain
-        >> retrain_general
-        >> save_baselines
-    )
+# ML forecasting/prediction is temporarily disabled project-wide. The entire
+# DAG registration below is commented out (not deleted) so no "ml_retrain"
+# DAG is registered with Airflow at all while this is off - the helper
+# callables above remain intact and ready to wire back in via the exact
+# block below when ML is re-enabled.
+#
+# with DAG(
+#     dag_id="ml_retrain",
+#     description=(
+#         "KS-test drift detection + conditional ML model retraining. "
+#         "Use dag_run.conf={'force_retrain': true} for initial training."
+#     ),
+#     schedule_interval="0 3 * * 0",   # weekly Sunday 03:00 UTC + on-demand triggers
+#     start_date=datetime(2024, 1, 1),
+#     catchup=False,
+#     max_active_runs=1,
+#     tags=["pulse", "ml", "drift", "retrain"],
+#     default_args=_task_defaults,
+#     params={"bucket": BUCKET},
+#     render_template_as_native_obj=True,
+# ) as dag:
+#
+#     # ── 1. Verify transformed data exists ──────────────────────────────────
+#     load_features = PythonOperator(
+#         task_id="load_current_features",
+#         python_callable=load_current_features,
+#     )
+#
+#     # ── 2. KS drift tests (or force_retrain bypass) ────────────────────────
+#     ks_tests = PythonOperator(
+#         task_id="run_ks_tests",
+#         python_callable=run_ks_tests,
+#         execution_timeout=timedelta(minutes=30),
+#     )
+#
+#     # ── 3. Evaluate & split models by category ────────────────────────────
+#     evaluate_drift = PythonOperator(
+#         task_id="evaluate_drift_report",
+#         python_callable=evaluate_drift_report,
+#     )
+#
+#     # ── 4. Gate: skip retraining if no general model drift detected ───────
+#     gate_retrain = ShortCircuitOperator(
+#         task_id="should_retrain",
+#         python_callable=should_retrain_callable,
+#         ignore_downstream_trigger_rules=True,
+#     )
+#
+#     # ── 5. Retrain general models ──────────────────────────────────────────
+#     # General models intentionally train on ALL tenant buckets (no --bucket-name arg).
+#     # The triggering bucket only determines WHICH drift was detected; the retrain
+#     # always uses the full cross-tenant dataset so the shared model stays accurate.
+#     retrain_general = DockerOperator(
+#         task_id="retrain_general",
+#         image=PYTHON_IMAGE,
+#         command=["python3", "/app/machine-learning/general/train.py"],
+#         environment=docker_pipeline_env(),
+#         network_mode=SPARK_NETWORK,
+#         mounts=docker_app_mounts(),
+#         auto_remove="force",
+#         do_xcom_push=False,
+#         mount_tmp_dir=False,
+#         execution_timeout=timedelta(hours=4),
+#     )
+#
+#     # ── 6. Save updated drift baselines for retrained general models ───────
+#     save_baselines = PythonOperator(
+#         task_id="save_new_baselines",
+#         python_callable=save_new_baselines,
+#     )
+#
+#     # ── Dependencies ───────────────────────────────────────────────────────
+#     (
+#         load_features
+#         >> ks_tests
+#         >> evaluate_drift
+#         >> gate_retrain
+#         >> retrain_general
+#         >> save_baselines
+#     )

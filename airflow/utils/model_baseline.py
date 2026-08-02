@@ -38,7 +38,10 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 import numpy as np
 

@@ -1,0 +1,120 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Base layer for the Pulse platform.
+#
+# NOTE ON THE FILENAME: kustomize only ever looks for a file literally named
+# "kustomization.yaml" (or "kustomization.yml" / "Kustomization") in a
+# directory - it is not a name you can choose. This file is that file.
+#
+# Every namespaced object in this base sets `namespace: production`
+# explicitly (see each file's metadata block) - this base deploys straight
+# into a single `production` namespace, not through an overlay. Exceptions,
+# all deliberate:
+#   - storageclass.yaml's StorageClass and secrets/vault-cluster-secret-
+#     store.yaml's ClusterSecretStore are genuinely cluster-scoped kinds -
+#     there is no namespace field to set.
+#   - monitoring.yaml's Namespace object (for `monitoring` itself) is also
+#     cluster-scoped, and its ServiceMonitor objects deliberately live IN
+#     that `monitoring` namespace, not `production` - see the comment at the
+#     top of that file for why. Its JMX exporter ConfigMaps are the odd one
+#     out in the other direction: conceptually part of "the monitoring
+#     system" but forced into `production` because ConfigMap volume mounts
+#     require the same namespace as the pod consuming them.
+# The `production` namespace itself is created automatically by ArgoCD's
+# CreateNamespace=true sync option (see .k8s/argocd/argocd.yaml) rather than
+# defined as its own object here.
+
+resources:
+  - storageclass.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - svc.yaml
+  # ServiceAccount + Role + RoleBinding so Airflow can create/watch/delete
+  # its own task Pods through the Kubernetes API (KubernetesPodOperator /
+  # run_k8s_task_pod in pipeline_config.py) instead of needing
+  # /var/run/docker.sock. See the comment at the top of rbac.yaml.
+  - rbac.yaml
+  # ClusterSecretStore + ExternalSecret - plain custom resources, applied
+  # like anything else here. The External Secrets Operator running
+  # in-cluster watches these, reads the referenced Vault paths, and
+  # creates/updates a matching plain Secret automatically. See
+  # docs/SECRETS_MANAGEMENT.md.
+  - secrets/vault-cluster-secret-store.yaml
+  - secrets/pulse-postgresql-external-secret.yaml
+  - secrets/pulse-minio-external-secret.yaml
+  - secrets/pulse-airflow-external-secret.yaml
+  - secrets/pulse-api-external-secret.yaml
+  - secrets/pulse-nifi-external-secret.yaml
+  - hpa.yaml
+  # vpa.yaml uses the VerticalPodAutoscaler CRD, which is NOT installed on
+  # this cluster yet (its controller is a separate install - see the
+  # comment at the top of vpa.yaml). Until it is, `kubectl apply -k
+  # .k8s/bases` (and `--dry-run=server`) will fail specifically on the
+  # VerticalPodAutoscaler objects with "no matches for kind" - every other
+  # resource in this base is unaffected and applies fine on its own.
+  - vpa.yaml
+  # NetworkPolicy is a stable, built-in API (unlike VPA) - no separate
+  # controller needed for these to apply. Whether they actually block
+  # anything depends on the cluster's CNI - see the big comment at the top
+  # of networkpolicy.yaml.
+  - networkpolicy.yaml
+  # References a TLS Secret named "pulse-tls" that is NOT defined anywhere
+  # in this repo - it was created directly with `kubectl create secret tls`
+  # (see the comment at the top of ingress.yaml). If you're applying this
+  # base against a fresh cluster, create that secret first or this
+  # Ingress's TLS block will point at a Secret that doesn't exist yet
+  # (the Ingress object itself will still apply fine either way).
+  - ingress.yaml
+  # ServiceMonitor objects use the monitoring.coreos.com/v1 CRD, which is
+  # NOT installed on this cluster by default - it comes from the Prometheus
+  # Operator (typically via the kube-prometheus-stack Helm chart). Until
+  # that's installed, `kubectl apply -k .k8s/bases` (and `--dry-run=server`)
+  # will fail specifically on the ServiceMonitor objects with "no matches
+  # for kind" - the same situation as vpa.yaml above. See the comment at the
+  # top of monitoring.yaml.
+  - monitoring.yaml
+
+# Images NOT listed here (zookeeper, kafka, redis) are unmodified upstream
+# images - docker-compose.yml uses them directly with no build step, and
+# ci.yaml does not build/push them either, so deployment.yaml already
+# references their real upstream image names directly.
+#
+# pulse-python is listed below purely for consistency/documentation - no
+# manifest in this base has a container `image: pulse-python` field for
+# kustomize to rewrite anymore (there's no standalone pulse-python
+# Deployment; Airflow creates its own task pods dynamically at runtime -
+# see note 7 in deployment.yaml). The actual source of truth for that image
+# path is the PIPELINE_PYTHON_IMAGE env var on pulse-airflow-webserver/
+# scheduler - keep both in sync by hand when you set your real username.
+images:
+  - name: pulse-frontend
+    newName: haq2682/pulse-frontend
+    newTag: latest
+  - name: pulse-nginx
+    newName: haq2682/pulse-nginx
+    newTag: latest
+  - name: pulse-api
+    newName: haq2682/pulse-api
+    newTag: latest
+  - name: pulse-python
+    newName: haq2682/pulse-python
+    newTag: latest
+  - name: pulse-postgresql
+    newName: haq2682/pulse-postgresql
+    newTag: latest
+  - name: pulse-minio
+    newName: haq2682/pulse-minio
+    newTag: latest
+  - name: pulse-spark
+    newName: haq2682/pulse-spark
+    newTag: latest
+  - name: pulse-debezium
+    newName: haq2682/pulse-debezium
+    newTag: latest
+  - name: pulse-nifi
+    newName: haq2682/pulse-nifi
+    newTag: latest
+  - name: pulse-airflow
+    newName: haq2682/pulse-airflow
+    newTag: latest

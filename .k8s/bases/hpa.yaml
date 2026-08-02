@@ -1,0 +1,168 @@
+# HorizontalPodAutoscalers - add/remove replicas of a Deployment based on
+# observed CPU (and, for pulse-api, memory) load. Requires the Metrics
+# Server to be running in the cluster (it already is here) - without it,
+# `kubectl get hpa` shows TARGETS as <unknown> and nothing ever scales.
+#
+# Once an HPA targets a Deployment, the HPA - not the Deployment's own
+# `replicas:` field in deployment.yaml - becomes authoritative for how many
+# pods run. Kubernetes computes utilization against each container's
+# resource REQUEST (not its limit), so every target below already has
+# requests set in deployment.yaml - HPA has nothing to divide by otherwise.
+#
+# Sizing note for this specific 4-core / 16GB machine: every Deployment in
+# deployment.yaml has a baseline of 1 replica now (down from 2 for
+# pulse-spark-worker/pulse-api/pulse-frontend/pulse-nginx) specifically so
+# the stack fits this machine at rest - minReplicas below matches that same
+# floor for the 3 HPAs that used to require 2 (nginx/frontend/api), so the
+# HPA controller doesn't immediately fight the Deployment back up to 2.
+# maxReplicas values are each individually affordable, but NOT a promise
+# that every service can be scaled to its max at the same time.
+# pulse-spark-worker requests 1 CPU / 2Gi per pod (tied directly to its
+# SPARK_WORKER_CORES/SPARK_WORKER_MEMORY env vars, also trimmed down from
+# 2/6g for this machine) - scaling it to its maxReplicas of 2 costs 2 CPU /
+# 4Gi total, comfortably inside the stated budget alongside everything
+# else, unlike before this pass.
+#
+# Docs: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: pulse-spark-worker-hpa
+  namespace: production
+  labels:
+    app: pulse-spark-worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pulse-spark-worker
+  minReplicas: 1
+  maxReplicas: 2
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: pulse-debezium-hpa
+  namespace: production
+  labels:
+    app: pulse-debezium
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pulse-debezium
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: pulse-airflow-webserver-hpa
+  namespace: production
+  labels:
+    app: pulse-airflow-webserver
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pulse-airflow-webserver
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: pulse-nginx-hpa
+  namespace: production
+  labels:
+    app: pulse-nginx
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pulse-nginx
+  minReplicas: 1
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: pulse-frontend-hpa
+  namespace: production
+  labels:
+    app: pulse-frontend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pulse-frontend
+  minReplicas: 1
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+# api gets a second metric (memory) alongside CPU - it does in-memory
+# pandas/numpy work and drives Spark jobs, so it can get memory-heavy
+# without necessarily being CPU-heavy at the same moment. When multiple
+# metrics are set, the HPA computes a desired replica count for each and
+# scales to whichever asks for MORE replicas.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: pulse-api-hpa
+  namespace: production
+  labels:
+    app: pulse-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pulse-api
+  minReplicas: 1
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75

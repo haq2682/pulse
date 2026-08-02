@@ -1,0 +1,312 @@
+# One ClusterIP Service per Deployment that actually listens on a port.
+# Ingress (added later) will be what exposes any of this outside the
+# cluster - nothing here is reachable from outside minikube yet.
+#
+# Jobs (pulse-minio-init, pulse-airflow-init) run once and exit, so a
+# Service (which routes to long-running pods) doesn't apply to them - they
+# have none, and that's the only kind of Deployment/Job left without one.
+# pulse-airflow-scheduler used to be the other exception ("the scheduler
+# process doesn't serve traffic") but now has a Service too, purely to
+# expose its statsd-exporter sidecar's metrics port - see monitoring.yaml.
+#
+# Several Services below also carry extra named ports beyond the
+# application's own port - these back the exporter sidecars/JMX javaagents
+# added in deployment.yaml for the monitoring system (see monitoring.yaml's
+# ServiceMonitors, which reference these ports by name, not number).
+#
+# There used to be a standalone pulse-python Deployment here too (an idle
+# `tail -f /dev/null` container Airflow execed into) - it's gone now that
+# Airflow creates its own ephemeral task pods via KubernetesPodOperator
+# instead. See note 7 at the top of deployment.yaml.
+#
+# Docs: https://kubernetes.io/docs/concepts/services-networking/service/
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-frontend
+  namespace: production
+  labels:
+    app: pulse-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: pulse-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-nginx
+  namespace: production
+  labels:
+    app: pulse-nginx
+spec:
+  type: ClusterIP
+  selector:
+    app: pulse-nginx
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+    - name: metrics
+      port: 9113
+      targetPort: 9113
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-api
+  namespace: production
+  labels:
+    app: pulse-api
+spec:
+  type: ClusterIP
+  selector:
+    app: pulse-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-postgresql
+  namespace: production
+  labels:
+    app: pulse-postgresql
+spec:
+  type: ClusterIP
+  selector:
+    app: pulse-postgresql
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: 5432
+    - name: metrics
+      port: 9187
+      targetPort: 9187
+---
+# Second Service, same pods, different purpose: NodePort so a desktop SQL
+# client (DBeaver, Beekeeper Studio, psql, ...) can connect directly.
+# Postgres speaks its own binary wire protocol, not HTTP, so this can't go
+# through the Ingress like the web UIs do - a NodePort is the closest
+# minikube-native equivalent (LoadBalancer needs `minikube tunnel` and,
+# even then, only really behaves cleanly on the docker driver on Linux).
+# nodePort is pinned to 30432 (rather than left to auto-assign) so your
+# client's saved connection doesn't break if this gets re-applied.
+# Named "-nodeport", not "-external", to avoid reading like the unrelated
+# ExternalSecret objects in secrets/ (pulse-postgresql-external-secret).
+# See docs/INGRESS_ACCESS.md for the exact connection details.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-postgresql-nodeport
+  namespace: production
+  labels:
+    app: pulse-postgresql
+spec:
+  type: NodePort
+  selector:
+    app: pulse-postgresql
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: 5432
+      nodePort: 30432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-minio
+  namespace: production
+  labels:
+    app: pulse-minio
+spec:
+  type: ClusterIP
+  selector:
+    app: pulse-minio
+  ports:
+    - name: s3-api
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-spark-master
+  namespace: production
+  labels:
+    app: pulse-spark-master
+spec:
+  type: ClusterIP
+  selector:
+    app: pulse-spark-master
+  ports:
+    - name: rpc
+      port: 7077
+      targetPort: 7077
+    - name: ui
+      port: 8080
+      targetPort: 8080
+---
+# Not required for workers to register with the master (they connect out to
+# pulse-spark-master:7077 themselves), but gives every worker pod's web UI a
+# single, stable address to reach for debugging.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-spark-worker
+  namespace: production
+  labels:
+    app: pulse-spark-worker
+spec:
+  type: ClusterIP
+  selector:
+    app: pulse-spark-worker
+  ports:
+    - name: ui
+      port: 8081
+      targetPort: 8081
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-zookeeper
+  namespace: production
+  labels:
+    app: pulse-zookeeper
+spec:
+  type: ClusterIP
+  selector:
+    app: pulse-zookeeper
+  ports:
+    - name: client
+      port: 2181
+      targetPort: 2181
+    - name: jmx-metrics
+      port: 7071
+      targetPort: 7071
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-kafka
+  namespace: production
+  labels:
+    app: pulse-kafka
+spec:
+  type: ClusterIP
+  selector:
+    app: pulse-kafka
+  ports:
+    - name: broker
+      port: 9092
+      targetPort: 9092
+    - name: jmx-metrics
+      port: 7071
+      targetPort: 7071
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-debezium
+  namespace: production
+  labels:
+    app: pulse-debezium
+spec:
+  type: ClusterIP
+  selector:
+    app: pulse-debezium
+  ports:
+    - name: connect-api
+      port: 8083
+      targetPort: 8083
+    - name: jmx-metrics
+      port: 7071
+      targetPort: 7071
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-redis
+  namespace: production
+  labels:
+    app: pulse-redis
+spec:
+  type: ClusterIP
+  selector:
+    app: pulse-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+    - name: metrics
+      port: 9121
+      targetPort: 9121
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-nifi
+  namespace: production
+  labels:
+    app: pulse-nifi
+spec:
+  type: ClusterIP
+  selector:
+    app: pulse-nifi
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+    - name: https
+      port: 8443
+      targetPort: 8443
+    - name: site-to-site
+      port: 10000
+      targetPort: 10000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-airflow-webserver
+  namespace: production
+  labels:
+    app: pulse-airflow-webserver
+spec:
+  type: ClusterIP
+  selector:
+    app: pulse-airflow-webserver
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+    - name: metrics
+      port: 9102
+      targetPort: 9102
+---
+# Metrics-only Service - the scheduler process itself serves no application
+# traffic, but its statsd-exporter sidecar (see deployment.yaml) needs a
+# stable address for monitoring.yaml's ServiceMonitor to scrape.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-airflow-scheduler
+  namespace: production
+  labels:
+    app: pulse-airflow-scheduler
+spec:
+  type: ClusterIP
+  selector:
+    app: pulse-airflow-scheduler
+  ports:
+    - name: metrics
+      port: 9102
+      targetPort: 9102

@@ -1,0 +1,107 @@
+# ArgoCD Application - points ArgoCD at this repo's .k8s/bases and keeps the
+# `production` namespace in-cluster in sync with it.
+#
+# This object itself lives in the `argocd` namespace (ArgoCD's own
+# convention - wherever the ArgoCD controller/API server are installed),
+# NOT `production` - it's control-plane configuration for ArgoCD, not part
+# of the Pulse application it deploys.
+#
+# Apply with: kubectl apply -f .k8s/argocd/argocd.yaml
+#
+# Docs: https://argo-cd.readthedocs.io/en/stable/user-guide/application-specification/
+#
+# ── Argo CD Image Updater ────────────────────────────────────────────────
+# The annotations below tell the argocd-image-updater controller (installed
+# by terraform/resource.tf's helm_release.argocd_image_updater) which 10
+# images to watch and how to pick a new one - matches ci.yaml, which pushes
+# every image as both `latest` and an immutable `sha-<git-sha>` tag
+# specifically so Image Updater has real, ordered, unique tags to compare.
+#
+# - update-strategy `latest`: picks the most recently BUILT image (by
+#   registry timestamp, not tag name sorting) - see
+#   https://argocd-image-updater.readthedocs.io/en/stable/install/strategies/#update-to-the-most-recently-built-image
+#   The upstream docs warn this strategy pulls image manifests to check
+#   build times, which counts against Docker Hub's anonymous/free-tier pull
+#   limits - worth knowing since every image here is on Docker Hub, though
+#   for a single-developer repo polling every 2 minutes (Image Updater's
+#   default interval) this is unlikely to matter in practice.
+# - allow-tags restricts candidates to `sha-*` tags only, so it never
+#   "updates" to the floating `latest` tag itself (which would defeat the
+#   point - that tag's digest changes without any new, comparable build
+#   time semantics Image Updater can reason about the same way).
+# - Each alias below is spelled identically to its `images[].name` entry in
+#   kustomization.yaml (e.g. `pulse-api`), so no extra `kustomize.image-
+#   name` override annotation is needed - Image Updater matches on name
+#   directly.
+# - No write-back-method annotation - `argocd` (the default) is used,
+#   meaning Image Updater calls the Argo CD API to set the resolved image,
+#   the same way `argocd app set --kustomize-image` would. This needs no
+#   git credentials and makes no commits on your behalf, unlike the `git`
+#   write-back method. It's "pseudo-persistent": if this Application object
+#   is ever deleted and recreated (or itself becomes managed by a parent
+#   app-of-apps with its own selfHeal), Image Updater's live override is
+#   lost and falls back to the `newTag: latest` baked into
+#   kustomization.yaml - acceptable here since this Application isn't
+#   managed that way.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pulse
+  namespace: argocd
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: >-
+      pulse-frontend=haq2682/pulse-frontend,
+      pulse-nginx=haq2682/pulse-nginx,
+      pulse-api=haq2682/pulse-api,
+      pulse-python=haq2682/pulse-python,
+      pulse-postgresql=haq2682/pulse-postgresql,
+      pulse-minio=haq2682/pulse-minio,
+      pulse-spark=haq2682/pulse-spark,
+      pulse-debezium=haq2682/pulse-debezium,
+      pulse-nifi=haq2682/pulse-nifi,
+      pulse-airflow=haq2682/pulse-airflow
+    argocd-image-updater.argoproj.io/pulse-frontend.update-strategy: latest
+    argocd-image-updater.argoproj.io/pulse-frontend.allow-tags: regexp:^sha-.*$
+    argocd-image-updater.argoproj.io/pulse-nginx.update-strategy: latest
+    argocd-image-updater.argoproj.io/pulse-nginx.allow-tags: regexp:^sha-.*$
+    argocd-image-updater.argoproj.io/pulse-api.update-strategy: latest
+    argocd-image-updater.argoproj.io/pulse-api.allow-tags: regexp:^sha-.*$
+    argocd-image-updater.argoproj.io/pulse-python.update-strategy: latest
+    argocd-image-updater.argoproj.io/pulse-python.allow-tags: regexp:^sha-.*$
+    argocd-image-updater.argoproj.io/pulse-postgresql.update-strategy: latest
+    argocd-image-updater.argoproj.io/pulse-postgresql.allow-tags: regexp:^sha-.*$
+    argocd-image-updater.argoproj.io/pulse-minio.update-strategy: latest
+    argocd-image-updater.argoproj.io/pulse-minio.allow-tags: regexp:^sha-.*$
+    argocd-image-updater.argoproj.io/pulse-spark.update-strategy: latest
+    argocd-image-updater.argoproj.io/pulse-spark.allow-tags: regexp:^sha-.*$
+    argocd-image-updater.argoproj.io/pulse-debezium.update-strategy: latest
+    argocd-image-updater.argoproj.io/pulse-debezium.allow-tags: regexp:^sha-.*$
+    argocd-image-updater.argoproj.io/pulse-nifi.update-strategy: latest
+    argocd-image-updater.argoproj.io/pulse-nifi.allow-tags: regexp:^sha-.*$
+    argocd-image-updater.argoproj.io/pulse-airflow.update-strategy: latest
+    argocd-image-updater.argoproj.io/pulse-airflow.allow-tags: regexp:^sha-.*$
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/haq2682/pulse.git
+    targetRevision: main
+    path: .k8s/bases
+  destination:
+    # In-cluster (ArgoCD's own well-known symbolic address) - not a
+    # separate remote cluster.
+    server: https://kubernetes.default.svc
+    namespace: production
+  syncPolicy:
+    automated:
+      # prune: deletes resources that are removed from this repo's
+      # .k8s/bases on the next sync. selfHeal: reverts any manual
+      # `kubectl edit`/`kubectl delete` against a resource ArgoCD manages,
+      # back to what's committed here - the core GitOps guarantee that the
+      # cluster always matches this repo, not the other way around.
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # Creates the `production` namespace itself if it doesn't already
+      # exist - no separate Namespace object needs to be committed here or
+      # created in terraform/ (avoids two systems both trying to own it).
+      - CreateNamespace=true

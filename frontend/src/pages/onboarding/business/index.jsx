@@ -200,7 +200,7 @@ const AddBusiness = () => {
                                     onChange={(e) => setCurrency(e.value)}
                                     suggestions={currencySuggestions}
                                     completeMethod={async (e) => {
-                                        const res = await axiosInstance.get(`http://localhost:8000/onboarding/api/currencies?query=${e.query}`);
+                                        const res = await axiosInstance.get(`/onboarding/api/currencies?query=${e.query}`);
                                         setCurrencySuggestions(res.data);
                                     }}
                                     placeholder="Currency"
@@ -228,7 +228,7 @@ const AddBusiness = () => {
                                     onChange={(e) => setRegion(e.value)}
                                     suggestions={regionSuggestions}
                                     completeMethod={async (e) => {
-                                        const res = await axiosInstance.get(`http://localhost:8000/onboarding/api/regions?query=${e.query}`);
+                                        const res = await axiosInstance.get(`/onboarding/api/regions?query=${e.query}`);
                                         setRegionSuggestions(res.data);
                                     }}
                                     placeholder="Country/Region"

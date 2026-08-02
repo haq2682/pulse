@@ -54,10 +54,12 @@ Crash handling & auto-restart
 ------------------------------
 ``run_db_streaming`` is a long-running task (never exits normally).
 If the Spark job or Debezium connection crashes:
-  - The docker-exec command exits with non-zero
+  - The task pod's container exits with non-zero
   - Airflow marks the task FAILED
   - Airflow waits ``retry_delay`` (1 min) then restarts the task
   - retries=9999 means effectively infinite restarts
+  - The exited pod is deleted (matching the old auto_remove="force"
+    DockerOperator behaviour) and a fresh one is created on retry.
 
 Spark Structured Streaming uses a MinIO-backed checkpoint
 (s3a://pulse-checkpoints/normalize-stream) so restarts pick up exactly
@@ -83,25 +85,27 @@ from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.models import Variable
-from airflow.providers.docker.operators.docker import DockerOperator
+from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from airflow.operators.python import PythonOperator
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from config.pipeline_config import (
+    DB_STREAM_POD_LABELS,
     DEBEZIUM_URL,
     DEFAULT_BUCKET,
     DEFAULT_DB_TABLES,
     DEFAULT_DB_URI,
     DEFAULT_TASK_ARGS,
-    PYTHON_CONTAINER,
+    POD_NAMESPACE,
     PYTHON_IMAGE,
-    SPARK_NETWORK,
+    STREAM_POD_RESOURCES,
+    TASK_SERVICE_ACCOUNT,
     POSTGRES_SERVER,
     POSTGRES_DB,
     POSTGRES_USER,
     POSTGRES_PASSWORD,
-    docker_pipeline_env,
-    docker_app_mounts,
+    k8s_pipeline_env,
+    run_k8s_task_pod,
 )
 
 BUCKET    = Variable.get("default_bucket", default_var=DEFAULT_BUCKET)
@@ -208,7 +212,7 @@ def check_or_deploy_debezium(**context):
     health-check task should only ensure the connector is alive; it must
     never re-snapshot the database.
     """
-    
+
     conf      = context["dag_run"].conf or {}
     bucket    = conf.get("bucket", BUCKET)
 
@@ -286,13 +290,8 @@ def check_or_deploy_debezium(**context):
 
     # Deploy / verify with --deploy-connector-only so we get snapshot.mode=no_data.
     # This ensures a connector restart NEVER triggers a full database re-snapshot.
-    # Use the Docker Python SDK (exec_run) instead of subprocess + docker CLI.
-    # This avoids the need for the CLI binary in the Airflow container.
-    import docker as _docker_sdk
-    import concurrent.futures as _futures
-
-    _client    = _docker_sdk.from_env()
-    _container = _client.containers.get(PYTHON_CONTAINER)
+    # Runs in its own Kubernetes Pod (see run_k8s_task_pod) rather than
+    # exec'ing into a shared container over docker.sock.
     _cmd = [
         "python3", "/app/mapping/run_mapping.py",
         "--mode", "db",
@@ -301,20 +300,14 @@ def check_or_deploy_debezium(**context):
         "--db-tables", db_tables,
         "--deploy-connector-only",   # deploy connector only -- NO JDBC re-load
     ]
-    with _futures.ThreadPoolExecutor(max_workers=1) as _pool:
-        _future = _pool.submit(
-            lambda: _container.exec_run(cmd=_cmd, demux=True, stream=False)
-        )
-        try:
-            _result = _future.result(timeout=120)
-        except _futures.TimeoutError:
-            raise RuntimeError("Debezium deploy timed out after 120 s.")
-    _stdout = (_result.output[0] or b"").decode("utf-8", errors="replace")
-    _stderr = (_result.output[1] or b"").decode("utf-8", errors="replace")
-    if _result.exit_code != 0:
+    exit_code, logs = run_k8s_task_pod(
+        name="pulse-debezium-deploy",
+        command=_cmd,
+        timeout_seconds=120,
+    )
+    if exit_code != 0:
         raise RuntimeError(
-            f"Debezium deploy failed (rc={_result.exit_code}).\n"
-            f"STDOUT: {_stdout[-2000:]}\nSTDERR: {_stderr[-2000:]}"
+            f"Debezium deploy failed (rc={exit_code}).\nOutput: {logs[-2000:]}"
         )
     print("Debezium connector deployed successfully.")
     return {
@@ -359,14 +352,15 @@ with DAG(
     # ── 2. Start the continuous mapping stream ────────────────────────────
     # This task runs FOREVER (until the Spark job crashes or is stopped).
     # On crash:  Airflow waits 1 min → restarts → Spark resumes from checkpoint.
-    # On DAG pause/cancellation: DockerOperator stops the container → streaming stops.
-    # On crash: Airflow waits 1 min → restarts → Spark resumes from checkpoint.
+    # On DAG pause/cancellation: the task pod is deleted → streaming stops.
     # NOTE: does NOT use --trigger-once here.  This is the 24/7 streaming job.
-    run_db_streaming = DockerOperator(
+    run_db_streaming = KubernetesPodOperator(
         task_id="run_db_mapping_stream",
+        name="pulse-db-stream",
+        namespace=POD_NAMESPACE,
         image=PYTHON_IMAGE,
-        command=[
-            "python3", "/app/mapping/run_mapping.py",
+        cmds=["python3", "/app/mapping/run_mapping.py"],
+        arguments=[
             "--mode", "db",
             # dag_run.conf overrides; params are fallback for manual UI runs.
             "--business-id", "{{ (ti.xcom_pull(task_ids='deploy_debezium_connector') or {}).get('bucket') or dag_run.conf.get('bucket') or params.bucket }}",
@@ -375,13 +369,13 @@ with DAG(
             # No --trigger-once: this must run indefinitely.
             # No --enable-downstream: downstream runs as a scheduled Airflow batch job.
         ],
-        environment=docker_pipeline_env(),
-        network_mode=SPARK_NETWORK,
-        mounts=docker_app_mounts(),
-        auto_remove="force",
-        do_xcom_push=False,
-        mount_tmp_dir=False,
-        tty=True,
+        env_vars=k8s_pipeline_env(),
+        service_account_name=TASK_SERVICE_ACCOUNT,
+        labels=DB_STREAM_POD_LABELS,
+        container_resources=STREAM_POD_RESOURCES(),
+        in_cluster=True,
+        get_logs=True,
+        is_delete_operator_pod=True,   # matches the old auto_remove="force"
         **_streaming_defaults,
     )
 

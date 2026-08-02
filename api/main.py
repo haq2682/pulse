@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from middleware import auth_middleware
 from minio import Minio
+from prometheus_fastapi_instrumentator import Instrumentator
 import os
 import logging
 from urllib.parse import urlparse
@@ -68,6 +69,10 @@ app.add_middleware(
 @app.middleware("http")
 async def analytics_middleware(request, call_next):
     return await auth_middleware(request, call_next)
+
+# Exposes per-route request count/latency/size at GET /metrics for
+# monitoring.yaml's pulse-api ServiceMonitor to scrape.
+Instrumentator().instrument(app).expose(app, include_in_schema=False)
 
 
 # Register your authentication router

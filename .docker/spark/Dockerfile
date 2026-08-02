@@ -1,4 +1,5 @@
-FROM python-py310
+ARG BASE_IMAGE=python-py310
+FROM ${BASE_IMAGE}
 
 # Install Spark runtime dependencies
 RUN apt-get update && \

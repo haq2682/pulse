@@ -47,6 +47,14 @@ _MYSQL_SERVER_ID_RANGE = 900000
 _DEPLOY_CONNECT_TIMEOUT = 10
 _DEPLOY_READ_TIMEOUT = 120
 
+# Same KAFKA_BOOTSTRAP env var used everywhere else in this project
+# (docker-compose.yml, .env.example, k8s deployment.yaml) - .env.example's
+# own placeholder value ("your_kafka_bootstrap_internal") confirms this is
+# already meant to be the internal address, matching this constant's name.
+# Falls back to Kafka's docker-compose static IP, matching this file's own
+# existing fallback style (see DEBEZIUM_URL below).
+KAFKA_BOOTSTRAP_INTERNAL = os.getenv("KAFKA_BOOTSTRAP", "10.5.0.7:9092")
+
 # URI scheme -> internal db type key
 URI_SCHEME_MAP = {
     "postgresql": "postgres",

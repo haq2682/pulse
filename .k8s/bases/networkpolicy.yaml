@@ -1,0 +1,1458 @@
+# One NetworkPolicy per Deployment/Job, each declaring both `Ingress` and
+# `Egress` together - self-contained, so "what can pulse-X talk to" is
+# answered by reading one block, the same pattern used everywhere else in
+# this base. Every policy is built directly from deployment.yaml's actual
+# env vars (which service calls which, on which port) - not guessed.
+#
+# READ THIS FIRST - NetworkPolicy is NOT enforced on this cluster today.
+# NetworkPolicy is a Kubernetes API that any CNI *may* implement - it's not
+# guaranteed, and minikube's default networking (the "docker" driver's
+# built-in bridge networking, no Calico/Cilium/Weave/Flannel installed) does
+# NOT enforce it. This was verified empirically, not assumed: a deny-all
+# test policy was applied against two throwaway test pods and traffic still
+# flowed through unblocked. These objects will apply to the API server
+# without error and are correct, real policy - but on this specific
+# cluster, right now, they are inert paperwork. Real enforcement needs a
+# policy-enforcing CNI (e.g. `minikube start --cni=calico`), which requires
+# recreating the cluster - that's a bigger, more disruptual step than this
+# task, so it hasn't been done. Almost every managed cloud Kubernetes
+# offering (EKS with the VPC CNI's policy mode or Calico, GKE, AKS) does
+# enforce NetworkPolicy by default or with one flag, so this file is exactly
+# what you'd want there.
+#
+# DNS - every single policy below includes an egress rule for DNS
+# (UDP/TCP 53 to CoreDNS in kube-system). This is the single most common
+# NetworkPolicy mistake: forgetting it doesn't just break "DNS stuff" - it
+# breaks EVERY service-name-based connection (Kubernetes DNS is how
+# `pulse-postgresql` etc. resolve to an IP at all), even ones explicitly
+# allowed by another rule.
+#
+# MONITORING - every policy below whose Deployment gained a metrics port in
+# this pass (see deployment.yaml/svc.yaml) also gets an extra ingress rule
+# allowing that port from a `monitoring` namespaceSelector, so Prometheus
+# (once installed - see monitoring.yaml) can actually scrape it once a
+# policy-enforcing CNI is in use.
+#
+# VAULT / EXTERNAL SECRETS OPERATOR - the two policies at the very bottom
+# of this file are the one exception to "every policy here lives in
+# production": they cover ESO (in `kube-system`) talking to Vault (in
+# `vault`) on port 8200, since neither of those namespaces is otherwise
+# touched by this base. Same "inert until a policy-enforcing CNI is used"
+# caveat as everything else in this file applies to them too.
+#
+# Docs: https://kubernetes.io/docs/concepts/services-networking/network-policies/
+
+# ─────────────────────────────────────────────────────────────────────────
+# Frontend - entry point. Only the ingress-nginx controller (the `ingress`
+# minikube addon, already running) should reach it; it makes no calls of
+# its own (a browser talks to it, not the pod).
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-frontend-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-frontend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 80
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Nginx - the other entry point (gateway proxying /api and /upload). Same
+# ingress source as frontend; egress to the two services it proxies to.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-nginx-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-nginx
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 80
+    # nginx-prometheus-exporter sidecar - see the MONITORING note at the
+    # top of this file.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9113
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-api
+      ports:
+        - protocol: TCP
+          port: 8000
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-nifi
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# API - only pulse-nginx calls it (same-origin gateway design, see
+# nginx/conf.d/upload.conf). Egress covers every backing service it's
+# wired to in deployment.yaml, plus the internet (Gemini API, Google OAuth,
+# SMTP relay) since those aren't cluster-internal destinations - restricted
+# to HTTPS/submission ports and excluding private IP ranges, so this rule
+# can't be used to reach other pods directly by IP, only real external
+# hosts.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-api-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
+    # prometheus-fastapi-instrumentator exposes /metrics on the app's own
+    # port - see the MONITORING note at the top of this file.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-debezium
+      ports:
+        - protocol: TCP
+          port: 8083
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-master
+      ports:
+        - protocol: TCP
+          port: 7077
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-airflow-webserver
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 587
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Ephemeral batch task pods - clean/transform/analyze/scheduled-batch-steps/
+# connector-deploy, created on demand by KubernetesPodOperator or
+# run_k8s_task_pod() (see airflow/config/pipeline_config.py), labelled
+# app: pulse-task. Nothing calls them over the network - they're triggered
+# via the Kubernetes API, not HTTP - so ingress is fully closed. Egress is
+# the union of everything any of these short-lived scripts needs (this is a
+# deliberate simplification over writing a separate policy per script -
+# see the comment at the top of this file about beginner-friendly scope).
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-task-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-task
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-debezium
+      ports:
+        - protocol: TCP
+          port: 8083
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-master
+      ports:
+        - protocol: TCP
+          port: 7077
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# DB streaming pod - the 24/7 Debezium CDC → Spark Streaming → MinIO task
+# launched by db_streaming_dag.py, labelled app: pulse-db-stream. Same
+# "nothing calls it" reasoning as pulse-task above.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-db-stream-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-db-stream
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-master
+      ports:
+        - protocol: TCP
+          port: 7077
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# API streaming pod - the 24/7 external-API-polling → Kafka → Spark
+# Streaming → MinIO task launched by api_streaming_dag.py, labelled
+# app: pulse-api-stream. Needs internet egress too - the user's api_url is
+# an arbitrary external host, same reasoning as pulse-api-netpol's rule for
+# Gemini/Google/SMTP.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-api-stream-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-api-stream
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-master
+      ports:
+        - protocol: TCP
+          port: 7077
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# PostgreSQL - a database only ever accepts connections, it never
+# initiates any of its own. Ingress from every service that has
+# POSTGRES_* env vars wired in deployment.yaml, including pulse-debezium
+# (CDC reads the replication stream).
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-postgresql-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-postgresql
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-api
+        - podSelector:
+            matchLabels:
+              app: pulse-task
+        - podSelector:
+            matchLabels:
+              app: pulse-db-stream
+        - podSelector:
+            matchLabels:
+              app: pulse-api-stream
+        - podSelector:
+            matchLabels:
+              app: pulse-nifi
+        - podSelector:
+            matchLabels:
+              app: pulse-debezium
+        - podSelector:
+            matchLabels:
+              app: pulse-airflow-webserver
+        - podSelector:
+            matchLabels:
+              app: pulse-airflow-scheduler
+        - podSelector:
+            matchLabels:
+              app: pulse-airflow-init
+      ports:
+        - protocol: TCP
+          port: 5432
+    # External DB client access (DBeaver, Beekeeper Studio, ...) via the
+    # pulse-postgresql-nodeport Service in svc.yaml. NodePort
+    # traffic arrives at the pod as if from outside the cluster entirely -
+    # there's no pod identity to scope a podSelector to, so this is
+    # necessarily a broad "allow from anywhere" rule, unlike every other
+    # rule in this file. It only opens port 5432, and only takes effect at
+    # all once a policy-enforcing CNI is in use (see the note at the top of
+    # this file) - today this NodePort is reachable regardless either way.
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 5432
+    # postgres_exporter sidecar - see the MONITORING note at the top of
+    # this file.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9187
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# MinIO - object storage backing service. Ingress from every service that
+# has MINIO_* env vars wired, including both one-shot Jobs.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-minio-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-minio
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-api
+        - podSelector:
+            matchLabels:
+              app: pulse-task
+        - podSelector:
+            matchLabels:
+              app: pulse-db-stream
+        - podSelector:
+            matchLabels:
+              app: pulse-api-stream
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-master
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-worker
+        - podSelector:
+            matchLabels:
+              app: pulse-nifi
+        - podSelector:
+            matchLabels:
+              app: pulse-airflow-webserver
+        - podSelector:
+            matchLabels:
+              app: pulse-airflow-scheduler
+        - podSelector:
+            matchLabels:
+              app: pulse-airflow-init
+        - podSelector:
+            matchLabels:
+              app: pulse-minio-init
+      ports:
+        - protocol: TCP
+          port: 9000
+        - protocol: TCP
+          port: 9001
+    # The ingress-nginx controller proxies minio.pulse-engine.com here
+    # (see ingress.yaml) - console port only, the S3 API port stays
+    # internal-only.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 9001
+    # MinIO's native Prometheus endpoints live on the S3 API port itself
+    # (see monitoring.yaml's pulse-minio ServiceMonitor) - see the
+    # MONITORING note at the top of this file.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9000
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Spark Master - workers register with it (spark://pulse-spark-master:7077)
+# and api/python submit jobs to it on the same port.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-spark-master-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-spark-master
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-worker
+        - podSelector:
+            matchLabels:
+              app: pulse-api
+        - podSelector:
+            matchLabels:
+              app: pulse-task
+        - podSelector:
+            matchLabels:
+              app: pulse-db-stream
+        - podSelector:
+            matchLabels:
+              app: pulse-api-stream
+      ports:
+        - protocol: TCP
+          port: 7077
+    # The ingress-nginx controller proxies spark.pulse-engine.com here
+    # (see ingress.yaml) - only the dashboard port, not 7077 (Spark's own
+    # RPC protocol, which was never HTTP and isn't reachable via Ingress).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Spark's built-in Prometheus servlet, also on the UI port - see the
+    # MONITORING note at the top of this file.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Spark Worker - registers itself with the master; Spark's master<->worker
+# RPC is bidirectional (heartbeats/task dispatch flow both ways), so
+# ingress from the master is allowed too, not just egress to it.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-spark-worker-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-spark-worker
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-master
+      ports:
+        - protocol: TCP
+          port: 8081
+    # Same Prometheus servlet as pulse-spark-master above.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8081
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-master
+      ports:
+        - protocol: TCP
+          port: 7077
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Zookeeper - only Kafka talks to it.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-zookeeper-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-zookeeper
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-kafka
+      ports:
+        - protocol: TCP
+          port: 2181
+    # JMX exporter javaagent - see the MONITORING note at the top of this
+    # file.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 7071
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Kafka - ingress from every service with KAFKA_BOOTSTRAP wired; egress to
+# Zookeeper (Kafka depends on it for broker coordination).
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-kafka-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-kafka
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-api
+        - podSelector:
+            matchLabels:
+              app: pulse-task
+        - podSelector:
+            matchLabels:
+              app: pulse-db-stream
+        - podSelector:
+            matchLabels:
+              app: pulse-api-stream
+        - podSelector:
+            matchLabels:
+              app: pulse-debezium
+        - podSelector:
+            matchLabels:
+              app: pulse-nifi
+        - podSelector:
+            matchLabels:
+              app: pulse-airflow-webserver
+        - podSelector:
+            matchLabels:
+              app: pulse-airflow-scheduler
+      ports:
+        - protocol: TCP
+          port: 9092
+    # JMX exporter javaagent - see the MONITORING note at the top of this
+    # file.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 7071
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-zookeeper
+      ports:
+        - protocol: TCP
+          port: 2181
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Debezium (Kafka Connect) - ingress from services with KAFKA_CONNECT_URL/
+# DEBEZIUM_URL wired; egress to Kafka (its own storage topics) and
+# Postgres (the CDC source it reads from).
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-debezium-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-debezium
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-api
+        - podSelector:
+            matchLabels:
+              app: pulse-task
+        - podSelector:
+            matchLabels:
+              app: pulse-airflow-webserver
+        - podSelector:
+            matchLabels:
+              app: pulse-airflow-scheduler
+      ports:
+        - protocol: TCP
+          port: 8083
+    # JMX exporter javaagent - see the MONITORING note at the top of this
+    # file.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 7071
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Redis - ingress from every service with REDIS_HOST wired.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-redis-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-redis
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-api
+        - podSelector:
+            matchLabels:
+              app: pulse-task
+        - podSelector:
+            matchLabels:
+              app: pulse-db-stream
+        - podSelector:
+            matchLabels:
+              app: pulse-api-stream
+        - podSelector:
+            matchLabels:
+              app: pulse-airflow-webserver
+      ports:
+        - protocol: TCP
+          port: 6379
+    # redis_exporter sidecar - see the MONITORING note at the top of this
+    # file.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9121
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# NiFi - reached through the nginx gateway's /upload proxy AND directly at
+# nifi.pulse-engine.com via Ingress (see ingress.yaml) for the admin UI.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-nifi-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-nifi
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Airflow init (Job) - runs db migrate/upgrade/create-user once, then
+# exits. Nothing calls it; it only needs to reach Postgres.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-airflow-init-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-airflow-init
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Airflow Webserver - api calls it (AIRFLOW_BASE_URL); it in turn calls
+# every backing service airflow/config/pipeline_config.py wires up. Also
+# reached directly at airflow.pulse-engine.com via Ingress (see
+# ingress.yaml) for the Airflow UI.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-airflow-webserver-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-airflow-webserver
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-api
+      ports:
+        - protocol: TCP
+          port: 8080
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+    # statsd-exporter sidecar - see the MONITORING note at the top of this
+    # file.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9102
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-debezium
+      ports:
+        - protocol: TCP
+          port: 8083
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-master
+      ports:
+        - protocol: TCP
+          port: 7077
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Airflow Scheduler - has a statsd-exporter sidecar now (see the Service in
+# svc.yaml), so ingress is no longer fully closed - Prometheus needs to
+# reach its metrics port. The scheduler process itself still receives no
+# application traffic.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-airflow-scheduler-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-airflow-scheduler
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9102
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-debezium
+      ports:
+        - protocol: TCP
+          port: 8083
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-master
+      ports:
+        - protocol: TCP
+          port: 7077
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# MinIO init (Job) - creates buckets on first boot, then exits. Nothing
+# calls it; it only needs to reach MinIO.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-minio-init-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: pulse-minio-init
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Vault - only the External Secrets Operator's main controller pod ever
+# reads from it (see vault/policies/, vault/scripts/04-apply-policies-and-
+# roles.sh). ESO's chart also deploys a cert-controller and a webhook pod
+# in kube-system - neither of those talks to Vault, so ingress is scoped to
+# the controller pod specifically (app.kubernetes.io/name: external-
+# secrets), not all of kube-system. Egress needs DNS (to resolve
+# kubernetes.default.svc for its own Kubernetes-auth TokenReview calls to
+# the API server) - nothing else; Vault itself never calls out anywhere.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-vault-netpol
+  namespace: vault
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vault
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: external-secrets
+      ports:
+        - protocol: TCP
+          port: 8200
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ─────────────────────────────────────────────────────────────────────────
+# External Secrets Operator (main controller only, see the note above) -
+# egress to Vault, plus DNS to resolve vault.vault.svc in the first place.
+# No ingress rule: nothing calls the controller pod directly - it acts as
+# a client (to Vault, to the Kubernetes API to write Secrets) rather than
+# serving requests of its own.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pulse-external-secrets-netpol
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: external-secrets
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: vault
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+      ports:
+        - protocol: TCP
+          port: 8200
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

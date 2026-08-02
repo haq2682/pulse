@@ -10,14 +10,16 @@ ReactJS and FastAPI.
 
 - [Tech Stack](#tech-stack)
 - [Features and Components](#features-and-components)
-- [Minimum System Requirements](#minimum-system-requirements)
-- [Environment Setup](#environment-setup)
-- [Installation](#installation)
-- [Database Setup, Migrations, and Seed Data](#database-setup-migrations-and-seed-data)
-- [Running the Project](#running-the-project)
-- [Tests](#tests)
-- [Cleanup](#cleanup)
-- [Troubleshooting](#troubleshooting)
+- [Two Ways to Run This](#two-ways-to-run-this)
+- [DevOps Pipeline Setup (Kubernetes + GitOps)](#devops-pipeline-setup-kubernetes--gitops)
+- [Local Development (Docker Compose)](#local-development-docker-compose)
+  - [Minimum System Requirements](#minimum-system-requirements)
+  - [Environment Setup](#environment-setup)
+  - [Installation](#installation)
+  - [Database Setup, Migrations, and Seed Data](#database-setup-migrations-and-seed-data)
+  - [Running the Project](#running-the-project)
+  - [Cleanup](#cleanup)
+  - [Troubleshooting](#troubleshooting)
 
 ## Tech Stack
 
@@ -28,7 +30,8 @@ ReactJS and FastAPI.
 | Storage             | PostgreSQL (Bitnami image), MinIO (S3-compatible object storage), Redis 7                                                                                 |
 | ML / NLP            | sentence-transformers, spaCy, gensim, torch (CPU build), google-generativeai (Gemini)                                                                     |
 | Frontend            | React 19, Vite, Tailwind CSS 4, PrimeReact, Chart.js, axios, react-router 7                                                                               |
-| Infra               | Docker Compose, Nginx (reverse proxy / TLS), Node 25 (frontend build stage), Java 17/21 (Spark / Debezium base images)                                    |
+| Local dev infra     | Docker Compose, Nginx (reverse proxy / TLS), Node 25 (frontend build stage), Java 17/21 (Spark / Debezium base images)                                    |
+| DevOps / GitOps     | Ansible (host bootstrap), Terraform + Helm (cluster infra), Kubernetes / Minikube, ArgoCD + Argo CD Image Updater, HashiCorp Vault + External Secrets Operator, Prometheus (kube-prometheus-stack) + Grafana, GitHub Actions |
 
 ## Features and Components
 
@@ -42,8 +45,225 @@ ReactJS and FastAPI.
   MongoDB, SQL Server, Oracle, Db2, Vitess, Spanner, and Informix as
   external source connectors. Cassandra is not supported by the system.
 - **Reverse proxy / TLS termination** via Nginx
+- **`.ansible/`, `terraform/`, `.k8s/`, `vault/`** — the production-style
+  deployment path: a single Ansible playbook provisions a host all the way
+  up to a running Minikube cluster, Terraform installs every piece of
+  cluster infrastructure via Helm, and ArgoCD then keeps the `production`
+  namespace continuously in sync with `.k8s/bases` straight from this repo.
+  See [DevOps Pipeline Setup](#devops-pipeline-setup-kubernetes--gitops)
+  below.
 
-## Minimum System Requirements
+## Two Ways to Run This
+
+| | Docker Compose | Kubernetes + GitOps |
+|---|---|---|
+| **Best for** | Quick local development, iterating on one service at a time | Something closer to how this would actually run in production — the full pipeline this repo is really built around |
+| **Setup effort** | One `.env` file, a few `docker compose` commands | Ansible playbook, then Terraform, then a handful of one-time bootstrap scripts |
+| **Autoscaling / self-healing / monitoring** | No | Yes — HPA, ArgoCD self-heal, Prometheus + Grafana |
+| **Secrets** | Plain `.env` file | HashiCorp Vault, synced into the cluster by External Secrets Operator |
+| **How you deploy a code change** | `docker compose up -d --build <service>` | `git push` → CI builds & pushes images → ArgoCD Image Updater picks up the new tag automatically |
+| **Where to start** | [Local Development](#local-development-docker-compose) below | [DevOps Pipeline Setup](#devops-pipeline-setup-kubernetes--gitops) below |
+
+Both paths run the exact same application code — this only changes *how*
+it's deployed and operated.
+
+## DevOps Pipeline Setup (Kubernetes + GitOps)
+
+This provisions a full GitOps pipeline on a single Linux host: Ansible
+installs everything the host needs and brings up a Minikube cluster,
+Terraform installs every piece of cluster infrastructure via Helm, HashiCorp
+Vault holds the application secrets, and ArgoCD continuously syncs the
+`production` namespace to whatever is committed in this repo's `.k8s/bases`.
+
+**Requirements:** a Linux host (Ubuntu/Debian - the Ansible playbook uses
+`apt`), at least 4 CPU cores and 16GB RAM (this runs Minikube plus every
+piece of infra below, on top of the full application stack once deployed -
+noticeably heavier than the Docker Compose path), and a Docker Hub account.
+
+### 1. Bootstrap the host with Ansible
+
+Installs Docker, kubelet/kubeadm/kubectl, Minikube (and starts it, with the
+`metrics-server` and `ingress` addons enabled), Helm, the `argocd` CLI, and
+Terraform - all in one playbook run:
+
+```bash
+cd .ansible
+ansible-playbook -i inventory.ini install-deps.yaml --ask-become-pass
+```
+
+Check `inventory.ini` matches your actual host/user first (it targets
+`127.0.0.1` by default, i.e. the machine you're running this on).
+
+### 2. Install cluster infrastructure with Terraform
+
+```bash
+cd terraform
+terraform init
+terraform apply -target=kubernetes_namespace.vault
+cd ..
+```
+
+Only the `vault` namespace first, on its own - Vault's pod mounts a TLS
+certificate Secret unconditionally (next step), which has to already exist
+in that namespace before Vault's own Helm release ever installs, or its
+pod fails to start at all.
+
+```bash
+openssl req -x509 -nodes -newkey rsa:2048 -days 825 \
+  -keyout vault.key -out vault.crt \
+  -subj "/CN=vault.vault.svc.cluster.local/O=pulse-dev" \
+  -addext "subjectAltName=DNS:vault,DNS:vault.vault,DNS:vault.vault.svc,DNS:vault.vault.svc.cluster.local,DNS:vault-internal,DNS:vault-internal.vault,DNS:vault-internal.vault.svc,DNS:vault-internal.vault.svc.cluster.local,DNS:vault-0.vault-internal,DNS:vault-0.vault-internal.vault.svc.cluster.local,DNS:localhost,IP:127.0.0.1"
+kubectl create secret tls vault-tls -n vault --cert=vault.crt --key=vault.key
+```
+
+Move `vault.key`/`vault.crt` out of the repo directory afterward, same
+treatment as every other bootstrap secret here - see
+`docs/SECRETS_MANAGEMENT.md`'s TLS section for the full detail (including
+why `global.tlsDisable` alone doesn't work and what would silently break
+if this cert - or the Vault `storage` stanza next to it in
+`terraform/resource.tf` - were handled naively).
+
+Now the rest of the infrastructure:
+
+```bash
+cd terraform
+terraform apply
+cd ..
+```
+
+This installs 5 Helm releases - ArgoCD, Argo CD Image Updater, HashiCorp
+Vault (TLS-enabled, using the cert just created), External Secrets
+Operator, and kube-prometheus-stack (Prometheus + Grafana + Alertmanager) -
+each into its own namespace (`argocd`, `vault`, `monitoring`;
+`external-secrets` itself installs into `kube-system`), plus the
+`dev`/`staging` namespaces. It does **not** create the `production`
+namespace - ArgoCD creates that itself in step 6.
+
+### 3. Bootstrap Vault
+
+Vault starts empty and sealed - it needs to be initialized once, then
+unsealed, then configured with the KV secrets engine, Kubernetes auth, and
+the actual application secret values, seeded from your `.env` file. Every
+script here is idempotent (safe to re-run) and fully unattended - none of
+them prompt for a key or token, they read `vault-init-output.json`
+themselves:
+
+```bash
+cd vault/scripts
+./01-init-vault.sh          # writes vault-init-output.json - move it to
+                             # secure storage (e.g. ~/.vault-pulse/) right
+                             # after this, per the script's own output
+./02-unseal-vault.sh
+./03-enable-kv-and-k8s-auth.sh
+./04-apply-policies-and-roles.sh
+cd ../..
+./vault/scripts/05-seed-secrets-from-env.sh   # run from the repo root - needs your .env
+```
+
+See `docs/SECRETS_MANAGEMENT.md` for the full architecture, how to rotate a
+secret afterward, and the exact severity of losing `vault-init-output.json`
+(≥3 of its 5 unseal keys, or its root token, and this Vault's data is gone).
+
+### 4. Load the TLS certificate
+
+One self-signed certificate covers `pulse-engine.com` and every subdomain
+used below (`*.pulse-engine.com`). It has to be loaded as a Secret named
+`pulse-tls` into **every namespace** that has an Ingress referencing it -
+`production` (the main app) and `argocd` (the ArgoCD UI):
+
+```bash
+openssl req -x509 -nodes -newkey rsa:2048 -days 825 \
+  -keyout pulse-engine.key -out pulse-engine.crt \
+  -subj "/CN=pulse-engine.com/O=pulse-dev" \
+  -addext "subjectAltName=DNS:pulse-engine.com,DNS:*.pulse-engine.com"
+
+kubectl create secret tls pulse-tls -n production --cert=pulse-engine.crt --key=pulse-engine.key
+kubectl create secret tls pulse-tls -n argocd     --cert=pulse-engine.crt --key=pulse-engine.key
+```
+
+Move `pulse-engine.key`/`.crt` out of the repo directory afterward (same
+treatment as the Vault keys) - see `docs/INGRESS_ACCESS.md`, which also
+covers the `/etc/hosts` entries you'll need for your browser to resolve
+`pulse-engine.com` and friends to the cluster at all.
+
+### 5. Configure CI and push
+
+CI (`.github/workflows/ci.yaml`) builds and pushes every custom image to
+Docker Hub on every push to `main`, tagged both `latest` and an immutable
+`sha-<commit>` (the tag Argo CD Image Updater watches for). It needs two
+repository secrets, set under the GitHub repo's Settings → Secrets and
+variables → Actions:
+
+| Secret | Value |
+|---|---|
+| `DOCKERHUB_USERNAME` | Your Docker Hub username |
+| `DOCKERHUB_TOKEN` | A Docker Hub access token with write/push scope |
+
+Then commit and push everything from steps 1-5 (review `git status` first -
+this is a lot of new and modified files):
+
+```bash
+git add .
+git status   # review before committing - never commit vault-init-output.json,
+             # pulse-engine.key, terraform.tfstate, or .env (all gitignored,
+             # but worth a second look before a push this size)
+git commit -m "Add Kubernetes/GitOps deployment pipeline"
+git push origin main
+```
+
+This is the step that actually makes ArgoCD's sync target real - until
+something is pushed, `.k8s/bases` doesn't exist on the `main` branch that
+`.k8s/argocd/argocd.yaml` points at.
+
+### 6. Point ArgoCD at this repo
+
+```bash
+kubectl apply -f .k8s/argocd/argocd.yaml
+```
+
+This creates the `production` namespace (via `CreateNamespace=true`) and
+starts syncing every object in `.k8s/bases` into it - roughly 90 objects on
+first sync: 14 Deployments, 2 Jobs, 15 Services, PVCs, the HPAs, the
+NetworkPolicies, the ExternalSecrets that pull real values out of Vault, and
+the ServiceMonitors that wire everything up to Prometheus. `selfHeal: true`
+means any manual `kubectl edit`/`delete` against these resources gets
+reverted back to what's in git on the next sync - this repo, not `kubectl`,
+is meant to be the source of truth from this point on.
+
+### 7. Verify
+
+```bash
+kubectl get application -n argocd pulse         # HEALTHY / Synced, once images actually exist on Docker Hub
+kubectl get pods -n production
+```
+
+Then see `docs/INGRESS_ACCESS.md` for the actual URLs (including ArgoCD's
+own UI, now reachable over HTTPS through the same Ingress) and
+`docs/SECRETS_MANAGEMENT.md` for the secrets architecture in more depth.
+
+### Optional: the Vertical Pod Autoscaler
+
+`.k8s/bases/vpa.yaml`'s 7 `VerticalPodAutoscaler` objects need a controller
+that isn't part of any of the above - it's not a Helm chart, so it isn't in
+`terraform/resource.tf`:
+
+```bash
+git clone https://github.com/kubernetes/autoscaler.git
+cd autoscaler/vertical-pod-autoscaler
+./hack/vpa-up.sh
+```
+
+Every VPA here uses `updateMode: "Off"` (recommendation-only, never evicts
+a running pod), so this is safe to skip entirely - ArgoCD will just show
+those 7 objects as permanently `OutOfSync` until it's installed.
+
+## Local Development (Docker Compose)
+
+The fastest way to run the whole stack on one machine. See [Two Ways to
+Run This](#two-ways-to-run-this) above if you're deciding between this and
+the full Kubernetes pipeline.
+
+### Minimum System Requirements
 
 - **Docker / Docker Compose**: The entire tech stack runs on Docker and Docker Compose.
 - **OS:** Linux and MacOS are preferred, but the system can run on Windows as well.
@@ -52,7 +272,7 @@ ReactJS and FastAPI.
   `8080`, `7077`, `4040`, `2181`, `9092`, `8083`, `6379`, `8081`, `10000`,
   `8443`, `8090`, plus configurable Nginx ports (defaults `8082` / `9443`)
 
-## Environment Setup
+### Environment Setup
 
 1. Copy the environment template:
    
@@ -91,7 +311,7 @@ ReactJS and FastAPI.
    - Oracle: `jars/ojdbc8.jar`
    - Spanner: `jars/gcp-credentials.json`
 
-## Installation
+### Installation
 
 Dependencies are installed automatically as part of the Docker image build
 — no separate manual install step is required for the containerized
@@ -116,7 +336,7 @@ cd frontend
 npm ci
 ```
 
-## Database Setup, Migrations, and Seed Data
+### Database Setup, Migrations, and Seed Data
 
 ### PostgreSQL initialization
 
@@ -204,7 +424,7 @@ airflow users create --username ${AIRFLOW_ADMIN_USER:-admin} --password ${AIRFLO
 Synthetic e-commerce data lives in `faker/*.xlsx`, generated via the
 `faker/faker.ipynb` notebook.
 
-## Running the Project
+### Running the Project
 
 ### Full stack — first-time setup
 
@@ -329,7 +549,7 @@ docker compose build airflow-webserver airflow-scheduler
 docker compose up -d airflow-webserver airflow-scheduler
 ```
 
-## Cleanup
+### Cleanup
 
 The standard Compose command would be:
 
@@ -346,7 +566,7 @@ first**, then run:
 
 This purges all `ecom.*` Kafka topics.
 
-## Troubleshooting
+### Troubleshooting
 
 - **Verify Debezium is running:**
   

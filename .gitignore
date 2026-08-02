@@ -64,3 +64,13 @@ frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
 jars/deps/aws-java-sdk-bundle-1.12.262.jar
+
+*.pem
+
+*.tfstate
+*.tfstate.backup
+
+# Vault unseal keys + root token (vault/scripts/01-init-vault.sh writes this
+# in the current directory) — move it to secure storage outside the repo
+# immediately after generating it; this is a backstop, not the plan.
+vault-init-output.json

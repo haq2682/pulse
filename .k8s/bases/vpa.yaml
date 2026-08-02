@@ -1,0 +1,208 @@
+# VerticalPodAutoscalers - watch a Deployment's actual CPU/memory usage
+# over time and recommend better request/limit values than the ones
+# hand-picked in deployment.yaml.
+#
+# IMPORTANT: unlike HPA, the VPA API is NOT built into Kubernetes. It needs
+# its own controller (3 pods: recommender, updater, admission-controller)
+# installed separately - this cluster does not have it installed yet, so
+# these objects will sit inert (or fail to apply, since the CRD they use
+# won't exist) until it is. The official install method is a script against
+# a clone of the project, not a simple `kubectl apply -f <url>`:
+#
+#   git clone https://github.com/kubernetes/autoscaler.git
+#   cd autoscaler/vertical-pod-autoscaler
+#   ./hack/vpa-up.sh
+#
+# See docs/SECRETS_MANAGEMENT.md's neighbor - there is no doc file for this
+# yet; the install/verification steps live only in this comment for now.
+#
+# Every target below uses updateMode: "Off" - the safest of VPA's modes.
+# It only calculates and stores recommendations (visible via
+# `kubectl describe vpa <name>`); it never evicts or changes a running pod
+# on its own. The other modes ("Recreate", "InPlaceOrRecreate", "InPlace",
+# "Initial") actually apply their recommendations - "Recreate" in
+# particular evicts and recreates pods when its recommendation drifts far
+# enough from the current request, which causes a real restart. That's not
+# something to turn on by default for singleton, stateful-ish services like
+# a database with no replica to fail over to - start with "Off", read the
+# recommendations for a while, then decide.
+#
+# All 7 targets here are the singleton "backing service" style workloads in
+# deployment.yaml (1 replica, not fronted by an HPA) - the natural fit for
+# VPA, which manages a container's resource shape, not its replica count.
+#
+# Docs: https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/README.md
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: pulse-spark-master-vpa
+  namespace: production
+  labels:
+    app: pulse-spark-master
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pulse-spark-master
+  updatePolicy:
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: pulse-spark-master
+        minAllowed:
+          cpu: 100m
+          memory: 256Mi
+        maxAllowed:
+          cpu: "1"
+          memory: 1Gi
+        controlledResources: ["cpu", "memory"]
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: pulse-postgresql-vpa
+  namespace: production
+  labels:
+    app: pulse-postgresql
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pulse-postgresql
+  updatePolicy:
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: pulse-postgresql
+        minAllowed:
+          cpu: 100m
+          memory: 256Mi
+        maxAllowed:
+          cpu: "1"
+          memory: 2Gi
+        controlledResources: ["cpu", "memory"]
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: pulse-zookeeper-vpa
+  namespace: production
+  labels:
+    app: pulse-zookeeper
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pulse-zookeeper
+  updatePolicy:
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: pulse-zookeeper
+        minAllowed:
+          cpu: 100m
+          memory: 256Mi
+        maxAllowed:
+          cpu: "1"
+          memory: 1Gi
+        controlledResources: ["cpu", "memory"]
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: pulse-kafka-vpa
+  namespace: production
+  labels:
+    app: pulse-kafka
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pulse-kafka
+  updatePolicy:
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: pulse-kafka
+        minAllowed:
+          cpu: 250m
+          memory: 512Mi
+        maxAllowed:
+          cpu: "1500m"
+          memory: 3Gi
+        controlledResources: ["cpu", "memory"]
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: pulse-redis-vpa
+  namespace: production
+  labels:
+    app: pulse-redis
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pulse-redis
+  updatePolicy:
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: pulse-redis
+        minAllowed:
+          cpu: 50m
+          memory: 64Mi
+        maxAllowed:
+          cpu: 500m
+          memory: 512Mi
+        controlledResources: ["cpu", "memory"]
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: pulse-minio-vpa
+  namespace: production
+  labels:
+    app: pulse-minio
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pulse-minio
+  updatePolicy:
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: pulse-minio
+        minAllowed:
+          cpu: 100m
+          memory: 256Mi
+        maxAllowed:
+          cpu: "1"
+          memory: 2Gi
+        controlledResources: ["cpu", "memory"]
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: pulse-airflow-scheduler-vpa
+  namespace: production
+  labels:
+    app: pulse-airflow-scheduler
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pulse-airflow-scheduler
+  updatePolicy:
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: pulse-airflow-scheduler
+        minAllowed:
+          cpu: 100m
+          memory: 256Mi
+        maxAllowed:
+          cpu: "1"
+          memory: 1Gi
+        controlledResources: ["cpu", "memory"]

@@ -486,8 +486,7 @@ def validate_api_endpoint(api_url: str, timeout: int = 10) -> Tuple[bool, str]:
             return False, "Invalid API URL: hostname not found"
         
         # SSRF Protection: Check if URL is safe before making request
-        # is_safe, safety_error = _is_safe_url(api_url)
-        is_safe = True
+        is_safe, safety_error = _is_safe_url(api_url)
         if not is_safe:
             return False, f"Security error: {safety_error}"
         

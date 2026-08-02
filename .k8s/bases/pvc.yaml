@@ -1,0 +1,151 @@
+# One PersistentVolumeClaim per docker-compose named volume that is actually
+# mounted by a service. docker-compose.yml also declares "spark_jars" and
+# "app" as top-level volumes, but neither one is mounted by any service in
+# the file, so no PVC is created for them here.
+#
+# All PVCs use ReadWriteOnce (a single node may mount them read-write) because
+# the "pulse-storage" StorageClass is a hostPath provisioner, which only ever
+# supports ReadWriteOnce. On minikube (a single-node cluster) this is not a
+# limitation: every pod is scheduled on that one node anyway.
+#
+# Docs: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pulse-postgresql-pvc
+  namespace: production
+  labels:
+    app: pulse-postgresql
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: pulse-storage
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pulse-minio-pvc
+  namespace: production
+  labels:
+    app: pulse-minio
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: pulse-storage
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pulse-spark-master-pvc
+  namespace: production
+  labels:
+    app: pulse-spark-master
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: pulse-storage
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pulse-zookeeper-data-pvc
+  namespace: production
+  labels:
+    app: pulse-zookeeper
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: pulse-storage
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pulse-zookeeper-log-pvc
+  namespace: production
+  labels:
+    app: pulse-zookeeper
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: pulse-storage
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pulse-kafka-pvc
+  namespace: production
+  labels:
+    app: pulse-kafka
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: pulse-storage
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pulse-redis-pvc
+  namespace: production
+  labels:
+    app: pulse-redis
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: pulse-storage
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pulse-nifi-pvc
+  namespace: production
+  labels:
+    app: pulse-nifi
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: pulse-storage
+  resources:
+    requests:
+      storage: 15Gi
+---
+# Shared by the airflow-init Job, pulse-airflow-webserver, and
+# pulse-airflow-scheduler, same as docker-compose.yml's single airflow_logs
+# volume. This only works because ReadWriteOnce allows concurrent mounts from
+# multiple pods as long as they land on the same node - guaranteed here since
+# minikube only has one node. On a real multi-node cluster this PVC would
+# need a ReadWriteMany-capable StorageClass (e.g. NFS/EFS) instead.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pulse-airflow-logs-pvc
+  namespace: production
+  labels:
+    app: pulse-airflow
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: pulse-storage
+  resources:
+    requests:
+      storage: 5Gi

@@ -1,0 +1,193 @@
+name: Build & Push Docker Images
+
+# Builds every custom image in this repo and pushes it to Docker Hub with a
+# `pulse-` prefix and an immutable sha tag (`sha-<git sha>`), which is what
+# Argo CD Image Updater uses (update-strategy: latest, allow-tags regexp:
+# ^sha-.*$ - see the annotations on .k8s/argocd/argocd.yaml's Application).
+#
+# Required repository secrets:
+#   DOCKERHUB_USERNAME   Docker Hub username
+#   DOCKERHUB_TOKEN      Docker Hub access token (write/push scope)
+#
+# Optional repository variables:
+#   VITE_API_URL           Relative API base the SPA is built with (default: /api)
+#   VITE_NIFI_UPLOAD_URL   Upload endpoint the SPA posts files to (default: /upload)
+
+on:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SHA_TAG: sha-${{ github.sha }}
+  # Shared build args for the frontend (kept uniform across matrix jobs;
+  # images that don't declare these ARGs simply ignore them).
+  VITE_BUILD_ARGS: |
+    VITE_API_URL=${{ vars.VITE_API_URL }}
+    VITE_NIFI_UPLOAD_URL=${{ vars.VITE_NIFI_UPLOAD_URL }}
+
+jobs:
+  lint-frontend:
+    name: Lint frontend (ESLint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+        working-directory: frontend
+
+      - run: npm run lint
+        working-directory: frontend
+
+  # No pytest suite exists anywhere in this repo yet, so there's nothing to
+  # "test" here in the unit-test sense - this runs ruff, restricted to just
+  # E9 (syntax errors) and F821 (undefined names). Both are genuine runtime
+  # bugs, not style opinions - deliberately NOT ruff's full default rule
+  # set, which produces 1800+ findings on this codebase (it's never been
+  # linted before) and would make this gate permanently red on day one for
+  # reasons unrelated to correctness. Widen this once the codebase has been
+  # brought up to a stricter baseline on purpose, not as a side effect of
+  # adding CI.
+  lint-python:
+    name: Lint Python (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - run: pip install ruff==0.16.1
+
+      - run: >-
+          ruff check --select E9,F821
+          api/ cleaning/ mapping/ transformation/ analysis/
+          machine-learning/ airflow/
+
+  build-python:
+    name: pulse-python
+    needs: [lint-frontend, lint-python]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .docker/python/Dockerfile
+          push: true
+          pull: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/pulse-python:${{ env.SHA_TAG }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/pulse-python:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Images whose Dockerfiles start from pulse-python (FROM python-py310).
+  build-dependent:
+    name: pulse-${{ matrix.name }}
+    needs: build-python
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: api
+            file: .docker/api/Dockerfile
+          - name: spark
+            file: .docker/spark/Dockerfile
+          - name: airflow
+            file: .docker/airflow/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          push: true
+          pull: true
+          build-args: |
+            BASE_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/pulse-python:${{ env.SHA_TAG }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/pulse-${{ matrix.name }}:${{ env.SHA_TAG }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/pulse-${{ matrix.name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Self-contained images (no dependency on pulse-python).
+  build-standalone:
+    name: pulse-${{ matrix.name }}
+    needs: [lint-frontend, lint-python]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: frontend
+            file: .docker/frontend/Dockerfile
+          - name: nginx
+            file: .docker/nginx/Dockerfile
+          - name: postgresql
+            file: .docker/postgresql/Dockerfile
+          - name: minio
+            file: .docker/minio/Dockerfile
+          - name: debezium
+            file: .docker/debezium/Dockerfile
+          - name: nifi
+            file: .docker/nifi/Dockerfile
+          - name: cassandra
+            file: .docker/cassandra/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          push: true
+          pull: true
+          build-args: ${{ env.VITE_BUILD_ARGS }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/pulse-${{ matrix.name }}:${{ env.SHA_TAG }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/pulse-${{ matrix.name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

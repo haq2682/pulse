@@ -6,7 +6,7 @@ Manages the CONTINUOUS, long-running API ingestion pipeline for API mode.
 Architecture
 ------------
 ``run_mapping.py --mode api`` starts two parallel processes inside the
-python container:
+task pod:
 
   Process 1 – API Ingestion Service
     Polls the USER-PROVIDED external API endpoint every ``api_poll_interval``
@@ -57,10 +57,12 @@ no further user action is needed.
 Crash handling & auto-restart
 ------------------------------
 ``run_api_streaming`` runs forever.  On crash:
-  - DockerOperator container exits non-zero
+  - The task pod's container exits non-zero
   - Airflow marks task FAILED, waits 1 min, restarts
   - retries=9999 means effectively infinite restarts
   - Spark checkpoint persists in MinIO so no data is lost
+  - The exited pod is deleted (matching the old auto_remove="force"
+    DockerOperator behaviour) and a fresh one is created on retry.
 
 Required dag_run.conf parameters
 ----------------------------------
@@ -81,22 +83,24 @@ from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.models import Variable
-from airflow.providers.docker.operators.docker import DockerOperator
+from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from airflow.operators.python import PythonOperator
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from config.pipeline_config import (
     API_POLL_INTERVAL,
+    API_STREAM_POD_LABELS,
     DEFAULT_BUCKET,
     DEFAULT_TASK_ARGS,
+    POD_NAMESPACE,
     PYTHON_IMAGE,
-    SPARK_NETWORK,
+    STREAM_POD_RESOURCES,
+    TASK_SERVICE_ACCOUNT,
     POSTGRES_SERVER,
     POSTGRES_DB,
     POSTGRES_USER,
     POSTGRES_PASSWORD,
-    docker_pipeline_env,
-    docker_app_mounts,
+    k8s_pipeline_env,
 )
 
 BUCKET        = Variable.get("default_bucket",    default_var=DEFAULT_BUCKET)
@@ -239,7 +243,7 @@ def verify_api_health(**context):
 
     raise RuntimeError(
         f"Could not reach the user API at {api_url}. "
-        "Ensure the endpoint is running and accessible from within the Docker network."
+        "Ensure the endpoint is running and accessible from within the cluster."
     )
 
 
@@ -280,11 +284,18 @@ with DAG(
     #
     # NOTE: no --trigger-once / --poll-duration here.
     # The job polls indefinitely at poll_interval seconds per cycle.
-    run_api_streaming = DockerOperator(
+    #
+    # This pod also needs internet egress (the user's api_url is an
+    # arbitrary external host) - see the pulse-api-stream-netpol entry in
+    # networkpolicy.yaml, which grants that the same way pulse-api-netpol
+    # does for Gemini/Google/SMTP.
+    run_api_streaming = KubernetesPodOperator(
         task_id="run_api_mapping_stream",
+        name="pulse-api-stream",
+        namespace=POD_NAMESPACE,
         image=PYTHON_IMAGE,
-        command=[
-            "python3", "/app/mapping/run_mapping.py",
+        cmds=["python3", "/app/mapping/run_mapping.py"],
+        arguments=[
             "--mode", "api",
             # dag_run.conf overrides; params are fallback for manual UI runs.
             "--business-id",     "{{ (ti.xcom_pull(task_ids='check_api_health') or {}).get('bucket') or dag_run.conf.get('bucket') or params.bucket }}",
@@ -294,13 +305,13 @@ with DAG(
             # No --poll-duration: must poll forever.
             # No --enable-downstream: downstream is a scheduled Airflow batch job.
         ],
-        environment=docker_pipeline_env(),
-        network_mode=SPARK_NETWORK,
-        mounts=docker_app_mounts(),
-        auto_remove="force",
-        do_xcom_push=False,
-        mount_tmp_dir=False,
-        tty=True,
+        env_vars=k8s_pipeline_env(),
+        service_account_name=TASK_SERVICE_ACCOUNT,
+        labels=API_STREAM_POD_LABELS,
+        container_resources=STREAM_POD_RESOURCES(),
+        in_cluster=True,
+        get_logs=True,
+        is_delete_operator_pod=True,   # matches the old auto_remove="force"
         **_streaming_defaults,
     )
 

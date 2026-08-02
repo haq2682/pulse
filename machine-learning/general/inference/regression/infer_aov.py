@@ -463,8 +463,7 @@ def main(BUCKET_NAME, EXPORT_PLOTS=False):
     print("AOV Prediction - Improved Inference")
     print("="*60)
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Model: {MODEL_NAME}\n")
-    
+
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
 

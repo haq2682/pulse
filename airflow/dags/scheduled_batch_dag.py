@@ -102,7 +102,7 @@ from config.pipeline_config import (
     POSTGRES_DB,
     POSTGRES_USER,
     POSTGRES_PASSWORD,
-    PYTHON_CONTAINER,
+    run_k8s_task_pod,
 )
 
 # ---------------------------------------------------------------------------
@@ -424,33 +424,26 @@ def _run_batch_pipeline_for_bucket(bucket: str) -> tuple:
             f"--bucket-name {bucket}",
             None,
         ),
-        (
-            # Specific models always retrain on every cycle using the freshly
-            # transformed data produced above.  They are per-tenant and cannot
-            # be shared across businesses.  Training runs here (inside the
-            # advisory lock) so a failure aborts this bucket and Airflow retries
-            # it without affecting any other tenant's pipeline.
-            "specific_model_training",
-            "machine-learning/specific/train.py",
-            f"--bucket-name {bucket}",
-            _STEP_TIMEOUT_SECONDS * 2,   # training is slower than other steps
-        ),
-        (
-            "ml_inference",
-            "machine-learning/infer_all.py",
-            f"--bucket-name {bucket}",
-            None,
-        ),
+        # (
+        #     # Specific models always retrain on every cycle using the freshly
+        #     # transformed data produced above.  They are per-tenant and cannot
+        #     # be shared across businesses.  Training runs here (inside the
+        #     # advisory lock) so a failure aborts this bucket and Airflow retries
+        #     # it without affecting any other tenant's pipeline.
+        #     "specific_model_training",
+        #     "machine-learning/specific/train.py",
+        #     f"--bucket-name {bucket}",
+        #     _STEP_TIMEOUT_SECONDS * 2,   # training is slower than other steps
+        # ),
+        # (
+        #     "ml_inference",
+        #     "machine-learning/infer_all.py",
+        #     f"--bucket-name {bucket}",
+        #     None,
+        # ),
     ]
 
     print(f"\n{'='*60}\n[{bucket}] Starting batch pipeline\n{'='*60}")
-
-    # Initialise Docker Python SDK once — reused for every step in this bucket.
-    # exec_run() uses the Docker API socket (no CLI binary needed).
-    import docker as _docker_sdk
-    import concurrent.futures as _futures
-    _sdk_client    = _docker_sdk.from_env()
-    _sdk_container = _sdk_client.containers.get(PYTHON_CONTAINER)
 
     # Wrap all step execution in try/finally so the advisory lock is released
     # on every exit path — success, step failure, timeout, or unexpected exception.
@@ -461,14 +454,18 @@ def _run_batch_pipeline_for_bucket(bucket: str) -> tuple:
             print(f"  [{bucket}] ▶ {step_name}")
             _step_cmd = ["python3", f"/app/{script}"] + args_str.split()
 
+            # run_k8s_task_pod creates a fresh Kubernetes Pod for this one
+            # step, waits for it to finish (or the timeout to expire),
+            # returns its exit code + combined log output, and always
+            # deletes the pod - the Kubernetes-native replacement for what
+            # exec_run() into a shared long-running container used to do.
             try:
-                with _futures.ThreadPoolExecutor(max_workers=1) as _pool:
-                    _exec_result = _pool.submit(
-                        lambda _c=_step_cmd: _sdk_container.exec_run(
-                            cmd=_c, demux=True, stream=False
-                        )
-                    ).result(timeout=step_timeout)
-            except _futures.TimeoutError:
+                _returncode, _log_output = run_k8s_task_pod(
+                    name=f"pulse-sched-{step_name}",
+                    command=_step_cmd,
+                    timeout_seconds=step_timeout,
+                )
+            except TimeoutError:
                 print(
                     f"  [{bucket}] ⏱  {step_name} timed out after {step_timeout}s "
                     "— aborting this bucket."
@@ -480,19 +477,18 @@ def _run_batch_pipeline_for_bucket(bucket: str) -> tuple:
                 )
                 return bucket, False
 
-            _returncode  = _exec_result.exit_code
-            stderr_tail  = (_exec_result.output[1] or b"").decode("utf-8", errors="replace")[-800:]
+            log_tail = (_log_output or "")[-800:]
 
             if _returncode == 0:
                 print(f"  [{bucket}] ✅ {step_name} completed")
             else:
                 err_msg = (
                     f"{step_name} exited with code {_returncode}. "
-                    + (stderr_tail if stderr_tail else "")
+                    + (log_tail if log_tail else "")
                 )
                 print(
                     f"  [{bucket}] ⚠️  {step_name} exited with code {_returncode}"
-                    + (f"\n     stderr: {stderr_tail}" if stderr_tail else "")
+                    + (f"\n     log: {log_tail}" if log_tail else "")
                 )
                 # Abort the remaining steps for this bucket so we don't
                 # transform/analyze stale or partially-cleaned data.
@@ -594,9 +590,12 @@ def run_pipeline_for_single_bucket(bucket: str, **context) -> None:
             f"Batch pipeline failed for tenant '{bucket}'. "
             "See task log for step-level details."
         )
+    # ML forecasting/prediction is temporarily disabled project-wide (see
+    # ml_retrain_dag.py) - firing this would just trigger a DAG with no
+    # active tasks, so it's commented out rather than left calling into it.
     # Trigger drift check immediately — this tenant's data is fresh right now.
     # Does not wait for any other tenant; does not block on failure.
-    _trigger_drift_check_for_bucket(bucket)
+    # _trigger_drift_check_for_bucket(bucket)
 
 
 # ---------------------------------------------------------------------------
