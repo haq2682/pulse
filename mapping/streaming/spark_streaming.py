@@ -136,8 +136,10 @@ def create_spark_session() -> SparkSession:
         SparkSession.builder
         .appName("StreamingNormalization")
         .master(spark_master)
-        # Dynamic allocation requires an external shuffle service that is not
-        # configured on this standalone cluster.  Use a fixed executor count
+        # This is a long-running Structured Streaming query with continuous,
+        # roughly constant load - there's no idle period for dynamic
+        # allocation to reclaim, and churning executors mid-stream would add
+        # latency without saving resources. Use a fixed executor count
         # constrained to 1 core / 1 GiB for this streaming workload.
         .config("spark.dynamicAllocation.enabled", "false")
         .config("spark.executor.instances", os.getenv("SPARK_EXECUTOR_INSTANCES", "1"))

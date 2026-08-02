@@ -52,6 +52,13 @@ def create_ml_spark_session(
             .config("spark.dynamicAllocation.enabled", "true")
             .config("spark.dynamicAllocation.minExecutors", "0")
             .config("spark.dynamicAllocation.initialExecutors", "1")
+            # Migrate RDD/shuffle blocks off an executor before it's removed
+            # by dynamic allocation or a spark-worker pod eviction, instead
+            # of dropping them and forcing a recompute/reshuffle.
+            .config("spark.decommission.enabled", "true")
+            .config("spark.storage.decommission.enabled", "true")
+            .config("spark.storage.decommission.rddBlocks.enabled", "true")
+            .config("spark.storage.decommission.shuffleBlocks.enabled", "true")
         )
     else:
         builder = builder.config("spark.dynamicAllocation.enabled", "false")

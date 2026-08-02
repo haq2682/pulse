@@ -234,9 +234,10 @@ _spark_master = (
 spark = (
     SparkSession.builder.appName("NormalizeData")
     .master(_spark_master)
-    # Dynamic allocation requires an external shuffle service on standalone
-    # clusters which is not configured here.  Disable it so executor count
-    # stays predictable; the caller (create_spark_session in spark_streaming)
+    # This is a short, one-shot batch job - dynamic allocation's ramp-up
+    # latency (waiting on the scheduler backlog signal before requesting
+    # executors) isn't worth it here. Disable it so executor count stays
+    # predictable; the caller (create_spark_session in spark_streaming)
     # manages its own session and overrides this via getOrCreate anyway.
     .config("spark.dynamicAllocation.enabled", "false")
     # Use pre-downloaded local JARs — no Maven/internet access needed.

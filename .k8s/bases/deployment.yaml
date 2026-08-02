@@ -756,6 +756,13 @@ spec:
       labels:
         app: pulse-spark-worker
     spec:
+      # Give a decommissioning worker time to migrate its executor's RDD/
+      # shuffle blocks (see spark.storage.decommission.* in the driver-side
+      # SparkSession configs) before Kubernetes SIGKILLs it. Paired with the
+      # preStop hook below and the PDB in pdb.yaml, this is what makes
+      # HPA/eviction-driven scale-down of this Deployment safe instead of
+      # just dropping in-flight work.
+      terminationGracePeriodSeconds: 120
       containers:
         - name: pulse-spark-worker
           image: pulse-spark
@@ -783,8 +790,13 @@ spec:
               value: python3.10
             # spark.ui.prometheus.enabled turns on Spark's built-in metrics
             # servlet - see monitoring.yaml's pulse-spark-worker ServiceMonitor.
+            # spark.decommission.enabled makes the Worker process itself
+            # register a handler for spark.worker.decommission.signal
+            # (SIGPWR by default) - without it, the preStop hook's signal
+            # below would just be ignored and the pod would terminate the
+            # same way it always did.
             - name: SPARK_WORKER_OPTS
-              value: "-Dspark.shuffle.service.enabled=true -Dspark.worker.cleanup.enabled=true -Dspark.worker.cleanup.interval=300 -Dspark.worker.cleanup.appDataTtl=600 -Dspark.ui.prometheus.enabled=true"
+              value: "-Dspark.shuffle.service.enabled=true -Dspark.worker.cleanup.enabled=true -Dspark.worker.cleanup.interval=300 -Dspark.worker.cleanup.appDataTtl=600 -Dspark.ui.prometheus.enabled=true -Dspark.decommission.enabled=true"
             - name: MINIO_ENDPOINT
               value: pulse-minio:9000
           envFrom:
@@ -810,6 +822,22 @@ spec:
               port: 8081
             initialDelaySeconds: 30
             periodSeconds: 20
+          lifecycle:
+            preStop:
+              # Kubernetes only ever sends SIGTERM on pod termination, but
+              # Spark's standalone Worker listens for SIGPWR (see
+              # spark.worker.decommission.signal) to start decommissioning.
+              # spark-class execs the JVM as PID 1 (no wrapper shell), so
+              # signalling PID 1 from this exec hook reaches it directly.
+              # Kubernetes only sends SIGTERM AFTER this hook returns, so the
+              # trailing sleep matters: without it, SIGTERM would follow the
+              # signal almost instantly and race the JVM's own shutdown hooks
+              # against the (async) block migration decommissioning just
+              # triggered. 90s leaves 30s of the 120s
+              # terminationGracePeriodSeconds as a buffer for the JVM to exit
+              # on its own before Kubernetes SIGKILLs it.
+              exec:
+                command: ["/bin/sh", "-c", "kill -s PWR 1; sleep 90"]
 ---
 # ─────────────────────────────────────────────────────────────────────────
 # NiFi

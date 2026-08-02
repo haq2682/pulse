@@ -38,10 +38,14 @@ def create_spark_session():
 
     if not is_local:
         # -----------------------------------------------------------------------
-        # Cluster layout: 2 workers × 2 cores × 4 GB RAM each
-        #   → 1 executor per worker (2 cores/executor) = 2 executors max
-        #   → 4 GB worker − 512 MB OS − 512 MB JVM overhead = ~3 GB safe ceiling
-        #   → parallelism/shuffle partitions = 2 executors × 2 cores × 2 = 8–16
+        # Cluster layout: up to 2 workers (HPA-scaled, pulse-spark-worker-hpa's
+        # maxReplicas) × 1 core × 2 GB RAM each (SPARK_WORKER_CORES/
+        # SPARK_WORKER_MEMORY in deployment.yaml)
+        #   → 1 executor per worker (1 core/executor) = 2 executors max
+        #   → TRANSFORM_EXECUTOR_MEMORY (1g) + memoryOverhead (384m) = 1.375g
+        #     per executor, leaving ~640m of the worker pod's 2Gi container
+        #     limit for the Spark worker daemon itself plus OS/JVM headroom
+        #   → parallelism/shuffle partitions = 2 executors × 1 core × 8 = 16
         # -----------------------------------------------------------------------
         dynamic_enabled = os.getenv("TRANSFORM_DYNAMIC_ALLOCATION_ENABLED", "true").lower() == "true"
         min_exec     = int(os.getenv("TRANSFORM_MIN_EXECUTORS",     "0"))
@@ -69,21 +73,41 @@ def create_spark_session():
                     os.getenv("TRANSFORM_BACKLOG_TIMEOUT", "1s"))
             .config("spark.dynamicAllocation.sustainedSchedulerBacklogTimeout",
                     os.getenv("TRANSFORM_SUSTAINED_BACKLOG_TIMEOUT", "5s"))
-            # 2 cores per executor → 1 executor fills one worker completely
+            # Graceful executor/worker decommissioning: when dynamic allocation
+            # (or a spark-worker pod eviction) removes an executor, migrate its
+            # RDD/shuffle blocks to a surviving executor first instead of just
+            # dropping them - avoids forcing a costly recompute/reshuffle.
+            # Requires spark.shuffle.service.enabled=true on the workers
+            # (set via SPARK_WORKER_OPTS in deployment.yaml), which is what
+            # lets shuffle data outlive the executor that produced it.
+            .config("spark.decommission.enabled", "true")
+            .config("spark.storage.decommission.enabled", "true")
+            .config("spark.storage.decommission.rddBlocks.enabled", "true")
+            .config("spark.storage.decommission.shuffleBlocks.enabled", "true")
+            # 1 core per executor → 1 executor fills one worker completely
+            # (must match SPARK_WORKER_CORES in deployment.yaml: standalone
+            # mode can't split one executor across multiple workers, so a
+            # value here higher than what a single worker advertises means
+            # the master can never place an executor at all)
             .config("spark.executor.cores",
-                    os.getenv("TRANSFORM_EXECUTOR_CORES", "2"))
-            # 2 g execution/storage heap + 512 m JVM overhead = 2.5 g per executor slot
-            # leaves ~1.5 g on the worker for OS and Spark worker daemon
+                    os.getenv("TRANSFORM_EXECUTOR_CORES", "1"))
+            # 1g execution/storage heap + 384m overhead (Spark's own default
+            # floor: max(384m, 10% of executor.memory)) = 1.375g per executor
+            # slot - fits inside the worker pod's 2Gi container limit
+            # alongside the worker daemon's own footprint (see layout note
+            # at the top of this block). MUST stay under ~1.75g here: this
+            # executor JVM and the Worker daemon share the same container's
+            # memory cgroup, so anything left unbudgeted risks an OOMKill.
             .config("spark.executor.memory",
-                    os.getenv("TRANSFORM_EXECUTOR_MEMORY", "2g"))
+                    os.getenv("TRANSFORM_EXECUTOR_MEMORY", "1g"))
             .config("spark.executor.memoryOverhead",
-                    os.getenv("TRANSFORM_EXECUTOR_MEMORY_OVERHEAD", "512m"))
+                    os.getenv("TRANSFORM_EXECUTOR_MEMORY_OVERHEAD", "384m"))
             # Driver runs on the host machine (16 GB) — 3 g is safe
             .config("spark.driver.memory",
                     os.getenv("TRANSFORM_DRIVER_MEMORY", "3g"))
             .config("spark.driver.maxResultSize",
                     os.getenv("TRANSFORM_DRIVER_MAX_RESULT_SIZE", "1g"))
-            # 2 executors × 2 cores = 4 slots; 4× multiplier → 16 partitions
+            # 2 executors × 1 core = 2 slots; 8× multiplier → 16 partitions
             .config("spark.sql.shuffle.partitions",
                     os.getenv("TRANSFORM_SHUFFLE_PARTITIONS", "16"))
             .config("spark.default.parallelism",

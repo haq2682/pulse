@@ -23,6 +23,13 @@
 # 4Gi total, comfortably inside the stated budget alongside everything
 # else, unlike before this pass.
 #
+# pulse-spark-worker also has its scale-down made safe rather than just
+# elastic: dynamicAllocation on the driver side (transformation/
+# machine-learning/cleaning/analysis Spark configs) plus decommission
+# block-migration configs, a 120s terminationGracePeriodSeconds + SIGPWR
+# preStop hook, and a minAvailable:1 PodDisruptionBudget (pdb.yaml) all
+# work together so this HPA's scale-down doesn't drop in-flight work.
+#
 # Docs: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

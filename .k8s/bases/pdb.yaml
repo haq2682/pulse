@@ -1,0 +1,27 @@
+# PodDisruptionBudgets - put a floor on how many pods of a Deployment can be
+# taken down at once by *voluntary* disruptions (node drain, `kubectl drain`,
+# cluster-autoscaler consolidation). This does NOT apply to involuntary
+# disruptions (node crash, OOM-kill) or to a Deployment's own rolling update.
+#
+# pulse-spark-worker is the one target here: it's the only autoscaled
+# Deployment (see hpa.yaml's pulse-spark-worker-hpa, minReplicas 1 /
+# maxReplicas 2) whose pods hold state that a mid-eviction kill would lose -
+# in-flight executor task output and shuffle blocks. minAvailable: 1 stops a
+# voluntary disruption from ever dropping it to 0 workers at once; combined
+# with the pod's own terminationGracePeriodSeconds + preStop hook in
+# deployment.yaml (which trigger Spark's graceful worker decommissioning),
+# a single eviction has both time and a guaranteed peer to migrate blocks to.
+#
+# Docs: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pulse-spark-worker-pdb
+  namespace: production
+  labels:
+    app: pulse-spark-worker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pulse-spark-worker

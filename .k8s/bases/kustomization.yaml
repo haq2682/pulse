@@ -47,6 +47,9 @@ resources:
   - secrets/pulse-api-external-secret.yaml
   - secrets/pulse-nifi-external-secret.yaml
   - hpa.yaml
+  # PodDisruptionBudget for pulse-spark-worker - stable, built-in API (like
+  # NetworkPolicy below), no separate controller needed.
+  - pdb.yaml
   # vpa.yaml uses the VerticalPodAutoscaler CRD, which is NOT installed on
   # this cluster yet (its controller is a separate install - see the
   # comment at the top of vpa.yaml). Until it is, `kubectl apply -k
