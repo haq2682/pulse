@@ -134,7 +134,12 @@ data:
         clientSoftwareVersion: "$3"
         listener: "$4"
         networkProcessor: "$5"
-    - pattern: kafka.server<type=(.+), listener=(.+), networkProcessor=(.+)><>(.+):
+    # Quoted (unlike every other pattern here) because this one ends in a
+    # bare ":" - as an unquoted plain scalar, YAML reads that trailing
+    # colon as opening a nested mapping instead of a literal character,
+    # which crashes the JMX exporter javaagent at Kafka startup (SnakeYAML
+    # composer error, fatal to the whole JVM, not just to metrics).
+    - pattern: "kafka.server<type=(.+), listener=(.+), networkProcessor=(.+)><>(.+):"
       name: kafka_server_$1_$4
       type: GAUGE
       labels:

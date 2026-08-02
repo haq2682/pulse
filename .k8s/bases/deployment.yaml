@@ -955,13 +955,20 @@ spec:
           readinessProbe:
             tcpSocket:
               port: 8080
-            initialDelaySeconds: 60
+            initialDelaySeconds: 90
             periodSeconds: 15
+          # NiFi is a genuinely slow-starting, heavy JVM app - trimmed to a
+          # 1g/2g heap for this machine (see NIFI_JVM_HEAP_INIT/MAX above),
+          # which stretches cold-start further. The old 120s/30s/default-3-
+          # failures window (kills at ~210s) was cutting it off mid-startup,
+          # not catching a genuine hang - same failure mode already fixed
+          # for pulse-kafka/pulse-zookeeper's probes.
           livenessProbe:
             tcpSocket:
               port: 8080
-            initialDelaySeconds: 120
+            initialDelaySeconds: 180
             periodSeconds: 30
+            failureThreshold: 5
       volumes:
         - name: pulse-nifi-storage
           persistentVolumeClaim:

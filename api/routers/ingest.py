@@ -47,6 +47,9 @@ from fastapi import APIRouter, HTTPException, Query
 # MinIO / S3-compatible client (same config as onboarding router)
 # ---------------------------------------------------------------------------
 _MINIO_ENDPOINT  = os.getenv("MINIO_ENDPOINT",  "http://localhost:9000")
+# boto3 requires a scheme in endpoint_url - see onboarding.py's identical guard.
+if not _MINIO_ENDPOINT.startswith(("http://", "https://")):
+    _MINIO_ENDPOINT = f"http://{_MINIO_ENDPOINT}"
 _MINIO_ACCESS    = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 _MINIO_SECRET    = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 

@@ -839,6 +839,20 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    # jmx-exporter-init downloads jmx_prometheus_javaagent.jar from GitHub
+    # releases at pod startup (see deployment.yaml) - needs real internet
+    # egress, not just cluster-internal traffic. Same ipBlock/except pattern
+    # as pulse-api-netpol's outbound HTTPS rule above.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
 ---
 # ─────────────────────────────────────────────────────────────────────────
 # Kafka - ingress from every service with KAFKA_BOOTSTRAP wired; egress to
@@ -914,6 +928,18 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    # jmx-exporter-init downloads jmx_prometheus_javaagent.jar from GitHub
+    # releases at pod startup - see pulse-zookeeper-netpol's identical rule.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
 ---
 # ─────────────────────────────────────────────────────────────────────────
 # Debezium (Kafka Connect) - ingress from services with KAFKA_CONNECT_URL/
@@ -985,6 +1011,18 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    # jmx-exporter-init downloads jmx_prometheus_javaagent.jar from GitHub
+    # releases at pod startup - see pulse-zookeeper-netpol's identical rule.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
 ---
 # ─────────────────────────────────────────────────────────────────────────
 # Redis - ingress from every service with REDIS_HOST wired.
@@ -1412,6 +1450,28 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    # Vault's own Kubernetes auth method needs this: validating an incoming
+    # login JWT means Vault calls the TokenReview API against the cluster's
+    # own API server (auth/kubernetes/config's kubernetes_host). Without
+    # this, every login attempt fails with a generic "permission denied" -
+    # the real cause (egress blocked) doesn't surface in Vault's own logs.
+    # podSelector-based rules can't reliably target kube-apiserver (it runs
+    # hostNetwork, not as a normal pod IP Calico can match). Two ipBlocks,
+    # not one: kube-proxy DNATs kubernetes.default.svc's ClusterIP to the
+    # apiserver's real address before Calico's policy engine evaluates the
+    # packet, so the ClusterIP alone (10.96.0.1:443) doesn't reliably match -
+    # the node's own IP on the apiserver's actual --secure-port (minikube's
+    # single node, 192.168.49.2:8443) is what's actually on the wire.
+    - to:
+        - ipBlock:
+            cidr: 10.96.0.1/32
+        - ipBlock:
+            cidr: 192.168.49.2/32
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 8443
 ---
 # ─────────────────────────────────────────────────────────────────────────
 # External Secrets Operator (main controller only, see the note above) -
@@ -1456,3 +1516,19 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    # This controller writes Secret objects and calls Vault's Kubernetes
+    # auth login endpoint (which itself needs the API server to validate
+    # the JWT) - both need direct access to the API server. Same two-ipBlock
+    # rationale as pulse-vault-netpol above (kube-apiserver runs hostNetwork,
+    # and kube-proxy DNATs the ClusterIP to the node's real address before
+    # Calico's policy engine sees the packet).
+    - to:
+        - ipBlock:
+            cidr: 10.96.0.1/32
+        - ipBlock:
+            cidr: 192.168.49.2/32
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 8443

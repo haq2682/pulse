@@ -46,6 +46,15 @@ _AIRFLOW_PASS  = os.getenv("AIRFLOW_PASSWORD",  "admin")
 _DAG_ID        = "batch_downstream"
 _POLL_INTERVAL = int(os.getenv("PIPELINE_POLL_INTERVAL", "15"))  # seconds
 
+
+def _minio_endpoint_url() -> str:
+    """MINIO_ENDPOINT with a scheme, as boto3's endpoint_url requires - see
+    onboarding.py's identical guard for why this can't just be the raw env var."""
+    endpoint = os.getenv("MINIO_ENDPOINT", "http://localhost:9000")
+    if not endpoint.startswith(("http://", "https://")):
+        endpoint = f"http://{endpoint}"
+    return endpoint
+
 # ── Airflow task-id → (description, progress_start %, progress_end %) ─────────
 _TASK_PROGRESS: Dict[str, tuple] = {
     "clean":               ("Cleaning Data",               0,   25),
@@ -721,7 +730,7 @@ class PipelineService:
             # Initialize S3 client for MinIO
             s3_client = boto3.client(
                 "s3",
-                endpoint_url=os.getenv("MINIO_ENDPOINT", "http://localhost:9000"),
+                endpoint_url=_minio_endpoint_url(),
                 aws_access_key_id=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
                 aws_secret_access_key=os.getenv("MINIO_SECRET_KEY", "minioadmin"),
                 config=Config(signature_version="s3v4"),
@@ -924,7 +933,7 @@ class PipelineService:
 
             s3_client = boto3.client(
                 "s3",
-                endpoint_url=os.getenv("MINIO_ENDPOINT", "http://localhost:9000"),
+                endpoint_url=_minio_endpoint_url(),
                 aws_access_key_id=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
                 aws_secret_access_key=os.getenv("MINIO_SECRET_KEY", "minioadmin"),
                 config=Config(signature_version="s3v4"),
@@ -987,7 +996,7 @@ class PipelineService:
             # Initialize S3 client for MinIO
             s3_client = boto3.client(
                 "s3",
-                endpoint_url=os.getenv("MINIO_ENDPOINT", "http://localhost:9000"),
+                endpoint_url=_minio_endpoint_url(),
                 aws_access_key_id=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
                 aws_secret_access_key=os.getenv("MINIO_SECRET_KEY", "minioadmin"),
                 config=Config(signature_version="s3v4"),

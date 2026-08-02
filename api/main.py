@@ -17,6 +17,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger("pulse")
 
+
+def _minio_host_port(endpoint: str) -> str:
+    """Strip a scheme from MINIO_ENDPOINT if present, for the `minio` SDK's
+    Minio(endpoint, ...) constructor which expects a bare host:port.
+
+    urlparse("host:port") without "//" misparses "host" as the URL *scheme*
+    (parsed.scheme is truthy) and "port" as the path, leaving netloc empty -
+    `if parsed.scheme` alone doesn't distinguish that from a real
+    "http://host:port" endpoint. Check for "://" explicitly instead.
+    """
+    if "://" in endpoint:
+        return urlparse(endpoint).netloc
+    return endpoint
+
 # Import your configuration (if you use .env and frontend URL there)
 try:
     from config import get_settings
@@ -127,8 +141,7 @@ def health():
     # Check MinIO
     try:
         minio_endpoint = os.getenv("MINIO_ENDPOINT", "minio:9000")
-        parsed = urlparse(minio_endpoint)
-        host_port = parsed.netloc if parsed.scheme else minio_endpoint
+        host_port = _minio_host_port(minio_endpoint)
         mc = Minio(
             host_port,
             access_key=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
@@ -159,9 +172,8 @@ async def startup_event():
     
     # Get MinIO credentials from environment
     minio_endpoint = os.getenv("MINIO_ENDPOINT", "minio:9000")
-    
-    parsed = urlparse(minio_endpoint)
-    host_port = parsed.netloc if parsed.scheme else minio_endpoint
+
+    host_port = _minio_host_port(minio_endpoint)
     minio_access_key = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
     minio_secret_key = os.getenv("MINIO_SECRET_KEY", "minioadmin")
     

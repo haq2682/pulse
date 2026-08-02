@@ -26,6 +26,14 @@ redis = aioredis.from_url(
 )
 
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://localhost:9000")
+# boto3 requires a scheme in endpoint_url; docker-compose's .env already
+# includes one, but the Kubernetes deployment.yaml sets this to a bare
+# host:port (the format the plain `minio` SDK and other clients in this
+# codebase expect instead) - prepend http:// when it's missing rather than
+# assume the caller always provides one. MinIO has no TLS listener anywhere
+# in this project (no MINIO_SECURE var exists), so http is always correct.
+if not MINIO_ENDPOINT.startswith(("http://", "https://")):
+    MINIO_ENDPOINT = f"http://{MINIO_ENDPOINT}"
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MAPPING_LOG_DIR = os.getenv("MAPPING_LOG_DIR", "/tmp")
