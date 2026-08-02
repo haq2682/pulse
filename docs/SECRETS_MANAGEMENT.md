@@ -124,6 +124,16 @@ kubectl delete pod vault-0 -n vault   # picks up the new cert - see below
 `ClusterSecretStore`'s `caProvider` reads the same live Secret directly -
 no separate copy to keep in sync.
 
+**This Secret is not a Terraform resource** (deliberately - doing so would
+put the TLS private key in `.tfstate`), so it isn't tracked or recreated by
+`terraform apply` on its own. `terraform destroy` deletes the `vault`
+namespace, which cascades to delete this Secret along with it even though
+Terraform never created it. `vault/scripts/recreate-vault-tls.sh` handles
+the common case - reusing the existing key/cert from `~/.vault-pulse/`
+rather than rotating them - and is what "Reproducing on a fresh cluster"
+below uses. Use the `openssl`/`kubectl create` pair above instead only when
+you actually want a new keypair (e.g. after a SAN list change).
+
 **The `OnDelete` gotcha** - the vault-helm chart's StatefulSet uses
 `updateStrategyType: OnDelete` (the chart's own default, not something set
 in this repo), meaning a `helm upgrade`/`terraform apply` that changes
@@ -200,11 +210,9 @@ cd ..
 
 # The vault-tls Secret has to exist BEFORE the Vault pod ever starts -
 # server.extraVolumes mounts it unconditionally, see terraform/resource.tf.
-openssl req -x509 -nodes -newkey rsa:2048 -days 825 \
-  -keyout vault.key -out vault.crt \
-  -subj "/CN=vault.vault.svc.cluster.local/O=pulse-dev" \
-  -addext "subjectAltName=DNS:vault,DNS:vault.vault,DNS:vault.vault.svc,DNS:vault.vault.svc.cluster.local,DNS:vault-internal,DNS:vault-internal.vault,DNS:vault-internal.vault.svc,DNS:vault-internal.vault.svc.cluster.local,DNS:vault-0.vault-internal,DNS:vault-0.vault-internal.vault.svc.cluster.local,DNS:localhost,IP:127.0.0.1"
-kubectl create secret tls vault-tls -n vault --cert=vault.crt --key=vault.key
+# Reuses vault.key/vault.crt from ~/.vault-pulse/ if you still have them
+# from a previous pass (generates a fresh pair only if neither is found).
+./vault/scripts/recreate-vault-tls.sh
 
 cd terraform
 terraform apply -target=helm_release.vault -target=null_resource.vault_tls_restart -target=helm_release.external_secrets

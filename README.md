@@ -123,6 +123,14 @@ why `global.tlsDisable` alone doesn't work and what would silently break
 if this cert - or the Vault `storage` stanza next to it in
 `terraform/resource.tf` - were handled naively).
 
+The `vault-tls` Secret above is not a Terraform resource (deliberately -
+see that same section for why), so `terraform destroy` deletes it along
+with the `vault` namespace every time. On a repeat pass through this step,
+`vault/scripts/recreate-vault-tls.sh` replaces the manual `openssl`/`kubectl
+create` pair above - it reuses your existing `vault.key`/`vault.crt` from
+`~/.vault-pulse/` if you still have them, only generating a new pair if
+neither is found.
+
 Now the rest of the infrastructure:
 
 ```bash
