@@ -5,18 +5,29 @@
 # and logging in as root.
 
 # Prints the path to vault-init-output.json and exits 0, or prints an error
-# to stderr and exits 1. Checks the current directory first (where
-# 01-init-vault.sh writes it originally), then ~/.vault-pulse/ (the secure
-# storage location docs/SECRETS_MANAGEMENT.md tells you to move it to
-# afterward) - so this keeps working no matter which of the two you're
-# running from.
+# to stderr and exits 1. Checks three places, in order: the current
+# directory (wherever 01-init-vault.sh happened to be run from), this
+# scripts/ directory itself (README has you `cd vault/scripts` before
+# running 01-04, but `cd`s back to the repo root before running 05 - so a
+# file written by 01 during that first cd is in scripts/, not the repo
+# root cwd 05 runs from), then ~/.vault-pulse/ (the secure storage location
+# docs/SECRETS_MANAGEMENT.md tells you to move it to afterward). Using
+# BASH_SOURCE rather than $0 for the second check is deliberate - $0 stays
+# the top-level invoked script's path even inside a sourced file, so it
+# would resolve to whichever numbered script sourced this one instead of
+# lib.sh's own (and therefore this directory's) location.
 find_vault_init_file() {
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
   if [ -f vault-init-output.json ]; then
     echo "vault-init-output.json"
+  elif [ -f "$script_dir/vault-init-output.json" ]; then
+    echo "$script_dir/vault-init-output.json"
   elif [ -f "$HOME/.vault-pulse/vault-init-output.json" ]; then
     echo "$HOME/.vault-pulse/vault-init-output.json"
   else
-    echo "vault-init-output.json not found in the current directory or ~/.vault-pulse/ - run 01-init-vault.sh first, or restore your copy from secure storage." >&2
+    echo "vault-init-output.json not found in the current directory, $script_dir/, or ~/.vault-pulse/ - run 01-init-vault.sh first, or restore your copy from secure storage." >&2
     exit 1
   fi
 }
