@@ -1,5 +1,5 @@
 # One Ingress, host-based routing (a separate subdomain per service, not a
-# path per service). This matters for NiFi/Airflow/Spark specifically: web
+# path per service). This matters for Airflow/Spark specifically: web
 # apps like these generate links and redirects assuming they own the whole
 # path space, so putting one behind e.g. pulse-engine.com/nifi tends to
 # break its own UI (broken asset paths, redirects that drop the prefix).
@@ -41,6 +41,14 @@ metadata:
   namespace: production
   labels:
     app: pulse-ingress
+  annotations:
+    # ingress-nginx's own client_max_body_size defaults to 1m - completely
+    # separate from pulse-nginx's own 10G client_max_body_size (nginx/
+    # templates/upload.conf.template) - a request has to clear BOTH nginx
+    # layers, and the controller's default silently caps it at 1m first.
+    # Verified live: a 5MB onboarding file-upload chunk 413'd here even
+    # though pulse-nginx itself was already configured to accept up to 10G.
+    nginx.ingress.kubernetes.io/proxy-body-size: "10g"
 spec:
   ingressClassName: nginx
   tls:
@@ -51,7 +59,7 @@ spec:
         - minio.pulse-engine.com
       secretName: pulse-tls
   rules:
-    # Main app - the nginx gateway (SPA + /api + /upload, same-origin).
+    # Main app - the nginx gateway (SPA + /api, same-origin).
     - host: pulse-engine.com
       http:
         paths:
@@ -97,45 +105,3 @@ spec:
                 name: pulse-minio
                 port:
                   number: 9001
----
-# NiFi gets its own Ingress object, separate from the shared one above -
-# nginx.ingress.kubernetes.io/backend-protocol is set Ingress-wide, and
-# NiFi is the one backend here that must be reached over HTTPS, not HTTP.
-# With SINGLE_USER_CREDENTIALS_USERNAME/PASSWORD set (see deployment.yaml),
-# NiFi's own web server enforces HTTPS-only - its single-user auth provider
-# requires a secure channel, so even though NIFI_WEB_HTTP_PORT=8080 is also
-# set, HTTPS wins and NiFi only ever binds 8443 (verified live: the pod's
-# own startup log shows only an SSL connector on 8443, no HTTP connector at
-# all). Routing this Ingress at :8080 like every other host here left
-# nothing listening on the other end - hence the 503s, and the liveness/
-# readiness probes (deployment.yaml, tcpSocket port 8080) killing the pod
-# in a loop for the same reason. ingress-nginx defaults to NOT verifying
-# the backend's certificate (NiFi's is self-signed, generated on first
-# boot) - fine for this same trust-the-self-signed-cert setup as the rest
-# of this file.
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: pulse-nifi-ingress
-  namespace: production
-  labels:
-    app: pulse-nifi
-  annotations:
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-spec:
-  ingressClassName: nginx
-  tls:
-    - hosts:
-        - nifi.pulse-engine.com
-      secretName: pulse-tls
-  rules:
-    - host: nifi.pulse-engine.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: pulse-nifi
-                port:
-                  number: 8443

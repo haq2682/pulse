@@ -82,7 +82,8 @@ from config.pipeline_config import (
     TASK_POD_LABELS,
     TASK_POD_RESOURCES,
     TASK_SERVICE_ACCOUNT,
-    k8s_pipeline_env,
+    k8s_pipeline_env_templated,
+    k8s_pipeline_pod_ip_runtime_env,
 )
 
 BUCKET = Variable.get("default_bucket", default_var=DEFAULT_BUCKET)
@@ -105,7 +106,13 @@ _task_defaults = dict(
 _pod_task_defaults = dict(
     namespace=POD_NAMESPACE,
     image=PYTHON_IMAGE,
-    env_vars=k8s_pipeline_env(),
+    # PYTHON_IMAGE is tagged :latest, which Kubernetes defaults to
+    # imagePullPolicy=Always for - silently re-pulling from Docker Hub over
+    # any locally-built/freshly-pushed image otherwise. Same fix already
+    # applied to the long-lived Deployments.
+    image_pull_policy="IfNotPresent",
+    env_vars=k8s_pipeline_env_templated(),
+    pod_runtime_info_envs=k8s_pipeline_pod_ip_runtime_env(),
     service_account_name=TASK_SERVICE_ACCOUNT,
     labels=TASK_POD_LABELS,
     container_resources=TASK_POD_RESOURCES(),

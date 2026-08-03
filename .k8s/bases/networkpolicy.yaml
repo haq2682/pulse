@@ -123,13 +123,6 @@ spec:
         - protocol: TCP
           port: 8000
     - to:
-        - podSelector:
-            matchLabels:
-              app: pulse-nifi
-      ports:
-        - protocol: TCP
-          port: 8080
-    - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: kube-system
@@ -180,6 +173,22 @@ spec:
       ports:
         - protocol: TCP
           port: 8000
+    # mapping/map.py's Spark driver runs inside this container (see the
+    # resources comment on this Deployment) - pulse-spark-worker's executor
+    # needs to call back on the fixed ports set via spark.driver.port /
+    # spark.driver.blockManager.port there. Verified live: without this,
+    # the executor resolved and reached the right pod (spark.driver.host
+    # fix) but the connection itself timed out after 120s with no rule
+    # permitting it.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-worker
+      ports:
+        - protocol: TCP
+          port: 7078
+        - protocol: TCP
+          port: 7079
   egress:
     - to:
         - podSelector:
@@ -277,7 +286,21 @@ spec:
   policyTypes:
     - Ingress
     - Egress
-  ingress: []
+  ingress:
+    # Callback from pulse-spark-worker's executors to this pod's Spark
+    # driver (cleaning_config.py/spark_config.py/analysis_config.py all set
+    # spark.driver.port/blockManager.port to these fixed values) - same
+    # pattern already verified live and fixed for pulse-api-netpol during
+    # mapping/map.py's debugging.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-worker
+      ports:
+        - protocol: TCP
+          port: 7078
+        - protocol: TCP
+          port: 7079
   egress:
     - to:
         - podSelector:
@@ -351,7 +374,20 @@ spec:
   policyTypes:
     - Ingress
     - Egress
-  ingress: []
+  ingress:
+    # Callback from pulse-spark-worker's executors to this pod's Spark
+    # driver (mapping/map.py sets spark.driver.port/blockManager.port to
+    # these fixed values) - same pattern already verified live and fixed
+    # for pulse-api-netpol during mapping/map.py's debugging.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-worker
+      ports:
+        - protocol: TCP
+          port: 7078
+        - protocol: TCP
+          port: 7079
   egress:
     - to:
         - podSelector:
@@ -420,7 +456,20 @@ spec:
   policyTypes:
     - Ingress
     - Egress
-  ingress: []
+  ingress:
+    # Callback from pulse-spark-worker's executors to this pod's Spark
+    # driver (mapping/map.py sets spark.driver.port/blockManager.port to
+    # these fixed values) - same pattern already verified live and fixed
+    # for pulse-api-netpol during mapping/map.py's debugging.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-worker
+      ports:
+        - protocol: TCP
+          port: 7078
+        - protocol: TCP
+          port: 7079
   egress:
     - to:
         - podSelector:
@@ -516,9 +565,6 @@ spec:
               app: pulse-api-stream
         - podSelector:
             matchLabels:
-              app: pulse-nifi
-        - podSelector:
-            matchLabels:
               app: pulse-debezium
         - podSelector:
             matchLabels:
@@ -603,9 +649,6 @@ spec:
         - podSelector:
             matchLabels:
               app: pulse-spark-worker
-        - podSelector:
-            matchLabels:
-              app: pulse-nifi
         - podSelector:
             matchLabels:
               app: pulse-airflow-webserver
@@ -781,6 +824,52 @@ spec:
       ports:
         - protocol: TCP
           port: 9000
+    # Callback to mapping/map.py's Spark driver, which runs inside pulse-api
+    # (see the matching ingress rule on pulse-api-netpol) - fixed ports via
+    # spark.driver.port / spark.driver.blockManager.port.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-api
+      ports:
+        - protocol: TCP
+          port: 7078
+        - protocol: TCP
+          port: 7079
+    # Callback to cleaning/transformation/analysis's Spark driver (app:
+    # pulse-task, ephemeral KubernetesPodOperator pods) and the two 24/7
+    # streaming drivers (app: pulse-db-stream / pulse-api-stream, which run
+    # mapping/map.py the same way pulse-api's mapping subprocess does) - same
+    # fixed driver.port/blockManager.port pattern as the pulse-api rule
+    # above, and the matching ingress rules on pulse-task-netpol/
+    # pulse-db-stream-netpol/pulse-api-stream-netpol below.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-task
+      ports:
+        - protocol: TCP
+          port: 7078
+        - protocol: TCP
+          port: 7079
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-db-stream
+      ports:
+        - protocol: TCP
+          port: 7078
+        - protocol: TCP
+          port: 7079
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-api-stream
+      ports:
+        - protocol: TCP
+          port: 7078
+        - protocol: TCP
+          port: 7079
     - to:
         - namespaceSelector:
             matchLabels:
@@ -887,9 +976,6 @@ spec:
         - podSelector:
             matchLabels:
               app: pulse-debezium
-        - podSelector:
-            matchLabels:
-              app: pulse-nifi
         - podSelector:
             matchLabels:
               app: pulse-airflow-webserver
@@ -1081,87 +1167,6 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
----
-# ─────────────────────────────────────────────────────────────────────────
-# NiFi - reached through the nginx gateway's /upload proxy AND directly at
-# nifi.pulse-engine.com via Ingress (see ingress.yaml) for the admin UI.
-# ─────────────────────────────────────────────────────────────────────────
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: pulse-nifi-netpol
-  namespace: production
-spec:
-  podSelector:
-    matchLabels:
-      app: pulse-nifi
-  policyTypes:
-    - Ingress
-    - Egress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: pulse-nginx
-      ports:
-        - protocol: TCP
-          port: 8080
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
-      ports:
-        - protocol: TCP
-          port: 8443
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: pulse-kafka
-      ports:
-        - protocol: TCP
-          port: 9092
-    - to:
-        - podSelector:
-            matchLabels:
-              app: pulse-minio
-      ports:
-        - protocol: TCP
-          port: 9000
-    - to:
-        - podSelector:
-            matchLabels:
-              app: pulse-postgresql
-      ports:
-        - protocol: TCP
-          port: 5432
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-          podSelector:
-            matchLabels:
-              k8s-app: kube-dns
-      ports:
-        - protocol: UDP
-          port: 53
-        - protocol: TCP
-          port: 53
-    # NiFi's Git-backed Flow Registry client needs to reach GitHub directly
-    # (api.github.com + github.com, both real internet endpoints, not
-    # cluster-internal) to list/pull flow versions - same ipBlock/except
-    # pattern already used for jmx-exporter-init's GitHub download
-    # elsewhere in this file.
-    - to:
-        - ipBlock:
-            cidr: 0.0.0.0/0
-            except:
-              - 10.0.0.0/8
-              - 172.16.0.0/12
-              - 192.168.0.0/16
-      ports:
-        - protocol: TCP
-          port: 443
 ---
 # ─────────────────────────────────────────────────────────────────────────
 # Airflow init (Job) - runs db migrate/upgrade/create-user once, then
@@ -1380,6 +1385,29 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    # This scheduler runs Airflow's LocalExecutor - task instances (including
+    # every KubernetesPodOperator/run_k8s_task_pod() call in batch_downstream_dag.py,
+    # db_streaming_dag.py, api_streaming_dag.py) execute as subprocesses of this
+    # same pod, so it's this pod (not a separate Celery worker) that makes the
+    # create/list/delete pod calls directly against the Kubernetes API. Without
+    # this rule, those calls hang until urllib3's connect timeout, which
+    # surfaces as the clean/transform/analyze/db-stream/api-stream tasks
+    # repeatedly failing with "Pod ... returned a failure" / ConnectTimeoutError
+    # to 10.96.0.1:443 - verified live. Same dual-ipBlock rationale as
+    # pulse-vault-netpol/pulse-external-secrets-netpol above (kube-apiserver
+    # runs hostNetwork, and kube-proxy DNATs the ClusterIP to the node's real
+    # address before Calico's policy engine evaluates the packet, so the
+    # ClusterIP alone doesn't reliably match).
+    - to:
+        - ipBlock:
+            cidr: 10.96.0.1/32
+        - ipBlock:
+            cidr: 192.168.49.2/32
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 8443
 ---
 # ─────────────────────────────────────────────────────────────────────────
 # MinIO init (Job) - creates buckets on first boot, then exits. Nothing

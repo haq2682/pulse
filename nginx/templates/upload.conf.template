@@ -2,24 +2,30 @@
 # Pulse nginx gateway
 #   - Serves the built React SPA (same origin as the API -> no CORS needed)
 #   - /api/*  -> FastAPI (service name: api), WebSocket upgrades included
-#   - /upload -> NiFi (HandleHttpRequest), large-file upload settings
 #   - /health -> FastAPI health endpoint
 #
 # HTTP-only on purpose: TLS is terminated upstream (cloud LB / K8s ingress),
 # which is where the certs live. This keeps the image cert-free and startable
 # anywhere without mounting an ssl directory.
 #
-# Upstream hostnames come from ${API_UPSTREAM_HOST}/${NIFI_UPSTREAM_HOST},
-# substituted into this file by the base nginx image's own envsubst-on-
-# templates entrypoint step (this file lives in /etc/nginx/templates/, not
-# /etc/nginx/conf.d/ - see the Dockerfile). Docker Compose's service names
-# (api, nifi) and Kubernetes' Service names (pulse-api, pulse-nifi) are NOT
-# the same string, so a single hardcoded hostname can't work in both -
-# nginx resolves a literal (non-variable) proxy_pass/upstream target at
-# config-load time, so the wrong one doesn't just misroute, it makes nginx
-# fail to start at all ("host not found in upstream"). The Dockerfile ENVs
-# default these to Compose's names; deployment.yaml overrides them to the
-# Kubernetes Service names for the pulse-nginx container.
+# Upstream hostname comes from ${API_UPSTREAM_HOST}, substituted into this
+# file by the base nginx image's own envsubst-on-templates entrypoint step
+# (this file lives in /etc/nginx/templates/, not /etc/nginx/conf.d/ - see
+# the Dockerfile). Docker Compose's service name (api) and Kubernetes'
+# Service name (pulse-api) are NOT the same string, so a single hardcoded
+# hostname can't work in both - nginx resolves a literal (non-variable)
+# proxy_pass target at config-load time, so the wrong one doesn't just
+# misroute, it makes nginx fail to start at all ("host not found in
+# upstream"). The Dockerfile ENV defaults this to Compose's name;
+# deployment.yaml overrides it to the Kubernetes Service name for the
+# pulse-nginx container.
+#
+# File uploads go through /api/onboarding/upload-chunk (plain FastAPI route,
+# same proxy_pass as everything else under /api/) rather than a dedicated
+# /upload location - NiFi (which previously owned this path, proxying to its
+# own HandleHttpRequest listener on a separate upstream) has been removed
+# from the stack. The large-body/long-timeout settings below are kept as
+# server-wide defaults since /api/ still needs to accept big file uploads.
 # =============================================================================
 
 # Large file upload settings
@@ -35,13 +41,6 @@ send_timeout 1800s;
 client_body_buffer_size 256k;
 proxy_buffering off;
 proxy_request_buffering off;
-
-# Upstream to NiFi HandleHttpRequest
-upstream nifi_upload {
-    least_conn;
-    server ${NIFI_UPSTREAM_HOST}:8080 max_fails=3 fail_timeout=30s;
-    keepalive 32;
-}
 
 server {
     listen 80;
@@ -94,38 +93,6 @@ server {
         allow 127.0.0.1;
         deny all;
         stub_status;
-    }
-
-    # ── NiFi upload endpoint ─────────────────────────────────────────────
-    location /upload {
-        proxy_pass http://nifi_upload;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-File-Id $http_x_file_id;
-        proxy_set_header X-User-Id $http_x_user_id;
-        proxy_set_header X-Business-Id $http_x_business_id;
-        proxy_pass_header Content-Type;
-        proxy_buffering off;
-        proxy_request_buffering off;
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
-
-        # CORS — dev only (dev frontend on :5173 uploads cross-origin to the
-        # gateway). In prod the SPA is served same-origin through this gateway,
-        # so these headers are inert and no preflight occurs.
-        set $cors_origin "";
-        if ($http_origin ~* '^https?://(localhost(:[0-9]+)?|127\.0\.0\.1(:[0-9]+)?)$') {
-            set $cors_origin $http_origin;
-        }
-        add_header 'Access-Control-Allow-Origin' '$cors_origin' always;
-        add_header 'Access-Control-Allow-Methods' 'POST, OPTIONS' always;
-        add_header 'Access-Control-Allow-Headers' 'Content-Type, X-File-Id, X-User-Id, X-Business-Id, X-File-Name, X-File-Size, X-File-Type' always;
-        add_header 'Access-Control-Max-Age' '3600' always;
-        if ($request_method = 'OPTIONS') {
-            return 204;
-        }
     }
 
     # ── React SPA (client-side routing fallback) ─────────────────────────

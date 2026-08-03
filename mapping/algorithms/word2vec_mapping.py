@@ -144,5 +144,5 @@ def word2vec_column_mapping(
         df = df.withColumnRenamed(old_col, new_col)
     df = df.drop(*extra_cols)
     for col in missing_cols:
-        df = df.withColumn(col, lit(None))
+        df = df.withColumn(col, lit(None).cast("string"))
     return df, missing_cols, extra_cols, mapped_cols

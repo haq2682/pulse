@@ -391,6 +391,95 @@ def k8s_pipeline_env() -> dict:
     }
 
 
+def k8s_pipeline_env_vars() -> list:
+    """
+    Same values as k8s_pipeline_env(), as a list[V1EnvVar] instead of a plain
+    dict, plus POD_IP sourced from the Kubernetes Downward API.
+
+    For run_k8s_task_pod() ONLY - that function talks to the Kubernetes API
+    directly via the raw `kubernetes` client, with no Airflow templating
+    involved, so building V1EnvVar objects with plain string values here is
+    safe. Do NOT use this for a KubernetesPodOperator's env_vars= - that
+    field is templated (Jinja) at task-execution time, and even a value
+    with no `{{ }}` syntax at all still gets run through
+    render_template_as_native_obj's NativeEnvironment, which silently
+    coerces any numeric-looking string (e.g. REDIS_PORT="6379") back into
+    a Python int - verified live: this produced a 400 Bad Request from the
+    Kubernetes API ("cannot unmarshal number into ... EnvVar...value of
+    type string") the first time clean/transform/analyze's task pods
+    actually reached pod-creation. See k8s_pipeline_env_templated() and
+    k8s_pipeline_pod_ip_runtime_env() for the KubernetesPodOperator-safe
+    equivalents.
+
+    Every cleaning/transformation/analysis/machine-learning Spark session
+    (cleaning_config.py, transformation/config/spark_config.py,
+    analysis_config.py, machine-learning/spark_utils.py) sets
+    spark.driver.host from os.getenv("POD_IP") - a bare pod has no DNS
+    record for its own hostname, which is what Spark advertises to
+    executors by default, and every executor on pulse-spark-worker fails
+    with java.net.UnknownHostException without this (same root cause
+    already verified live and fixed in mapping/map.py, where POD_IP comes
+    from deployment.yaml's Downward API fieldRef on the long-lived
+    pulse-api container).
+    """
+    from kubernetes import client
+
+    env_vars = [
+        client.V1EnvVar(name=k, value=str(v))
+        for k, v in k8s_pipeline_env().items()
+    ]
+    env_vars.append(
+        client.V1EnvVar(
+            name="POD_IP",
+            value_from=client.V1EnvVarSource(
+                field_ref=client.V1ObjectFieldSelector(field_path="status.podIP")
+            ),
+        )
+    )
+    return env_vars
+
+
+def k8s_pipeline_env_templated() -> dict:
+    """
+    Same values as k8s_pipeline_env(), for a KubernetesPodOperator's env_vars=
+    specifically (which IS templated - see the warning in k8s_pipeline_env_vars()
+    above). Every value is wrapped in repr() so Jinja's NativeEnvironment
+    (render_template_as_native_obj=True on these DAGs) round-trips it back to
+    the correct plain string instead of silently coercing a numeric-looking
+    one (e.g. REDIS_PORT="6379") into a Python int - verified live:
+    NativeEnvironment.from_string("6379").render({}) == 6379 (int), even
+    with zero {{ }} template syntax anywhere in the value, which the
+    Kubernetes API then rejects with a 400 (EnvVar.value must be a string).
+    repr('6379') == "'6379'", and rendering that literal Python string
+    expression through ast.literal_eval (what NativeEnvironment does under
+    the hood) correctly yields back the plain str '6379' - verified live.
+    """
+    return {k: repr(str(v)) for k, v in k8s_pipeline_env().items()}
+
+
+def k8s_pipeline_pod_ip_runtime_env() -> list:
+    """
+    POD_IP as a pod_runtime_info_envs entry (list[V1EnvVar]) for a
+    KubernetesPodOperator. Deliberately NOT part of k8s_pipeline_env_templated()'s
+    dict - a dict-based env_vars entry can only hold a literal value
+    (see convert_env_vars()'s dict branch), never a valueFrom/fieldRef.
+    pod_runtime_info_envs is merged into the operator's own env_vars list at
+    construction time but - unlike the dict entries - has no plain .value
+    string for Jinja's per-field rendering to touch, so it survives
+    render_template_as_native_obj untouched (verified live).
+    """
+    from kubernetes import client
+
+    return [
+        client.V1EnvVar(
+            name="POD_IP",
+            value_from=client.V1EnvVarSource(
+                field_ref=client.V1ObjectFieldSelector(field_path="status.podIP")
+            ),
+        )
+    ]
+
+
 def _resource_requirements(cpu_request, mem_request, cpu_limit, mem_limit):
     """Small wrapper so call sites below read as plain numbers/strings."""
     from kubernetes.client import V1ResourceRequirements
@@ -440,7 +529,6 @@ def run_k8s_task_pod(name: str, command: list, timeout_seconds: int) -> tuple:
         k8s_config.load_kube_config()
 
     core_v1 = client.CoreV1Api()
-    env_list = [client.V1EnvVar(name=k, value=str(v)) for k, v in k8s_pipeline_env().items()]
 
     pod = client.V1Pod(
         metadata=client.V1ObjectMeta(generate_name=f"{name}-", labels=TASK_POD_LABELS),
@@ -451,8 +539,14 @@ def run_k8s_task_pod(name: str, command: list, timeout_seconds: int) -> tuple:
                 client.V1Container(
                     name="task",
                     image=PYTHON_IMAGE,
+                    # PYTHON_IMAGE is tagged :latest, which Kubernetes
+                    # defaults to imagePullPolicy=Always for - silently
+                    # re-pulling from Docker Hub over any locally-built/
+                    # freshly-pushed image otherwise. Same fix already
+                    # applied to the long-lived Deployments.
+                    image_pull_policy="IfNotPresent",
                     command=command,
-                    env=env_list,
+                    env=k8s_pipeline_env_vars(),
                     resources=TASK_POD_RESOURCES(),
                 )
             ],

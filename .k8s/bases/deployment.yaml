@@ -12,12 +12,12 @@
 #    pulse-minio-init, which uses docker-compose's `entrypoint:` field - that
 #    genuinely overrides ENTRYPOINT, so it is translated to k8s `command:`.
 #
-# 2. Secrets - the five Secret objects referenced below (pulse-postgresql-
-#    secret, pulse-minio-secret, pulse-airflow-secret, pulse-api-secret,
-#    pulse-nifi-secret) are never defined here. They materialize from the
-#    ExternalSecret objects in secrets/ (see docs/SECRETS_MANAGEMENT.md) -
-#    the External Secrets Operator running in-cluster reads each one from
-#    HashiCorp Vault and creates/updates a plain Secret with a matching name
+# 2. Secrets - the four Secret objects referenced below (pulse-postgresql-
+#    secret, pulse-minio-secret, pulse-airflow-secret, pulse-api-secret)
+#    are never defined here. They materialize from the ExternalSecret
+#    objects in secrets/ (see docs/SECRETS_MANAGEMENT.md) - the External
+#    Secrets Operator running in-cluster reads each one from HashiCorp
+#    Vault and creates/updates a plain Secret with a matching name
 #    automatically. Pods never talk to Vault directly. Expected keys per secret:
 #      pulse-postgresql-secret: POSTGRES_USER, POSTGRES_PASSWORD,
 #                                POSTGRES_DB, DEBEZIUM_PASSWORD
@@ -27,8 +27,6 @@
 #                                AIRFLOW_ADMIN_USER, AIRFLOW_ADMIN_PASSWORD
 #      pulse-api-secret:        SECRET_KEY, GEMINI_API_KEY, GOOGLE_CLIENT_ID,
 #                                GOOGLE_CLIENT_SECRET, SMTP_USER, SMTP_PASSWORD
-#      pulse-nifi-secret:       NIFI_ADMIN_USER, NIFI_ADMIN_PASSWORD,
-#                                NIFI_SENSITIVE_PROPS_KEY
 #
 # 3. Service discovery - docker-compose used fixed 10.5.0.x addresses on the
 #    spark-network bridge network. Those are replaced with the matching
@@ -887,144 +885,6 @@ spec:
                 command: ["/bin/sh", "-c", "kill -s PWR 1; sleep 90"]
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# NiFi
-# ─────────────────────────────────────────────────────────────────────────
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: pulse-nifi
-  namespace: production
-  labels:
-    app: pulse-nifi
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: pulse-nifi
-  template:
-    metadata:
-      labels:
-        app: pulse-nifi
-    spec:
-      containers:
-        - name: pulse-nifi
-          image: pulse-nifi
-          ports:
-            - containerPort: 8080
-            - containerPort: 8443
-            - containerPort: 10000
-          env:
-            # Sized for a 4-core/16GB machine (see the sizing note at the
-            # top of hpa.yaml) - down from 8g/16g. Container memory limit
-            # (3Gi below) intentionally leaves ~1Gi of headroom above
-            # NIFI_JVM_HEAP_MAX/-Xmx for JVM overhead outside the heap
-            # (metaspace, thread stacks, direct buffers, NiFi's off-heap
-            # content/provenance repositories) - sizing the limit equal to
-            # -Xmx risks an OOMKill from the container's cgroup even while
-            # the JVM itself still has heap room.
-            - name: NIFI_JVM_HEAP_INIT
-              value: 1g
-            - name: NIFI_JVM_HEAP_MAX
-              value: 2g
-            - name: JAVA_OPTS
-              value: >-
-                -Xms1g
-                -Xmx2g
-                -XX:+UseG1GC
-                -XX:MaxGCPauseMillis=500
-                -XX:InitiatingHeapOccupancyPercent=45
-                -XX:G1HeapRegionSize=16m
-            # HTTPS-only: SINGLE_USER_CREDENTIALS_USERNAME/PASSWORD below
-            # enable NiFi's single-user auth provider, which requires a
-            # secure channel - NiFi's own start scripts enforce HTTPS and
-            # never bind an HTTP listener once single-user credentials are
-            # set, regardless of NIFI_WEB_HTTP_PORT. Verified live: the
-            # pod's startup log only ever showed an SSL connector on 8443.
-            # No NIFI_WEB_HTTP_PORT/HOST here - setting one is misleading
-            # dead config, not a working fallback. svc.yaml/ingress.yaml
-            # and the probes below all target 8443 to match.
-            - name: NIFI_WEB_HTTPS_PORT
-              value: "8443"
-            - name: NIFI_WEB_HTTPS_HOST
-              value: 0.0.0.0
-            # NiFi's reverse-proxy Host-header allowlist (nifi.web.proxy.host)
-            # - empty by default, which makes NiFi reject every request
-            # arriving with a Host header other than what it's bound to
-            # (400 Bad Request, verified live via the ingress-nginx access
-            # log: backend returned 400 for a plain GET /nifi/). Must list
-            # every external Host header NiFi will actually see - currently
-            # just the ingress NodePort host:port. The NodePort
-            # (ingress-nginx-controller's :443 mapping) isn't pinned - see
-            # docs/INGRESS_ACCESS.md - so this needs updating together with
-            # ingress.yaml/Google Console redirect URIs whenever it changes
-            # (`kubectl get svc -n ingress-nginx ingress-nginx-controller`).
-            - name: NIFI_WEB_PROXY_HOST
-              value: nifi.pulse-engine.com:32249
-            - name: NIFI_SENSITIVE_PROPS_ALGORITHM
-              value: AES/GCM/NoPadding
-            - name: NIFI_CLUSTER_IS_NODE
-              value: "false"
-            - name: MINIO_ENDPOINT
-              value: pulse-minio:9000
-            - name: POSTGRES_SERVER
-              value: pulse-postgresql
-            - name: KAFKA_BOOTSTRAP
-              value: pulse-kafka:9092
-            - name: SINGLE_USER_CREDENTIALS_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: pulse-nifi-secret
-                  key: NIFI_ADMIN_USER
-            - name: SINGLE_USER_CREDENTIALS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: pulse-nifi-secret
-                  key: NIFI_ADMIN_PASSWORD
-            - name: NIFI_SENSITIVE_PROPS_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: pulse-nifi-secret
-                  key: NIFI_SENSITIVE_PROPS_KEY
-          envFrom:
-            - secretRef:
-                name: pulse-minio-secret
-            - secretRef:
-                name: pulse-postgresql-secret
-          volumeMounts:
-            - name: pulse-nifi-storage
-              mountPath: /opt/nifi/nifi-current/data
-          resources:
-            requests:
-              cpu: 250m
-              memory: 2Gi
-            limits:
-              cpu: 1000m
-              memory: 3Gi
-          readinessProbe:
-            tcpSocket:
-              port: 8443
-            initialDelaySeconds: 90
-            periodSeconds: 15
-          # NiFi is a genuinely slow-starting, heavy JVM app - trimmed to a
-          # 1g/2g heap for this machine (see NIFI_JVM_HEAP_INIT/MAX above),
-          # which stretches cold-start further. The old 120s/30s/default-3-
-          # failures window (kills at ~210s) was cutting it off mid-startup,
-          # not catching a genuine hang - same failure mode already fixed
-          # for pulse-kafka/pulse-zookeeper's probes.
-          livenessProbe:
-            tcpSocket:
-              port: 8443
-            initialDelaySeconds: 180
-            periodSeconds: 30
-            failureThreshold: 5
-      volumes:
-        - name: pulse-nifi-storage
-          persistentVolumeClaim:
-            claimName: pulse-nifi-pvc
----
-# ─────────────────────────────────────────────────────────────────────────
 # Airflow init - one-shot Job (docker-compose's airflow-init): runs
 # migrations and creates the admin user, then exits. A Job is the correct
 # fit for the same reason as pulse-minio-init above.
@@ -1459,6 +1319,35 @@ spec:
           ports:
             - containerPort: 8000
           env:
+            # mapping/map.py's Spark driver runs inside this container (see
+            # the resources comment below) and needs to advertise a real,
+            # reachable address for executors on pulse-spark-worker to call
+            # back on. Without this, Spark defaults spark.driver.host to the
+            # container's own hostname - which in Kubernetes is the bare pod
+            # name (e.g. pulse-api-xxxxx-yyyyy), NOT resolvable via cluster
+            # DNS (only the Service name is). Verified live: every executor
+            # crashed immediately with java.net.UnknownHostException for
+            # exactly that pod-name string. The Service name itself isn't a
+            # safe substitute either - with multiple pulse-api replicas
+            # (HPA), it's a load-balanced VIP that could route an executor's
+            # callback to a different replica than the one that actually
+            # spawned the driver. The pod's own real IP is the only address
+            # that's both reachable and guaranteed to hit the right pod.
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            # mapping/algorithms/nltk_mapping.py's own nltk.download(...)
+            # calls (unlike the build-time prefetch in .docker/api/
+            # download_nltk.py) don't pass an explicit download_dir - NLTK
+            # picks its own default, which verified live is NOT the same
+            # world-readable /usr/local/share/nltk_data location baked in
+            # at build time. Without this, it silently redownloads into
+            # /home/appuser/nltk_data on every run instead of finding what
+            # was already baked in, defeating the whole point of baking it
+            # in and reintroducing the runtime network dependency.
+            - name: NLTK_DATA
+              value: /usr/local/share/nltk_data
             - name: POSTGRES_SERVER
               value: pulse-postgresql
             # api/config.py's Settings class has a REQUIRED (no default)
@@ -1541,13 +1430,24 @@ spec:
                 name: pulse-minio-secret
             - secretRef:
                 name: pulse-api-secret
+          # mapping/map.py's "NormalizeData" Spark session (spawned as a plain
+          # subprocess.Popen child from onboarding.py's /start-mapping, not a
+          # separate KubernetesPodOperator pod like the later cleaning/
+          # transformation/analysis/ML stages) runs its Spark *driver* JVM
+          # inside this same container - it shares this cgroup with uvicorn,
+          # it isn't a separately-budgeted pod. Verified live: with the old
+          # 1Gi limit, this subprocess was OOMKilled by the kernel every time
+          # (confirmed via dmesg - uvicorn's own ~750Mi baseline usage left
+          # no room for Spark's driver JVM, which defaults to 1g on its own).
+          # Sized here to comfortably fit uvicorn's baseline + the explicit
+          # MAPPING_DRIVER_MEMORY set in mapping/map.py, with real headroom.
           resources:
             requests:
               cpu: 250m
-              memory: 512Mi
+              memory: 768Mi
             limits:
               cpu: 1000m
-              memory: 1Gi
+              memory: 2560Mi
           readinessProbe:
             httpGet:
               path: /health
@@ -1636,16 +1536,14 @@ spec:
           ports:
             - containerPort: 80
           env:
-            # Overrides the image's own defaults (api/nifi, Docker Compose's
-            # service names) to the real Kubernetes Service names - see
+            # Overrides the image's own default (api, Docker Compose's
+            # service name) to the real Kubernetes Service name - see
             # nginx/templates/upload.conf.template and .docker/nginx/Dockerfile.
-            # nginx resolves these at config-load time (not per-request), so
-            # getting this wrong doesn't just misroute - it crash-loops the
+            # nginx resolves this at config-load time (not per-request), so
+            # getting it wrong doesn't just misroute - it crash-loops the
             # container with "host not found in upstream".
             - name: API_UPSTREAM_HOST
               value: pulse-api
-            - name: NIFI_UPSTREAM_HOST
-              value: pulse-nifi
           resources:
             requests:
               cpu: 100m

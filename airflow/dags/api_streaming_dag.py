@@ -100,7 +100,8 @@ from config.pipeline_config import (
     POSTGRES_DB,
     POSTGRES_USER,
     POSTGRES_PASSWORD,
-    k8s_pipeline_env,
+    k8s_pipeline_env_templated,
+    k8s_pipeline_pod_ip_runtime_env,
 )
 
 BUCKET        = Variable.get("default_bucket",    default_var=DEFAULT_BUCKET)
@@ -294,6 +295,11 @@ with DAG(
         name="pulse-api-stream",
         namespace=POD_NAMESPACE,
         image=PYTHON_IMAGE,
+        # PYTHON_IMAGE is tagged :latest, which Kubernetes defaults to
+        # imagePullPolicy=Always for - silently re-pulling from Docker Hub
+        # over any locally-built/freshly-pushed image otherwise. Same fix
+        # already applied to the long-lived Deployments.
+        image_pull_policy="IfNotPresent",
         cmds=["python3", "/app/mapping/run_mapping.py"],
         arguments=[
             "--mode", "api",
@@ -305,7 +311,8 @@ with DAG(
             # No --poll-duration: must poll forever.
             # No --enable-downstream: downstream is a scheduled Airflow batch job.
         ],
-        env_vars=k8s_pipeline_env(),
+        env_vars=k8s_pipeline_env_templated(),
+        pod_runtime_info_envs=k8s_pipeline_pod_ip_runtime_env(),
         service_account_name=TASK_SERVICE_ACCOUNT,
         labels=API_STREAM_POD_LABELS,
         container_resources=STREAM_POD_RESOURCES(),

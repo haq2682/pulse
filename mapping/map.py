@@ -6,7 +6,14 @@ import re
 # JAR paths — set BEFORE pyspark is imported so the JVM gateway starts with
 # the correct driver classpath (Delta Lake + S3A).
 # ---------------------------------------------------------------------------
-_JARS_DIR = "/app/jars"
+# jars/deps/, not jars/ directly - verified live: the old bare "/app/jars"
+# path silently found none of these, and Spark doesn't error on a missing
+# --driver-class-path entry, so this went unnoticed until Delta Lake's
+# catalog class was actually needed at runtime (ClassNotFoundException:
+# org.apache.spark.sql.delta.catalog.DeltaCatalog). aws-java-sdk-bundle is
+# fetched into this same directory at build time - see download_aws_sdk.sh -
+# rather than committed to the repo (~280MB).
+_JARS_DIR = "/app/jars/deps"
 _MAP_JARS = [
     f"{_JARS_DIR}/hadoop-aws-3.3.4.jar",
     f"{_JARS_DIR}/aws-java-sdk-bundle-1.12.262.jar",
@@ -240,6 +247,36 @@ spark = (
     # predictable; the caller (create_spark_session in spark_streaming)
     # manages its own session and overrides this via getOrCreate anyway.
     .config("spark.dynamicAllocation.enabled", "false")
+    # Without this, Spark advertises this driver to executors using its own
+    # hostname, which in Kubernetes is the bare pod name - not resolvable
+    # via cluster DNS (only the Service name is, and that's a load-balanced
+    # VIP shared across replicas, not safe for a callback address either).
+    # Every executor on pulse-spark-worker failed immediately with
+    # java.net.UnknownHostException for that pod name until this was set
+    # (verified live). POD_IP comes from deployment.yaml's Downward API
+    # fieldRef on this same container - see that env var's comment.
+    .config("spark.driver.host", os.getenv("POD_IP", "localhost"))
+    # Fixed ports (Spark picks random ephemeral ones by default) so
+    # pulse-api-netpol can allow exactly these from pulse-spark-worker,
+    # rather than opening every port. Verified live: even after the
+    # driver.host fix above got the executor resolving and reaching the
+    # right pod, the connection itself timed out after 120s with no
+    # NetworkPolicy rule permitting it - "resolves" and "reachable" are
+    # two different problems, this fixes the second one.
+    .config("spark.driver.port", os.getenv("MAPPING_DRIVER_PORT", "7078"))
+    .config("spark.driver.blockManager.port", os.getenv("MAPPING_DRIVER_BLOCKMANAGER_PORT", "7079"))
+    # This driver runs as a plain subprocess of the pulse-api container
+    # itself (see onboarding.py's /start-mapping), not a separately-budgeted
+    # pod like the later cleaning/transformation/analysis/ML stages - it
+    # shares pulse-api's own memory cgroup with uvicorn. Spark's default
+    # spark.driver.memory (1g) alone was enough to blow past pulse-api's
+    # container limit on top of uvicorn's own baseline usage, and the
+    # kernel OOM-killed this process every time (verified live via dmesg).
+    # Explicit and deliberately modest - this driver mostly orchestrates
+    # work on the real Spark cluster rather than collecting large amounts
+    # of data locally. See deployment.yaml's pulse-api resources comment
+    # for the container-side half of this fix.
+    .config("spark.driver.memory", os.getenv("MAPPING_DRIVER_MEMORY", "768m"))
     # Use pre-downloaded local JARs — no Maven/internet access needed.
     # Do NOT set spark.jars to local driver paths — that uploads them to the
     # executor and creates duplicate class definitions alongside the copies
@@ -253,6 +290,25 @@ spark = (
     .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
     .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
     .config("spark.hadoop.fs.s3a.path.style.access", "true")
+    # MinIO has no TLS listener anywhere in this project - fs.s3a.endpoint
+    # is a bare host:port (Hadoop's own convention; unlike boto3's
+    # endpoint_url it does NOT take a URL scheme), and
+    # fs.s3a.connection.ssl.enabled defaults to true, so without this the
+    # S3A client tries to open a TLS handshake against a plain-HTTP
+    # listener. Verified live: the driver's own final Delta/Parquet commit
+    # (a direct S3A call, unlike the executor-side compute stages) hung
+    # for minutes with connections sitting in a non-ESTABLISHED state
+    # before this was set.
+    .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
+    # Without an explicit region, the AWS SDK's default credential/region
+    # provider chain makes a real network call out to actual AWS
+    # infrastructure to auto-detect the bucket's region, even though
+    # fs.s3a.endpoint already points it at MinIO - verified live via
+    # outbound connections to real AWS/CloudFront IP ranges from the
+    # driver's JVM during the same hang above. This is a fake region (MinIO
+    # doesn't have regions), just a value that satisfies the SDK enough to
+    # skip that discovery call.
+    .config("spark.hadoop.fs.s3a.endpoint.region", "us-east-1")
     .config("inferSchema", "true")
     .config("mergeSchema", "true")
     # Delta Lake extensions — enables Delta format reads/writes and MERGE SQL.
@@ -450,7 +506,7 @@ def normalize_dataframe(df, column_variants, mapped_cols):
     missing_cols = []
     for std_col in column_variants.keys():
         if std_col not in df.columns:
-            df = df.withColumn(std_col, lit(None))
+            df = df.withColumn(std_col, lit(None).cast("string"))
             missing_cols.append(std_col)
 
     schema_cols = list(column_variants.keys())

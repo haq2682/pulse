@@ -58,7 +58,6 @@ metadata:
       pulse-minio=haq2682/pulse-minio,
       pulse-spark=haq2682/pulse-spark,
       pulse-debezium=haq2682/pulse-debezium,
-      pulse-nifi=haq2682/pulse-nifi,
       pulse-airflow=haq2682/pulse-airflow
     argocd-image-updater.argoproj.io/pulse-frontend.update-strategy: latest
     argocd-image-updater.argoproj.io/pulse-frontend.allow-tags: regexp:^sha-.*$
@@ -76,8 +75,6 @@ metadata:
     argocd-image-updater.argoproj.io/pulse-spark.allow-tags: regexp:^sha-.*$
     argocd-image-updater.argoproj.io/pulse-debezium.update-strategy: latest
     argocd-image-updater.argoproj.io/pulse-debezium.allow-tags: regexp:^sha-.*$
-    argocd-image-updater.argoproj.io/pulse-nifi.update-strategy: latest
-    argocd-image-updater.argoproj.io/pulse-nifi.allow-tags: regexp:^sha-.*$
     argocd-image-updater.argoproj.io/pulse-airflow.update-strategy: latest
     argocd-image-updater.argoproj.io/pulse-airflow.allow-tags: regexp:^sha-.*$
 spec:

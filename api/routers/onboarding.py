@@ -538,83 +538,92 @@ async def get_data_type(userId: str, db=Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# @router.post("/upload-chunk")
-# async def upload_chunk(
-#     request: Request,
-#     db=Depends(get_db)
-# ):
-#     try:
-#         form = await request.form()
-#         chunk = await form["chunk"].read()
-#         chunk_index = int(form["chunkIndex"])
-#         total_chunks = int(form["totalChunks"])
-#         file_id = form["fileId"]
-#         file_name = form["fileName"]
-#         file_size = int(form["fileSize"])
-#         file_type = form["fileType"]
-#         user_id = form["userId"]
-        
-#         onboarding = db.execute(text("SELECT business_id FROM onboarding WHERE user_id = :user_id AND is_completed = false"), {"user_id": user_id})
-#         onboarding_record = onboarding.fetchone()
-#         if not onboarding_record:
-#             raise HTTPException(status_code=404, detail="Onboarding record not found")
-        
-#         business_id = onboarding_record[0]
-#         s3_key = f"ingested/{file_name}"
-        
-#         if chunk_index == 0:
-#             existing = db.execute(text("SELECT file_id FROM uploaded_files WHERE file_id = :file_id"), {"file_id": file_id})
-#             if not existing.fetchone():
-#                 db.execute(text(
-#                     "INSERT INTO uploaded_files (file_id, business_id, file_name, file_size, file_type, s3_key, upload_status) "
-#                     "VALUES (:file_id, :business_id, :file_name, :file_size, :file_type, :s3_key, :upload_status)"
-#                 ), {"file_id": file_id, "business_id": business_id, "file_name": file_name, "file_size": file_size, "file_type": file_type, "s3_key": s3_key, "upload_status": "uploading"})
-#                 db.commit()
-            
-#             multipart = s3.create_multipart_upload(Bucket=business_id, Key=s3_key)
-#             upload_id = multipart["UploadId"]
-#             await redis.set(f"upload:{file_id}:upload_id", upload_id, ex=86400)
-#         else:
-#             upload_id = await redis.get(f"upload:{file_id}:upload_id")
-        
-#         part_number = chunk_index + 1
-#         part = s3.upload_part(
-#             Bucket=business_id,
-#             Key=s3_key,
-#             PartNumber=part_number,
-#             UploadId=upload_id,
-#             Body=chunk
-#         )
-        
-#         parts_key = f"upload:{file_id}:parts"
-#         parts_json = await redis.get(parts_key) or "[]"
-#         parts = json.loads(parts_json)
-#         parts.append({"PartNumber": part_number, "ETag": part["ETag"]})
-#         await redis.set(parts_key, json.dumps(parts), ex=86400)
-        
-#         if chunk_index == total_chunks - 1:
-#             parts = sorted(parts, key=lambda x: x["PartNumber"])
-#             s3.complete_multipart_upload(
-#                 Bucket=business_id,
-#                 Key=s3_key,
-#                 UploadId=upload_id,
-#                 MultipartUpload={"Parts": parts}
-#             )
-            
-#             db.execute(text("UPDATE uploaded_files SET upload_status = :status WHERE file_id = :file_id"), 
-#                       {"status": "completed", "file_id": file_id})
-#             db.commit()
-            
-#             await redis.delete(f"upload:{file_id}:upload_id")
-#             await redis.delete(f"upload:{file_id}:parts")
-        
-#         return {"status": 200, "chunkIndex": chunk_index}
-#     except Exception as e:
-#         if 'file_id' in locals():
-#             db.execute(text("UPDATE uploaded_files SET upload_status = :status WHERE file_id = :file_id"), 
-#                       {"status": "failed", "file_id": file_id})
-#             db.commit()
-#         raise HTTPException(status_code=400, detail=str(e))
+@router.post("/upload-chunk")
+async def upload_chunk(
+    request: Request,
+    db=Depends(get_db)
+):
+    upload_id = None
+    try:
+        form = await request.form()
+        chunk = await form["chunk"].read()
+        chunk_index = int(form["chunkIndex"])
+        total_chunks = int(form["totalChunks"])
+        file_id = form["fileId"]
+        file_name = form["fileName"]
+        file_size = int(form["fileSize"])
+        file_type = form["fileType"]
+        user_id = form["userId"]
+
+        onboarding = db.execute(text("SELECT business_id FROM onboarding WHERE user_id = :user_id AND is_completed = false"), {"user_id": user_id})
+        onboarding_record = onboarding.fetchone()
+        if not onboarding_record:
+            raise HTTPException(status_code=404, detail="Onboarding record not found")
+
+        business_id = onboarding_record[0]
+        s3_key = f"ingested/{file_name}"
+
+        if chunk_index == 0:
+            existing = db.execute(text("SELECT file_id FROM uploaded_files WHERE file_id = :file_id"), {"file_id": file_id})
+            if not existing.fetchone():
+                db.execute(text(
+                    "INSERT INTO uploaded_files (file_id, business_id, file_name, file_size, file_type, s3_key, upload_status) "
+                    "VALUES (:file_id, :business_id, :file_name, :file_size, :file_type, :s3_key, :upload_status)"
+                ), {"file_id": file_id, "business_id": business_id, "file_name": file_name, "file_size": file_size, "file_type": file_type, "s3_key": s3_key, "upload_status": "uploading"})
+                db.commit()
+
+            multipart = s3.create_multipart_upload(Bucket=business_id, Key=s3_key)
+            upload_id = multipart["UploadId"]
+            await redis.set(f"upload:{file_id}:upload_id", upload_id, ex=86400)
+        else:
+            upload_id = await redis.get(f"upload:{file_id}:upload_id")
+
+        part_number = chunk_index + 1
+        part = s3.upload_part(
+            Bucket=business_id,
+            Key=s3_key,
+            PartNumber=part_number,
+            UploadId=upload_id,
+            Body=chunk
+        )
+
+        parts_key = f"upload:{file_id}:parts"
+        parts_json = await redis.get(parts_key) or "[]"
+        parts = json.loads(parts_json)
+        parts.append({"PartNumber": part_number, "ETag": part["ETag"]})
+        await redis.set(parts_key, json.dumps(parts), ex=86400)
+
+        if chunk_index == total_chunks - 1:
+            parts = sorted(parts, key=lambda x: x["PartNumber"])
+            s3.complete_multipart_upload(
+                Bucket=business_id,
+                Key=s3_key,
+                UploadId=upload_id,
+                MultipartUpload={"Parts": parts}
+            )
+
+            db.execute(text("UPDATE uploaded_files SET upload_status = :status WHERE file_id = :file_id"),
+                      {"status": "completed", "file_id": file_id})
+            db.commit()
+
+            await redis.delete(f"upload:{file_id}:upload_id")
+            await redis.delete(f"upload:{file_id}:parts")
+
+        return {"status": 200, "chunkIndex": chunk_index}
+    except Exception as e:
+        if 'file_id' in locals():
+            db.execute(text("UPDATE uploaded_files SET upload_status = :status WHERE file_id = :file_id"),
+                      {"status": "failed", "file_id": file_id})
+            db.commit()
+        # Abort the S3 multipart upload on failure so it doesn't linger as an
+        # orphaned, billable-storage part set that MinIO never cleans up on
+        # its own (no lifecycle rule is configured for incomplete uploads).
+        if upload_id and 'business_id' in locals() and 's3_key' in locals():
+            try:
+                s3.abort_multipart_upload(Bucket=business_id, Key=s3_key, UploadId=upload_id)
+            except Exception:
+                pass
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/uploaded-files")
 async def get_uploaded_files(userId: str, db=Depends(get_db)):

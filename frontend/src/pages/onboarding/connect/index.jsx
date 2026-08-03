@@ -17,7 +17,6 @@ import usePageTitle from '@/hooks/usePageTitle';
 
 const CHUNK_SIZE = 5 * 1024 * 1024;
 const MAPPING_STATUS_POLL_INTERVAL = 3000; // 3 seconds
-const NIFI_UPLOAD_URL = import.meta.env.VITE_NIFI_UPLOAD_URL || '/upload';
 
 const Connect = () => {
     usePageTitle('Onboarding - Connect');
@@ -144,97 +143,45 @@ const Connect = () => {
         }
     };
 
-    // const uploadFileInChunks = async (file, fileId) => {
-    //     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-
-    //     try {
-    //         for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-    //             const start = chunkIndex * CHUNK_SIZE;
-    //             const end = Math.min(start + CHUNK_SIZE, file.size);
-    //             const chunk = file.slice(start, end);
-
-    //             const formData = new FormData();
-    //             formData.append('chunk', chunk);
-    //             formData.append('chunkIndex', chunkIndex);
-    //             formData.append('totalChunks', totalChunks);
-    //             formData.append('fileId', fileId);
-    //             formData.append('fileName', file.name);
-    //             formData.append('fileSize', file.size);
-    //             formData.append('fileType', file.type);
-    //             formData.append('userId', user.user_id);
-
-    //             await axiosInstance.post('/onboarding/upload-chunk', formData, {
-    //                 headers: { 'Content-Type': 'multipart/form-data' }
-    //             });
-
-    //             const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
-    //             setUploadProgress(prev => ({ ...prev, [fileId]: progress }));
-    //         }
-
-    //         setUploadedFiles(prev => prev.map(f => 
-    //             f.fileId === fileId ? { ...f, persisted: true } : f
-    //         ));
-
-    //         setTimeout(() => {
-    //             setUploadProgress(prev => {
-    //                 const newProgress = { ...prev };
-    //                 delete newProgress[fileId];
-    //                 return newProgress;
-    //             });
-    //         }, 1000);
-
-    //     } catch (error) {
-    //         console.error('Upload error:', error);
-    //         setUploadedFiles(prev => prev.filter(f => f.fileId !== fileId));
-    //         setUploadProgress(prev => {
-    //             const newProgress = { ...prev };
-    //             delete newProgress[fileId];
-    //             return newProgress;
-    //         });
-    //         throw error;
-    //     }
-    // };
-
-    const uploadFileToNiFi = async (file, fileId) => {
-        const formData = new FormData();
-        formData.append('file', file);  // Only send the file
+    const uploadFileInChunks = async (file, fileId) => {
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
         try {
-            const response = await axiosInstance.post(NIFI_UPLOAD_URL, formData, {
-                headers: { 
-                    'Content-Type': 'multipart/form-data',
-                    'Accept': 'application/json',
-                    // ✅ Send metadata as HTTP headers
-                    'X-File-Id': fileId,
-                    'X-User-Id': user.user_id,
-                    'X-Business-Id': businessIdRef.current
-                },
-                baseURL: '',
-                withCredentials: false,
-                onUploadProgress: (progressEvent) => {
-                    if (progressEvent.total) {
-                        const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                        setUploadProgress(prev => ({ ...prev, [fileId]: progress }));
-                    }
-                },
-                timeout: 1800000,
-            });
+            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                const start = chunkIndex * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, file.size);
+                const chunk = file.slice(start, end);
 
-            if (response.status === 200 || response.status === 202) {
-                setUploadedFiles(prev => prev.map(f =>
-                    f.fileId === fileId ? { ...f, persisted: true } : f
-                ));
+                const formData = new FormData();
+                formData.append('chunk', chunk);
+                formData.append('chunkIndex', chunkIndex);
+                formData.append('totalChunks', totalChunks);
+                formData.append('fileId', fileId);
+                formData.append('fileName', file.name);
+                formData.append('fileSize', file.size);
+                formData.append('fileType', file.type);
+                formData.append('userId', user.user_id);
 
-                setTimeout(() => {
-                    setUploadProgress(prev => {
-                        const newProgress = { ...prev };
-                        delete newProgress[fileId];
-                        return newProgress;
-                    });
-                }, 1000);
+                await axiosInstance.post('/onboarding/upload-chunk', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
 
-                return response.data;
+                const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+                setUploadProgress(prev => ({ ...prev, [fileId]: progress }));
             }
+
+            setUploadedFiles(prev => prev.map(f =>
+                f.fileId === fileId ? { ...f, persisted: true } : f
+            ));
+
+            setTimeout(() => {
+                setUploadProgress(prev => {
+                    const newProgress = { ...prev };
+                    delete newProgress[fileId];
+                    return newProgress;
+                });
+            }, 1000);
+
         } catch (error) {
             console.error('Upload error:', error);
             setUploadedFiles(prev => prev.filter(f => f.fileId !== fileId));
@@ -243,7 +190,7 @@ const Connect = () => {
                 delete newProgress[fileId];
                 return newProgress;
             });
-            throw new Error(error.response?.data?.message || error.message || 'Upload failed');
+            throw error;
         }
     };
     const validateFile = (file) => {
@@ -252,51 +199,6 @@ const Connect = () => {
         const fileExtension = fileName.split('.').pop();
         return allowedExtensions.includes(fileExtension);
     };
-
-    // const handleFileSelect = async (files) => {
-    //     const fileArray = Array.isArray(files) ? files : Array.from(files);
-        
-    //     const validFiles = fileArray.filter(file => {
-    //         if (!validateFile(file)) {
-    //             console.warn(`File ${file.name} has invalid format`);
-    //             return false;
-    //         }
-    //         return true;
-    //     });
-
-    //     if (validFiles.length === 0) {
-    //         setErrors(prev => ({ ...prev, form: 'Please select valid file formats (CSV, XLSX, XLS, Parquet, JSON)' }));
-    //         return;
-    //     }
-
-    //     const newFiles = validFiles.filter(file => {
-    //         return !uploadedFiles.some(f => f.name === file.name && f.size === file.size);
-    //     });
-
-    //     for (const file of newFiles) {
-    //         const fileId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${file.name}`;
-    //         const fileObj = {
-    //             fileId,
-    //             name: file.name,
-    //             size: file.size,
-    //             type: file.type,
-    //             persisted: false
-    //         };
-            
-    //         setUploadedFiles(prev => [...prev, fileObj]);
-    //         setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
-            
-    //         uploadFileInChunks(file, fileId).catch(err => {
-    //             setErrors(prev => ({ ...prev, form: `Failed to upload ${file.name}` }));
-    //         });
-    //     }
-
-    //     setErrors(prev => ({ ...prev, form: '' }));
-        
-    //     if (fileInputRef.current) {
-    //         fileInputRef.current.value = '';
-    //     }
-    // };
 
     const handleFileSelect = async (files) => {
         const fileArray = Array.isArray(files) ? files : Array.from(files);
@@ -331,9 +233,8 @@ const Connect = () => {
             setUploadedFiles(prev => [...prev, fileObj]);
             setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
 
-            // Use NiFi upload instead of chunked upload
-            uploadFileToNiFi(file, fileId).catch(err => {
-                setErrors(prev => ({ ...prev, form: `Failed to upload ${file.name}: ${err.message}` }));
+            uploadFileInChunks(file, fileId).catch(err => {
+                setErrors(prev => ({ ...prev, form: `Failed to upload ${file.name}` }));
             });
         }
 

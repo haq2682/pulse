@@ -114,21 +114,6 @@ spec:
     requests:
       storage: 2Gi
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: pulse-nifi-pvc
-  namespace: production
-  labels:
-    app: pulse-nifi
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: pulse-storage
-  resources:
-    requests:
-      storage: 15Gi
----
 # Shared by the airflow-init Job, pulse-airflow-webserver, and
 # pulse-airflow-scheduler, same as docker-compose.yml's single airflow_logs
 # volume. This only works because ReadWriteOnce allows concurrent mounts from

@@ -45,7 +45,6 @@ resources:
   - secrets/pulse-minio-external-secret.yaml
   - secrets/pulse-airflow-external-secret.yaml
   - secrets/pulse-api-external-secret.yaml
-  - secrets/pulse-nifi-external-secret.yaml
   - hpa.yaml
   # PodDisruptionBudget for pulse-spark-worker - stable, built-in API (like
   # NetworkPolicy below), no separate controller needed.
@@ -114,9 +113,6 @@ images:
     newTag: latest
   - name: pulse-debezium
     newName: haq2682/pulse-debezium
-    newTag: latest
-  - name: pulse-nifi
-    newName: haq2682/pulse-nifi
     newTag: latest
   - name: pulse-airflow
     newName: haq2682/pulse-airflow

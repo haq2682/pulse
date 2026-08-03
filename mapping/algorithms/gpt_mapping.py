@@ -384,7 +384,7 @@ Instructions:
     # Add missing columns with null values
     for col in updated_missing_cols:
         if col not in df.columns:
-            df = df.withColumn(col, lit(None))
+            df = df.withColumn(col, lit(None).cast("string"))
             print(f"  ✓ Added missing column: '{col}' (null values)")
 
     print(f"\n📊 Final DataFrame columns: {df.columns}\n")

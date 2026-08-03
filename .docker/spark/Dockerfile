@@ -21,6 +21,19 @@ ENV SPARK_EXTRA_CLASSPATH=/opt/spark/external-jars/*
 # Copy external JARs (kafka connector + transitive deps)
 COPY ./jars/deps/ /opt/spark/external-jars/
 
+# aws-java-sdk-bundle isn't checked into jars/deps/ (see download_aws_sdk.sh
+# for why) - executors load their classpath from this directory
+# (SPARK_EXTRA_CLASSPATH above), separately from pulse-api's own copy of
+# the same jar at /app/jars/deps/. Needed here too: Hadoop's S3A connector
+# (hadoop-aws, already copied above) requires it to write Parquet output to
+# MinIO, and that write happens as an executor task, not just on the
+# driver - verified live via NoClassDefFoundError on this exact image
+# without it.
+COPY .docker/download_aws_sdk.sh /tmp/
+RUN chmod +x /tmp/download_aws_sdk.sh && \
+    /tmp/download_aws_sdk.sh /opt/spark/external-jars && \
+    rm /tmp/download_aws_sdk.sh
+
 # Ensure python3.10 symlink is intact (inherited but explicit for safety)
 RUN ln -sf /usr/local/bin/python3.10 /usr/local/bin/python3
 
