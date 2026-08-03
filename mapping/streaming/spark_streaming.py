@@ -6,11 +6,17 @@ import threading
 import re
 
 # ---------------------------------------------------------------------------
-# JAR paths — baked into the repo at mapping/streaming/jars/ so they are
-# available inside the api container via the ./mapping volume mount at
-# /app/mapping/streaming/jars/ without requiring any image rebuild.
+# JAR paths — set BEFORE pyspark is imported so the JVM gateway starts with
+# the correct driver classpath (Kafka + Delta + S3A), no Maven download needed.
 # ---------------------------------------------------------------------------
-_SPARK_JARS_DIR = "/app/jars"
+# jars/deps/, not jars/ directly - same bug already found+fixed in
+# mapping/map.py: the bare "/app/jars" path silently finds none of these,
+# and Spark doesn't error on a missing --driver-class-path entry. This file
+# runs as its own KubernetesPodOperator task pod (db_streaming_dag.py /
+# api_streaming_dag.py, via run_mapping.py --mode db/api), on the
+# pulse-python image - see .docker/python/Dockerfile for where jars/deps/
+# actually gets populated (COPY ./jars + download_aws_sdk.sh).
+_SPARK_JARS_DIR = "/app/jars/deps"
 _KAFKA_JARS = [
     f"{_SPARK_JARS_DIR}/spark-sql-kafka-0-10_2.12-3.5.0.jar",
     f"{_SPARK_JARS_DIR}/spark-token-provider-kafka-0-10_2.12-3.5.0.jar",
@@ -147,6 +153,21 @@ def create_spark_session() -> SparkSession:
         .config("spark.executor.memory", os.getenv("SPARK_EXECUTOR_MEMORY", "1g"))
         .config("spark.driver.memory", os.getenv("SPARK_DRIVER_MEMORY", "1g"))
         .config("spark.cores.max", os.getenv("SPARK_CORES_MAX", "1"))
+        # This driver runs as its own KubernetesPodOperator task pod (see
+        # airflow/config/pipeline_config.py) - a bare K8s pod has no DNS
+        # record for its own hostname, which is what Spark advertises to
+        # executors by default. Same root cause (and fix) already verified
+        # live in mapping/map.py: without this, every executor on
+        # pulse-spark-worker fails with java.net.UnknownHostException.
+        # POD_IP comes from a Downward API fieldRef added to this pod's env -
+        # see pipeline_config.py's k8s_pipeline_pod_ip_runtime_env().
+        .config("spark.driver.host", os.getenv("POD_IP", "localhost"))
+        # Fixed ports (Spark picks random ephemeral ones by default) so the
+        # matching NetworkPolicy rule can allow exactly these from
+        # pulse-spark-worker instead of opening every port - same reasoning
+        # as mapping/map.py's identical fix.
+        .config("spark.driver.port", os.getenv("SPARK_DRIVER_PORT", "7078"))
+        .config("spark.driver.blockManager.port", os.getenv("SPARK_DRIVER_BLOCKMANAGER_PORT", "7079"))
         # Driver classpath: JARs are mounted at /app/jars/ in the api container.
         # Do NOT use spark.jars here — that would re-upload these JARs from the
         # driver to the executor, creating duplicate class definitions on the
@@ -163,6 +184,22 @@ def create_spark_session() -> SparkSession:
         .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ACCESS_KEY"))
         .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_SECRET_KEY"))
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
+        # MinIO has no TLS listener anywhere in this project -
+        # fs.s3a.connection.ssl.enabled defaults to true, so without this the
+        # S3A client tries to open a TLS handshake against a plain-HTTP
+        # listener. Same hang already verified live and fixed in
+        # mapping/map.py, for the exact same MinIO write path.
+        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
+        # Without an explicit region, the AWS SDK's default credential/region
+        # provider chain makes a real network call out to actual AWS
+        # infrastructure to auto-detect the bucket's region, even though
+        # fs.s3a.endpoint already points it at MinIO - same gap already
+        # verified live and fixed in mapping/map.py. Fake region (MinIO
+        # doesn't have regions), just enough to satisfy the SDK and skip
+        # that discovery call.
+        .config("spark.hadoop.fs.s3a.endpoint.region", "us-east-1")
+        .config("spark.hadoop.fs.s3a.aws.credentials.provider",
+                "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
         # Delta Lake extensions — enables MERGE, UPDATE, DELETE SQL syntax and
         # the Python ``DeltaTable`` API used for CDC upserts.
         .config(
