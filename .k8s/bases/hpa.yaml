@@ -66,7 +66,7 @@ spec:
     kind: Deployment
     name: pulse-debezium
   minReplicas: 1
-  maxReplicas: 3
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
@@ -88,7 +88,7 @@ spec:
     kind: Deployment
     name: pulse-airflow-webserver
   minReplicas: 1
-  maxReplicas: 3
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
@@ -110,7 +110,7 @@ spec:
     kind: Deployment
     name: pulse-nginx
   minReplicas: 1
-  maxReplicas: 4
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
@@ -132,7 +132,7 @@ spec:
     kind: Deployment
     name: pulse-frontend
   minReplicas: 1
-  maxReplicas: 4
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
@@ -159,7 +159,7 @@ spec:
     kind: Deployment
     name: pulse-api
   minReplicas: 1
-  maxReplicas: 4
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
