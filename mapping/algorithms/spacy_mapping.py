@@ -11,6 +11,23 @@ if not logging.getLogger().handlers:
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     )
 
+# Module-level singleton, loaded once per process instead of once per call
+# (spacy_column_mapping runs once per table - customers, orders, addresses,
+# etc. - and previously reloaded the full model from disk every single time).
+# disable=[...] drops the tagger/parser/ner/lemmatizer/attribute_ruler
+# components - the only thing this file ever calls is doc.similarity(),
+# which only needs the tokenizer and word vectors. Those disabled
+# components are the majority of en_core_web_md's memory footprint and were
+# never used - verified live: the mapping subprocess (shares pulse-api's
+# container memory cgroup with uvicorn - see deployment.yaml's resources
+# comment) was OOM-killed by the kernel loading the full pipeline on top of
+# whatever the earlier algorithms in the same run (nltk, wordnet, roberta)
+# had already left resident.
+_NLP = spacy.load(
+    "en_core_web_md",
+    disable=["tagger", "parser", "ner", "lemmatizer", "attribute_ruler"],
+)
+
 
 def preprocess_column_name(column):
     """
@@ -43,7 +60,7 @@ def spacy_column_mapping(df, missing_cols, extra_cols, mapped_cols, threshold=0.
     Returns:
         Tuple of (df, missing_cols, extra_cols, mapped_cols)
     """
-    nlp = spacy.load("en_core_web_md")
+    nlp = _NLP
 
     for missing_col in missing_cols[:]:
         best_match = None

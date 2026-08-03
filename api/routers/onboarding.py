@@ -38,6 +38,43 @@ MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MAPPING_LOG_DIR = os.getenv("MAPPING_LOG_DIR", "/tmp")
 MAPPING_PROCESS_TTL = 86400  # 24 hours in seconds
+
+
+def _mapping_pid_is_alive(pid: int) -> bool:
+    """
+    True if `pid` is a real, still-executing process on this host - i.e.
+    NOT gone (ESRCH) and NOT a zombie.
+
+    os.kill(pid, 0) alone is not enough: a process that has exited but
+    hasn't been reaped by its parent yet (a zombie - the state a
+    kernel-OOM-killed subprocess.Popen child is left in until this
+    process's event loop happens to await/poll it) still occupies a valid
+    PID slot, so os.kill(pid, 0) succeeds and does NOT raise - verified
+    live, this is exactly what left the mapping pipeline reporting
+    "running" forever in the onboarding UI after the OOM-killed subprocess
+    became a zombie. /proc/<pid>/status's State line is the reliable way
+    to tell the two apart.
+    """
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # Exists (different owner/container in a multi-replica setup) - alive.
+        return True
+
+    try:
+        with open(f"/proc/{pid}/status", "r") as f:
+            for line in f:
+                if line.startswith("State:"):
+                    return "Z" not in line
+    except FileNotFoundError:
+        # Process vanished between the kill(0) check and reading /proc - gone.
+        return False
+    except OSError:
+        # /proc unavailable for some other reason - fall back to kill(0)'s answer.
+        pass
+    return True
 MAPPING_LOG_MAX_LINES = 500  # Maximum number of log lines to return to avoid large responses
 MANUAL_MAPPING_TIMEOUT_SECONDS = 300  # 5 minutes timeout for applying manual mappings
 
@@ -818,11 +855,10 @@ async def start_mapping(request: Request, db=Depends(get_db)):
             process_still_running = False
             if mapping_pid:
                 try:
-                    os.kill(int(mapping_pid), 0)
-                    process_still_running = True
-                except OSError:
+                    process_still_running = _mapping_pid_is_alive(int(mapping_pid))
+                except ValueError:
                     process_still_running = False
-            
+
             if process_still_running:
                 return {
                     "status": 200,
@@ -1189,24 +1225,13 @@ async def get_mapping_status(request: Request, userId: str, db=Depends(get_db)):
                 process_dead = False
                 try:
                     process_id = int(process_id_str)
-                    # os.kill(pid, 0) checks process existence on THIS host only.
-                    # In a multi-replica deployment the PID may belong to a
-                    # different container, so we only treat the process as dead
-                    # when the OS explicitly says "no such process" (ESRCH).
-                    # EPERM means the process exists but belongs to another user —
-                    # treat it as still alive.  Any other OSError is a "not found".
-                    import errno as _errno
-                    try:
-                        os.kill(process_id, 0)
-                    except PermissionError:
-                        # Process exists (different owner or container) — assume alive
-                        pass
-                    except OSError as _oe:
-                        if _oe.errno == _errno.ESRCH:
-                            # No such process on this host
-                            process_dead = True
-                        # Any other OSError (e.g. EPERM from different namespace):
-                        # assume alive to avoid false negatives in multi-replica setups
+                    # _mapping_pid_is_alive checks process existence on THIS host
+                    # only. In a multi-replica deployment the PID may belong to a
+                    # different container, so it only treats the process as dead
+                    # when the OS explicitly says "no such process" (ESRCH) or the
+                    # process is a zombie - never on EPERM (exists, different
+                    # owner/container - assume alive) or an unreadable /proc.
+                    process_dead = not _mapping_pid_is_alive(process_id)
                 except ValueError:
                     process_dead = True  # Invalid PID stored in Redis
 
@@ -1444,9 +1469,8 @@ async def stream_mapping_logs(request: Request, userId: str, db=Depends(get_db))
                         if process_id_str:
                             try:
                                 process_id = int(process_id_str)
-                                # Check if process exists using signal 0 (Unix-specific)
-                                # This doesn't kill the process, just tests if it exists
-                                os.kill(process_id, 0)
+                                if not _mapping_pid_is_alive(process_id):
+                                    raise OSError("mapping process no longer alive")
                                 # Process is running, continue monitoring
                             except (OSError, ValueError):
                                 # Process is done, read any remaining output and exit
