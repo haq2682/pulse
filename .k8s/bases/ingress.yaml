@@ -47,7 +47,6 @@ spec:
     - hosts:
         - pulse-engine.com
         - spark.pulse-engine.com
-        - nifi.pulse-engine.com
         - airflow.pulse-engine.com
         - minio.pulse-engine.com
       secretName: pulse-tls
@@ -75,16 +74,6 @@ spec:
                 name: pulse-spark-master
                 port:
                   number: 8080
-    - host: nifi.pulse-engine.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: pulse-nifi
-                port:
-                  number: 8080
     - host: airflow.pulse-engine.com
       http:
         paths:
@@ -108,3 +97,45 @@ spec:
                 name: pulse-minio
                 port:
                   number: 9001
+---
+# NiFi gets its own Ingress object, separate from the shared one above -
+# nginx.ingress.kubernetes.io/backend-protocol is set Ingress-wide, and
+# NiFi is the one backend here that must be reached over HTTPS, not HTTP.
+# With SINGLE_USER_CREDENTIALS_USERNAME/PASSWORD set (see deployment.yaml),
+# NiFi's own web server enforces HTTPS-only - its single-user auth provider
+# requires a secure channel, so even though NIFI_WEB_HTTP_PORT=8080 is also
+# set, HTTPS wins and NiFi only ever binds 8443 (verified live: the pod's
+# own startup log shows only an SSL connector on 8443, no HTTP connector at
+# all). Routing this Ingress at :8080 like every other host here left
+# nothing listening on the other end - hence the 503s, and the liveness/
+# readiness probes (deployment.yaml, tcpSocket port 8080) killing the pod
+# in a loop for the same reason. ingress-nginx defaults to NOT verifying
+# the backend's certificate (NiFi's is self-signed, generated on first
+# boot) - fine for this same trust-the-self-signed-cert setup as the rest
+# of this file.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pulse-nifi-ingress
+  namespace: production
+  labels:
+    app: pulse-nifi
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - nifi.pulse-engine.com
+      secretName: pulse-tls
+  rules:
+    - host: nifi.pulse-engine.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pulse-nifi
+                port:
+                  number: 8443

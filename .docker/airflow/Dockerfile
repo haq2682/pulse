@@ -13,3 +13,14 @@ RUN pip install \
     "apache-airflow==${AIRFLOW_VERSION}" \
     "apache-airflow-providers-cncf-kubernetes" \
     --constraint "${CONSTRAINT_URL}"
+
+# DAGs/plugins/config/utils - docker-compose bind-mounts these live from
+# ./airflow/ (see docker-compose.yml), but Kubernetes deployment.yaml has no
+# live host bind mount equivalent, so they need to be baked into the image
+# instead, same as note 5 in deployment.yaml's header for the other
+# pipeline directories. Paths match AIRFLOW__CORE__DAGS_FOLDER/
+# PLUGINS_FOLDER and PYTHONPATH set on pulse-airflow-webserver/scheduler.
+COPY ./airflow/dags /opt/airflow/dags
+COPY ./airflow/plugins /opt/airflow/plugins
+COPY ./airflow/config /opt/airflow/config
+COPY ./airflow/utils /opt/airflow/utils

@@ -27,10 +27,10 @@ class Settings(BaseSettings):
     # Google OAuth (OPTIONAL:  won't crash if not set)
     google_client_id: str = ""
     google_client_secret: str = ""
-    google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
-    
+    google_redirect_uri: str = "http://localhost:8000/auth/google/callback"  # dev default (docker compose); K8s overrides via deployment.yaml
+
     # Frontend
-    frontend_url: str = "http://localhost:5173"
+    frontend_url: str = "http://localhost:5173"  # dev default (docker compose); K8s overrides via deployment.yaml
     
     # Environment: "development" or "production"
     environment: str = "development"

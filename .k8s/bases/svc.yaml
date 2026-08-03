@@ -202,7 +202,23 @@ metadata:
   labels:
     app: pulse-kafka
 spec:
-  type: ClusterIP
+  # Headless (no ClusterIP) - Kafka's own controller connects to "itself"
+  # via KAFKA_ADVERTISED_LISTENERS=pulse-kafka:9092 (has to be the Service
+  # DNS name so other pods can resolve it - see that env var's comment in
+  # deployment.yaml), and a pod reaching its own Service's ClusterIP is a
+  # hairpin NAT path. Verified live that this specific path hangs
+  # indefinitely here (`echo > /dev/tcp/pulse-kafka/9092` from inside the
+  # pulse-kafka pod itself never completed, while the same test against its
+  # own pod IP or 127.0.0.1 succeeded instantly) - kube-proxy/Calico isn't
+  # completing the hairpin round-trip. That left the controller stuck in a
+  # permanent self-reconnect loop, degrading the broker enough that even
+  # unrelated external clients (Debezium's AdminClient) started timing out
+  # waiting for Metadata responses. Headless removes the NAT hop entirely:
+  # DNS for "pulse-kafka" resolves straight to the current pod's real IP
+  # (via its Endpoints record) for every caller, including the broker
+  # itself - the standard fix for this failure mode with a single-replica
+  # broker-style workload.
+  clusterIP: None
   selector:
     app: pulse-kafka
   ports:

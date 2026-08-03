@@ -1112,7 +1112,7 @@ spec:
               kubernetes.io/metadata.name: ingress-nginx
       ports:
         - protocol: TCP
-          port: 8080
+          port: 8443
   egress:
     - to:
         - podSelector:
@@ -1147,6 +1147,21 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    # NiFi's Git-backed Flow Registry client needs to reach GitHub directly
+    # (api.github.com + github.com, both real internet endpoints, not
+    # cluster-internal) to list/pull flow versions - same ipBlock/except
+    # pattern already used for jmx-exporter-init's GitHub download
+    # elsewhere in this file.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
 ---
 # ─────────────────────────────────────────────────────────────────────────
 # Airflow init (Job) - runs db migrate/upgrade/create-user once, then

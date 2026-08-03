@@ -37,8 +37,17 @@ vault_login_as_root
 # input redirection and fail. Parsing line-by-line as plain KEY=VALUE data
 # avoids that entirely.
 set -a
-while IFS='=' read -r key value; do
+while IFS= read -r line || [[ -n "$line" ]]; do
+  key="${line%%=*}"
   [[ -z "$key" || "$key" == \#* ]] && continue
+  # `IFS='=' read -r key value` (the previous approach here) silently drops
+  # a trailing `=` from value - `read` treats IFS characters as separators
+  # and discards a trailing empty field, exactly like it does trailing
+  # whitespace. That's fatal for base64 values (Fernet keys, etc.), which
+  # almost always end in `=` padding - splitting on the FIRST `=` only via
+  # parameter expansion instead preserves the rest of the line verbatim,
+  # trailing `=` included.
+  value="${line#*=}"
   # Strip one matching pair of surrounding quotes, if present.
   if [[ "$value" == \"*\" && "$value" == *\" ]]; then
     value="${value%\"}"
