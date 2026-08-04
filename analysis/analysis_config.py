@@ -121,20 +121,41 @@ def create_spark_session(app_name="Analysis"):
         .config("spark.sql.execution.arrow.pyspark.enabled", "true")
         # Explicit rather than relying on Spark's own 1g default - this
         # driver runs inside a KubernetesPodOperator task pod capped at
-        # TASK_POD_RESOURCES()'s 2Gi limit (pipeline_config.py), with
+        # TASK_POD_RESOURCES()'s 3Gi limit (pipeline_config.py), with
         # nothing else sharing that cgroup. maxResultSize dropped from 2g to
         # stay under this heap - a maxResultSize larger than the heap it's
-        # collected into can never actually be honored.
-        .config("spark.driver.memory", os.getenv("ANALYSIS_DRIVER_MEMORY", "1g"))
+        # collected into can never actually be honored. Bumped from 1g to
+        # 1536m - verified live: analysis.py's single main() runs dozens of
+        # independent analytics computations sequentially in one session
+        # (thousands of Spark jobs/stages total for a full run), and 1g
+        # wasn't enough headroom on top of the accumulated per-execution
+        # bookkeeping below once the pod's container limit was raised to
+        # 2Gi's replacement - the "base" container was OOMKilled by the
+        # kernel directly (not a graceful JVM OutOfMemoryError).
+        .config("spark.driver.memory", os.getenv("ANALYSIS_DRIVER_MEMORY", "1536m"))
         .config("spark.driver.maxResultSize", os.getenv("ANALYSIS_DRIVER_MAX_RESULT_SIZE", "512m"))
         # spark.driver.memory only bounds the JVM heap - Metaspace/CodeCache
         # aren't covered and grow with every distinct query plan Spark
         # JIT-compiles. This driver runs every analysis query for a business
         # in one long-lived session - same mechanism verified live in
         # mapping/map.py's driver (shares pulse-api's container, not this
-        # one, but the JVM behavior is identical). Capped here too so it
-        # can't silently eat the rest of this pod's 2Gi budget.
-        .config("spark.driver.extraJavaOptions", "-XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=128m")
+        # one, but the JVM behavior is identical). Bumped from 256m to 384m
+        # for Metaspace specifically - analysis.py compiles far more
+        # distinct query plans in one session (thousands of stages across
+        # dozens of independent computations) than any other stage.
+        .config("spark.driver.extraJavaOptions", "-XX:MaxMetaspaceSize=384m -XX:ReservedCodeCacheSize=128m")
+        # Spark's own UI/SQL-execution-history listeners retain metadata
+        # (job/stage/task info, full SQL execution plans) for every action
+        # run in the session, up to their retention caps - with thousands
+        # of jobs/stages/executions in a single analysis.py run, that's real
+        # accumulated driver heap even under the defaults. This pod is
+        # ephemeral and its Spark UI (port 4040) is never exposed by any
+        # Service/Ingress, so nothing depends on it - disabled outright
+        # rather than just tightening retention.
+        .config("spark.ui.enabled", "false")
+        .config("spark.sql.ui.retainedExecutions", "20")
+        .config("spark.ui.retainedJobs", "50")
+        .config("spark.ui.retainedStages", "50")
         .config("spark.jars", _JARS_STR)
         .config("spark.driver.extraClassPath", _JARS_CP)
         .config("spark.executor.extraClassPath", _JARS_CP)

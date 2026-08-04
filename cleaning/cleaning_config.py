@@ -145,6 +145,12 @@ def create_spark_session():
         .config("spark.sql.adaptive.enabled", "true")
         .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
         .config("spark.sql.execution.arrow.pyspark.enabled", "true")
+        # This pod is ephemeral and its Spark UI (port 4040) is never
+        # exposed by any Service/Ingress - free to disable. See
+        # analysis_config.py's identical fix for why this matters more
+        # there (thousands of jobs/stages in one session accumulating UI
+        # listener bookkeeping on the driver heap).
+        .config("spark.ui.enabled", "false")
         # Explicit rather than relying on Spark's own 1g default - this
         # driver runs inside a KubernetesPodOperator task pod capped at
         # TASK_POD_RESOURCES()'s 2Gi limit (pipeline_config.py), with

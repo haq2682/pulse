@@ -491,9 +491,19 @@ def _resource_requirements(cpu_request, mem_request, cpu_limit, mem_limit):
 
 # Bounded, short-lived steps (clean/transform/analyze/connector-deploy/etc).
 # Kept modest given this project's minikube target - see hpa.yaml's sizing
-# comment about this being a 4-core/16GB machine.
+# comment about this being a 4-core/16GB machine. run_k8s_task_pod() applies
+# this to every step uniformly (no per-step override) - the limit is sized
+# for the heaviest of them (analysis.py: one long-lived driver session
+# running dozens of independent analytics computations, thousands of Spark
+# jobs/stages total). Verified live at 2Gi: the "base" container itself got
+# OOMKilled mid-run (not a graceful JVM OutOfMemoryError - the kernel killed
+# it directly) once JVM heap+Metaspace+CodeCache (capped in
+# analysis_config.py) plus the Python driver process's own accumulated
+# state from thousands of sequential actions exceeded the limit. Cleaning/
+# transformation don't need this much - the extra headroom is simply unused
+# for them, not harmful.
 def TASK_POD_RESOURCES():
-    return _resource_requirements("250m", "512Mi", "1000m", "2Gi")
+    return _resource_requirements("250m", "512Mi", "1000m", "3Gi")
 
 
 # The 24/7 streaming pods (db_streaming / api_streaming) run a Spark
