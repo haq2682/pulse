@@ -131,6 +131,20 @@ def create_spark_session():
         .config("spark.sql.adaptive.enabled", "true")
         .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
         .config("spark.sql.execution.arrow.pyspark.enabled", "true")
+        # Explicit rather than relying on Spark's own 1g default - this
+        # driver runs inside a KubernetesPodOperator task pod capped at
+        # TASK_POD_RESOURCES()'s 2Gi limit (pipeline_config.py), with
+        # nothing else sharing that cgroup.
+        .config("spark.driver.memory", os.getenv("CLEAN_DRIVER_MEMORY", "1g"))
+        # spark.driver.memory only bounds the JVM heap - Metaspace/CodeCache
+        # aren't covered and grow with every distinct query plan Spark
+        # JIT-compiles. This driver processes every table for a business in
+        # one long-lived session, each triggering fresh codegen - same
+        # mechanism verified live in mapping/map.py's driver (shares
+        # pulse-api's container, not this one, but the JVM behavior is
+        # identical). Capped here too so it can't silently eat the rest of
+        # this pod's 2Gi budget over a run with many tables.
+        .config("spark.driver.extraJavaOptions", "-XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=128m")
         # Use pre-downloaded local JARs — no Maven/internet access needed.
         .config("spark.jars", _CLEAN_JARS_STR)
         .config("spark.driver.extraClassPath", _CLEAN_CP)

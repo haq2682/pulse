@@ -122,11 +122,28 @@ def create_spark_session():
                     os.getenv("TRANSFORM_EXECUTOR_MEMORY", "1g"))
             .config("spark.executor.memoryOverhead",
                     os.getenv("TRANSFORM_EXECUTOR_MEMORY_OVERHEAD", "384m"))
-            # Driver runs on the host machine (16 GB) — 3 g is safe
+            # Stale from before the K8s migration - this comment used to say
+            # "Driver runs on the host machine (16 GB) - 3g is safe", but per
+            # the spark.driver.host comment above, this driver actually runs
+            # inside its own KubernetesPodOperator task pod, capped at
+            # TASK_POD_RESOURCES()'s 2Gi limit (pipeline_config.py). A 3g
+            # heap request there exceeds the ENTIRE container's memory limit
+            # before Spark does anything - not a slow leak like mapping/
+            # map.py's driver, a guaranteed failure. Dropped to fit with
+            # headroom left for Metaspace/CodeCache/off-heap (capped below)
+            # and OS/JVM overhead.
             .config("spark.driver.memory",
-                    os.getenv("TRANSFORM_DRIVER_MEMORY", "3g"))
+                    os.getenv("TRANSFORM_DRIVER_MEMORY", "1200m"))
             .config("spark.driver.maxResultSize",
-                    os.getenv("TRANSFORM_DRIVER_MAX_RESULT_SIZE", "1g"))
+                    os.getenv("TRANSFORM_DRIVER_MAX_RESULT_SIZE", "512m"))
+            # spark.driver.memory only bounds the JVM heap - Metaspace/
+            # CodeCache aren't covered and grow with every distinct query
+            # plan Spark JIT-compiles, which this driver does once per table
+            # per run. Same mechanism verified live in mapping/map.py's
+            # driver (shares pulse-api's container, not this one, but the
+            # JVM behavior is identical).
+            .config("spark.driver.extraJavaOptions",
+                    "-XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=128m")
             # 2 executors × 1 core = 2 slots; 8× multiplier → 16 partitions
             .config("spark.sql.shuffle.partitions",
                     os.getenv("TRANSFORM_SHUFFLE_PARTITIONS", "16"))

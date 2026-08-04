@@ -107,7 +107,22 @@ def create_spark_session(app_name="Analysis"):
         .config("spark.sql.adaptive.enabled", "true")
         .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
         .config("spark.sql.execution.arrow.pyspark.enabled", "true")
-        .config("spark.driver.maxResultSize", "2g")
+        # Explicit rather than relying on Spark's own 1g default - this
+        # driver runs inside a KubernetesPodOperator task pod capped at
+        # TASK_POD_RESOURCES()'s 2Gi limit (pipeline_config.py), with
+        # nothing else sharing that cgroup. maxResultSize dropped from 2g to
+        # stay under this heap - a maxResultSize larger than the heap it's
+        # collected into can never actually be honored.
+        .config("spark.driver.memory", os.getenv("ANALYSIS_DRIVER_MEMORY", "1g"))
+        .config("spark.driver.maxResultSize", os.getenv("ANALYSIS_DRIVER_MAX_RESULT_SIZE", "512m"))
+        # spark.driver.memory only bounds the JVM heap - Metaspace/CodeCache
+        # aren't covered and grow with every distinct query plan Spark
+        # JIT-compiles. This driver runs every analysis query for a business
+        # in one long-lived session - same mechanism verified live in
+        # mapping/map.py's driver (shares pulse-api's container, not this
+        # one, but the JVM behavior is identical). Capped here too so it
+        # can't silently eat the rest of this pod's 2Gi budget.
+        .config("spark.driver.extraJavaOptions", "-XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=128m")
         .config("spark.jars", _JARS_STR)
         .config("spark.driver.extraClassPath", _JARS_CP)
         .config("spark.executor.extraClassPath", _JARS_CP)
