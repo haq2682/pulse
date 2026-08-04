@@ -84,6 +84,14 @@ def create_ml_spark_session(
             .config("spark.storage.decommission.enabled", "true")
             .config("spark.storage.decommission.rddBlocks.enabled", "true")
             .config("spark.storage.decommission.shuffleBlocks.enabled", "true")
+            # spark.driver.memory only bounds the JVM heap - Metaspace/
+            # CodeCache aren't covered and grow with every distinct query
+            # plan Spark JIT-compiles. Same mechanism verified live in
+            # mapping/map.py's driver; capped here too, centrally, so every
+            # ML script inherits it rather than needing this repeated in
+            # each of the 6 training/inference scripts.
+            .config("spark.driver.extraJavaOptions",
+                    "-XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=128m")
         )
     else:
         builder = builder.config("spark.dynamicAllocation.enabled", "false")

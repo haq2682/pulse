@@ -70,7 +70,7 @@ def create_spark_session():
                     "spark.executor.instances": os.getenv("ML_SPARK_EXECUTOR_INSTANCES", "1"),
                     "spark.executor.cores": os.getenv("ML_SPARK_EXECUTOR_CORES", "1"),
                     "spark.executor.memory": os.getenv("ML_SPARK_EXECUTOR_MEMORY", "1536m"),
-                    "spark.executor.memoryOverhead": os.getenv("ML_SPARK_EXECUTOR_MEMORY_OVERHEAD", "768"),
+                    "spark.executor.memoryOverhead": os.getenv("ML_SPARK_EXECUTOR_MEMORY_OVERHEAD", "768m"),
                     "spark.sql.shuffle.partitions": os.getenv("ML_SPARK_SHUFFLE_PARTITIONS", "4"),
                     "spark.default.parallelism": os.getenv("ML_SPARK_DEFAULT_PARALLELISM", "4"),
                     "spark.sql.adaptive.enabled": os.getenv("ML_SPARK_SQL_ADAPTIVE", "true"),
