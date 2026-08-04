@@ -232,6 +232,21 @@ spec:
       ports:
         - protocol: TCP
           port: 7077
+    # mapping/map.py's driver (runs inside this container) connects OUT to
+    # the executor's own block manager port to pull back results (e.g.
+    # approxQuantile) - not just the executor registering with the driver
+    # on 7078/7079 above. Verified live in cleaning/cleaning_config.py's
+    # identical fix: this direction was never opened, so the fetch just
+    # timed out (120s) instead of being refused, for 30 minutes until the
+    # job aborted. spark.blockManager.port pins the executor side to this
+    # fixed port (see map.py) so it can be allowed here specifically.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-worker
+      ports:
+        - protocol: TCP
+          port: 7080
     - to:
         - podSelector:
             matchLabels:
@@ -344,6 +359,22 @@ spec:
       ports:
         - protocol: TCP
           port: 7077
+    # This driver (cleaning/transformation/analysis) connects OUT to the
+    # executor's own block manager port to pull back results (e.g.
+    # approxQuantile) - not just the executor registering with the driver
+    # on 7078/7079 (see the ingress rule above). Verified live: this
+    # direction was never opened, so the fetch just timed out (120s)
+    # instead of being refused, for 30 minutes until the job aborted.
+    # spark.blockManager.port pins the executor side to this fixed port
+    # (see cleaning_config.py/spark_config.py/analysis_config.py) so it can
+    # be allowed here specifically.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-worker
+      ports:
+        - protocol: TCP
+          port: 7080
     - to:
         - namespaceSelector:
             matchLabels:
@@ -424,6 +455,21 @@ spec:
       ports:
         - protocol: TCP
           port: 7077
+    # This driver (mapping/streaming/spark_streaming.py) connects OUT to
+    # the executor's own block manager port to pull back results - not
+    # just the executor registering with the driver on 7078/7079 (see the
+    # ingress rule above). Verified live: this direction was never opened,
+    # so the fetch just timed out (120s) instead of being refused, for 30
+    # minutes until the job aborted (same bug in cleaning/cleaning_config.py).
+    # spark.blockManager.port pins the executor side to this fixed port so
+    # it can be allowed here specifically.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-worker
+      ports:
+        - protocol: TCP
+          port: 7080
     - to:
         - namespaceSelector:
             matchLabels:
@@ -506,6 +552,21 @@ spec:
       ports:
         - protocol: TCP
           port: 7077
+    # This driver (mapping/streaming/spark_streaming.py) connects OUT to
+    # the executor's own block manager port to pull back results - not
+    # just the executor registering with the driver on 7078/7079 (see the
+    # ingress rule above). Verified live: this direction was never opened,
+    # so the fetch just timed out (120s) instead of being refused, for 30
+    # minutes until the job aborted (same bug in cleaning/cleaning_config.py).
+    # spark.blockManager.port pins the executor side to this fixed port so
+    # it can be allowed here specifically.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pulse-spark-worker
+      ports:
+        - protocol: TCP
+          port: 7080
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -809,6 +870,31 @@ spec:
       ports:
         - protocol: TCP
           port: 8081
+    # The driver (pulse-api's mapping subprocess, pulse-task's cleaning/
+    # transformation/analysis, and the two 24/7 streaming drivers) connects
+    # IN to this executor's own block manager port to pull back results
+    # (e.g. approxQuantile) - not just this worker registering out to the
+    # driver on 7078/7079 (see the egress rules below). Verified live:
+    # this direction was never opened, so the fetch just timed out (120s)
+    # instead of being refused, for 30 minutes until the job aborted.
+    # spark.blockManager.port pins this executor's port to this fixed
+    # value in every stage config so it can be allowed here specifically.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pulse-api
+        - podSelector:
+            matchLabels:
+              app: pulse-task
+        - podSelector:
+            matchLabels:
+              app: pulse-db-stream
+        - podSelector:
+            matchLabels:
+              app: pulse-api-stream
+      ports:
+        - protocol: TCP
+          port: 7080
   egress:
     - to:
         - podSelector:

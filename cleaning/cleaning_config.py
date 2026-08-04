@@ -107,6 +107,20 @@ def create_spark_session():
             # reasoning as mapping/map.py's identical fix.
             .config("spark.driver.port", os.getenv("SPARK_DRIVER_PORT", "7078"))
             .config("spark.driver.blockManager.port", os.getenv("SPARK_DRIVER_BLOCKMANAGER_PORT", "7079"))
+            # spark.blockManager.port sets the default block manager port for
+            # BOTH driver and executors - the driver's own is overridden
+            # above, so this is effectively the EXECUTOR's block manager
+            # port. Left unset, it's random/ephemeral per run. Verified
+            # live: approxQuantile (and anything else needing the driver to
+            # pull a result back from the executor's block manager, not just
+            # the executor registering with the driver) connects OUT from
+            # this pod TO the executor on this port - "Connecting to
+            # <executor-ip>:<random-port> timed out (120000 ms)" repeated
+            # for 30 minutes until the job aborted, because no NetworkPolicy
+            # rule can allow a port that changes every run. Fixed so
+            # pulse-task-netpol's egress and pulse-spark-worker-netpol's
+            # ingress can both pin exactly this port.
+            .config("spark.blockManager.port", os.getenv("SPARK_EXECUTOR_BLOCKMANAGER_PORT", "7080"))
             .config("spark.dynamicAllocation.enabled", "true")
             .config("spark.dynamicAllocation.minExecutors", "0")
             .config("spark.dynamicAllocation.initialExecutors", "1")

@@ -168,6 +168,18 @@ def create_spark_session() -> SparkSession:
         # as mapping/map.py's identical fix.
         .config("spark.driver.port", os.getenv("SPARK_DRIVER_PORT", "7078"))
         .config("spark.driver.blockManager.port", os.getenv("SPARK_DRIVER_BLOCKMANAGER_PORT", "7079"))
+        # spark.blockManager.port sets the default block manager port for
+        # BOTH driver and executors - the driver's own is overridden above,
+        # so this is effectively the EXECUTOR's block manager port. Left
+        # unset, it's random/ephemeral per run, and the driver connecting
+        # OUT to the executor to pull back a result (not just the executor
+        # registering with the driver) has no NetworkPolicy rule that can
+        # allow a port that changes every run - verified live in
+        # cleaning/cleaning_config.py's identical fix (approxQuantile hung
+        # for 30 minutes on exactly this). Fixed so pulse-db-stream-netpol/
+        # pulse-api-stream-netpol's egress and pulse-spark-worker-netpol's
+        # ingress can both pin this port.
+        .config("spark.blockManager.port", os.getenv("SPARK_EXECUTOR_BLOCKMANAGER_PORT", "7080"))
         # Driver classpath: JARs are mounted at /app/jars/ in the api container.
         # Do NOT use spark.jars here — that would re-upload these JARs from the
         # driver to the executor, creating duplicate class definitions on the

@@ -191,7 +191,7 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis, ingestionType, pi
             <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
                 <div className="text-center max-w-2xl">
                     {/* Knob */}
-                    <div className="mb-6 place-self-center">
+                    <div className="mb-6 flex justify-center">
                         <Knob
                             value={progress}
                             readOnly
@@ -295,7 +295,7 @@ const InlinePipelineProgress = ({ businessId, onStartAnalysis, ingestionType, pi
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
                 <div className="text-center max-w-2xl">
-                    <div className="mb-6 place-self-center">
+                    <div className="mb-6 flex justify-center">
                         <Knob
                             value={progress}
                             readOnly
