@@ -10,7 +10,9 @@ ReactJS and FastAPI.
 
 - [Tech Stack](#tech-stack)
 - [Features and Components](#features-and-components)
+- [Architecture Diagram](#architecture-diagram)
 - [Two Ways to Run This](#two-ways-to-run-this)
+- [Common Prerequisites (Both Paths)](#common-prerequisites-both-paths)
 - [DevOps Pipeline Setup (Kubernetes + GitOps)](#devops-pipeline-setup-kubernetes--gitops)
 - [Local Development (Docker Compose)](#local-development-docker-compose)
   - [Minimum System Requirements](#minimum-system-requirements)
@@ -39,8 +41,22 @@ ReactJS and FastAPI.
 - **`frontend/`** — React/Vite single-page app (port 5173)
 - **`cleaning/`, `mapping/`, `transformation/`, `analysis/`, `machine-learning/`**
   — PySpark-based data pipeline stages
+  - **Note:** The `machine-learning/` stage is currently disabled
+    project-wide. Model training produced unreliable results with
+    inconsistent accuracy scores, and the training process itself took an
+    extended amount of time, which in turn delayed completion of the
+    broader data engineering pipeline. The machine-learning code and its
+    Airflow DAG wiring remain in the repository (with the DAG registration
+    commented out) so the stage can be re-enabled once these issues are
+    resolved.
 - **`airflow/`** — DAGs for batch, streaming, and ML-retrain orchestration
 - **`nifi/`** — data ingestion flow templates
+  - **Note:** Apache NiFi has been disabled in the current data ingestion
+    architecture. Source files are now uploaded directly from the React
+    frontend to MinIO object storage buckets, bypassing the NiFi flow
+    described here. The NiFi flow templates and their local-development
+    setup instructions remain documented below for local-development and
+    historical reference.
 - **CDC ingestion via Debezium**, supporting PostgreSQL, MySQL, MariaDB,
   MongoDB, SQL Server, Oracle, Db2, Vitess, Spanner, and Informix as
   external source connectors. Cassandra is not supported by the system.
@@ -52,6 +68,14 @@ ReactJS and FastAPI.
   namespace continuously in sync with `.k8s/bases` straight from this repo.
   See [DevOps Pipeline Setup](#devops-pipeline-setup-kubernetes--gitops)
   below.
+
+## Architecture Diagram
+
+> **Placeholder:** A high-level architecture diagram of this project and its
+> infrastructure (application services, data pipeline stages, and
+> supporting infrastructure) is planned and will be added here. It is being
+> prepared separately in tldraw / draw.io and will be inserted at this
+> location once complete.
 
 ## Two Ways to Run This
 
@@ -67,6 +91,100 @@ ReactJS and FastAPI.
 Both paths run the exact same application code — this only changes *how*
 it's deployed and operated.
 
+## Common Prerequisites (Both Paths)
+
+The two steps below were previously documented only under [Local
+Development](#local-development-docker-compose). They are relocated here
+because both the DevOps/Kubernetes path and the Docker Compose path depend
+on them: the Vault bootstrap step in [DevOps Pipeline
+Setup](#devops-pipeline-setup-kubernetes--gitops) seeds every application
+secret directly from the same `.env` file created below, and both paths use
+the same MinIO buckets.
+
+### Environment Variables (`.env`)
+
+1. Copy the environment template:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Fill in the variables that have **no default anywhere in the codebase**:
+   `SECRET_KEY`, `NIFI_ADMIN_USER`, `NIFI_ADMIN_PASSWORD`,
+   `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`. (`NIFI_ADMIN_USER` /
+   `NIFI_ADMIN_PASSWORD` only matter if you're also running the legacy
+   Docker Compose NiFi flow — see the note under [Features and
+   Components](#features-and-components) — but the variables must still be
+   present in `.env` for `docker compose` to start cleanly.)
+
+   Also set `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DATABASE_NAME`,
+   and `POSTGRES_SERVER` — these are required for the API to start
+   (`api/config.py` has no default for them), even though
+   `airflow/config/pipeline_config.py` falls back to `postgres` /
+   `postgres` / `pulse` / `10.5.0.5` if they're unset for the Airflow
+   pipeline code path.
+
+3. Generate secrets:
+
+   ```bash
+   # SECRET_KEY
+   python -c "import secrets; print(secrets.token_hex(32))"
+
+   # AIRFLOW_FERNET_KEY
+   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+   ```
+
+4. Optional integrations (these have defaults or are blank if unused):
+   Gemini API key, SMTP settings, Google OAuth credentials, Hugging Face
+   token.
+
+5. If you plan to use the Debezium Oracle or Spanner connectors, place the
+   required files **before** first bringing the stack up (whichever path
+   you're using):
+
+   - Oracle: `jars/ojdbc8.jar`
+   - Spanner: `jars/gcp-credentials.json`
+
+### MinIO Bucket Initialization
+
+Bucket **creation** (`pulse-bucket-1`, `pulse-test-bucket`,
+`pulse-checkpoints`) is already automated in both paths — the
+`minio-init` Compose service and, in Kubernetes, the one-shot
+`pulse-minio-init` Job (`.k8s/bases/deployment.yaml`) both create these
+automatically on startup. The commands below are for pointing the `mc`
+CLI at MinIO manually and, more usefully, for **seeding sample/test
+data**, which is not automated in either path.
+
+1. Point the MinIO client at the running MinIO instance (replace the
+   placeholders with your `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` values
+   from `.env`):
+
+   ```bash
+   mc alias set local http://localhost:9000 <MINIO_ROOT_USER> <MINIO_ROOT_PASSWORD>
+   ```
+
+   For Docker Compose, `localhost:9000` is reachable directly. For the
+   Kubernetes path, MinIO is not exposed to the host by default — port-forward
+   it first:
+
+   ```bash
+   kubectl port-forward svc/pulse-minio 9000:9000 -n production
+   ```
+
+2. Create the buckets manually if needed (normally a no-op confirmation,
+   since both paths already create these automatically on startup):
+
+   ```bash
+   mc mb --ignore-existing local/pulse-bucket-1
+   mc mb --ignore-existing local/pulse-checkpoints
+   ```
+
+3. Seed the bucket with the sample data shipped in this repo:
+
+   ```bash
+   mc cp --recursive ./buckets/pulse-bucket-1 local/pulse-bucket-1
+   ```
+
 ## DevOps Pipeline Setup (Kubernetes + GitOps)
 
 This provisions a full GitOps pipeline on a single Linux host: Ansible
@@ -74,6 +192,11 @@ installs everything the host needs and brings up a Minikube cluster,
 Terraform installs every piece of cluster infrastructure via Helm, HashiCorp
 Vault holds the application secrets, and ArgoCD continuously syncs the
 `production` namespace to whatever is committed in this repo's `.k8s/bases`.
+
+> **Placeholder:** A diagram of this DevOps/GitOps pipeline (Ansible →
+> Terraform → Vault bootstrap → CI → ArgoCD → Kubernetes) is planned and
+> will be added here. It is being prepared separately in tldraw / draw.io
+> and will be inserted at this location once complete.
 
 **Requirements:** a Linux host (Ubuntu/Debian - the Ansible playbook uses
 `apt`), at least 4 CPU cores and 16GB RAM (this runs Minikube plus every
@@ -151,10 +274,11 @@ namespace - ArgoCD creates that itself in step 6.
 
 Vault starts empty and sealed - it needs to be initialized once, then
 unsealed, then configured with the KV secrets engine, Kubernetes auth, and
-the actual application secret values, seeded from your `.env` file. Every
-script here is idempotent (safe to re-run) and fully unattended - none of
-them prompt for a key or token, they read `vault-init-output.json`
-themselves:
+the actual application secret values, seeded from your `.env` file (see
+[Common Prerequisites](#common-prerequisites-both-paths) above if you
+haven't created one yet). Every script here is idempotent (safe to re-run)
+and fully unattended - none of them prompt for a key or token, they read
+`vault-init-output.json` themselves:
 
 ```bash
 cd vault/scripts
@@ -267,6 +391,13 @@ those 7 objects as permanently `OutOfSync` until it's installed.
 
 ## Local Development (Docker Compose)
 
+> **Legacy:** This path predates the [DevOps Pipeline
+> Setup](#devops-pipeline-setup-kubernetes--gitops) above and is kept here
+> as a legacy, docker-only setup path — it is not the primary way this
+> project is intended to be deployed going forward. If you only want to run
+> this project with plain Docker / Docker Compose, without Kubernetes,
+> Ansible, Terraform, or ArgoCD, follow the instructions in this section.
+
 The fastest way to run the whole stack on one machine. See [Two Ways to
 Run This](#two-ways-to-run-this) above if you're deciding between this and
 the full Kubernetes pipeline.
@@ -282,42 +413,10 @@ the full Kubernetes pipeline.
 
 ### Environment Setup
 
-1. Copy the environment template:
-   
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Fill in the variables that have **no default anywhere in the codebase**:
-   `SECRET_KEY`, `NIFI_ADMIN_USER`, `NIFI_ADMIN_PASSWORD`,
-   `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`.
-   
-   Also set `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DATABASE_NAME`,
-   and `POSTGRES_SERVER` — these are required for the API to start
-   (`api/config.py` has no default for them), even though
-   `airflow/config/pipeline_config.py` falls back to `postgres` /
-   `postgres` / `pulse` / `10.5.0.5` if they're unset for the Airflow
-   pipeline code path.
-
-3. Generate secrets:
-   
-   ```bash
-   # SECRET_KEY
-   python -c "import secrets; print(secrets.token_hex(32))"
-   
-   # AIRFLOW_FERNET_KEY
-   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-   ```
-
-4. Optional integrations (these have defaults or are blank if unused):
-   Gemini API key, SMTP settings, Google OAuth credentials, Hugging Face
-   token.
-
-5. If you plan to use the Debezium Oracle or Spanner connectors, place the
-   required files **before** the first `docker compose up`:
-   
-   - Oracle: `jars/ojdbc8.jar`
-   - Spanner: `jars/gcp-credentials.json`
+This step has moved to [Common Prerequisites (Both
+Paths)](#common-prerequisites-both-paths) → Environment Variables above,
+since the DevOps/Kubernetes path depends on the same `.env` file. Complete
+that section first, then continue with Installation below.
 
 ### Installation
 
@@ -454,37 +553,19 @@ Synthetic e-commerce data lives in `faker/*.xlsx`, generated via the
    the API, frontend, `python` worker (port 5000), PostgreSQL, MinIO,
    Spark, Kafka, Zookeeper, Debezium, Redis, NiFi, Airflow, and Nginx.
 
-3. Point the MinIO client at the running MinIO instance (replace the
-   placeholders with your `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` values
-   from `.env`):
-   
-   ```bash
-   mc alias set local http://localhost:9000 <MINIO_ROOT_USER> <MINIO_ROOT_PASSWORD>
-   ```
+3. Point the MinIO client at the running instance, confirm the buckets
+   exist, and seed sample data — see [Common Prerequisites (Both
+   Paths)](#common-prerequisites-both-paths) → MinIO Bucket Initialization
+   above (for Docker Compose, `localhost:9000` is reachable directly, so
+   the `kubectl port-forward` step there doesn't apply).
 
-4. Create the buckets the pipeline expects. The `minio-init` service
-   already creates `pulse-bucket-1`, `pulse-test-bucket`, and
-   `pulse-checkpoints` automatically on startup, so these commands are
-   normally just a no-op confirmation:
-   
-   ```bash
-   mc mb local/pulse-bucket-1
-   mc mb local/pulse-checkpoints
-   ```
-
-5. Seed the bucket with the sample data shipped in this repo:
-   
-   ```bash
-   mc cp --recursive ./buckets/pulse-bucket-1 local/pulse-bucket-1
-   ```
-
-6. Make the worker startup scripts executable:
+4. Make the worker startup scripts executable:
    
    ```bash
    chmod +x bash/*.sh
    ```
 
-7. Start a Spark worker. Before running, open the script and adjust
+5. Start a Spark worker. Before running, open the script and adjust
    `SPARK_WORKER_CORES` / `SPARK_WORKER_MEMORY` to match your host's
    available resources:
    
@@ -493,7 +574,7 @@ Synthetic e-commerce data lives in `faker/*.xlsx`, generated via the
    ./bash/start_worker.sh         # Windows (Git Bash)
    ```
 
-8. Import and configure the NiFi batch-mode flow (see the two subsections
+6. Import and configure the NiFi batch-mode flow (see the two subsections
    below).
 
 ### Importing the NiFi batch-mode flow
