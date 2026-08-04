@@ -65,7 +65,7 @@
   changed_when: false
 
 - name: Initialize Minikube cluster
-  ansible.builtin.command: minikube start --driver=docker --kubernetes-version=v1.34.9
+  ansible.builtin.command: minikube start --driver=docker --kubernetes-version=v1.34.9 --cni=calico
   register: minikube_status
   become: true
   become_user: "{{ normal_user }}"

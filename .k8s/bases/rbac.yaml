@@ -32,7 +32,13 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["pods"]
-    verbs: ["create", "get", "list", "watch", "delete"]
+    # patch is required by KubernetesPodOperator's own startup-timeout
+    # handling (patch_already_checked marks a slow-to-start pod so it isn't
+    # re-processed) - verified live: without it, a pod that took >120s to
+    # start failed with a 403 Forbidden trying to patch itself, which masked
+    # whatever actually made it slow to start and also broke the operator's
+    # own cleanup path.
+    verbs: ["create", "get", "list", "watch", "delete", "patch"]
   - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get"]
