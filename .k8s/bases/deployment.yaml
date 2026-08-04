@@ -1439,15 +1439,24 @@ spec:
           # 1Gi limit, this subprocess was OOMKilled by the kernel every time
           # (confirmed via dmesg - uvicorn's own ~750Mi baseline usage left
           # no room for Spark's driver JVM, which defaults to 1g on its own).
-          # Sized here to comfortably fit uvicorn's baseline + the explicit
-          # MAPPING_DRIVER_MEMORY set in mapping/map.py, with real headroom.
+          # 2560Mi (uvicorn baseline + MAPPING_DRIVER_MEMORY) still wasn't
+          # enough once the mapping subprocess itself is accounted for - it
+          # loads its OWN copies of the spaCy/nltk/sentence-transformers
+          # models (a separate process from the 4 uvicorn workers, not
+          # sharing their already-loaded copies), on top of that same JVM.
+          # Verified live via dmesg: the java driver process got OOM-killed
+          # mid-batch (after several tables had already written fine) once
+          # all three - uvicorn baseline, the mapping subprocess's models,
+          # and the JVM - were resident at once. Bumped with real headroom
+          # for all three; spark.driver.extraJavaOptions in map.py also caps
+          # the JVM's own Metaspace/CodeCache growth across tables.
           resources:
             requests:
               cpu: 250m
               memory: 768Mi
             limits:
               cpu: 1000m
-              memory: 2560Mi
+              memory: 3584Mi
           readinessProbe:
             httpGet:
               path: /health

@@ -277,6 +277,17 @@ spark = (
     # of data locally. See deployment.yaml's pulse-api resources comment
     # for the container-side half of this fix.
     .config("spark.driver.memory", os.getenv("MAPPING_DRIVER_MEMORY", "768m"))
+    # spark.driver.memory only bounds the JVM heap - it does nothing for
+    # Metaspace/CodeCache, which grow with every distinct query plan Spark
+    # JIT-compiles. This driver processes many differently-shaped tables
+    # (customers, orders, reviews, ...) in one long-lived session, each
+    # triggering fresh codegen that Metaspace/CodeCache don't reclaim
+    # mid-session - verified live via dmesg: the java process's RSS kept
+    # climbing table over table until the kernel OOM-killed it mid-batch,
+    # well above the 768m heap setting. Capped explicitly so this off-heap
+    # growth has a hard ceiling instead of silently eating the rest of
+    # pulse-api's container budget.
+    .config("spark.driver.extraJavaOptions", "-XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=128m")
     # Use pre-downloaded local JARs — no Maven/internet access needed.
     # Do NOT set spark.jars to local driver paths — that uploads them to the
     # executor and creates duplicate class definitions alongside the copies
