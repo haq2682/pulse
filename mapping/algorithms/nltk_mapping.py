@@ -1,5 +1,6 @@
 import logging
 import re
+import socket
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.metrics.distance import edit_distance
@@ -14,12 +15,21 @@ if not logging.getLogger().handlers:
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     )
 
-# Download required NLTK data
-nltk.download("punkt", quiet=True)
-nltk.download("stopwords", quiet=True)
-nltk.download("wordnet", quiet=True)
-nltk.download("averaged_perceptron_tagger", quiet=True)
-nltk.download("punkt_tab", quiet=True)
+# .docker/python/Dockerfile bakes this data into /usr/local/share/nltk_data
+# at build time for exactly this reason - a runtime download means every
+# mapping run depends on live internet access from inside pulse-api.
+# nltk.download()'s own "already installed?" check only looks at its
+# download_dir argument (default ~/nltk_data), not the full nltk.data.path
+# search list, so without passing download_dir it never saw the baked-in
+# copy and re-downloaded from raw.githubusercontent.com on every run - and
+# since that download has no read timeout, a single stalled connection hung
+# the mapping pipeline forever (verified live). Pointing download_dir at the
+# same path the Dockerfile used makes this a no-op in normal operation; the
+# socket timeout is a fallback in case the bake is ever missing/incomplete.
+socket.setdefaulttimeout(30)
+_NLTK_DATA_DIR = "/usr/local/share/nltk_data"
+for _pkg in ("punkt", "stopwords", "wordnet", "averaged_perceptron_tagger", "punkt_tab"):
+    nltk.download(_pkg, download_dir=_NLTK_DATA_DIR, quiet=True)
 
 
 def preprocess_column_name(column):
