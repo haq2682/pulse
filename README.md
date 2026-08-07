@@ -72,11 +72,7 @@ ReactJS and FastAPI.
 
 ## Architecture Diagram
 
-> **Placeholder:** A high-level architecture diagram of this project and its
-> infrastructure (application services, data pipeline stages, and
-> supporting infrastructure) is planned and will be added here. It is being
-> prepared separately in tldraw / draw.io and will be inserted at this
-> location once complete.
+![Architecture-Diagram](frontend/src/assets/Architecture-Diagram.png)
 
 ## Demo Video
 
@@ -198,10 +194,7 @@ Terraform installs every piece of cluster infrastructure via Helm, HashiCorp
 Vault holds the application secrets, and ArgoCD continuously syncs the
 `production` namespace to whatever is committed in this repo's `.k8s/bases`.
 
-> **Placeholder:** A diagram of this DevOps/GitOps pipeline (Ansible →
-> Terraform → Vault bootstrap → CI → ArgoCD → Kubernetes) is planned and
-> will be added here. It is being prepared separately in tldraw / draw.io
-> and will be inserted at this location once complete.
+![DevOps-Pipeline](frontend/src/assets/Pulse-Devops-Pipeline.gif)
 
 **Requirements:** a Linux host (Ubuntu/Debian - the Ansible playbook uses
 `apt`), at least 4 CPU cores and 16GB RAM (this runs Minikube plus every
