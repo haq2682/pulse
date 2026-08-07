@@ -11,6 +11,7 @@ ReactJS and FastAPI.
 - [Tech Stack](#tech-stack)
 - [Features and Components](#features-and-components)
 - [Architecture Diagram](#architecture-diagram)
+- [Demo Video](#demo-video)
 - [Two Ways to Run This](#two-ways-to-run-this)
 - [Common Prerequisites (Both Paths)](#common-prerequisites-both-paths)
 - [DevOps Pipeline Setup (Kubernetes + GitOps)](#devops-pipeline-setup-kubernetes--gitops)
@@ -76,6 +77,10 @@ ReactJS and FastAPI.
 > supporting infrastructure) is planned and will be added here. It is being
 > prepared separately in tldraw / draw.io and will be inserted at this
 > location once complete.
+
+## Demo Video
+
+[Here is the demo video of the project](https://drive.google.com/file/d/1Xn2pFmHivepc7J7pFdRFfa6-qEpxTLCD/view?usp=sharing)
 
 ## Two Ways to Run This
 
