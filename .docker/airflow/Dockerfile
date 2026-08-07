@@ -9,8 +9,18 @@ ENV CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints
 # Tasks run as their own Kubernetes Pods via the in-cluster ServiceAccount
 # token - no docker.sock, no host bind mounts. Replaces the earlier
 # apache-airflow-providers-docker setup (see docs/CLOUD_DEPLOYMENT_GUIDE.md).
+#
+# The [statsd] extra is required for AIRFLOW__METRICS__STATSD_ON=True
+# (deployment.yaml) to actually do anything - airflow/stats.py imports
+# `statsd.StatsClient` lazily and silently falls back to a no-op stats
+# client if that import fails, so without this extra the webserver/
+# scheduler start up fine and look healthy, but never emit a single StatsD
+# packet - verified live: the statsd-exporter sidecar's own
+# statsd_exporter_udp_packets_total stayed at 0 after 2+ days uptime, and
+# `pip show statsd` in the running container confirmed the package was
+# simply never installed.
 RUN pip install \
-    "apache-airflow==${AIRFLOW_VERSION}" \
+    "apache-airflow[statsd]==${AIRFLOW_VERSION}" \
     "apache-airflow-providers-cncf-kubernetes" \
     --constraint "${CONSTRAINT_URL}"
 
