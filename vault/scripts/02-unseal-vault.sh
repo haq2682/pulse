@@ -1,12 +1,6 @@
 #!/bin/bash
-# Run this after every Vault pod restart (crash, node reboot, minikube
-# stop/start, pod eviction, a Helm upgrade that recreates the pod...). Vault
-# always starts sealed; unsealing is not persisted, it's a runtime state
-# rebuilt in memory every time the process starts. Safe to re-run - if
-# Vault is already unsealed, this is a no-op.
-#
-# Reads 3 of the 5 unseal keys from vault-init-output.json automatically
-# (see lib.sh) - nothing is typed in by hand.
+# Run after every Vault pod restart - unsealing is runtime state, not
+# persisted. Safe to re-run; no-op if already unsealed.
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 

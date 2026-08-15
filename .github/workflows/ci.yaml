@@ -1,9 +1,8 @@
 name: Build & Push Docker Images
 
-# Builds every custom image in this repo and pushes it to Docker Hub with a
-# `pulse-` prefix and an immutable sha tag (`sha-<git sha>`), which is what
-# Argo CD Image Updater uses (update-strategy: latest, allow-tags regexp:
-# ^sha-.*$ - see the annotations on .k8s/argocd/argocd.yaml's Application).
+# Builds every custom image and pushes to Docker Hub with a `pulse-` prefix
+# and an immutable sha tag (`sha-<git sha>`) - what Argo CD Image Updater
+# watches for (see .k8s/argocd/argocd.yaml).
 #
 # Required repository secrets:
 #   DOCKERHUB_USERNAME   Docker Hub username
@@ -26,8 +25,6 @@ concurrency:
 
 env:
   SHA_TAG: sha-${{ github.sha }}
-  # Shared build args for the frontend (kept uniform across matrix jobs;
-  # images that don't declare these ARGs simply ignore them).
   VITE_BUILD_ARGS: |
     VITE_API_URL=${{ vars.VITE_API_URL }}
     VITE_NIFI_UPLOAD_URL=${{ vars.VITE_NIFI_UPLOAD_URL }}
@@ -51,15 +48,8 @@ jobs:
       - run: npm run lint
         working-directory: frontend
 
-  # No pytest suite exists anywhere in this repo yet, so there's nothing to
-  # "test" here in the unit-test sense - this runs ruff, restricted to just
-  # E9 (syntax errors) and F821 (undefined names). Both are genuine runtime
-  # bugs, not style opinions - deliberately NOT ruff's full default rule
-  # set, which produces 1800+ findings on this codebase (it's never been
-  # linted before) and would make this gate permanently red on day one for
-  # reasons unrelated to correctness. Widen this once the codebase has been
-  # brought up to a stricter baseline on purpose, not as a side effect of
-  # adding CI.
+  # Restricted to E9 (syntax errors) and F821 (undefined names), not ruff's
+  # full default rule set - widen once the codebase has a stricter baseline.
   lint-python:
     name: Lint Python (ruff)
     runs-on: ubuntu-latest
@@ -105,7 +95,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Images whose Dockerfiles start from pulse-python (FROM python-py310).
   build-dependent:
     name: pulse-${{ matrix.name }}
     needs: build-python
@@ -145,7 +134,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Self-contained images (no dependency on pulse-python).
   build-standalone:
     name: pulse-${{ matrix.name }}
     needs: [lint-frontend, lint-python]

@@ -1,37 +1,9 @@
-# VerticalPodAutoscalers - watch a Deployment's actual CPU/memory usage
-# over time and recommend better request/limit values than the ones
-# hand-picked in deployment.yaml.
-#
-# IMPORTANT: unlike HPA, the VPA API is NOT built into Kubernetes. It needs
-# its own controller (3 pods: recommender, updater, admission-controller)
-# installed separately - this cluster does not have it installed yet, so
-# these objects will sit inert (or fail to apply, since the CRD they use
-# won't exist) until it is. The official install method is a script against
-# a clone of the project, not a simple `kubectl apply -f <url>`:
-#
+# VerticalPodAutoscalers - VPA is not built into Kubernetes; needs its own
+# controller installed separately:
 #   git clone https://github.com/kubernetes/autoscaler.git
-#   cd autoscaler/vertical-pod-autoscaler
-#   ./hack/vpa-up.sh
+#   cd autoscaler/vertical-pod-autoscaler && ./hack/vpa-up.sh
 #
-# See docs/SECRETS_MANAGEMENT.md's neighbor - there is no doc file for this
-# yet; the install/verification steps live only in this comment for now.
-#
-# Every target below uses updateMode: "Off" - the safest of VPA's modes.
-# It only calculates and stores recommendations (visible via
-# `kubectl describe vpa <name>`); it never evicts or changes a running pod
-# on its own. The other modes ("Recreate", "InPlaceOrRecreate", "InPlace",
-# "Initial") actually apply their recommendations - "Recreate" in
-# particular evicts and recreates pods when its recommendation drifts far
-# enough from the current request, which causes a real restart. That's not
-# something to turn on by default for singleton, stateful-ish services like
-# a database with no replica to fail over to - start with "Off", read the
-# recommendations for a while, then decide.
-#
-# All 7 targets here are the singleton "backing service" style workloads in
-# deployment.yaml (1 replica, not fronted by an HPA) - the natural fit for
-# VPA, which manages a container's resource shape, not its replica count.
-#
-# Docs: https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/README.md
+# updateMode: "Off" only calculates recommendations - never evicts a pod.
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:

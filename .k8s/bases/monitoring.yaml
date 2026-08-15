@@ -1,49 +1,17 @@
-# Prometheus monitoring wiring for every service in deployment.yaml that now
-# exposes metrics (native endpoints, JMX javaagents, sidecar exporters, or
-# app-level instrumentation - see the comments next to each in
-# deployment.yaml and svc.yaml).
+# Prometheus monitoring wiring - ServiceMonitor CRD (Prometheus Operator/
+# kube-prometheus-stack) is expected to already exist in-cluster.
 #
-# This file does NOT install Prometheus/Grafana themselves - only the
-# `monitoring.coreos.com/v1` ServiceMonitor CRD is expected to already exist
-# in-cluster (installed by the Prometheus Operator, typically via the
-# kube-prometheus-stack Helm chart). ServiceMonitor objects sit inert with
-# no effect until a Prometheus instance is actually running and configured
-# to pick them up - see the label note below.
-#
-# All ServiceMonitors live in the `monitoring` namespace (a ServiceMonitor
-# can watch Services in a different namespace than its own - that's what
-# `namespaceSelector` below is for) and each one targets `production` via
-# `namespaceSelector.matchNames`, matching every other object in this repo.
-#
-# IMPORTANT for whoever installs kube-prometheus-stack later: by default its
-# Prometheus CR only picks up ServiceMonitors carrying a `release: <chart
-# release name>` label (Helm value `prometheus.prometheusSpec.
-# serviceMonitorSelectorNilUsesHelmValues`, true by default). Either set that
-# Helm value to `false` (so Prometheus watches every ServiceMonitor
-# cluster-wide, regardless of labels - simplest for a single-cluster,
-# single-team setup like this one), or add a matching `release:` label to
-# every object below. Not decided here since it depends on how
-# kube-prometheus-stack ends up being installed.
-#
-# Docs: https://prometheus-operator.dev/docs/getting-started/design/#servicemonitor
+# terraform/resource.tf sets serviceMonitorSelectorNilUsesHelmValues=false,
+# so Prometheus watches every ServiceMonitor cluster-wide regardless of labels.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: monitoring
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# JMX exporter configs - mounted into pulse-zookeeper/pulse-kafka/
-# pulse-debezium via the pulse-jmx-exporter-config volume in deployment.yaml.
-# These MUST live in the `production` namespace (the same namespace as the
-# pods that mount them - ConfigMap volume mounts cannot cross namespaces),
-# which is why they carry `namespace: production` here despite being
-# conceptually part of "the monitoring system". Everything else in this file
-# is genuinely cluster-scoped or lives in `monitoring` on purpose.
-#
-# Content is copied verbatim from the upstream prometheus/jmx_exporter
-# example configs (kafka-2_0_0.yml, kafka-connect.yml, zookeeper.yaml) -
-# these are the standard, maintained MBean-to-metric mapping rules for each
-# JVM, not something written from scratch here.
+# JMX exporter configs - must live in `production` (same namespace as the
+# pods mounting them). Copied verbatim from upstream prometheus/jmx_exporter
+# example configs.
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: v1
 kind: ConfigMap
@@ -291,8 +259,6 @@ data:
 # each pointed at `production` via namespaceSelector.
 # ─────────────────────────────────────────────────────────────────────────
 
-# MinIO - native Prometheus endpoints, no exporter needed. Two separate
-# scrape targets: cluster-wide aggregate metrics and per-node metrics.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -315,12 +281,6 @@ spec:
       path: /minio/v2/metrics/node
       interval: 30s
 ---
-# Spark Master - built-in Prometheus servlet (spark.ui.prometheus.enabled,
-# set via SPARK_MASTER_OPTS in deployment.yaml), scraped off the existing UI
-# port. Path convention per Spark 3.x's metrics servlet - not yet verified
-# against a live scrape on this cluster since no Prometheus instance is
-# running to confirm it end-to-end; if the path is wrong, `kubectl port-
-# forward` to the pod's 8080 and check the master UI's own metrics link.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -340,7 +300,6 @@ spec:
       path: /metrics/master/prometheus/
       interval: 30s
 ---
-# Spark Worker - same servlet, same caveat as pulse-spark-master above.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -360,7 +319,6 @@ spec:
       path: /metrics/worker/prometheus/
       interval: 30s
 ---
-# Zookeeper - JMX exporter javaagent, ensemble health.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -380,7 +338,6 @@ spec:
       path: /metrics
       interval: 30s
 ---
-# Kafka - JMX exporter javaagent, broker health + consumer lag.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -400,9 +357,6 @@ spec:
       path: /metrics
       interval: 30s
 ---
-# Debezium (Kafka Connect) - JMX exporter javaagent. Highest-value target in
-# this whole file: a stuck/failed CDC connector fails silently (Postgres
-# keeps writing, Kafka just stops receiving) without this.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -422,9 +376,6 @@ spec:
       path: /metrics
       interval: 30s
 ---
-# PostgreSQL - postgres_exporter sidecar. Watch replication slot lag
-# specifically (POSTGRESQL_WAL_LEVEL: logical in deployment.yaml exists for
-# Debezium - lag here means the CDC pipeline is falling behind).
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -444,8 +395,6 @@ spec:
       path: /metrics
       interval: 30s
 ---
-# Redis - redis_exporter sidecar. Shared between app caching and Airflow's
-# webserver rate limiter, so a stall degrades both in non-obvious ways.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -465,9 +414,6 @@ spec:
       path: /metrics
       interval: 30s
 ---
-# Nginx - nginx-prometheus-exporter sidecar off stub_status. This is the
-# edge gateway, so RED metrics (rate/errors/duration) here matter more than
-# almost anywhere else in the stack.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -487,9 +433,6 @@ spec:
       path: /metrics
       interval: 30s
 ---
-# API - prometheus-fastapi-instrumentator, exposed at /metrics on the app's
-# own port (see api/main.py). Primary user-facing surface, worth per-route
-# latency/error breakdown.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -509,8 +452,6 @@ spec:
       path: /metrics
       interval: 30s
 ---
-# Airflow Webserver - statsd-exporter sidecar. Bridges Airflow's native
-# StatsD metrics to Prometheus.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -530,9 +471,6 @@ spec:
       path: /metrics
       interval: 30s
 ---
-# Airflow Scheduler - same statsd-exporter pattern. Scheduler heartbeat lag
-# and DAG parse time - the metrics you'd actually alert on - are both
-# emitted by the scheduler process, not the webserver.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:

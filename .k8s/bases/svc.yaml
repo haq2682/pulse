@@ -1,25 +1,6 @@
-# One ClusterIP Service per Deployment that actually listens on a port.
-# Ingress (added later) will be what exposes any of this outside the
-# cluster - nothing here is reachable from outside minikube yet.
-#
-# Jobs (pulse-minio-init, pulse-airflow-init) run once and exit, so a
-# Service (which routes to long-running pods) doesn't apply to them - they
-# have none, and that's the only kind of Deployment/Job left without one.
-# pulse-airflow-scheduler used to be the other exception ("the scheduler
-# process doesn't serve traffic") but now has a Service too, purely to
-# expose its statsd-exporter sidecar's metrics port - see monitoring.yaml.
-#
-# Several Services below also carry extra named ports beyond the
-# application's own port - these back the exporter sidecars/JMX javaagents
-# added in deployment.yaml for the monitoring system (see monitoring.yaml's
-# ServiceMonitors, which reference these ports by name, not number).
-#
-# There used to be a standalone pulse-python Deployment here too (an idle
-# `tail -f /dev/null` container Airflow execed into) - it's gone now that
-# Airflow creates its own ephemeral task pods via KubernetesPodOperator
-# instead. See note 7 at the top of deployment.yaml.
-#
-# Docs: https://kubernetes.io/docs/concepts/services-networking/service/
+# One ClusterIP Service per Deployment that listens on a port. Named ports
+# beyond the app's own port back exporter sidecars/JMX javaagents, referenced
+# by name in monitoring.yaml's ServiceMonitors.
 apiVersion: v1
 kind: Service
 metadata:
@@ -90,17 +71,9 @@ spec:
       port: 9187
       targetPort: 9187
 ---
-# Second Service, same pods, different purpose: NodePort so a desktop SQL
-# client (DBeaver, Beekeeper Studio, psql, ...) can connect directly.
-# Postgres speaks its own binary wire protocol, not HTTP, so this can't go
-# through the Ingress like the web UIs do - a NodePort is the closest
-# minikube-native equivalent (LoadBalancer needs `minikube tunnel` and,
-# even then, only really behaves cleanly on the docker driver on Linux).
-# nodePort is pinned to 30432 (rather than left to auto-assign) so your
-# client's saved connection doesn't break if this gets re-applied.
-# Named "-nodeport", not "-external", to avoid reading like the unrelated
-# ExternalSecret objects in secrets/ (pulse-postgresql-external-secret).
-# See docs/INGRESS_ACCESS.md for the exact connection details.
+# Second Service, same pods: NodePort for direct desktop SQL client access
+# (Postgres speaks its own wire protocol, not HTTP, so it can't go through
+# Ingress). nodePort pinned to 30432 rather than auto-assigned.
 apiVersion: v1
 kind: Service
 metadata:
@@ -156,9 +129,6 @@ spec:
       port: 8080
       targetPort: 8080
 ---
-# Not required for workers to register with the master (they connect out to
-# pulse-spark-master:7077 themselves), but gives every worker pod's web UI a
-# single, stable address to reach for debugging.
 apiVersion: v1
 kind: Service
 metadata:
@@ -202,22 +172,9 @@ metadata:
   labels:
     app: pulse-kafka
 spec:
-  # Headless (no ClusterIP) - Kafka's own controller connects to "itself"
-  # via KAFKA_ADVERTISED_LISTENERS=pulse-kafka:9092 (has to be the Service
-  # DNS name so other pods can resolve it - see that env var's comment in
-  # deployment.yaml), and a pod reaching its own Service's ClusterIP is a
-  # hairpin NAT path. Verified live that this specific path hangs
-  # indefinitely here (`echo > /dev/tcp/pulse-kafka/9092` from inside the
-  # pulse-kafka pod itself never completed, while the same test against its
-  # own pod IP or 127.0.0.1 succeeded instantly) - kube-proxy/Calico isn't
-  # completing the hairpin round-trip. That left the controller stuck in a
-  # permanent self-reconnect loop, degrading the broker enough that even
-  # unrelated external clients (Debezium's AdminClient) started timing out
-  # waiting for Metadata responses. Headless removes the NAT hop entirely:
-  # DNS for "pulse-kafka" resolves straight to the current pod's real IP
-  # (via its Endpoints record) for every caller, including the broker
-  # itself - the standard fix for this failure mode with a single-replica
-  # broker-style workload.
+  # Headless: Kafka's own controller connects to itself via
+  # KAFKA_ADVERTISED_LISTENERS=pulse-kafka:9092, and a pod reaching its own
+  # Service's ClusterIP is a hairpin NAT path that hangs on this cluster.
   clusterIP: None
   selector:
     app: pulse-kafka
@@ -286,9 +243,6 @@ spec:
       port: 9102
       targetPort: 9102
 ---
-# Metrics-only Service - the scheduler process itself serves no application
-# traffic, but its statsd-exporter sidecar (see deployment.yaml) needs a
-# stable address for monitoring.yaml's ServiceMonitor to scrape.
 apiVersion: v1
 kind: Service
 metadata:

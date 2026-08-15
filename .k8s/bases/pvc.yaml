@@ -1,14 +1,5 @@
-# One PersistentVolumeClaim per docker-compose named volume that is actually
-# mounted by a service. docker-compose.yml also declares "spark_jars" and
-# "app" as top-level volumes, but neither one is mounted by any service in
-# the file, so no PVC is created for them here.
-#
-# All PVCs use ReadWriteOnce (a single node may mount them read-write) because
-# the "pulse-storage" StorageClass is a hostPath provisioner, which only ever
-# supports ReadWriteOnce. On minikube (a single-node cluster) this is not a
-# limitation: every pod is scheduled on that one node anyway.
-#
-# Docs: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
+# All PVCs use ReadWriteOnce - the "pulse-storage" StorageClass is a
+# hostPath provisioner, which only ever supports ReadWriteOnce.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -114,12 +105,9 @@ spec:
     requests:
       storage: 2Gi
 ---
-# Shared by the airflow-init Job, pulse-airflow-webserver, and
-# pulse-airflow-scheduler, same as docker-compose.yml's single airflow_logs
-# volume. This only works because ReadWriteOnce allows concurrent mounts from
-# multiple pods as long as they land on the same node - guaranteed here since
-# minikube only has one node. On a real multi-node cluster this PVC would
-# need a ReadWriteMany-capable StorageClass (e.g. NFS/EFS) instead.
+# Shared by airflow-init, pulse-airflow-webserver, and pulse-airflow-
+# scheduler - relies on all pods landing on minikube's one node. A real
+# multi-node cluster needs a ReadWriteMany StorageClass (e.g. NFS/EFS) instead.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

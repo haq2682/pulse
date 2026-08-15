@@ -1,74 +1,14 @@
-# Deployments (and two Jobs) for every active service in docker-compose.yml,
-# excluding the "cassandra" and "debezium-cassandra" services, which are
-# already commented out there.
+# Deployments (and two Jobs) for every active service in docker-compose.yml.
 #
-# Conventions used throughout this file:
+# docker-compose `command:` maps to k8s `args:` (not `command:`, which
+# overrides ENTRYPOINT); pulse-minio-init is the one exception since it
+# uses docker-compose's `entrypoint:`, so it maps to k8s `command:`.
 #
-# 1. command vs. args - docker-compose's `command:` field overrides a
-#    container's CMD only, leaving its built-in ENTRYPOINT untouched. That is
-#    what Kubernetes' `args:` field does too, so every docker-compose
-#    `command:` below is translated to k8s `args:` (not `command:`, which
-#    would override ENTRYPOINT - a different thing). The one exception is
-#    pulse-minio-init, which uses docker-compose's `entrypoint:` field - that
-#    genuinely overrides ENTRYPOINT, so it is translated to k8s `command:`.
+# The Secret objects referenced below are not defined here - they're
+# synced from Vault by the ExternalSecret objects in secrets/.
 #
-# 2. Secrets - the four Secret objects referenced below (pulse-postgresql-
-#    secret, pulse-minio-secret, pulse-airflow-secret, pulse-api-secret)
-#    are never defined here. They materialize from the ExternalSecret
-#    objects in secrets/ (see docs/SECRETS_MANAGEMENT.md) - the External
-#    Secrets Operator running in-cluster reads each one from HashiCorp
-#    Vault and creates/updates a plain Secret with a matching name
-#    automatically. Pods never talk to Vault directly. Expected keys per secret:
-#      pulse-postgresql-secret: POSTGRES_USER, POSTGRES_PASSWORD,
-#                                POSTGRES_DB, DEBEZIUM_PASSWORD
-#      pulse-minio-secret:      MINIO_ROOT_USER, MINIO_ROOT_PASSWORD,
-#                                MINIO_ACCESS_KEY, MINIO_SECRET_KEY
-#      pulse-airflow-secret:    AIRFLOW_FERNET_KEY, AIRFLOW_SECRET_KEY,
-#                                AIRFLOW_ADMIN_USER, AIRFLOW_ADMIN_PASSWORD
-#      pulse-api-secret:        SECRET_KEY, GEMINI_API_KEY, GOOGLE_CLIENT_ID,
-#                                GOOGLE_CLIENT_SECRET, SMTP_USER, SMTP_PASSWORD
-#
-# 3. Service discovery - docker-compose used fixed 10.5.0.x addresses on the
-#    spark-network bridge network. Those are replaced with the matching
-#    ClusterIP Service name from svc.yaml (e.g. pulse-postgresql,
-#    pulse-kafka:9092), which is how pods find each other in Kubernetes.
-#
-# 4. Startup ordering - docker-compose's `depends_on` only controls container
-#    *start* order, not readiness, and Kubernetes has no direct equivalent
-#    for Deployments. Every service here already needs to tolerate a
-#    dependency being briefly unreachable on first boot (the same is true
-#    today whenever docker-compose starts these containers in parallel), so
-#    no extra init-container "wait for dependency" logic has been added here
-#    to keep these manifests simple.
-#
-# 5. Application code - cleaning/, mapping/, transformation/, analysis/,
-#    machine-learning/, and sql/ are already COPY'd into the pulse-api and
-#    pulse-python images at build time (see .docker/api/Dockerfile and
-#    .docker/python/Dockerfile), so - unlike docker-compose - they are not
-#    bind-mounted here. This matches the "bake code into the image" target
-#    already recommended in docs/CLOUD_DEPLOYMENT_GUIDE.md.
-#
-# 6. Known gap - the pulse-api image does not COPY jars/deps/ (docker-compose
-#    bind-mounts it at runtime instead), so the Spark driver classpath jars
-#    it needs are not present in this Deployment yet. Fixing this means
-#    adding a COPY to .docker/api/Dockerfile - a Dockerfile change, so it's
-#    intentionally left as a follow-up rather than worked around here.
-#
-# 7. /var/run/docker.sock is deliberately NOT mounted into the Airflow
-#    Deployments below - it never was, even though docker-compose mounts it.
-#    DAG task execution has been migrated from DockerOperator/exec_run() (see
-#    docs/CLOUD_DEPLOYMENT_GUIDE.md's Blocker 1) to KubernetesPodOperator and
-#    pipeline_config.run_k8s_task_pod(), both of which create Pods through
-#    the Kubernetes API using the pulse-airflow ServiceAccount (see
-#    rbac.yaml) - a narrow, auditable set of permissions instead of
-#    docker.sock's effectively-root access to the whole host. That's why
-#    pulse-airflow-webserver/scheduler below set serviceAccountName:
-#    pulse-airflow and a POD_NAMESPACE env var (via the downward API) instead
-#    of a socket mount. There is no more standalone pulse-python Deployment
-#    either - every pipeline script now runs in its own ephemeral pod
-#    (labelled app: pulse-task / pulse-db-stream / pulse-api-stream, see
-#    networkpolicy.yaml) created on demand from the pulse-python image,
-#    rather than being exec'd into one shared long-running pod.
+# Airflow task execution uses KubernetesPodOperator (pulse-airflow
+# ServiceAccount, see rbac.yaml) instead of docker.sock.
 
 # ─────────────────────────────────────────────────────────────────────────
 # PostgreSQL
@@ -123,10 +63,6 @@ spec:
               port: 5432
             initialDelaySeconds: 30
             periodSeconds: 20
-        # Sidecar exporter - postgres_exporter connects to PostgreSQL over
-        # localhost (containers in one pod share a network namespace), reads
-        # pg_stat_* views, and re-exposes them as Prometheus metrics on its
-        # own port. See monitoring.yaml's pulse-postgresql ServiceMonitor.
         - name: pulse-postgres-exporter
           image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
           ports:
@@ -226,10 +162,7 @@ spec:
             claimName: pulse-minio-pvc
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# MinIO bucket bootstrap - one-shot Job (docker-compose's minio-init).
-# Runs to completion and exits; it is not a long-running pod, so a Job (not
-# a Deployment) is the correct fit here.
-# Docs: https://kubernetes.io/docs/concepts/workloads/controllers/job/
+# MinIO bucket bootstrap
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: batch/v1
 kind: Job
@@ -288,12 +221,6 @@ spec:
       labels:
         app: pulse-zookeeper
     spec:
-      # Downloads the JMX-to-Prometheus javaagent jar once into an emptyDir
-      # that the main container then mounts read-only. Confluent's images
-      # are plain JVM processes wrapped by cp-base-new's launch scripts,
-      # which read KAFKA_OPTS (the shared convention across all
-      # Confluent/Kafka-family images, not just Kafka itself) and pass it
-      # straight to `java`, so a -javaagent flag there is all that's needed.
       initContainers:
         - name: jmx-exporter-init
           image: curlimages/curl:8.10.1
@@ -341,13 +268,6 @@ spec:
               port: 2181
             initialDelaySeconds: 20
             periodSeconds: 10
-          # Zookeeper's JVM can legitimately take well over a minute to bind
-          # its port on constrained hardware (and Kafka's own startup blocks
-          # on this being ready first - see pulse-kafka below). The old
-          # 30s/20s/default-3-failures window killed it at ~90s, which was
-          # cutting it off mid-startup rather than catching a genuine hang -
-          # failureThreshold raised alongside initialDelaySeconds so a slow
-          # boot gets a real chance before Kubernetes gives up on it.
           livenessProbe:
             tcpSocket:
               port: 2181
@@ -389,8 +309,6 @@ spec:
       labels:
         app: pulse-kafka
     spec:
-      # See the matching comment on pulse-zookeeper's initContainer above -
-      # same javaagent jar, same mechanism, different JMX rules file.
       initContainers:
         - name: jmx-exporter-init
           image: curlimages/curl:8.10.1
@@ -447,14 +365,6 @@ spec:
               port: 9092
             initialDelaySeconds: 30
             periodSeconds: 10
-          # Kafka's own JVM startup is slow, and it blocks on Zookeeper
-          # already being reachable (KAFKA_ZOOKEEPER_CONNECT above) before it
-          # can finish booting - so this needs a longer window than
-          # Zookeeper's own probe, not the same one. The old 40s/20s/
-          # default-3-failures window killed it at ~80-100s; observed restart
-          # spacing under load matched that almost exactly, i.e. it was being
-          # killed right before it would have come up, not because it was
-          # actually stuck.
           livenessProbe:
             tcpSocket:
               port: 9092
@@ -522,9 +432,6 @@ spec:
               port: 6379
             initialDelaySeconds: 15
             periodSeconds: 20
-        # Sidecar exporter - same localhost pattern as postgres_exporter
-        # above. Redis here has no password set (no REDIS_PASSWORD is
-        # referenced anywhere in this file), so no auth env var is needed.
         - name: pulse-redis-exporter
           image: oliver006/redis_exporter:v1.88.0
           ports:
@@ -565,9 +472,6 @@ spec:
       labels:
         app: pulse-debezium
     spec:
-      # See the matching comment on pulse-zookeeper's initContainer above.
-      # quay.io/debezium/connect is a Kafka Connect distribution and reads
-      # the same KAFKA_OPTS convention as the Confluent images.
       initContainers:
         - name: jmx-exporter-init
           image: curlimages/curl:8.10.1
@@ -588,17 +492,8 @@ spec:
           env:
             - name: KAFKA_OPTS
               value: "-javaagent:/jmx-exporter/jmx_prometheus_javaagent.jar=7071:/etc/jmx-exporter/kafka-connect.yml"
-            # This image bundles every Debezium connector (oracle, mongodb,
-            # sqlserver, spanner, db2, ... ~15 total, 1.7GB image) - Kafka
-            # Connect's plugin scanner loads and reflects over all of them
-            # at startup regardless of which one is actually used, which is
-            # heavy on both metaspace and heap. Without an explicit heap
-            # size the JVM's container-aware default (~25% of the memory
-            # limit) was too small for that - verified live, the pod was
-            # OOMKilled (exit 137) mid-scan every time. Sized against the
-            # 2Gi limit below the same way as NiFi's JAVA_OPTS: leaves
-            # headroom above -Xmx for metaspace/thread stacks/direct
-            # buffers rather than sizing heap to the full container limit.
+            # Explicit heap size: the JVM's container-aware default OOMKilled
+            # this pod while scanning ~15 bundled connector plugins.
             - name: KAFKA_HEAP_OPTS
               value: "-Xms512m -Xmx1536m"
             - name: BOOTSTRAP_SERVERS
@@ -629,12 +524,8 @@ spec:
               value: "false"
             - name: CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE
               value: "false"
-            # NOTE: no credentials file is mounted at /etc/gcp yet (see the
-            # jars/gcp-credentials.json bind mount in docker-compose.yml) -
-            # only Debezium connectors that need GCP (e.g. Spanner) are
-            # affected. This would need a 6th Vault path + ExternalSecret
-            # (see docs/SECRETS_MANAGEMENT.md) plus a volumeMount here - not
-            # done yet since nothing currently exercises the GCP connectors.
+            # No credentials file mounted yet - only affects GCP connectors
+            # (e.g. Spanner), unused currently.
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: /etc/gcp/credentials.json
           volumeMounts:
@@ -651,21 +542,6 @@ spec:
             limits:
               cpu: 2000m
               memory: 2Gi
-          # Loading ~15 connector plugins' worth of reflection scanning is
-          # also CPU-bound, not just memory-hungry (see KAFKA_HEAP_OPTS
-          # above) - verified live, the container sat pinned at its old
-          # 1000m limit for its entire startup window. That starved the
-          # Kafka AdminClient's own I/O thread of scheduling time right
-          # when Kafka Connect calls WorkerConfig.lookupKafkaClusterId(),
-          # which has to get a response within Kafka's default 30s
-          # request.timeout.ms - it didn't, and the worker exited
-          # ("Timed out waiting for a node assignment: listNodes"), even
-          # though the broker itself was healthy and reachable (confirmed
-          # separately with a plain TCP connect).
-          # (see the KAFKA_HEAP_OPTS comment above) genuinely takes minutes,
-          # not the previous 20s/40s initial delays - same slow-JVM-startup
-          # treatment already applied to NiFi/Kafka/Zookeeper elsewhere in
-          # this file.
           readinessProbe:
             httpGet:
               path: /
@@ -720,8 +596,6 @@ spec:
             - containerPort: 8080
             - containerPort: 4040
           env:
-            # Must be the pod's own address, matching docker-compose's use of
-            # the container's own fixed IP for these two settings.
             - name: SPARK_MASTER_HOST
               valueFrom:
                 fieldRef:
@@ -736,8 +610,6 @@ spec:
               value: python3.10
             - name: PYSPARK_DRIVER_PYTHON
               value: python3.10
-            # spark.ui.prometheus.enabled turns on Spark's built-in metrics
-            # servlet - see monitoring.yaml's pulse-spark-master ServiceMonitor.
             - name: SPARK_MASTER_OPTS
               value: "-Dspark.shuffle.service.enabled=true -Dspark.ui.prometheus.enabled=true"
           envFrom:
@@ -769,20 +641,7 @@ spec:
             claimName: pulse-spark-master-pvc
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# Spark Worker - not a docker-compose service (workers were started
-# manually via bash/start_worker_linux.sh). Settings below (cores, memory,
-# SPARK_WORKER_OPTS) are copied from that script.
-#
-# Unlike the bash script, which generates a unique container name per
-# invocation to avoid clashing with previously-started workers, no such
-# trick is needed here: every replica of a Deployment already gets its own
-# unique pod identity and pod IP for free. Each replica's spark-class
-# process independently connects OUT to spark://pulse-spark-master:7077 and
-# registers itself - the master never needs to know about workers in
-# advance - so scaling this Deployment (manually now, or later via HPA) is
-# enough on its own for new workers to join the cluster. No PVC is attached:
-# workers are stateless compute, which is also what makes them safe to
-# scale up/down freely.
+# Spark Worker
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
@@ -801,12 +660,8 @@ spec:
       labels:
         app: pulse-spark-worker
     spec:
-      # Give a decommissioning worker time to migrate its executor's RDD/
-      # shuffle blocks (see spark.storage.decommission.* in the driver-side
-      # SparkSession configs) before Kubernetes SIGKILLs it. Paired with the
-      # preStop hook below and the PDB in pdb.yaml, this is what makes
-      # HPA/eviction-driven scale-down of this Deployment safe instead of
-      # just dropping in-flight work.
+      # Gives a decommissioning worker time to migrate shuffle blocks
+      # before SIGKILL - paired with the preStop hook below and pdb.yaml.
       terminationGracePeriodSeconds: 120
       containers:
         - name: pulse-spark-worker
@@ -822,9 +677,6 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-            # Sized for a 4-core/16GB machine (see the sizing note at the
-            # top of hpa.yaml) - down from 2/6g, its original bash-script-
-            # derived value.
             - name: SPARK_WORKER_CORES
               value: "1"
             - name: SPARK_WORKER_MEMORY
@@ -833,13 +685,8 @@ spec:
               value: python3.10
             - name: PYSPARK_DRIVER_PYTHON
               value: python3.10
-            # spark.ui.prometheus.enabled turns on Spark's built-in metrics
-            # servlet - see monitoring.yaml's pulse-spark-worker ServiceMonitor.
-            # spark.decommission.enabled makes the Worker process itself
-            # register a handler for spark.worker.decommission.signal
-            # (SIGPWR by default) - without it, the preStop hook's signal
-            # below would just be ignored and the pod would terminate the
-            # same way it always did.
+            # spark.decommission.enabled is required for the preStop hook's
+            # signal below to actually trigger a graceful shutdown.
             - name: SPARK_WORKER_OPTS
               value: "-Dspark.shuffle.service.enabled=true -Dspark.worker.cleanup.enabled=true -Dspark.worker.cleanup.interval=300 -Dspark.worker.cleanup.appDataTtl=600 -Dspark.ui.prometheus.enabled=true -Dspark.decommission.enabled=true"
             - name: MINIO_ENDPOINT
@@ -847,9 +694,6 @@ spec:
           envFrom:
             - secretRef:
                 name: pulse-minio-secret
-          # Matches SPARK_WORKER_CORES/SPARK_WORKER_MEMORY above: the worker
-          # JVM is configured to use exactly this much, so requests and
-          # limits are set equal rather than left to burst.
           resources:
             requests:
               cpu: "1"
@@ -869,25 +713,13 @@ spec:
             periodSeconds: 20
           lifecycle:
             preStop:
-              # Kubernetes only ever sends SIGTERM on pod termination, but
-              # Spark's standalone Worker listens for SIGPWR (see
-              # spark.worker.decommission.signal) to start decommissioning.
-              # spark-class execs the JVM as PID 1 (no wrapper shell), so
-              # signalling PID 1 from this exec hook reaches it directly.
-              # Kubernetes only sends SIGTERM AFTER this hook returns, so the
-              # trailing sleep matters: without it, SIGTERM would follow the
-              # signal almost instantly and race the JVM's own shutdown hooks
-              # against the (async) block migration decommissioning just
-              # triggered. 90s leaves 30s of the 120s
-              # terminationGracePeriodSeconds as a buffer for the JVM to exit
-              # on its own before Kubernetes SIGKILLs it.
+              # Sends SIGPWR to trigger Spark's own decommission handling,
+              # then sleeps so it can finish before terminationGracePeriodSeconds.
               exec:
                 command: ["/bin/sh", "-c", "kill -s PWR 1; sleep 90"]
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# Airflow init - one-shot Job (docker-compose's airflow-init): runs
-# migrations and creates the admin user, then exits. A Job is the correct
-# fit for the same reason as pulse-minio-init above.
+# Airflow init
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: batch/v1
 kind: Job
@@ -934,11 +766,8 @@ spec:
                   key: POSTGRES_PASSWORD
             - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
               value: postgresql+psycopg2://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@pulse-postgresql:5432/airflow
-            # Airflow itself only reads the double-underscore config names
-            # below - docker-compose renamed AIRFLOW_FERNET_KEY/
-            # AIRFLOW_SECRET_KEY (the .env/Secret key names) to these via
-            # ${VAR} substitution; envFrom alone does not rename keys, so
-            # these need explicit secretKeyRef entries too.
+            # envFrom does not rename keys, so Fernet/secret key need
+            # explicit secretKeyRef entries mapping to Airflow's config names.
             - name: AIRFLOW__CORE__FERNET_KEY
               valueFrom:
                 secretKeyRef:
@@ -1018,8 +847,6 @@ spec:
                   key: POSTGRES_PASSWORD
             - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
               value: postgresql+psycopg2://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@pulse-postgresql:5432/airflow
-            # See the matching comment in pulse-airflow-init - envFrom does
-            # not rename keys, so these need explicit secretKeyRef entries.
             - name: AIRFLOW__CORE__FERNET_KEY
               valueFrom:
                 secretKeyRef:
@@ -1061,31 +888,20 @@ spec:
               value: gemini-2.0-flash-lite
             - name: DEBEZIUM_URL
               value: http://pulse-debezium:8083
-            # airflow/config/pipeline_config.py defaults this to
-            # spark://10.5.0.3:7077 (the docker-compose static IP) if unset.
             - name: SPARK_MASTER_URL
               value: spark://pulse-spark-master:7077
-            # Task pods are created in this same namespace - see note 7 at
-            # the top of this file and rbac.yaml. The downward API is the
-            # standard way a pod learns its own namespace; nothing needs to
-            # hardcode it.
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-            # Image used for every KubernetesPodOperator/run_k8s_task_pod
-            # task pod. Keep in sync with the images: transformer in
-            # kustomization.yaml - see the comment on PYTHON_IMAGE in
-            # pipeline_config.py.
+            # Image for every KubernetesPodOperator task pod - keep in sync
+            # with the images: transformer in kustomization.yaml.
             - name: PIPELINE_PYTHON_IMAGE
               value: haq2682/pulse-python:latest
             - name: PYTHONPATH
               value: /opt/airflow/utils:/opt/airflow/config
             - name: _PIP_ADDITIONAL_REQUIREMENTS
               value: "minio scipy pandas numpy psycopg2-binary apache-airflow-providers-cncf-kubernetes kubernetes"
-            # Airflow emits StatsD metrics natively - point it at the
-            # statsd-exporter sidecar below over localhost (same pod network
-            # namespace). The sidecar bridges UDP StatsD -> Prometheus.
             - name: AIRFLOW__METRICS__STATSD_ON
               value: "True"
             - name: AIRFLOW__METRICS__STATSD_HOST
@@ -1123,9 +939,6 @@ spec:
               port: 8080
             initialDelaySeconds: 60
             periodSeconds: 30
-        # Sidecar - bridges Airflow's StatsD metrics (UDP 9125) to a
-        # Prometheus-scrapeable HTTP endpoint (9102). See monitoring.yaml's
-        # pulse-airflow-webserver ServiceMonitor.
         - name: pulse-statsd-exporter
           image: prom/statsd-exporter:v0.30.0-distroless
           ports:
@@ -1147,9 +960,7 @@ spec:
             claimName: pulse-airflow-logs-pvc
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# Airflow Scheduler - has a Service now (see svc.yaml) purely so its
-# statsd-exporter sidecar's metrics port is reachable; the scheduler process
-# itself still doesn't serve any application traffic.
+# Airflow Scheduler
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
@@ -1194,8 +1005,6 @@ spec:
                   key: POSTGRES_PASSWORD
             - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
               value: postgresql+psycopg2://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@pulse-postgresql:5432/airflow
-            # See the matching comment in pulse-airflow-init - envFrom does
-            # not rename keys, so these need explicit secretKeyRef entries.
             - name: AIRFLOW__CORE__FERNET_KEY
               valueFrom:
                 secretKeyRef:
@@ -1233,7 +1042,6 @@ spec:
               value: http://pulse-debezium:8083
             - name: SPARK_MASTER_URL
               value: spark://pulse-spark-master:7077
-            # See the matching comment in pulse-airflow-webserver.
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -1244,7 +1052,6 @@ spec:
               value: /opt/airflow/utils:/opt/airflow/config
             - name: _PIP_ADDITIONAL_REQUIREMENTS
               value: "minio scipy pandas numpy psycopg2-binary apache-airflow-providers-cncf-kubernetes kubernetes"
-            # See the matching comment in pulse-airflow-webserver.
             - name: AIRFLOW__METRICS__STATSD_ON
               value: "True"
             - name: AIRFLOW__METRICS__STATSD_HOST
@@ -1270,9 +1077,6 @@ spec:
             limits:
               cpu: 1000m
               memory: 1Gi
-        # See the matching sidecar in pulse-airflow-webserver. Scheduler
-        # heartbeat lag and DAG parse time - the highest-value metrics here -
-        # are both emitted by the scheduler process, not the webserver.
         - name: pulse-statsd-exporter
           image: prom/statsd-exporter:v0.30.0-distroless
           ports:
@@ -1319,41 +1123,19 @@ spec:
           ports:
             - containerPort: 8000
           env:
-            # mapping/map.py's Spark driver runs inside this container (see
-            # the resources comment below) and needs to advertise a real,
-            # reachable address for executors on pulse-spark-worker to call
-            # back on. Without this, Spark defaults spark.driver.host to the
-            # container's own hostname - which in Kubernetes is the bare pod
-            # name (e.g. pulse-api-xxxxx-yyyyy), NOT resolvable via cluster
-            # DNS (only the Service name is). Verified live: every executor
-            # crashed immediately with java.net.UnknownHostException for
-            # exactly that pod-name string. The Service name itself isn't a
-            # safe substitute either - with multiple pulse-api replicas
-            # (HPA), it's a load-balanced VIP that could route an executor's
-            # callback to a different replica than the one that actually
-            # spawned the driver. The pod's own real IP is the only address
-            # that's both reachable and guaranteed to hit the right pod.
+            # mapping/map.py's Spark driver runs in this container - executors
+            # on pulse-spark-worker call back on this address, and only the
+            # pod's own IP is guaranteed to reach the right replica.
             - name: POD_IP
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-            # mapping/algorithms/nltk_mapping.py's own nltk.download(...)
-            # calls (unlike the build-time prefetch in .docker/api/
-            # download_nltk.py) don't pass an explicit download_dir - NLTK
-            # picks its own default, which verified live is NOT the same
-            # world-readable /usr/local/share/nltk_data location baked in
-            # at build time. Without this, it silently redownloads into
-            # /home/appuser/nltk_data on every run instead of finding what
-            # was already baked in, defeating the whole point of baking it
-            # in and reintroducing the runtime network dependency.
+            # Must match the build-time NLTK download path or the mapping
+            # stage silently redownloads at runtime.
             - name: NLTK_DATA
               value: /usr/local/share/nltk_data
             - name: POSTGRES_SERVER
               value: pulse-postgresql
-            # api/config.py's Settings class has a REQUIRED (no default)
-            # postgres_database_name field - the app fails to start without
-            # this exact env var name (POSTGRES_DB alone, from
-            # pulse-postgresql-secret below, is not enough).
             - name: POSTGRES_DATABASE_NAME
               valueFrom:
                 secretKeyRef:
@@ -1363,9 +1145,6 @@ spec:
               value: pulse-minio:9000
             - name: KAFKA_BOOTSTRAP
               value: pulse-kafka:9092
-            # api/routers/pipeline.py and api/services/pipeline_service.py
-            # read this (not DEBEZIUM_URL) - without it they fall back to
-            # the docker-compose static IP.
             - name: KAFKA_CONNECT_URL
               value: http://pulse-debezium:8083
             - name: REDIS_HOST
@@ -1397,22 +1176,14 @@ spec:
                 secretKeyRef:
                   name: pulse-airflow-secret
                   key: AIRFLOW_FERNET_KEY
-            # Non-secret companions to the credentials in pulse-api-secret
-            # (SMTP_USER/PASSWORD, GOOGLE_CLIENT_ID/SECRET) - see .env.example.
             - name: SMTP_HOST
               value: smtp.gmail.com
             - name: SMTP_PORT
               value: "587"
             - name: FROM_EMAIL
               value: "Pulse Analytics Engine <no-reply@example.com>"
-            # /api prefix required: pulse-nginx only proxies paths under
-            # /api/ to this Service (see nginx/templates/upload.conf.template)
-            # - a bare /auth/... path falls through to the SPA catch-all
-            # instead of reaching FastAPI. NodePort (currently 32249) comes
-            # from ingress-nginx's auto-assigned Service port - re-check with
-            # `kubectl get svc -n ingress-nginx ingress-nginx-controller` and
-            # update both this value and the Google Cloud Console redirect
-            # URI together if it ever changes.
+            # NodePort must match ingress-nginx's assigned port and the
+            # Google Cloud Console redirect URI if it ever changes.
             - name: GOOGLE_REDIRECT_URI
               value: https://pulse-engine.com:32249/api/auth/google/callback
             - name: FRONTEND_URL
@@ -1430,26 +1201,9 @@ spec:
                 name: pulse-minio-secret
             - secretRef:
                 name: pulse-api-secret
-          # mapping/map.py's "NormalizeData" Spark session (spawned as a plain
-          # subprocess.Popen child from onboarding.py's /start-mapping, not a
-          # separate KubernetesPodOperator pod like the later cleaning/
-          # transformation/analysis/ML stages) runs its Spark *driver* JVM
-          # inside this same container - it shares this cgroup with uvicorn,
-          # it isn't a separately-budgeted pod. Verified live: with the old
-          # 1Gi limit, this subprocess was OOMKilled by the kernel every time
-          # (confirmed via dmesg - uvicorn's own ~750Mi baseline usage left
-          # no room for Spark's driver JVM, which defaults to 1g on its own).
-          # 2560Mi (uvicorn baseline + MAPPING_DRIVER_MEMORY) still wasn't
-          # enough once the mapping subprocess itself is accounted for - it
-          # loads its OWN copies of the spaCy/nltk/sentence-transformers
-          # models (a separate process from the 4 uvicorn workers, not
-          # sharing their already-loaded copies), on top of that same JVM.
-          # Verified live via dmesg: the java driver process got OOM-killed
-          # mid-batch (after several tables had already written fine) once
-          # all three - uvicorn baseline, the mapping subprocess's models,
-          # and the JVM - were resident at once. Bumped with real headroom
-          # for all three; spark.driver.extraJavaOptions in map.py also caps
-          # the JVM's own Metaspace/CodeCache growth across tables.
+          # Headroom for uvicorn + the mapping subprocess's own spaCy/nltk/
+          # sentence-transformers models + the Spark driver JVM they spawn,
+          # all resident in this one container.
           resources:
             requests:
               cpu: 250m
@@ -1471,8 +1225,7 @@ spec:
             periodSeconds: 20
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# Frontend (static SPA image, no API/upload proxying - see pulse-nginx below
-# for the gateway that does same-origin /api and /upload proxying)
+# Frontend
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
@@ -1517,10 +1270,7 @@ spec:
             periodSeconds: 20
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# Nginx gateway - serves the SPA and proxies /api (incl. WebSocket upgrades)
-# and /upload same-origin. TLS is not terminated here; see nginx/nginx.conf
-# and nginx/templates/upload.conf.template - it only ever listens on port
-# 80. TLS termination is expected to happen at the Ingress once one is added.
+# Nginx gateway
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
@@ -1545,12 +1295,6 @@ spec:
           ports:
             - containerPort: 80
           env:
-            # Overrides the image's own default (api, Docker Compose's
-            # service name) to the real Kubernetes Service name - see
-            # nginx/templates/upload.conf.template and .docker/nginx/Dockerfile.
-            # nginx resolves this at config-load time (not per-request), so
-            # getting it wrong doesn't just misroute - it crash-loops the
-            # container with "host not found in upstream".
             - name: API_UPSTREAM_HOST
               value: pulse-api
           resources:
@@ -1572,10 +1316,6 @@ spec:
               port: 80
             initialDelaySeconds: 15
             periodSeconds: 20
-        # Sidecar exporter - scrapes nginx's built-in stub_status module over
-        # localhost (see nginx/templates/upload.conf.template's /stub_status
-        # location, restricted to 127.0.0.1 only) and re-exposes it for
-        # Prometheus.
         - name: pulse-nginx-exporter
           image: nginx/nginx-prometheus-exporter:1.5.1
           args:

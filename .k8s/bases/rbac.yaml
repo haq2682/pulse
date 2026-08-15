@@ -1,19 +1,6 @@
-# RBAC for Airflow's Kubernetes-native task execution (KubernetesPodOperator
-# + pipeline_config.run_k8s_task_pod). This is the scoped, auditable
-# replacement for what mounting /var/run/docker.sock used to grant: instead
-# of root-equivalent access to the whole host's Docker daemon, Airflow gets
-# exactly the ability to create/watch/read-logs-from/delete Pods in this one
-# namespace - nothing else.
-#
-# pulse-airflow-webserver and pulse-airflow-scheduler run as this
-# ServiceAccount (see serviceAccountName in deployment.yaml). Task pods
-# spawned by KubernetesPodOperator/run_k8s_task_pod also run as this same
-# ServiceAccount by default (see TASK_SERVICE_ACCOUNT in
-# airflow/config/pipeline_config.py) - they don't need any Kubernetes API
-# access themselves, this just avoids relying on the cluster's "default"
-# ServiceAccount implicitly.
-#
-# Docs: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+# RBAC for Airflow's Kubernetes-native task execution (KubernetesPodOperator)
+# - scoped replacement for /var/run/docker.sock: create/watch/delete Pods
+# in this namespace only.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -32,12 +19,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["pods"]
-    # patch is required by KubernetesPodOperator's own startup-timeout
-    # handling (patch_already_checked marks a slow-to-start pod so it isn't
-    # re-processed) - verified live: without it, a pod that took >120s to
-    # start failed with a 403 Forbidden trying to patch itself, which masked
-    # whatever actually made it slow to start and also broke the operator's
-    # own cleanup path.
+    # patch is required by KubernetesPodOperator's startup-timeout handling.
     verbs: ["create", "get", "list", "watch", "delete", "patch"]
   - apiGroups: [""]
     resources: ["pods/log"]

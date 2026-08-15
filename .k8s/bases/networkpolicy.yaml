@@ -1,51 +1,16 @@
-# One NetworkPolicy per Deployment/Job, each declaring both `Ingress` and
-# `Egress` together - self-contained, so "what can pulse-X talk to" is
-# answered by reading one block, the same pattern used everywhere else in
-# this base. Every policy is built directly from deployment.yaml's actual
-# env vars (which service calls which, on which port) - not guessed.
+# One NetworkPolicy per Deployment/Job, declaring Ingress and Egress
+# together, built directly from deployment.yaml's actual env vars.
 #
-# READ THIS FIRST - NetworkPolicy is NOT enforced on this cluster today.
-# NetworkPolicy is a Kubernetes API that any CNI *may* implement - it's not
-# guaranteed, and minikube's default networking (the "docker" driver's
-# built-in bridge networking, no Calico/Cilium/Weave/Flannel installed) does
-# NOT enforce it. This was verified empirically, not assumed: a deny-all
-# test policy was applied against two throwaway test pods and traffic still
-# flowed through unblocked. These objects will apply to the API server
-# without error and are correct, real policy - but on this specific
-# cluster, right now, they are inert paperwork. Real enforcement needs a
-# policy-enforcing CNI (e.g. `minikube start --cni=calico`), which requires
-# recreating the cluster - that's a bigger, more disruptual step than this
-# task, so it hasn't been done. Almost every managed cloud Kubernetes
-# offering (EKS with the VPC CNI's policy mode or Calico, GKE, AKS) does
-# enforce NetworkPolicy by default or with one flag, so this file is exactly
-# what you'd want there.
+# NetworkPolicy is not enforced on this cluster - minikube's default CNI
+# doesn't implement it (verified: a deny-all test policy had no effect).
+# These apply cleanly and are correct policy; most managed cloud Kubernetes
+# (EKS, GKE, AKS) enforces NetworkPolicy by default or with one flag.
 #
-# DNS - every single policy below includes an egress rule for DNS
-# (UDP/TCP 53 to CoreDNS in kube-system). This is the single most common
-# NetworkPolicy mistake: forgetting it doesn't just break "DNS stuff" - it
-# breaks EVERY service-name-based connection (Kubernetes DNS is how
-# `pulse-postgresql` etc. resolve to an IP at all), even ones explicitly
-# allowed by another rule.
-#
-# MONITORING - every policy below whose Deployment gained a metrics port in
-# this pass (see deployment.yaml/svc.yaml) also gets an extra ingress rule
-# allowing that port from a `monitoring` namespaceSelector, so Prometheus
-# (once installed - see monitoring.yaml) can actually scrape it once a
-# policy-enforcing CNI is in use.
-#
-# VAULT / EXTERNAL SECRETS OPERATOR - the two policies at the very bottom
-# of this file are the one exception to "every policy here lives in
-# production": they cover ESO (in `kube-system`) talking to Vault (in
-# `vault`) on port 8200, since neither of those namespaces is otherwise
-# touched by this base. Same "inert until a policy-enforcing CNI is used"
-# caveat as everything else in this file applies to them too.
-#
-# Docs: https://kubernetes.io/docs/concepts/services-networking/network-policies/
+# Every policy includes a DNS egress rule (UDP/TCP 53 to kube-dns) - without
+# it, service-name resolution breaks entirely, not just "DNS stuff".
 
 # ─────────────────────────────────────────────────────────────────────────
-# Frontend - entry point. Only the ingress-nginx controller (the `ingress`
-# minikube addon, already running) should reach it; it makes no calls of
-# its own (a browser talks to it, not the pod).
+# Frontend
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -82,8 +47,7 @@ spec:
           port: 53
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# Nginx - the other entry point (gateway proxying /api and /upload). Same
-# ingress source as frontend; egress to the two services it proxies to.
+# Nginx
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -105,8 +69,6 @@ spec:
       ports:
         - protocol: TCP
           port: 80
-    # nginx-prometheus-exporter sidecar - see the MONITORING note at the
-    # top of this file.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -136,13 +98,8 @@ spec:
           port: 53
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# API - only pulse-nginx calls it (same-origin gateway design, see
-# nginx/templates/upload.conf.template). Egress covers every backing service it's
-# wired to in deployment.yaml, plus the internet (Gemini API, Google OAuth,
-# SMTP relay) since those aren't cluster-internal destinations - restricted
-# to HTTPS/submission ports and excluding private IP ranges, so this rule
-# can't be used to reach other pods directly by IP, only real external
-# hosts.
+# API - egress to the internet (Gemini, Google OAuth, SMTP) is restricted
+# to HTTPS/submission ports, excluding private IP ranges.
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -164,8 +121,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8000
-    # prometheus-fastapi-instrumentator exposes /metrics on the app's own
-    # port - see the MONITORING note at the top of this file.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -173,13 +128,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8000
-    # mapping/map.py's Spark driver runs inside this container (see the
-    # resources comment on this Deployment) - pulse-spark-worker's executor
-    # needs to call back on the fixed ports set via spark.driver.port /
-    # spark.driver.blockManager.port there. Verified live: without this,
-    # the executor resolved and reached the right pod (spark.driver.host
-    # fix) but the connection itself timed out after 120s with no rule
-    # permitting it.
     - from:
         - podSelector:
             matchLabels:
@@ -232,14 +180,6 @@ spec:
       ports:
         - protocol: TCP
           port: 7077
-    # mapping/map.py's driver (runs inside this container) connects OUT to
-    # the executor's own block manager port to pull back results (e.g.
-    # approxQuantile) - not just the executor registering with the driver
-    # on 7078/7079 above. Verified live in cleaning/cleaning_config.py's
-    # identical fix: this direction was never opened, so the fetch just
-    # timed out (120s) instead of being refused, for 30 minutes until the
-    # job aborted. spark.blockManager.port pins the executor side to this
-    # fixed port (see map.py) so it can be allowed here specifically.
     - to:
         - podSelector:
             matchLabels:
@@ -280,14 +220,8 @@ spec:
           port: 53
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# Ephemeral batch task pods - clean/transform/analyze/scheduled-batch-steps/
-# connector-deploy, created on demand by KubernetesPodOperator or
-# run_k8s_task_pod() (see airflow/config/pipeline_config.py), labelled
-# app: pulse-task. Nothing calls them over the network - they're triggered
-# via the Kubernetes API, not HTTP - so ingress is fully closed. Egress is
-# the union of everything any of these short-lived scripts needs (this is a
-# deliberate simplification over writing a separate policy per script -
-# see the comment at the top of this file about beginner-friendly scope).
+# Ephemeral batch task pods (app: pulse-task) - created on demand by
+# KubernetesPodOperator. Egress is the union of everything any stage needs.
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -302,11 +236,6 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Callback from pulse-spark-worker's executors to this pod's Spark
-    # driver (cleaning_config.py/spark_config.py/analysis_config.py all set
-    # spark.driver.port/blockManager.port to these fixed values) - same
-    # pattern already verified live and fixed for pulse-api-netpol during
-    # mapping/map.py's debugging.
     - from:
         - podSelector:
             matchLabels:
@@ -359,15 +288,6 @@ spec:
       ports:
         - protocol: TCP
           port: 7077
-    # This driver (cleaning/transformation/analysis) connects OUT to the
-    # executor's own block manager port to pull back results (e.g.
-    # approxQuantile) - not just the executor registering with the driver
-    # on 7078/7079 (see the ingress rule above). Verified live: this
-    # direction was never opened, so the fetch just timed out (120s)
-    # instead of being refused, for 30 minutes until the job aborted.
-    # spark.blockManager.port pins the executor side to this fixed port
-    # (see cleaning_config.py/spark_config.py/analysis_config.py) so it can
-    # be allowed here specifically.
     - to:
         - podSelector:
             matchLabels:
@@ -389,9 +309,7 @@ spec:
           port: 53
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# DB streaming pod - the 24/7 Debezium CDC → Spark Streaming → MinIO task
-# launched by db_streaming_dag.py, labelled app: pulse-db-stream. Same
-# "nothing calls it" reasoning as pulse-task above.
+# DB streaming pod (app: pulse-db-stream)
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -406,10 +324,6 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Callback from pulse-spark-worker's executors to this pod's Spark
-    # driver (mapping/map.py sets spark.driver.port/blockManager.port to
-    # these fixed values) - same pattern already verified live and fixed
-    # for pulse-api-netpol during mapping/map.py's debugging.
     - from:
         - podSelector:
             matchLabels:
@@ -455,14 +369,6 @@ spec:
       ports:
         - protocol: TCP
           port: 7077
-    # This driver (mapping/streaming/spark_streaming.py) connects OUT to
-    # the executor's own block manager port to pull back results - not
-    # just the executor registering with the driver on 7078/7079 (see the
-    # ingress rule above). Verified live: this direction was never opened,
-    # so the fetch just timed out (120s) instead of being refused, for 30
-    # minutes until the job aborted (same bug in cleaning/cleaning_config.py).
-    # spark.blockManager.port pins the executor side to this fixed port so
-    # it can be allowed here specifically.
     - to:
         - podSelector:
             matchLabels:
@@ -484,11 +390,8 @@ spec:
           port: 53
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# API streaming pod - the 24/7 external-API-polling → Kafka → Spark
-# Streaming → MinIO task launched by api_streaming_dag.py, labelled
-# app: pulse-api-stream. Needs internet egress too - the user's api_url is
-# an arbitrary external host, same reasoning as pulse-api-netpol's rule for
-# Gemini/Google/SMTP.
+# API streaming pod (app: pulse-api-stream) - needs internet egress too;
+# the user's api_url is an arbitrary external host.
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -503,10 +406,6 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Callback from pulse-spark-worker's executors to this pod's Spark
-    # driver (mapping/map.py sets spark.driver.port/blockManager.port to
-    # these fixed values) - same pattern already verified live and fixed
-    # for pulse-api-netpol during mapping/map.py's debugging.
     - from:
         - podSelector:
             matchLabels:
@@ -552,14 +451,6 @@ spec:
       ports:
         - protocol: TCP
           port: 7077
-    # This driver (mapping/streaming/spark_streaming.py) connects OUT to
-    # the executor's own block manager port to pull back results - not
-    # just the executor registering with the driver on 7078/7079 (see the
-    # ingress rule above). Verified live: this direction was never opened,
-    # so the fetch just timed out (120s) instead of being refused, for 30
-    # minutes until the job aborted (same bug in cleaning/cleaning_config.py).
-    # spark.blockManager.port pins the executor side to this fixed port so
-    # it can be allowed here specifically.
     - to:
         - podSelector:
             matchLabels:
@@ -593,10 +484,7 @@ spec:
           port: 53
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# PostgreSQL - a database only ever accepts connections, it never
-# initiates any of its own. Ingress from every service that has
-# POSTGRES_* env vars wired in deployment.yaml, including pulse-debezium
-# (CDC reads the replication stream).
+# PostgreSQL
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -639,20 +527,12 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
-    # External DB client access (DBeaver, Beekeeper Studio, ...) via the
-    # pulse-postgresql-nodeport Service in svc.yaml. NodePort
-    # traffic arrives at the pod as if from outside the cluster entirely -
-    # there's no pod identity to scope a podSelector to, so this is
-    # necessarily a broad "allow from anywhere" rule, unlike every other
-    # rule in this file. It only opens port 5432, and only takes effect at
-    # all once a policy-enforcing CNI is in use (see the note at the top of
-    # this file) - today this NodePort is reachable regardless either way.
+    # External DB client access via the pulse-postgresql-nodeport Service -
+    # no pod identity to scope, so this is a broad "allow from anywhere".
     - from: []
       ports:
         - protocol: TCP
           port: 5432
-    # postgres_exporter sidecar - see the MONITORING note at the top of
-    # this file.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -675,8 +555,7 @@ spec:
           port: 53
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# MinIO - object storage backing service. Ingress from every service that
-# has MINIO_* env vars wired, including both one-shot Jobs.
+# MinIO
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -727,9 +606,6 @@ spec:
           port: 9000
         - protocol: TCP
           port: 9001
-    # The ingress-nginx controller proxies minio.pulse-engine.com here
-    # (see ingress.yaml) - console port only, the S3 API port stays
-    # internal-only.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -737,9 +613,6 @@ spec:
       ports:
         - protocol: TCP
           port: 9001
-    # MinIO's native Prometheus endpoints live on the S3 API port itself
-    # (see monitoring.yaml's pulse-minio ServiceMonitor) - see the
-    # MONITORING note at the top of this file.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -762,8 +635,7 @@ spec:
           port: 53
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# Spark Master - workers register with it (spark://pulse-spark-master:7077)
-# and api/python submit jobs to it on the same port.
+# Spark Master
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -797,9 +669,6 @@ spec:
       ports:
         - protocol: TCP
           port: 7077
-    # The ingress-nginx controller proxies spark.pulse-engine.com here
-    # (see ingress.yaml) - only the dashboard port, not 7077 (Spark's own
-    # RPC protocol, which was never HTTP and isn't reachable via Ingress).
     - from:
         - namespaceSelector:
             matchLabels:
@@ -807,8 +676,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-    # Spark's built-in Prometheus servlet, also on the UI port - see the
-    # MONITORING note at the top of this file.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -838,9 +705,7 @@ spec:
           port: 53
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# Spark Worker - registers itself with the master; Spark's master<->worker
-# RPC is bidirectional (heartbeats/task dispatch flow both ways), so
-# ingress from the master is allowed too, not just egress to it.
+# Spark Worker
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -862,7 +727,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8081
-    # Same Prometheus servlet as pulse-spark-master above.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -870,15 +734,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8081
-    # The driver (pulse-api's mapping subprocess, pulse-task's cleaning/
-    # transformation/analysis, and the two 24/7 streaming drivers) connects
-    # IN to this executor's own block manager port to pull back results
-    # (e.g. approxQuantile) - not just this worker registering out to the
-    # driver on 7078/7079 (see the egress rules below). Verified live:
-    # this direction was never opened, so the fetch just timed out (120s)
-    # instead of being refused, for 30 minutes until the job aborted.
-    # spark.blockManager.port pins this executor's port to this fixed
-    # value in every stage config so it can be allowed here specifically.
     - from:
         - podSelector:
             matchLabels:
@@ -910,9 +765,6 @@ spec:
       ports:
         - protocol: TCP
           port: 9000
-    # Callback to mapping/map.py's Spark driver, which runs inside pulse-api
-    # (see the matching ingress rule on pulse-api-netpol) - fixed ports via
-    # spark.driver.port / spark.driver.blockManager.port.
     - to:
         - podSelector:
             matchLabels:
@@ -922,13 +774,6 @@ spec:
           port: 7078
         - protocol: TCP
           port: 7079
-    # Callback to cleaning/transformation/analysis's Spark driver (app:
-    # pulse-task, ephemeral KubernetesPodOperator pods) and the two 24/7
-    # streaming drivers (app: pulse-db-stream / pulse-api-stream, which run
-    # mapping/map.py the same way pulse-api's mapping subprocess does) - same
-    # fixed driver.port/blockManager.port pattern as the pulse-api rule
-    # above, and the matching ingress rules on pulse-task-netpol/
-    # pulse-db-stream-netpol/pulse-api-stream-netpol below.
     - to:
         - podSelector:
             matchLabels:
@@ -992,8 +837,6 @@ spec:
       ports:
         - protocol: TCP
           port: 2181
-    # JMX exporter javaagent - see the MONITORING note at the top of this
-    # file.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -1014,10 +857,6 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # jmx-exporter-init downloads jmx_prometheus_javaagent.jar from GitHub
-    # releases at pod startup (see deployment.yaml) - needs real internet
-    # egress, not just cluster-internal traffic. Same ipBlock/except pattern
-    # as pulse-api-netpol's outbound HTTPS rule above.
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -1071,8 +910,6 @@ spec:
       ports:
         - protocol: TCP
           port: 9092
-    # JMX exporter javaagent - see the MONITORING note at the top of this
-    # file.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -1100,8 +937,6 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # jmx-exporter-init downloads jmx_prometheus_javaagent.jar from GitHub
-    # releases at pod startup - see pulse-zookeeper-netpol's identical rule.
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -1147,8 +982,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8083
-    # JMX exporter javaagent - see the MONITORING note at the top of this
-    # file.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -1183,8 +1016,6 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # jmx-exporter-init downloads jmx_prometheus_javaagent.jar from GitHub
-    # releases at pod startup - see pulse-zookeeper-netpol's identical rule.
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -1231,8 +1062,6 @@ spec:
       ports:
         - protocol: TCP
           port: 6379
-    # redis_exporter sidecar - see the MONITORING note at the top of this
-    # file.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -1293,10 +1122,7 @@ spec:
           port: 53
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# Airflow Webserver - api calls it (AIRFLOW_BASE_URL); it in turn calls
-# every backing service airflow/config/pipeline_config.py wires up. Also
-# reached directly at airflow.pulse-engine.com via Ingress (see
-# ingress.yaml) for the Airflow UI.
+# Airflow Webserver
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -1325,8 +1151,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-    # statsd-exporter sidecar - see the MONITORING note at the top of this
-    # file.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -1391,10 +1215,7 @@ spec:
           port: 53
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# Airflow Scheduler - has a statsd-exporter sidecar now (see the Service in
-# svc.yaml), so ingress is no longer fully closed - Prometheus needs to
-# reach its metrics port. The scheduler process itself still receives no
-# application traffic.
+# Airflow Scheduler
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -1471,19 +1292,9 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # This scheduler runs Airflow's LocalExecutor - task instances (including
-    # every KubernetesPodOperator/run_k8s_task_pod() call in batch_downstream_dag.py,
-    # db_streaming_dag.py, api_streaming_dag.py) execute as subprocesses of this
-    # same pod, so it's this pod (not a separate Celery worker) that makes the
-    # create/list/delete pod calls directly against the Kubernetes API. Without
-    # this rule, those calls hang until urllib3's connect timeout, which
-    # surfaces as the clean/transform/analyze/db-stream/api-stream tasks
-    # repeatedly failing with "Pod ... returned a failure" / ConnectTimeoutError
-    # to 10.96.0.1:443 - verified live. Same dual-ipBlock rationale as
-    # pulse-vault-netpol/pulse-external-secrets-netpol above (kube-apiserver
-    # runs hostNetwork, and kube-proxy DNATs the ClusterIP to the node's real
-    # address before Calico's policy engine evaluates the packet, so the
-    # ClusterIP alone doesn't reliably match).
+    # LocalExecutor tasks run as subprocesses of this pod, so it makes
+    # KubernetesPodOperator's create/list/delete calls directly against the
+    # API server - needs direct egress (kube-apiserver runs hostNetwork).
     - to:
         - ipBlock:
             cidr: 10.96.0.1/32
@@ -1496,8 +1307,7 @@ spec:
           port: 8443
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# MinIO init (Job) - creates buckets on first boot, then exits. Nothing
-# calls it; it only needs to reach MinIO.
+# MinIO init (Job)
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -1534,14 +1344,7 @@ spec:
           port: 53
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# Vault - only the External Secrets Operator's main controller pod ever
-# reads from it (see vault/policies/, vault/scripts/04-apply-policies-and-
-# roles.sh). ESO's chart also deploys a cert-controller and a webhook pod
-# in kube-system - neither of those talks to Vault, so ingress is scoped to
-# the controller pod specifically (app.kubernetes.io/name: external-
-# secrets), not all of kube-system. Egress needs DNS (to resolve
-# kubernetes.default.svc for its own Kubernetes-auth TokenReview calls to
-# the API server) - nothing else; Vault itself never calls out anywhere.
+# Vault - only ESO's main controller pod reads from it.
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -1579,18 +1382,8 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # Vault's own Kubernetes auth method needs this: validating an incoming
-    # login JWT means Vault calls the TokenReview API against the cluster's
-    # own API server (auth/kubernetes/config's kubernetes_host). Without
-    # this, every login attempt fails with a generic "permission denied" -
-    # the real cause (egress blocked) doesn't surface in Vault's own logs.
-    # podSelector-based rules can't reliably target kube-apiserver (it runs
-    # hostNetwork, not as a normal pod IP Calico can match). Two ipBlocks,
-    # not one: kube-proxy DNATs kubernetes.default.svc's ClusterIP to the
-    # apiserver's real address before Calico's policy engine evaluates the
-    # packet, so the ClusterIP alone (10.96.0.1:443) doesn't reliably match -
-    # the node's own IP on the apiserver's actual --secure-port (minikube's
-    # single node, 192.168.49.2:8443) is what's actually on the wire.
+    # Vault's Kubernetes auth method validates login JWTs via the API
+    # server's TokenReview API - needs direct egress (hostNetwork).
     - to:
         - ipBlock:
             cidr: 10.96.0.1/32
@@ -1603,11 +1396,7 @@ spec:
           port: 8443
 ---
 # ─────────────────────────────────────────────────────────────────────────
-# External Secrets Operator (main controller only, see the note above) -
-# egress to Vault, plus DNS to resolve vault.vault.svc in the first place.
-# No ingress rule: nothing calls the controller pod directly - it acts as
-# a client (to Vault, to the Kubernetes API to write Secrets) rather than
-# serving requests of its own.
+# External Secrets Operator (main controller only)
 # ─────────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -1645,12 +1434,6 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # This controller writes Secret objects and calls Vault's Kubernetes
-    # auth login endpoint (which itself needs the API server to validate
-    # the JWT) - both need direct access to the API server. Same two-ipBlock
-    # rationale as pulse-vault-netpol above (kube-apiserver runs hostNetwork,
-    # and kube-proxy DNATs the ClusterIP to the node's real address before
-    # Calico's policy engine sees the packet).
     - to:
         - ipBlock:
             cidr: 10.96.0.1/32

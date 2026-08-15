@@ -1,29 +1,14 @@
 #!/bin/bash
-# Run this once, right after `terraform apply -target=kubernetes_namespace.vault`
-# (README step 2), any time you're standing the cluster back up after a
-# `terraform destroy` - and before the full `terraform apply` that installs
-# Vault's Helm release.
+# Run once, right after `terraform apply -target=kubernetes_namespace.vault`
+# and before the full `terraform apply` that installs Vault's Helm release -
+# any time the cluster comes back up after a `terraform destroy`.
 #
-# Why this is a separate manual step at all: Vault's pod mounts a Secret
-# named vault-tls unconditionally, but nothing creates that Secret
-# automatically - it was deliberately never made a Terraform resource,
-# because doing so would put the TLS private key in .tfstate (see
-# docs/SECRETS_MANAGEMENT.md's TLS section). `terraform destroy` deletes
-# the `vault` namespace, which cascades to delete everything inside it
-# INCLUDING this Secret, even though Terraform never created it and has no
-# record of it in state. So every destroy+apply cycle needs this re-run -
-# there is no way to make `terraform apply` alone bring it back without
-# giving up the "key material never touches Terraform state" property.
+# vault-tls is never a Terraform resource (that would put the private key
+# in .tfstate), so `terraform destroy` deletes it along with the `vault`
+# namespace with no way for `terraform apply` alone to recreate it.
 #
-# Reuses your existing vault.crt/vault.key if you still have them (checked
-# in the current directory, then ~/.vault-pulse/ - the same secure-storage
-# location docs/SECRETS_MANAGEMENT.md has you move them to). Only generates
-# a brand new self-signed keypair if neither is found; there's no need to
-# rotate this cert on every recreate, unlike the Vault unseal
-# keys/root token, which really do change on a genuine re-init.
-#
-# Safe to re-run - uses `apply`, not `create`, so running it again against
-# an already-current Secret is a no-op.
+# Reuses an existing vault.crt/vault.key if found (current directory, then
+# ~/.vault-pulse/); only generates a new keypair if neither exists.
 set -euo pipefail
 
 VAULT_DIR="$HOME/.vault-pulse"

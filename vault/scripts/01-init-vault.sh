@@ -1,18 +1,9 @@
 #!/bin/bash
-# Safe to re-run: if Vault is already initialized, this is a no-op. Never
-# re-initializes existing data automatically - a second `vault operator
-# init` against already-initialized storage would mint a brand-new root
-# token/unseal keys for data that's encrypted under the OLD ones, which
-# permanently locks it out. If Vault reports initialized=true but you have
-# no vault-init-output.json anywhere (current directory or ~/.vault-pulse/),
-# that data is unrecoverable - there is no safe automated fix for that.
-#
-# Writes vault-init-output.json in the current directory, containing 5
-# unseal keys and the root token, only on a genuine first run. .gitignore
-# already excludes this file, but treat that as a backstop, not the plan -
-# move it out of this directory into a password manager or offline vault
-# immediately (or ~/.vault-pulse/, which every other script here also knows
-# to check), then delete the local copy.
+# Safe to re-run: no-op if already initialized. Never re-initializes
+# existing data - a second `vault operator init` against initialized
+# storage mints new keys for data encrypted under the old ones, locking it
+# out permanently. Writes vault-init-output.json (5 unseal keys + root
+# token) only on first run - move it to secure storage immediately.
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 

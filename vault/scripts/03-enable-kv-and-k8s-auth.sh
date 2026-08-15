@@ -1,10 +1,6 @@
 #!/bin/bash
 # Run once, after Vault is initialized and unsealed. Safe to re-run - Vault
-# just reports "path is already in use" for anything already enabled.
-#
-# Logs in as root automatically, reading the token from vault-init-output.json
-# (see lib.sh) - `vault operator unseal` (02-unseal-vault.sh) does not also
-# log you in, and nothing here is typed in by hand either.
+# reports "path is already in use" for anything already enabled.
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 

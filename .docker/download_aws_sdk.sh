@@ -1,24 +1,8 @@
 #!/bin/sh
-# Build-time download of aws-java-sdk-bundle-1.12.262.jar, needed by both
-# pulse-api (mapping/map.py's Spark driver, which runs as a subprocess of
-# that container) and pulse-spark (the actual worker/executor classpath at
-# /opt/spark/external-jars/) - Hadoop's S3A connector (used by hadoop-aws,
-# already present in both images' jars/deps copies) needs it to write
-# Parquet output to MinIO. Never actually vendored anywhere in this repo -
-# verified live in both images: writes failed with NoClassDefFoundError
-# for com.amazonaws.auth.AWSCredentialsProvider without it.
-#
-# Not committed to the repo directly (~280MB, an already-compressed binary
-# git would have to carry forever) - fetched here at build time instead,
-# same reasoning as download_nltk.py/download_hf_model.py in .docker/api/.
-# Maven Central is a CDN-backed artifact registry (same reliability tier as
-# PyPI/npm), not a flaky mirror, but this is still a large file, so this
-# retries with curl's own resume support (-C -) rather than restarting from
-# zero on every transient failure, and verifies the download against Maven
-# Central's published SHA1 checksum rather than trusting a completed-
-# looking file (verified live earlier tonight, for a different dependency,
-# that a corrupted-but-complete-sized download is a real risk on this
-# network).
+# Build-time download of aws-java-sdk-bundle, needed by pulse-api and
+# pulse-spark's hadoop-aws S3A connector to write Parquet to MinIO. Not
+# committed to the repo (~280MB) - fetched here instead, with checksum
+# verification and resumable retries.
 #
 # Usage: download_aws_sdk.sh <destination-directory>
 set -eu

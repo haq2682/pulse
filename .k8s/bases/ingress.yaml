@@ -1,39 +1,16 @@
-# One Ingress, host-based routing (a separate subdomain per service, not a
-# path per service). This matters for Airflow/Spark specifically: web
-# apps like these generate links and redirects assuming they own the whole
-# path space, so putting one behind e.g. pulse-engine.com/nifi tends to
-# break its own UI (broken asset paths, redirects that drop the prefix).
-# A dedicated host avoids that entirely - each app still thinks it's being
-# accessed at "/".
+# One Ingress, host-based routing - a dedicated subdomain per service so
+# apps like Airflow/Spark that assume they own the root path work unmodified.
 #
-# TLS: a self-signed certificate for pulse-engine.com + *.pulse-engine.com
-# (one cert covers every host below) was generated locally and loaded
-# directly as a Kubernetes Secret named "pulse-tls" - it is NOT committed
-# anywhere in this repo (the private key never should be). Your browser
-# will show a "not secure" / certificate-warning page the first time you
-# visit each host - that's expected for a self-signed cert; the connection
-# is still genuinely encrypted, there's just no public CA vouching for it.
-# Regenerate it any time with:
-#
+# TLS Secret "pulse-tls" is not committed here - created directly with
+# `kubectl create secret tls`. Regenerate with:
 #   openssl req -x509 -nodes -newkey rsa:2048 -days 825 \
 #     -keyout pulse-engine.key -out pulse-engine.crt \
 #     -subj "/CN=pulse-engine.com/O=pulse-dev" \
 #     -addext "subjectAltName=DNS:pulse-engine.com,DNS:*.pulse-engine.com"
 #   kubectl create secret tls pulse-tls --cert=pulse-engine.crt --key=pulse-engine.key
 #
-# See docs/INGRESS_ACCESS.md for /etc/hosts entries, exact URLs (this
-# cluster's ingress controller is NodePort, not LoadBalancer, so the ports
-# aren't the plain 443/80 you'd normally expect), and the DBeaver/Beekeeper
-# Postgres connection details.
-#
-# NOT included here: Kafka and PostgreSQL. Ingress is an HTTP(S)-only
-# mechanism - it cannot carry Kafka's or Postgres's own binary wire
-# protocols. Postgres is exposed separately via a NodePort Service instead
-# (see svc.yaml, pulse-postgresql-external) - same docs file covers it.
-# Kafka is not exposed externally in this pass; see docs/INGRESS_ACCESS.md
-# for why and what the real options are.
-#
-# Docs: https://kubernetes.io/docs/concepts/services-networking/ingress/
+# Kafka and PostgreSQL are not routed here - Ingress is HTTP(S)-only.
+# PostgreSQL is exposed via a NodePort Service instead (see svc.yaml).
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -42,12 +19,6 @@ metadata:
   labels:
     app: pulse-ingress
   annotations:
-    # ingress-nginx's own client_max_body_size defaults to 1m - completely
-    # separate from pulse-nginx's own 10G client_max_body_size (nginx/
-    # templates/upload.conf.template) - a request has to clear BOTH nginx
-    # layers, and the controller's default silently caps it at 1m first.
-    # Verified live: a 5MB onboarding file-upload chunk 413'd here even
-    # though pulse-nginx itself was already configured to accept up to 10G.
     nginx.ingress.kubernetes.io/proxy-body-size: "10g"
 spec:
   ingressClassName: nginx
@@ -59,7 +30,6 @@ spec:
         - minio.pulse-engine.com
       secretName: pulse-tls
   rules:
-    # Main app - the nginx gateway (SPA + /api, same-origin).
     - host: pulse-engine.com
       http:
         paths:
@@ -70,8 +40,6 @@ spec:
                 name: pulse-nginx
                 port:
                   number: 80
-    # Spark Master web UI (port 8080 only - 7077 is Spark's own RPC wire
-    # protocol, not HTTP, and can't go through an Ingress either).
     - host: spark.pulse-engine.com
       http:
         paths:
@@ -92,9 +60,6 @@ spec:
                 name: pulse-airflow-webserver
                 port:
                   number: 8080
-    # MinIO console (port 9001 - the browser-facing admin UI). Port 9000
-    # (the S3 API) is also HTTP-based and technically ingress-able, but
-    # nothing browses the raw S3 API directly, so it's left internal-only.
     - host: minio.pulse-engine.com
       http:
         paths:

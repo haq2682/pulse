@@ -1,23 +1,11 @@
 #!/bin/bash
 # Reads .env and writes it into Vault, split into the same 5 logical groups
-# already used for the Kubernetes Secrets deployment.yaml expects.
+# used by deployment.yaml's Secrets. Must be run from the repo root (or
+# wherever your real .env lives).
 #
-# A few keys the app needs aren't in every .env (this project's .env.example
-# doesn't even list NIFI_SENSITIVE_PROPS_KEY - docker-compose.yml hardcodes
-# it inline instead). Where a key is missing, this script generates one
-# instead of failing, rather than blocking the whole seed on a value nobody
-# was ever asked to set: AIRFLOW_SECRET_KEY, AIRFLOW_ADMIN_PASSWORD, and
-# NIFI_SENSITIVE_PROPS_KEY get a fresh random value; AIRFLOW_ADMIN_USER
-# defaults to "admin". Rotate any of these later with `vault kv put`
-# directly - see docs/SECRETS_MANAGEMENT.md.
-#
-# Logs in as root itself (see lib.sh) rather than assuming an earlier
-# script's login is still cached in the vault-0 pod - that assumption
-# breaks silently if the pod restarts in between. Must still be run from
-# the repo root (or wherever your real .env lives) - that part isn't
-# something this script can locate on its own the way vault-init-output.json
-# can be (see lib.sh's find_vault_init_file), since there's no single
-# documented "secure" location for .env to fall back to.
+# A few keys aren't in every .env: AIRFLOW_SECRET_KEY, AIRFLOW_ADMIN_PASSWORD,
+# and NIFI_SENSITIVE_PROPS_KEY get a generated random value if missing;
+# AIRFLOW_ADMIN_USER defaults to "admin". Rotate later with `vault kv put`.
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
@@ -29,24 +17,14 @@ fi
 echo "Logging in to Vault ..."
 vault_login_as_root
 
-# Deliberately NOT `source .env` - that executes the file as bash, and .env
-# values are free-form data, not code. A value like
-# `FROM_EMAIL=Pulse Analytics Engine <someone@example.com>` is completely
-# valid .env content (and is exactly what docker-compose's own env_file
-# parser expects), but bash would try to interpret that unquoted `<` as
-# input redirection and fail. Parsing line-by-line as plain KEY=VALUE data
-# avoids that entirely.
+# Deliberately not `source .env` - .env values are free-form data (e.g.
+# unquoted `<` in an email display name), not bash code.
 set -a
 while IFS= read -r line || [[ -n "$line" ]]; do
   key="${line%%=*}"
   [[ -z "$key" || "$key" == \#* ]] && continue
-  # `IFS='=' read -r key value` (the previous approach here) silently drops
-  # a trailing `=` from value - `read` treats IFS characters as separators
-  # and discards a trailing empty field, exactly like it does trailing
-  # whitespace. That's fatal for base64 values (Fernet keys, etc.), which
-  # almost always end in `=` padding - splitting on the FIRST `=` only via
-  # parameter expansion instead preserves the rest of the line verbatim,
-  # trailing `=` included.
+  # Parameter expansion (not `IFS='=' read`) preserves a trailing `=` -
+  # fatal to drop for base64 values like Fernet keys.
   value="${line#*=}"
   # Strip one matching pair of surrounding quotes, if present.
   if [[ "$value" == \"*\" && "$value" == *\" ]]; then
