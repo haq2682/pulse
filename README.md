@@ -396,6 +396,11 @@ those 7 objects as permanently `OutOfSync` until it's installed.
 > Setup](#devops-pipeline-setup-kubernetes--gitops) above and is kept as a
 > Docker-only setup for local development, without Kubernetes, Ansible,
 > Terraform, or ArgoCD.
+>
+> To run it, check out the [`docker`](https://github.com/haq2682/pulse/tree/docker)
+> branch. The Docker Compose setup there, including the NiFi batch-mode
+> flow, runs correctly (last verified at commit `b19926a`), and that
+> branch's README contains only the Docker Compose instructions.
 
 The fastest way to run the whole stack on one machine. See [Two Ways to
 Run This](#two-ways-to-run-this) above if you're deciding between this and
