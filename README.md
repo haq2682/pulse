@@ -11,13 +11,13 @@ ReactJS and FastAPI.
 - [Tech Stack](#tech-stack)
 - [Features and Components](#features-and-components)
 - [Architecture Diagram](#architecture-diagram)
+  - [How It Works](#how-it-works)
 - [Demo Video](#demo-video)
 - [Two Ways to Run This](#two-ways-to-run-this)
 - [Common Prerequisites (Both Paths)](#common-prerequisites-both-paths)
 - [DevOps Pipeline Setup (Kubernetes + GitOps)](#devops-pipeline-setup-kubernetes--gitops)
 - [Local Development (Docker Compose)](#local-development-docker-compose)
   - [Minimum System Requirements](#minimum-system-requirements)
-  - [Environment Setup](#environment-setup)
   - [Installation](#installation)
   - [Database Setup, Migrations, and Seed Data](#database-setup-migrations-and-seed-data)
   - [Running the Project](#running-the-project)
@@ -43,36 +43,51 @@ ReactJS and FastAPI.
 - **`cleaning/`, `mapping/`, `transformation/`, `analysis/`, `machine-learning/`**
   — PySpark-based data pipeline stages
   - **Note:** The `machine-learning/` stage is currently disabled
-    project-wide. Model training produced unreliable results with
-    inconsistent accuracy scores, and the training process itself took an
-    extended amount of time, which in turn delayed completion of the
-    broader data engineering pipeline. The machine-learning code and its
-    Airflow DAG wiring remain in the repository (with the DAG registration
-    commented out) so the stage can be re-enabled once these issues are
-    resolved.
+    project-wide (inconsistent accuracy and long training times delayed the
+    rest of the pipeline). The code and its Airflow DAG wiring remain in the
+    repository, DAG registration commented out, for future re-enablement.
 - **`airflow/`** — DAGs for batch, streaming, and ML-retrain orchestration
-- **`nifi/`** — data ingestion flow templates
-  - **Note:** Apache NiFi has been disabled in the current data ingestion
-    architecture. Source files are now uploaded directly from the React
-    frontend to MinIO object storage buckets, bypassing the NiFi flow
-    described here. The NiFi flow templates and their local-development
-    setup instructions remain documented below for local-development and
-    historical reference.
+- **`nifi/`** — data ingestion flow templates for batch-mode ingestion
 - **CDC ingestion via Debezium**, supporting PostgreSQL, MySQL, MariaDB,
   MongoDB, SQL Server, Oracle, Db2, Vitess, Spanner, and Informix as
   external source connectors. Cassandra is not supported by the system.
 - **Reverse proxy / TLS termination** via Nginx
 - **`.ansible/`, `terraform/`, `.k8s/`, `vault/`** — the production-style
-  deployment path: a single Ansible playbook provisions a host all the way
-  up to a running Minikube cluster, Terraform installs every piece of
-  cluster infrastructure via Helm, and ArgoCD then keeps the `production`
-  namespace continuously in sync with `.k8s/bases` straight from this repo.
-  See [DevOps Pipeline Setup](#devops-pipeline-setup-kubernetes--gitops)
+  deployment path: Ansible provisions a host up to a running Minikube
+  cluster, Terraform installs every piece of cluster infrastructure via
+  Helm, and ArgoCD keeps the `production` namespace continuously in sync
+  with `.k8s/bases`. See [DevOps Pipeline Setup](#devops-pipeline-setup-kubernetes--gitops)
   below.
 
 ## Architecture Diagram
 
 ![Architecture-Diagram](frontend/src/assets/Architecture-Diagram.png)
+
+### How It Works
+
+1. **Ingestion.** The React frontend is the single entry point for data, and
+   offers two ways in. For **batch** uploads, files (`.csv`, `.json`,
+   `.xlsx`, `.parquet`) are routed through Apache NiFi, which writes them
+   into MinIO. For **streaming** sources, the frontend takes a database URI
+   or an external API URL; Debezium captures changes directly from the
+   database (CDC) and publishes them as Apache Kafka topics for Spark to
+   consume.
+
+2. **Processing.** Apache Spark reads from both MinIO and Kafka and runs
+   the full data pipeline — mapping, cleaning, transformation, analytics,
+   and forecasts/predictions — writing its results back to MinIO. Apache
+   Airflow orchestrates these Spark and Kafka jobs: scheduling, retry
+   logic, drift checks, and model retraining.
+
+3. **API and state.** FastAPI is the application backend. It reads and
+   writes MinIO for pipeline and analytics data, PostgreSQL for application
+   state and user data, and Redis as a cache for fast data retrieval. It
+   exposes a REST API to the frontend and pushes live updates to it over a
+   Socket.io-based real-time layer.
+
+4. **Frontend.** ReactJS drives both ingestion paths, calls the FastAPI
+   REST API for everything else, and receives real-time updates so
+   dashboards and pipeline status stay current without polling.
 
 ## Demo Video
 
@@ -94,13 +109,9 @@ it's deployed and operated.
 
 ## Common Prerequisites (Both Paths)
 
-The two steps below were previously documented only under [Local
-Development](#local-development-docker-compose). They are relocated here
-because both the DevOps/Kubernetes path and the Docker Compose path depend
-on them: the Vault bootstrap step in [DevOps Pipeline
-Setup](#devops-pipeline-setup-kubernetes--gitops) seeds every application
-secret directly from the same `.env` file created below, and both paths use
-the same MinIO buckets.
+Both the Docker Compose and Kubernetes paths depend on the same `.env` file
+(the Vault bootstrap step below seeds every application secret from it) and
+the same MinIO buckets, so they're documented once here.
 
 ### Environment Variables (`.env`)
 
@@ -113,10 +124,8 @@ the same MinIO buckets.
 2. Fill in the variables that have **no default anywhere in the codebase**:
    `SECRET_KEY`, `NIFI_ADMIN_USER`, `NIFI_ADMIN_PASSWORD`,
    `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`. (`NIFI_ADMIN_USER` /
-   `NIFI_ADMIN_PASSWORD` only matter if you're also running the legacy
-   Docker Compose NiFi flow — see the note under [Features and
-   Components](#features-and-components) — but the variables must still be
-   present in `.env` for `docker compose` to start cleanly.)
+   `NIFI_ADMIN_PASSWORD` are used to log into the NiFi UI — see
+   [Importing the NiFi batch-mode flow](#importing-the-nifi-batch-mode-flow).)
 
    Also set `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DATABASE_NAME`,
    and `POSTGRES_SERVER` — these are required for the API to start
@@ -219,15 +228,13 @@ Check `inventory.ini` matches your actual host/user first (it targets
 
 ```bash
 cd terraform
-terraform init
 terraform apply -target=kubernetes_namespace.vault
 cd ..
 ```
 
-Only the `vault` namespace first, on its own - Vault's pod mounts a TLS
-certificate Secret unconditionally (next step), which has to already exist
-in that namespace before Vault's own Helm release ever installs, or its
-pod fails to start at all.
+Only the `vault` namespace is created first — Vault's Helm release mounts a
+TLS Secret unconditionally, so that Secret must already exist in the
+namespace before the release installs, or Vault's pod fails to start.
 
 ```bash
 openssl req -x509 -nodes -newkey rsa:2048 -days 825 \
@@ -237,20 +244,16 @@ openssl req -x509 -nodes -newkey rsa:2048 -days 825 \
 kubectl create secret tls vault-tls -n vault --cert=vault.crt --key=vault.key
 ```
 
-Move `vault.key`/`vault.crt` out of the repo directory afterward, same
-treatment as every other bootstrap secret here - see
-`docs/SECRETS_MANAGEMENT.md`'s TLS section for the full detail (including
-why `global.tlsDisable` alone doesn't work and what would silently break
-if this cert - or the Vault `storage` stanza next to it in
-`terraform/resource.tf` - were handled naively).
+Move `vault.key`/`vault.crt` out of the repo directory afterward (same
+treatment as every other bootstrap secret here) — see
+`docs/SECRETS_MANAGEMENT.md` for the full TLS architecture.
 
-The `vault-tls` Secret above is not a Terraform resource (deliberately -
-see that same section for why), so `terraform destroy` deletes it along
-with the `vault` namespace every time. On a repeat pass through this step,
-`vault/scripts/recreate-vault-tls.sh` replaces the manual `openssl`/`kubectl
-create` pair above - it reuses your existing `vault.key`/`vault.crt` from
-`~/.vault-pulse/` if you still have them, only generating a new pair if
-neither is found.
+This Secret is deliberately not a Terraform resource, so `terraform destroy`
+removes it along with the `vault` namespace every time. On a repeat pass
+through this step, use `vault/scripts/recreate-vault-tls.sh` instead of the
+manual `openssl`/`kubectl create` pair above — it reuses your existing
+`vault.key`/`vault.crt` from `~/.vault-pulse/` if you still have them, only
+generating a new pair if neither is found.
 
 Now the rest of the infrastructure:
 
@@ -351,11 +354,11 @@ something is pushed, `.k8s/bases` doesn't exist on the `main` branch that
 kubectl apply -f .k8s/argocd/argocd.yaml
 ```
 
-This creates the `production` namespace (via `CreateNamespace=true`) and
-starts syncing every object in `.k8s/bases` into it - roughly 90 objects on
-first sync: 14 Deployments, 2 Jobs, 15 Services, PVCs, the HPAs, the
-NetworkPolicies, the ExternalSecrets that pull real values out of Vault, and
-the ServiceMonitors that wire everything up to Prometheus. `selfHeal: true`
+This creates the `production` namespace (`CreateNamespace=true`) and starts
+syncing every object in `.k8s/bases` into it - roughly 90 objects on first
+sync, including Deployments, Jobs, Services, PVCs, HPAs, NetworkPolicies,
+the ExternalSecrets that pull real values out of Vault, and the
+ServiceMonitors that wire everything up to Prometheus. `selfHeal: true`
 means any manual `kubectl edit`/`delete` against these resources gets
 reverted back to what's in git on the next sync - this repo, not `kubectl`,
 is meant to be the source of truth from this point on.
@@ -390,11 +393,9 @@ those 7 objects as permanently `OutOfSync` until it's installed.
 ## Local Development (Docker Compose)
 
 > **Legacy:** This path predates the [DevOps Pipeline
-> Setup](#devops-pipeline-setup-kubernetes--gitops) above and is kept here
-> as a legacy, docker-only setup path — it is not the primary way this
-> project is intended to be deployed going forward. If you only want to run
-> this project with plain Docker / Docker Compose, without Kubernetes,
-> Ansible, Terraform, or ArgoCD, follow the instructions in this section.
+> Setup](#devops-pipeline-setup-kubernetes--gitops) above and is kept as a
+> Docker-only setup for local development, without Kubernetes, Ansible,
+> Terraform, or ArgoCD.
 
 The fastest way to run the whole stack on one machine. See [Two Ways to
 Run This](#two-ways-to-run-this) above if you're deciding between this and
@@ -409,12 +410,8 @@ the full Kubernetes pipeline.
   `8080`, `7077`, `4040`, `2181`, `9092`, `8083`, `6379`, `8081`, `10000`,
   `8443`, `8090`, plus configurable Nginx ports (defaults `8082` / `9443`)
 
-### Environment Setup
-
-This step has moved to [Common Prerequisites (Both
-Paths)](#common-prerequisites-both-paths) → Environment Variables above,
-since the DevOps/Kubernetes path depends on the same `.env` file. Complete
-that section first, then continue with Installation below.
+Environment setup is covered above in [Common Prerequisites (Both
+Paths)](#common-prerequisites-both-paths) — complete that section first.
 
 ### Installation
 
@@ -443,7 +440,7 @@ npm ci
 
 ### Database Setup, Migrations, and Seed Data
 
-### PostgreSQL initialization
+#### PostgreSQL initialization
 
 PostgreSQL is initialized automatically on first container start.
 `.docker/postgresql/Dockerfile` copies each file in `sql/` into
@@ -465,7 +462,7 @@ scripts in alphabetical filename order. `add_api_url_column.sql` and
 `schema.sql` creates. On a fresh database, these two files will attempt to
 run before their target tables exist.
 
-### Debezium user creation
+#### Debezium user creation
 
 `sql/create_debezium_user.sh` would normally run as part of
 `/docker-entrypoint-initdb.d/` (alphabetically between
@@ -504,18 +501,17 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
     GRANT SELECT ON TABLES TO debezium_user;
 ```
 
-### Schema migrations
+#### Schema migrations
 
 There is no migration framework (e.g. Alembic) in use. `sql/add_*.sql`
 files are plain incremental patches — despite being auto-copied into the
-init directory above, they appear (per their own header comments) to be
-intended for manual application against an *existing* database, not for
-fresh-init use.
+init directory above, they are intended for manual application against an
+*existing* database, not fresh-init use.
 
-### Airflow metadata database
+#### Airflow metadata database
 
 Airflow's own metadata database is initialized by the `airflow-init`
-service in `docker compose.yml`:
+service in `docker-compose.yml`:
 
 ```bash
 airflow db migrate
@@ -524,30 +520,30 @@ airflow connections create-default-connections
 airflow users create --username ${AIRFLOW_ADMIN_USER:-admin} --password ${AIRFLOW_ADMIN_PASSWORD:-admin} --firstname Pulse --lastname Admin --role Admin --email admin@pulse.local
 ```
 
-### Seed data
+#### Seed data
 
 Synthetic e-commerce data lives in `faker/*.xlsx`, generated via the
 `faker/faker.ipynb` notebook.
 
 ### Running the Project
 
-### Full stack — first-time setup
+#### Full stack — first-time setup
 
 1. Build the shared `python-py310` base image first. The `api`,
    `spark_master`, and `airflow` Dockerfiles all build `FROM python-py310`,
    so it must exist before the other images can build:
-   
+
    ```bash
    docker compose up -d --build python
    ```
 
 2. Build and start the rest of the stack:
-   
+
    ```bash
    docker compose up -d --build
    ```
-   
-   This brings up every service defined in `docker compose.yml`, including
+
+   This brings up every service defined in `docker-compose.yml`, including
    the API, frontend, `python` worker (port 5000), PostgreSQL, MinIO,
    Spark, Kafka, Zookeeper, Debezium, Redis, NiFi, Airflow, and Nginx.
 
@@ -558,7 +554,7 @@ Synthetic e-commerce data lives in `faker/*.xlsx`, generated via the
    the `kubectl port-forward` step there doesn't apply).
 
 4. Make the worker startup scripts executable:
-   
+
    ```bash
    chmod +x bash/*.sh
    ```
@@ -566,7 +562,7 @@ Synthetic e-commerce data lives in `faker/*.xlsx`, generated via the
 5. Start a Spark worker. Before running, open the script and adjust
    `SPARK_WORKER_CORES` / `SPARK_WORKER_MEMORY` to match your host's
    available resources:
-   
+
    ```bash
    ./bash/start_worker_linux.sh   # Linux
    ./bash/start_worker.sh         # Windows (Git Bash)
@@ -575,7 +571,7 @@ Synthetic e-commerce data lives in `faker/*.xlsx`, generated via the
 6. Import and configure the NiFi batch-mode flow (see the two subsections
    below).
 
-### Importing the NiFi batch-mode flow
+#### Importing the NiFi batch-mode flow
 
 Open the NiFi UI at `http://localhost:8081/nifi` and log in with
 `NIFI_ADMIN_USER` / `NIFI_ADMIN_PASSWORD` from `.env`.
@@ -596,7 +592,7 @@ Open the NiFi UI at `http://localhost:8081/nifi` and log in with
    confirm the import.
 4. The `pulse_batch_mode` process group appears on the canvas.
 
-### Configuring the flow's controller services
+#### Configuring the flow's controller services
 
 After import, all 13 controller services defined in the flow start in a
 **disabled** state, and sensitive properties (passwords, secret keys) are
@@ -619,7 +615,7 @@ Enable the services with no dependencies first (`DBCPConnectionPool`,
 then the rest. You can also select all services and use the lightning-bolt
 **Enable** action, retrying once the dependency services report valid.
 
-### Subsequent startups
+#### Subsequent startups
 
 Once the images are built and the buckets are seeded, you don't need to
 repeat the steps above — just bring the stack back up:
@@ -656,19 +652,19 @@ This purges all `ecom.*` Kafka topics.
 ### Troubleshooting
 
 - **Verify Debezium is running:**
-  
+
   ```bash
   curl http://localhost:8083/
   ```
 
 - **Verify Nginx health:**
-  
+
   ```bash
   curl http://localhost:8082/health
   ```
 
 - **Confirm Redis is running:**
-  
+
   ```bash
   docker ps | grep redis
   ```
