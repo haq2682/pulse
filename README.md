@@ -6,18 +6,24 @@ analytics, insights, predictions, and forecasts from it. It is built on a
 Big Data stack — Python and Apache Spark are the core frameworks — alongside
 ReactJS and FastAPI.
 
+> **Branch:** This `docker` branch contains the Docker Compose setup. The
+> Kubernetes + GitOps deployment pipeline is on the `main` branch.
+
 ## Table of Contents
 
 - [Tech Stack](#tech-stack)
 - [Features and Components](#features-and-components)
-- [Minimum System Requirements](#minimum-system-requirements)
-- [Environment Setup](#environment-setup)
-- [Installation](#installation)
-- [Database Setup, Migrations, and Seed Data](#database-setup-migrations-and-seed-data)
-- [Running the Project](#running-the-project)
-- [Tests](#tests)
-- [Cleanup](#cleanup)
-- [Troubleshooting](#troubleshooting)
+- [Architecture Diagram](#architecture-diagram)
+  - [How It Works](#how-it-works)
+- [Demo Video](#demo-video)
+- [Prerequisites](#prerequisites)
+- [Local Development (Docker Compose)](#local-development-docker-compose)
+  - [Minimum System Requirements](#minimum-system-requirements)
+  - [Installation](#installation)
+  - [Database Setup, Migrations, and Seed Data](#database-setup-migrations-and-seed-data)
+  - [Running the Project](#running-the-project)
+  - [Cleanup](#cleanup)
+  - [Troubleshooting](#troubleshooting)
 
 ## Tech Stack
 
@@ -28,7 +34,7 @@ ReactJS and FastAPI.
 | Storage             | PostgreSQL (Bitnami image), MinIO (S3-compatible object storage), Redis 7                                                                                 |
 | ML / NLP            | sentence-transformers, spaCy, gensim, torch (CPU build), google-generativeai (Gemini)                                                                     |
 | Frontend            | React 19, Vite, Tailwind CSS 4, PrimeReact, Chart.js, axios, react-router 7                                                                               |
-| Infra               | Docker Compose, Nginx (reverse proxy / TLS), Node 25 (frontend build stage), Java 17/21 (Spark / Debezium base images)                                    |
+| Local dev infra     | Docker Compose, Nginx (reverse proxy / TLS), Node 25 (frontend build stage), Java 17/21 (Spark / Debezium base images)                                    |
 
 ## Features and Components
 
@@ -37,33 +43,65 @@ ReactJS and FastAPI.
 - **`cleaning/`, `mapping/`, `transformation/`, `analysis/`, `machine-learning/`**
   — PySpark-based data pipeline stages
 - **`airflow/`** — DAGs for batch, streaming, and ML-retrain orchestration
-- **`nifi/`** — data ingestion flow templates
+- **`nifi/`** — data ingestion flow templates for batch-mode ingestion
 - **CDC ingestion via Debezium**, supporting PostgreSQL, MySQL, MariaDB,
   MongoDB, SQL Server, Oracle, Db2, Vitess, Spanner, and Informix as
   external source connectors. Cassandra is not supported by the system.
 - **Reverse proxy / TLS termination** via Nginx
 
-## Minimum System Requirements
+## Architecture Diagram
 
-- **Docker / Docker Compose**: The entire tech stack runs on Docker and Docker Compose.
-- **OS:** Linux and MacOS are preferred, but the system can run on Windows as well.
-- **RAM & CPU:** At least 8GB RAM, requires tweaking of resources being used by Spark Workers and Apache NiFi. 16GB RAM is Recommended. At least 4 Cores of CPU are required. 8 Cores of CPU are recommended.
-- **Required host ports:** `5173`, `8000`, `5000`, `5432`, `9000`, `9001`,
-  `8080`, `7077`, `4040`, `2181`, `9092`, `8083`, `6379`, `8081`, `10000`,
-  `8443`, `8090`, plus configurable Nginx ports (defaults `8082` / `9443`)
+![Architecture-Diagram](https://raw.githubusercontent.com/haq2682/pulse/main/frontend/src/assets/Architecture-Diagram.png)
 
-## Environment Setup
+### How It Works
+
+1. **Ingestion.** The React frontend is the single entry point for data, and
+   offers two ways in. For **batch** uploads, files (`.csv`, `.json`,
+   `.xlsx`, `.parquet`) are routed through Apache NiFi, which writes them
+   into MinIO. For **streaming** sources, the frontend takes a database URI
+   or an external API URL; Debezium captures changes directly from the
+   database (CDC) and publishes them as Apache Kafka topics for Spark to
+   consume.
+
+2. **Processing.** Apache Spark reads from both MinIO and Kafka and runs
+   the full data pipeline — mapping, cleaning, transformation, analytics,
+   and forecasts/predictions — writing its results back to MinIO. Apache
+   Airflow orchestrates these Spark and Kafka jobs: scheduling, retry
+   logic, drift checks, and model retraining.
+
+3. **API and state.** FastAPI is the application backend. It reads and
+   writes MinIO for pipeline and analytics data, PostgreSQL for application
+   state and user data, and Redis as a cache for fast data retrieval. It
+   exposes a REST API to the frontend and pushes live updates to it over a
+   Socket.io-based real-time layer.
+
+4. **Frontend.** ReactJS drives both ingestion paths, calls the FastAPI
+   REST API for everything else, and receives real-time updates so
+   dashboards and pipeline status stay current without polling.
+
+## Demo Video
+
+[Here is the demo video of the project](https://drive.google.com/file/d/1Xn2pFmHivepc7J7pFdRFfa6-qEpxTLCD/view?usp=sharing)
+
+## Prerequisites
+
+The Docker Compose stack reads its configuration from a `.env` file and
+stores data in MinIO buckets. Complete the steps below before starting it.
+
+### Environment Variables (`.env`)
 
 1. Copy the environment template:
-   
+
    ```bash
    cp .env.example .env
    ```
 
 2. Fill in the variables that have **no default anywhere in the codebase**:
    `SECRET_KEY`, `NIFI_ADMIN_USER`, `NIFI_ADMIN_PASSWORD`,
-   `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`.
-   
+   `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`. (`NIFI_ADMIN_USER` /
+   `NIFI_ADMIN_PASSWORD` are used to log into the NiFi UI — see
+   [Importing the NiFi batch-mode flow](#importing-the-nifi-batch-mode-flow).)
+
    Also set `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DATABASE_NAME`,
    and `POSTGRES_SERVER` — these are required for the API to start
    (`api/config.py` has no default for them), even though
@@ -72,11 +110,11 @@ ReactJS and FastAPI.
    pipeline code path.
 
 3. Generate secrets:
-   
+
    ```bash
    # SECRET_KEY
    python -c "import secrets; print(secrets.token_hex(32))"
-   
+
    # AIRFLOW_FERNET_KEY
    python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
    ```
@@ -86,12 +124,57 @@ ReactJS and FastAPI.
    token.
 
 5. If you plan to use the Debezium Oracle or Spanner connectors, place the
-   required files **before** the first `docker compose up`:
-   
+   required files **before** first bringing the stack up:
+
    - Oracle: `jars/ojdbc8.jar`
    - Spanner: `jars/gcp-credentials.json`
 
-## Installation
+### MinIO Bucket Initialization
+
+The `minio-init` Compose service creates `pulse-bucket-1`,
+`pulse-test-bucket`, and `pulse-checkpoints` automatically on startup. The
+commands below point the `mc` CLI at MinIO and seed sample data, which is
+not automated.
+
+1. Point the MinIO client at the running MinIO instance (replace the
+   placeholders with your `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` values
+   from `.env`):
+
+   ```bash
+   mc alias set local http://localhost:9000 <MINIO_ROOT_USER> <MINIO_ROOT_PASSWORD>
+   ```
+
+2. Create the buckets manually if needed (normally a no-op confirmation,
+   since they are already created on startup):
+
+   ```bash
+   mc mb --ignore-existing local/pulse-bucket-1
+   mc mb --ignore-existing local/pulse-checkpoints
+   ```
+
+3. Seed the bucket with the sample data shipped in this repo:
+
+   ```bash
+   mc cp --recursive ./buckets/pulse-bucket-1 local/pulse-bucket-1
+   ```
+
+## Local Development (Docker Compose)
+
+Runs the whole stack on one machine with Docker Compose.
+
+### Minimum System Requirements
+
+- **Docker / Docker Compose**: The entire tech stack runs on Docker and Docker Compose.
+- **OS:** Linux and MacOS are preferred, but the system can run on Windows as well.
+- **RAM & CPU:** At least 8GB RAM, requires tweaking of resources being used by Spark Workers and Apache NiFi. 16GB RAM is Recommended. At least 4 Cores of CPU are required. 8 Cores of CPU are recommended.
+- **Required host ports:** `5173`, `8000`, `5000`, `5432`, `9000`, `9001`,
+  `8080`, `7077`, `4040`, `2181`, `9092`, `8083`, `6379`, `8081`, `10000`,
+  `8443`, `8090`, plus configurable Nginx ports (defaults `8082` / `9443`)
+
+Environment setup is covered in [Prerequisites](#prerequisites) — complete
+that section first.
+
+### Installation
 
 Dependencies are installed automatically as part of the Docker image build
 — no separate manual install step is required for the containerized
@@ -116,9 +199,9 @@ cd frontend
 npm ci
 ```
 
-## Database Setup, Migrations, and Seed Data
+### Database Setup, Migrations, and Seed Data
 
-### PostgreSQL initialization
+#### PostgreSQL initialization
 
 PostgreSQL is initialized automatically on first container start.
 `.docker/postgresql/Dockerfile` copies each file in `sql/` into
@@ -140,7 +223,7 @@ scripts in alphabetical filename order. `add_api_url_column.sql` and
 `schema.sql` creates. On a fresh database, these two files will attempt to
 run before their target tables exist.
 
-### Debezium user creation
+#### Debezium user creation
 
 `sql/create_debezium_user.sh` would normally run as part of
 `/docker-entrypoint-initdb.d/` (alphabetically between
@@ -179,18 +262,17 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
     GRANT SELECT ON TABLES TO debezium_user;
 ```
 
-### Schema migrations
+#### Schema migrations
 
 There is no migration framework (e.g. Alembic) in use. `sql/add_*.sql`
 files are plain incremental patches — despite being auto-copied into the
-init directory above, they appear (per their own header comments) to be
-intended for manual application against an *existing* database, not for
-fresh-init use.
+init directory above, they are intended for manual application against an
+*existing* database, not fresh-init use.
 
-### Airflow metadata database
+#### Airflow metadata database
 
 Airflow's own metadata database is initialized by the `airflow-init`
-service in `docker compose.yml`:
+service in `docker-compose.yml`:
 
 ```bash
 airflow db migrate
@@ -199,76 +281,56 @@ airflow connections create-default-connections
 airflow users create --username ${AIRFLOW_ADMIN_USER:-admin} --password ${AIRFLOW_ADMIN_PASSWORD:-admin} --firstname Pulse --lastname Admin --role Admin --email admin@pulse.local
 ```
 
-### Seed data
+#### Seed data
 
 Synthetic e-commerce data lives in `faker/*.xlsx`, generated via the
 `faker/faker.ipynb` notebook.
 
-## Running the Project
+### Running the Project
 
-### Full stack — first-time setup
+#### Full stack — first-time setup
 
 1. Build the shared `python-py310` base image first. The `api`,
    `spark_master`, and `airflow` Dockerfiles all build `FROM python-py310`,
    so it must exist before the other images can build:
-   
+
    ```bash
    docker compose up -d --build python
    ```
 
 2. Build and start the rest of the stack:
-   
+
    ```bash
    docker compose up -d --build
    ```
-   
-   This brings up every service defined in `docker compose.yml`, including
+
+   This brings up every service defined in `docker-compose.yml`, including
    the API, frontend, `python` worker (port 5000), PostgreSQL, MinIO,
    Spark, Kafka, Zookeeper, Debezium, Redis, NiFi, Airflow, and Nginx.
 
-3. Point the MinIO client at the running MinIO instance (replace the
-   placeholders with your `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` values
-   from `.env`):
-   
-   ```bash
-   mc alias set local http://localhost:9000 <MINIO_ROOT_USER> <MINIO_ROOT_PASSWORD>
-   ```
+3. Point the MinIO client at the running instance, confirm the buckets
+   exist, and seed sample data — see [Prerequisites](#prerequisites) →
+   MinIO Bucket Initialization above.
 
-4. Create the buckets the pipeline expects. The `minio-init` service
-   already creates `pulse-bucket-1`, `pulse-test-bucket`, and
-   `pulse-checkpoints` automatically on startup, so these commands are
-   normally just a no-op confirmation:
-   
-   ```bash
-   mc mb local/pulse-bucket-1
-   mc mb local/pulse-checkpoints
-   ```
+4. Make the worker startup scripts executable:
 
-5. Seed the bucket with the sample data shipped in this repo:
-   
-   ```bash
-   mc cp --recursive ./buckets/pulse-bucket-1 local/pulse-bucket-1
-   ```
-
-6. Make the worker startup scripts executable:
-   
    ```bash
    chmod +x bash/*.sh
    ```
 
-7. Start a Spark worker. Before running, open the script and adjust
+5. Start a Spark worker. Before running, open the script and adjust
    `SPARK_WORKER_CORES` / `SPARK_WORKER_MEMORY` to match your host's
    available resources:
-   
+
    ```bash
    ./bash/start_worker_linux.sh   # Linux
    ./bash/start_worker.sh         # Windows (Git Bash)
    ```
 
-8. Import and configure the NiFi batch-mode flow (see the two subsections
+6. Import and configure the NiFi batch-mode flow (see the two subsections
    below).
 
-### Importing the NiFi batch-mode flow
+#### Importing the NiFi batch-mode flow
 
 Open the NiFi UI at `http://localhost:8081/nifi` and log in with
 `NIFI_ADMIN_USER` / `NIFI_ADMIN_PASSWORD` from `.env`.
@@ -289,7 +351,7 @@ Open the NiFi UI at `http://localhost:8081/nifi` and log in with
    confirm the import.
 4. The `pulse_batch_mode` process group appears on the canvas.
 
-### Configuring the flow's controller services
+#### Configuring the flow's controller services
 
 After import, all 13 controller services defined in the flow start in a
 **disabled** state, and sensitive properties (passwords, secret keys) are
@@ -312,7 +374,7 @@ Enable the services with no dependencies first (`DBCPConnectionPool`,
 then the rest. You can also select all services and use the lightning-bolt
 **Enable** action, retrying once the dependency services report valid.
 
-### Subsequent startups
+#### Subsequent startups
 
 Once the images are built and the buckets are seeded, you don't need to
 repeat the steps above — just bring the stack back up:
@@ -329,7 +391,7 @@ docker compose build airflow-webserver airflow-scheduler
 docker compose up -d airflow-webserver airflow-scheduler
 ```
 
-## Cleanup
+### Cleanup
 
 The standard Compose command would be:
 
@@ -346,22 +408,22 @@ first**, then run:
 
 This purges all `ecom.*` Kafka topics.
 
-## Troubleshooting
+### Troubleshooting
 
 - **Verify Debezium is running:**
-  
+
   ```bash
   curl http://localhost:8083/
   ```
 
 - **Verify Nginx health:**
-  
+
   ```bash
   curl http://localhost:8082/health
   ```
 
 - **Confirm Redis is running:**
-  
+
   ```bash
   docker ps | grep redis
   ```
